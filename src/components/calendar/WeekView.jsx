@@ -838,10 +838,11 @@ const WeekView = ({
                             const BAR_HEIGHT = 26;
                             const BAR_GAP = 6;
 
-                            const weekTasks = (Array.isArray(todos) ? todos : []).filter((t) => {
+                            const weekTasks = (Array.isArray(events) ? events : []).filter((t) => {
                               try {
-                                const s = t.startDate || t.start_date || t.date || t.dueDate || t.due_date || null;
-                                const e = t.endDate || t.end_date || t.date || t.dueDate || t.due_date || s || null;
+                                if (String(t?.kind || "").toLowerCase() === "appointment") return false;
+                                const s = t.start || t.startAt || t.start_at || t.startDate || t.start_date || null;
+                                const e = t.end || t.endAt || t.end_at || t.endDate || t.end_date || null;
                                 const sDt = s ? new Date(s) : null;
                                 const eDt = e ? new Date(e) : null;
                                 if (!sDt || !eDt) return false;
@@ -860,8 +861,8 @@ const WeekView = ({
 
                             const normalized = weekTasks
                               .map((t) => {
-                                const s = t.startDate || t.start_date || t.date || t.dueDate || t.due_date || null;
-                                const e = t.endDate || t.end_date || t.date || t.dueDate || t.due_date || s || null;
+                                const s = t.start || t.startAt || t.start_at || t.startDate || t.start_date || null;
+                                const e = t.end || t.endAt || t.end_at || t.endDate || t.end_date || null;
                                 const sDt = s ? new Date(s) : null;
                                 const eDt = e ? new Date(e) : null;
                                 if (!sDt || !eDt) return null;
@@ -963,16 +964,9 @@ const WeekView = ({
                                     return (
                                       <div
                                         key={`allday-${t.id}-${i}`}
-                                        draggable
-                                        onDragStart={(e) => {
-                                          try {
-                                            e.dataTransfer.setData("taskId", String(t.id));
-                                            const durMs = entry.eEnd.getTime() - entry.sStart.getTime();
-                                            e.dataTransfer.setData("durationMs", String(Math.max(0, durMs)));
-                                            e.dataTransfer.effectAllowed = "move";
-                                          } catch {}
+                                        onClick={() => {
+                                          if (onEventClick) onEventClick(t);
                                         }}
-                                        onClick={() => onTaskClick && onTaskClick(String(t.id))}
                                         className={`absolute left-0 rounded px-2 text-xs overflow-hidden cursor-pointer ${bgClass || ""}`}
                                         style={barStyle}
                                         title={t.title || t.name}
@@ -1064,7 +1058,7 @@ const WeekView = ({
                                                   className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50"
                                                   onClick={() => {
                                                     setAllDayOverflow(null);
-                                                    onTaskClick && onTaskClick(String(it.id));
+                                                    if (onEventClick) onEventClick(it);
                                                   }}
                                                 >
                                                   {it.title || it.name || "Untitled"}
@@ -1286,6 +1280,14 @@ const WeekView = ({
                                   const evStart = parseDate(ev.start);
                                   const evEnd = parseDate(ev.end);
                                   if (!evStart) return null;
+                                  if (ev?.allDay) return null;
+
+                                  const endForSpan = evEnd || evStart;
+                                  const startDay = new Date(evStart.getFullYear(), evStart.getMonth(), evStart.getDate(), 0, 0, 0, 0);
+                                  const endDay = new Date(endForSpan.getFullYear(), endForSpan.getMonth(), endForSpan.getDate(), 0, 0, 0, 0);
+                                  const dayDiff = Math.floor((endDay.getTime() - startDay.getTime()) / (24 * 60 * 60 * 1000));
+                                  if (dayDiff >= 1) return null;
+
                                   if (
                                     evStart.getFullYear() !== date.getFullYear() ||
                                     evStart.getMonth() !== date.getMonth() ||

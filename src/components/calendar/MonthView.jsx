@@ -6,7 +6,7 @@ import React, {
   useMemo,
 } from "react";
 import { useCalendarPreferences } from "../../hooks/useCalendarPreferences";
-import { FaChevronLeft, FaChevronRight, FaChevronDown } from "react-icons/fa";
+import { FaChevronLeft, FaChevronRight, FaChevronDown, FaPlus } from "react-icons/fa";
 import { FaEdit, FaTrash } from "react-icons/fa";
 
 // Memoized small renderers to avoid re-renders during MonthView updates
@@ -110,6 +110,7 @@ const RangeTaskBar = React.memo(function RangeTaskBar({
   tailwindColorCache,
   getContrastTextColor,
   onTaskClick,
+  onEventClick,
 }) {
   try {
     if (r.lane == null) return null;
@@ -188,7 +189,8 @@ const RangeTaskBar = React.memo(function RangeTaskBar({
         title={r.task?.title}
         onClick={(e) => {
           e.stopPropagation();
-          if (typeof onTaskClick === "function") onTaskClick(r.task);
+          if (typeof onEventClick === "function") onEventClick(r.task);
+          else if (typeof onTaskClick === "function") onTaskClick(r.task);
         }}
       >
         <span className="shrink-0 text-xs" style={{ pointerEvents: "none" }}>
@@ -458,9 +460,15 @@ export default function MonthView({
       const ev = src[ei];
       if (ev.taskId || !ev.start) continue;
       try {
+        if (ev?.allDay) continue;
         const startLocal = toLocal(ev.start);
         const endLocal = ev.end ? toLocal(ev.end) : new Date(startLocal.getTime() + 30 * 60000);
         if (!endLocal || endLocal <= startLocal) continue;
+
+        const startDay = new Date(startLocal.getFullYear(), startLocal.getMonth(), startLocal.getDate(), 0, 0, 0, 0);
+        const endDay = new Date(endLocal.getFullYear(), endLocal.getMonth(), endLocal.getDate(), 0, 0, 0, 0);
+        const dayDiff = Math.floor((endDay.getTime() - startDay.getTime()) / (24 * 60 * 60 * 1000));
+        if (dayDiff >= 1) continue;
 
         let cur = new Date(startLocal);
         cur.setMinutes(Math.floor(cur.getMinutes() / 30) * 30, 0, 0);
@@ -506,9 +514,10 @@ export default function MonthView({
 
   const buildRangeTasks = useMemo(() => {
     const ranges = [];
-    (Array.isArray(todos) ? todos : []).forEach((t) => {
-      const sIso = t.startDate || t.dueDate || t.endDate || null;
-      const eIso = t.endDate || t.dueDate || t.startDate || null;
+    (Array.isArray(events) ? events : []).forEach((t) => {
+      if (String(t?.kind || "").toLowerCase() === "appointment") return;
+      const sIso = t.start || t.startAt || t.start_at || t.startDate || t.start_date || null;
+      const eIso = t.end || t.endAt || t.end_at || t.endDate || t.end_date || null;
       let s = parseDateOnly(sIso);
       let e = parseEndDateInclusive(eIso);
       if (!s && !e) return;
@@ -520,11 +529,8 @@ export default function MonthView({
       if (!s) s = e;
       if (!e) e = s;
 
-      const isSingleDay = s.getTime() === e.getTime();
-      const hasStartTime = !!t.startDate;
-      if (isSingleDay && hasStartTime) return;
-
       const spanDays = Math.max(1, Math.round((e - s) / (24 * 60 * 60 * 1000)) + 1);
+      if (spanDays < 2) return;
       const startKey = `${s.getFullYear()}-${String(s.getMonth() + 1).padStart(2, "0")}-${String(
         s.getDate()
       ).padStart(2, "0")}`;
@@ -561,10 +567,101 @@ export default function MonthView({
       }
     }
     return out;
-  }, [todos, month, year]);
+  }, [events, month, year]);
 
   const rangeTasks = buildRangeTasks;
   const lanesCount = useMemo(() => Math.min(rangeTasks.length, 20), [rangeTasks.length]);
+
+  const [allDayOverflow, setAllDayOverflow] = useState(null);
+  const allDayPopupRef = useRef(null);
+
+  useEffect(() => {
+    if (!allDayOverflow) return;
+    const onDocClick = (ev) => {
+      if (!allDayPopupRef.current) return;
+      if (allDayPopupRef.current.contains(ev.target)) return;
+      if (ev.target?.closest?.("[data-month-all-day-overflow-trigger='true']")) return;
+      setAllDayOverflow(null);
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [allDayOverflow]);
+
+  const allDayByDay = useMemo(() => {
+    const out = Array.from({ length: daysInMonth }, () => ({ primary: null, hidden: [] }));
+    if (!rangeTasks || rangeTasks.length === 0) return out;
+
+    for (let i = 0; i < daysInMonth; i++) {
+      const dayDate = new Date(year, month, i + 1);
+      const overlaps = rangeTasks.filter((r) => r.start <= dayDate && r.end >= dayDate);
+      if (overlaps.length === 0) continue;
+      overlaps.sort((a, b) => {
+        if (b.spanDays !== a.spanDays) return b.spanDays - a.spanDays;
+        const at = String(a.task?.title || "");
+        const bt = String(b.task?.title || "");
+        return at.localeCompare(bt);
+      });
+      out[i] = { primary: overlaps[0], hidden: overlaps.slice(1) };
+    }
+    return out;
+  }, [rangeTasks, daysInMonth, year, month]);
+
+  const primaryRuns = useMemo(() => {
+    const byKey = new Map();
+    allDayByDay.forEach((info, idx) => {
+      if (!info.primary) return;
+      const r = info.primary;
+      const key = String(
+        r.task?.id ||
+        `${r.start?.toISOString?.() || ""}|${r.end?.toISOString?.() || ""}|${r.task?.title || ""}`
+      );
+      if (!byKey.has(key)) byKey.set(key, { key, item: r, days: [] });
+      byKey.get(key).days.push(idx);
+    });
+
+    const runs = [];
+    for (const entry of byKey.values()) {
+      const days = entry.days.sort((a, b) => a - b);
+      let runStart = days[0];
+      let prev = days[0];
+      for (let i = 1; i < days.length; i++) {
+        const cur = days[i];
+        if (cur === prev + 1) {
+          prev = cur;
+          continue;
+        }
+        runs.push({ item: entry.item, startIdx: runStart, endIdx: prev });
+        runStart = cur;
+        prev = cur;
+      }
+      runs.push({ item: entry.item, startIdx: runStart, endIdx: prev });
+    }
+    return runs;
+  }, [allDayByDay]);
+
+  const getAllDayStyle = (r) => {
+    const ka = keyAreaMap?.[String(r?.task?.keyAreaId || r?.task?.key_area_id)];
+    let categoryColor = ka?.color || categories?.[r?.task?.kind]?.color;
+
+    const isTailwind = typeof categoryColor === "string" && categoryColor.startsWith("bg-");
+    const isColorStr = typeof categoryColor === "string" && !isTailwind;
+
+    const classForBg = isTailwind ? categoryColor : "";
+    const classForBgFinal = classForBg || "bg-gray-200";
+
+    const resolvedTailwind = isTailwind ? tailwindColorCache[categoryColor] : null;
+    const resolved = isColorStr ? categoryColor : resolvedTailwind;
+
+    const styleBg = resolved
+      ? {
+          backgroundColor: resolved,
+          border: `1px solid ${resolved}`,
+          color: getContrastTextColor(resolved),
+        }
+      : {};
+
+    return { classForBgFinal, styleBg };
+  };
 
   // Refs
   const gridRef = useRef(null);
@@ -677,7 +774,7 @@ export default function MonthView({
     const colLeft = fr.left - crect.left + container.scrollLeft;
     const colWidth = fr.width;
     setOverlayMetrics({ colLeft, colWidth, rows });
-  }, [year, month, daysInMonth, todos]);
+  }, [year, month, daysInMonth, events]);
 
   // --- ENSURE LEFT + RIGHT ROW HEIGHTS MATCH ---
   const syncRowHeights = () => {
@@ -880,6 +977,14 @@ export default function MonthView({
       try {
         if (ev.taskId || !ev.start) return false;
         const s = toLocal(ev.start);
+        const e = ev.end ? toLocal(ev.end) : null;
+        if (ev?.allDay) return false;
+        if (e) {
+          const sDay = new Date(s.getFullYear(), s.getMonth(), s.getDate(), 0, 0, 0, 0);
+          const eDay = new Date(e.getFullYear(), e.getMonth(), e.getDate(), 0, 0, 0, 0);
+          const dayDiff = Math.floor((eDay.getTime() - sDay.getTime()) / (24 * 60 * 60 * 1000));
+          if (dayDiff >= 1) return false;
+        }
         return s.getFullYear() === year && s.getMonth() === month;
       } catch (_) {
         return false;
@@ -1516,7 +1621,7 @@ export default function MonthView({
             </table>
 
             {/* All-day range overlay */}
-            {overlayMetrics.rows.length > 0 && lanesCount > 0 && (
+            {overlayMetrics.rows.length > 0 && (
               <div
                 style={{
                   position: "absolute",
@@ -1524,28 +1629,125 @@ export default function MonthView({
                   width: overlayMetrics.colWidth,
                   top: 0,
                   height: "100%",
-                  zIndex: 140,
+                  zIndex: 500,
                   pointerEvents: "none",
                 }}
               >
-                {rangeTasks.map((r) => (
-                  <RangeTaskBar
-                    key={`ov-${r.task?.id || String(Math.random())}`}
-                    r={r}
-                    overlayMetrics={overlayMetrics}
-                    LANE_WIDTH={LANE_WIDTH}
-                    LANE_GAP={LANE_GAP}
-                    LANE_HEIGHT={LANE_HEIGHT}
-                    CENTERED_BAR_WIDTH={CENTERED_BAR_WIDTH}
-                    ALL_DAY_COL_WIDTH={ALL_DAY_COL_WIDTH}
-                    month={month}
-                    categories={categories}
-                    keyAreaMap={keyAreaMap}
-                    tailwindColorCache={tailwindColorCache}
-                    getContrastTextColor={getContrastTextColor}
-                    onTaskClick={onTaskClick}
-                  />
-                ))}
+                {primaryRuns.map((run, idx) => {
+                  const startRow = overlayMetrics.rows[run.startIdx];
+                  const endRow = overlayMetrics.rows[run.endIdx];
+                  if (!startRow || !endRow) return null;
+
+                  const barWidth = Math.max(
+                    20,
+                    Math.min(overlayMetrics.colWidth - 12, CENTERED_BAR_WIDTH)
+                  );
+                  const left = Math.round(
+                    Math.max(4, (overlayMetrics.colWidth - barWidth) / 2)
+                  );
+
+                  const top = startRow.top + 2;
+                  const bottom = endRow.bottom - 2;
+                  const height = Math.max(16, bottom - top);
+                  const { classForBgFinal, styleBg } = getAllDayStyle(run.item);
+
+                  return (
+                    <div
+                      key={`md-run-${idx}-${run.item?.task?.id || ""}`}
+                      className={classForBgFinal}
+                      style={{
+                        position: "absolute",
+                        top,
+                        left,
+                        width: barWidth,
+                        height,
+                        borderRadius: 6,
+                        display: "flex",
+                        alignItems: "center",
+                        paddingLeft: 8,
+                        paddingRight: 8,
+                        boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
+                        pointerEvents: "auto",
+                        ...styleBg,
+                      }}
+                      title={run.item?.task?.title}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (typeof onEventClick === "function") onEventClick(run.item.task);
+                        else if (typeof onTaskClick === "function") onTaskClick(run.item.task);
+                      }}
+                    >
+                      <span className="truncate text-xs min-w-0 flex-1" style={{ pointerEvents: "none" }}>
+                        {run.item?.task?.title}
+                      </span>
+                    </div>
+                  );
+                })}
+
+                {allDayByDay.map((dayInfo, dayIdx) => {
+                  const row = overlayMetrics.rows[dayIdx];
+                  if (!row) return null;
+                  const primary = dayInfo.primary;
+                  const hidden = dayInfo.hidden || [];
+                  if (!primary && hidden.length === 0) return null;
+                  return (
+                    <div key={`ad-${dayIdx}`} style={{ position: "absolute", top: row.top, height: row.height, left: 0, right: 0 }}>
+                      {hidden.length > 0 && (
+                        <div className="absolute right-1 top-1 flex items-center gap-1" style={{ pointerEvents: "auto" }}>
+                          <button
+                            type="button"
+                            data-month-all-day-overflow-trigger="true"
+                            className="text-blue-700 hover:bg-slate-50 p-0.5 rounded inline-flex items-center"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setAllDayOverflow({ dayIdx, items: [primary, ...hidden].filter(Boolean) });
+                            }}
+                            title="Show all-day items"
+                          >
+                            <FaPlus size={12} />
+                          </button>
+                        </div>
+                      )}
+
+                      {allDayOverflow && allDayOverflow.dayIdx === dayIdx && (
+                        <div
+                          ref={allDayPopupRef}
+                          className="absolute left-full ml-2 top-0 w-64 max-h-56 overflow-auto rounded-lg border border-slate-200 bg-white shadow-lg z-[1000]"
+                          style={{ pointerEvents: "auto" }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="px-3 py-2 border-b border-slate-100 text-xs text-slate-700 flex items-center justify-between">
+                            <span className="font-semibold">Events</span>
+                            <button
+                              type="button"
+                              className="text-gray-500 hover:text-gray-700"
+                              onClick={() => setAllDayOverflow(null)}
+                              aria-label="Close"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                          <div className="py-1">
+                            {(allDayOverflow.items || []).map((it, idx) => (
+                              <button
+                                key={`md-overflow-${idx}-${it?.task?.id || ""}`}
+                                type="button"
+                                className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50"
+                                onClick={() => {
+                                  setAllDayOverflow(null);
+                                  if (typeof onEventClick === "function") onEventClick(it.task);
+                                  else if (typeof onTaskClick === "function") onTaskClick(it.task);
+                                }}
+                              >
+                                {it?.task?.title || "Untitled"}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -1697,7 +1899,7 @@ export default function MonthView({
                     background: "red",
                     willChange: "left, top, height, transform",
                     transform: "translateX(-50%)",
-                    zIndex: 160,
+                    zIndex: 80,
                     pointerEvents: "none",
                   }}
                 />
