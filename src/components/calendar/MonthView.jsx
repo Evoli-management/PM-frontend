@@ -258,10 +258,12 @@ export default function MonthView({
 
   const ALL_DAY_COL_WIDTH = 120;
   const HOUR_COL_WIDTH = 180;
+  const rightTableMinWidth = Math.max(800, HOUR_SLOTS.length * HOUR_COL_WIDTH);
 
   const BOTTOM_RADAR_HEIGHT = 26;
+  const BOTTOM_HSCROLL_HEIGHT = 14;
   // ✅ increased to avoid overlap with the sticky bottom scrollbar + radar
-  const BOTTOM_SCROLL_SAFE_GAP = BOTTOM_RADAR_HEIGHT + 24 + 16;
+  const BOTTOM_SCROLL_SAFE_GAP = BOTTOM_RADAR_HEIGHT + BOTTOM_HSCROLL_HEIGHT + 24 + 16;
 
   const LANE_WIDTH = 72;
   const LANE_GAP = 6;
@@ -585,6 +587,8 @@ export default function MonthView({
   const [eventOverlays, setEventOverlays] = useState([]);
   const [highlightTodayPulse, setHighlightTodayPulse] = useState(0);
   const [rowOverlay, setRowOverlay] = useState(null);
+  const hSyncLockRef = useRef(false);
+  const headerTrackRef = useRef(null);
 
   const heightSyncTimerRef = useRef(null);
   const cachedThRef = useRef(null);
@@ -633,59 +637,20 @@ export default function MonthView({
     setHighlightTodayPulse((v) => v + 1);
   };
 
-  // ✅ FULL SYNC: body <-> header + body <-> sticky bottom scrollbar
-  useEffect(() => {
-    const body = rightBodyScrollRef.current;
-    const head = rightHeaderScrollRef.current;
-    const bottom = bottomHScrollRef.current;
-    if (!body || !head || !bottom) return;
-
-    let lock = false;
-
-    const syncAllTo = (left) => {
-      head.scrollLeft = left;
-      body.scrollLeft = left;
-      bottom.scrollLeft = left;
-    };
-
-    const onBodyScroll = () => {
-      if (lock) return;
-      lock = true;
-      head.scrollLeft = body.scrollLeft;
-      bottom.scrollLeft = body.scrollLeft;
-      lock = false;
-    };
-
-    const onBottomScroll = () => {
-      if (lock) return;
-      lock = true;
-      body.scrollLeft = bottom.scrollLeft;
-      head.scrollLeft = bottom.scrollLeft;
-      lock = false;
-    };
-
-    // if user drags header (trackpad), keep others in sync too
-    const onHeadScroll = () => {
-      if (lock) return;
-      lock = true;
-      body.scrollLeft = head.scrollLeft;
-      bottom.scrollLeft = head.scrollLeft;
-      lock = false;
-    };
-
-    body.addEventListener("scroll", onBodyScroll, { passive: true });
-    bottom.addEventListener("scroll", onBottomScroll, { passive: true });
-    head.addEventListener("scroll", onHeadScroll, { passive: true });
-
-    // initial sync
-    syncAllTo(body.scrollLeft || 0);
-
-    return () => {
-      body.removeEventListener("scroll", onBodyScroll);
-      bottom.removeEventListener("scroll", onBottomScroll);
-      head.removeEventListener("scroll", onHeadScroll);
-    };
-  }, []);
+  const syncHorizontalPosition = (left) => {
+    try {
+      const safeLeft = Math.max(0, left || 0);
+      if (headerTrackRef.current) {
+        headerTrackRef.current.style.transform = `translateX(-${safeLeft}px)`;
+      }
+      if (bottomHScrollRef.current && Math.abs((bottomHScrollRef.current.scrollLeft || 0) - safeLeft) > 0.5) {
+        bottomHScrollRef.current.scrollLeft = safeLeft;
+      }
+      if (rightBodyScrollRef.current && Math.abs((rightBodyScrollRef.current.scrollLeft || 0) - safeLeft) > 0.5) {
+        rightBodyScrollRef.current.scrollLeft = safeLeft;
+      }
+    } catch (_) {}
+  };
 
   // All-day overlay metrics (left side)
   useLayoutEffect(() => {
@@ -830,6 +795,11 @@ export default function MonthView({
     ensureRowCountMatches();
     syncRowHeights();
   }, [monthDays.length]);
+
+  useEffect(() => {
+    const left = rightBodyScrollRef.current?.scrollLeft || 0;
+    syncHorizontalPosition(left);
+  }, [month, year, rightTableMinWidth]);
 
   // Focus current time on initial open (current month only)
   useEffect(() => {
@@ -1143,8 +1113,6 @@ export default function MonthView({
 
   const [showViewMenu, setShowViewMenu] = useState(false);
 
-  const rightTableMinWidth = Math.max(800, HOUR_SLOTS.length * HOUR_COL_WIDTH);
-
   const shiftMonthFromNav = (delta) => {
     if (!onShiftDate) return;
 
@@ -1177,13 +1145,13 @@ export default function MonthView({
         .mv-hide-xscrollbar::-webkit-scrollbar { height: 0px; }
         .mv-hide-xscrollbar { scrollbar-width: none; }
 
-        /* ✅ hover to show ONLY the sticky bottom scrollbar */
+        /* ✅ hover to show ONLY the bottom scrollbar */
         .mv-bottom-hscroll {
           opacity: 0;
           transition: opacity 120ms ease;
           pointer-events: none;
         }
-        .mv-vscroll:hover .mv-bottom-hscroll {
+        .mv-shell:hover .mv-bottom-hscroll {
           opacity: 1;
           pointer-events: auto;
         }
@@ -1292,27 +1260,150 @@ export default function MonthView({
         </div>
       </div>
 
-      {/* BODY: vertical scroll container */}
-      <div
-        ref={rightVScrollRef}
-        className="relative mv-vscroll"
-        style={{
-          height: 600,
-          overflowY: "auto",
-          overflowX: "hidden",
-          paddingBottom: BOTTOM_SCROLL_SAFE_GAP,
-          maxWidth: "100vw",
-          position: "relative",
-          scrollBehavior: "smooth",
-        }}
-      >
+      <div className="relative mv-shell">
+        {/* Fixed header row (outside vertical scroll) */}
+        <div className="flex" style={{ position: "relative" }}>
+          <div
+            className="relative"
+            style={{
+              width: 96 + ALL_DAY_COL_WIDTH,
+              minWidth: 96 + ALL_DAY_COL_WIDTH,
+              flexShrink: 0,
+              zIndex: 302,
+            }}
+          >
+            <table
+              className="border border-gray-200 rounded-l-lg"
+              style={{
+                borderCollapse: "separate",
+                borderSpacing: 0,
+                width: 96 + ALL_DAY_COL_WIDTH,
+                tableLayout: "fixed",
+                backgroundColor: "white",
+              }}
+            >
+              <thead>
+                <tr className="bg-white">
+                  <th
+                    className="text-left px-2 py-2 text-xs font-semibold text-gray-400"
+                    style={{
+                      width: "96px",
+                      height: "44px",
+                      borderRight: "2px solid rgba(226,232,240,1)",
+                      backgroundColor: "white",
+                    }}
+                  >
+                    Date
+                  </th>
+                  <th
+                    className="text-center px-2 py-2 text-xs font-semibold text-gray-400"
+                    style={{
+                      width: `${ALL_DAY_COL_WIDTH}px`,
+                      height: "44px",
+                      borderLeft: "2px solid rgba(226,232,240,1)",
+                      borderRight: "2px solid rgba(226,232,240,1)",
+                      backgroundColor: "white",
+                    }}
+                  >
+                    <span className="ml-2 px-2 py-1 rounded bg-emerald-500 text-white text-[11px] font-semibold">
+                      All-Day
+                    </span>
+                  </th>
+                </tr>
+              </thead>
+            </table>
+          </div>
+
+          <div className="flex-1" style={{ position: "relative", minWidth: 0 }}>
+            <div
+              ref={rightHeaderScrollRef}
+              className="mv-hide-scrollbar mv-hide-xscrollbar"
+              style={{
+                background: "white",
+                overflowX: "hidden",
+                overflowY: "hidden",
+                width: "100%",
+                minWidth: 0,
+              }}
+            >
+              <div
+                ref={headerTrackRef}
+                style={{
+                  width: rightTableMinWidth,
+                  transform: "translateX(0px)",
+                  willChange: "transform",
+                }}
+              >
+                <table
+                  ref={rightHeaderTableRef}
+                  className="border border-gray-200 rounded-r-lg"
+                  style={{
+                    borderCollapse: "separate",
+                    borderSpacing: 0,
+                    minWidth: rightTableMinWidth,
+                    tableLayout: "fixed",
+                  }}
+                >
+                  <thead>
+                    <tr className="bg-white">
+                      {HOUR_SLOTS.map((h, idx) => {
+                        let slotIsWorking = true;
+                        try {
+                          if (isWorkingTime) slotIsWorking = isWorkingTime(h);
+                        } catch {
+                          slotIsWorking = true;
+                        }
+                        const [_, mm] = (h || "").split(":");
+                        const showLabel = String(mm || "00") === "00";
+
+                        return (
+                          <th
+                            key={`hour-header-${idx}`}
+                            className="text-center px-1 py-2 text-xs font-semibold text-gray-400 w-16"
+                            style={{
+                              minWidth: 40,
+                              height: "44px",
+                              backgroundColor: slotIsWorking ? "white" : NON_WORK_BG,
+                              opacity: slotIsWorking ? 1 : NON_WORK_OPACITY,
+                              borderLeft: "1px solid rgba(226,232,240,0.4)",
+                              borderRight: "1px solid rgba(226,232,240,0.4)",
+                            }}
+                          >
+                            {showLabel ? (formatTime ? formatTime(h) : h) : ""}
+                          </th>
+                        );
+                      })}
+                    </tr>
+                  </thead>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* BODY: vertical scroll container */}
         <div
-          className="flex"
+          ref={rightVScrollRef}
+          className="relative mv-vscroll"
           style={{
+            height: "calc(100vh - 260px)",
+            maxHeight: "calc(100vh - 260px)",
+            minHeight: 0,
+            overflowY: "auto",
+            overflowX: "hidden",
+            paddingBottom: BOTTOM_SCROLL_SAFE_GAP,
+            maxWidth: "100vw",
             position: "relative",
-            paddingBottom: BOTTOM_RADAR_HEIGHT,
+            scrollBehavior: "smooth",
           }}
         >
+          <div
+            className="flex"
+            style={{
+              position: "relative",
+              paddingBottom: BOTTOM_RADAR_HEIGHT,
+            }}
+          >
           {/* LEFT TABLE: Date + All-Day (sticky) */}
           <div
             ref={gridRef}
@@ -1335,14 +1426,11 @@ export default function MonthView({
                 tableLayout: "fixed",
               }}
             >
-              <thead style={{ position: "sticky", top: 0, zIndex: 302, backgroundColor: "white" }}>
+              <thead style={{ display: "none" }}>
                 <tr className="bg-white">
                   <th
                     className="text-left px-2 py-2 text-xs font-semibold text-gray-400"
                     style={{
-                      position: "sticky",
-                      top: 0,
-                      zIndex: 302,
                       width: "96px",
                       height: "44px",
                       borderRight: "2px solid rgba(226,232,240,1)",
@@ -1354,9 +1442,6 @@ export default function MonthView({
                   <th
                     className="text-center px-2 py-2 text-xs font-semibold text-gray-400"
                     style={{
-                      position: "sticky",
-                      top: 0,
-                      zIndex: 302,
                       width: `${ALL_DAY_COL_WIDTH}px`,
                       height: "44px",
                       borderLeft: "2px solid rgba(226,232,240,1)",
@@ -1474,65 +1559,6 @@ export default function MonthView({
               minWidth: 0,
             }}
           >
-            {/* Sticky header (scrolls horizontally, stays sticky vertically) */}
-            <div
-              ref={rightHeaderScrollRef}
-              className="mv-hide-scrollbar mv-hide-xscrollbar"
-              style={{
-                position: "sticky",
-                top: 0,
-                zIndex: 302,
-                background: "white",
-                overflowX: "auto",
-                overflowY: "hidden",
-                width: "100%",
-                minWidth: 0,
-              }}
-            >
-              <table
-                ref={rightHeaderTableRef}
-                className="border border-gray-200 rounded-r-lg"
-                style={{
-                  borderCollapse: "separate",
-                  borderSpacing: 0,
-                  minWidth: rightTableMinWidth,
-                  tableLayout: "fixed",
-                }}
-              >
-                <thead>
-                  <tr className="bg-white">
-                    {HOUR_SLOTS.map((h, idx) => {
-                      let slotIsWorking = true;
-                      try {
-                        if (isWorkingTime) slotIsWorking = isWorkingTime(h);
-                      } catch {
-                        slotIsWorking = true;
-                      }
-                      const [_, mm] = (h || "").split(":");
-                      const showLabel = String(mm || "00") === "00";
-
-                      return (
-                        <th
-                          key={`hour-header-${idx}`}
-                          className="text-center px-1 py-2 text-xs font-semibold text-gray-400 w-16"
-                          style={{
-                            minWidth: 40,
-                            height: "44px",
-                            backgroundColor: slotIsWorking ? "white" : NON_WORK_BG,
-                            opacity: slotIsWorking ? 1 : NON_WORK_OPACITY,
-                            borderLeft: "1px solid rgba(226,232,240,0.4)",
-                            borderRight: "1px solid rgba(226,232,240,0.4)",
-                          }}
-                        >
-                          {showLabel ? (formatTime ? formatTime(h) : h) : ""}
-                        </th>
-                      );
-                    })}
-                  </tr>
-                </thead>
-              </table>
-            </div>
-
             {/* Body horizontal scroller */}
             <div
               ref={rightBodyScrollRef}
@@ -1543,6 +1569,16 @@ export default function MonthView({
                 marginBottom: 8,
                 width: "100%",
                 minWidth: 0,
+              }}
+              onScroll={(e) => {
+                try {
+                  if (hSyncLockRef.current) return;
+                  hSyncLockRef.current = true;
+                  const left = e.currentTarget.scrollLeft || 0;
+                  syncHorizontalPosition(left);
+                } finally {
+                  hSyncLockRef.current = false;
+                }
               }}
             >
               {/* wrapper makes overlays scroll with horizontal scroll */}
@@ -1714,20 +1750,19 @@ export default function MonthView({
               </div>
             </div>
           </div>
+          </div>
         </div>
 
-        {/* ✅ Sticky bottom REAL scrollbar (visible on hover) */}
+        {/* ✅ Bottom REAL scrollbar (visible on hover) */}
         <div
           className="mv-bottom-hscroll"
           style={{
-            position: "sticky",
-            bottom: BOTTOM_RADAR_HEIGHT, // sits just above radar
-            left: 0,
-            right: 0,
+            position: "relative",
             zIndex: 330,
             background: "rgba(255,255,255,0.92)",
             backdropFilter: "blur(2px)",
             borderTop: "1px solid rgba(226,232,240,0.8)",
+            height: BOTTOM_HSCROLL_HEIGHT,
           }}
         >
           <div
@@ -1736,44 +1771,23 @@ export default function MonthView({
               overflowX: "auto",
               overflowY: "hidden",
               width: "100%",
-              height: 14,
+              height: BOTTOM_HSCROLL_HEIGHT,
+            }}
+            onScroll={(e) => {
+              try {
+                if (hSyncLockRef.current) return;
+                hSyncLockRef.current = true;
+                const left = e.currentTarget.scrollLeft || 0;
+                syncHorizontalPosition(left);
+              } finally {
+                hSyncLockRef.current = false;
+              }
             }}
           >
             <div style={{ width: rightTableMinWidth, height: 1 }} />
           </div>
         </div>
 
-        {/* Bottom horizontal scroll radar */}
-        <div
-          className="pointer-events-none"
-          style={{
-            position: "sticky",
-            bottom: 0,
-            left: 0,
-            right: 0,
-            zIndex: 320,
-          }}
-        >
-          <div
-            style={{
-              height: BOTTOM_RADAR_HEIGHT,
-              background:
-                "linear-gradient(to right, rgba(59,130,246,0.15), rgba(59,130,246,0.05) 20%, rgba(59,130,246,0.05) 80%, rgba(59,130,246,0.15))",
-              borderTop: "1px solid rgba(226,232,240,0.8)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 8,
-              color: "#1e3a8a",
-              fontSize: 12,
-              fontWeight: 600,
-            }}
-          >
-            <FaChevronLeft />
-            <span>Scroll horizontally</span>
-            <FaChevronRight />
-          </div>
-        </div>
       </div>
     </>
   );
