@@ -41,6 +41,21 @@ const toOffsetISO = (d) => {
     return `${y}-${m}-${day}T${hh}:${mm}:${ss}${sign}${oh}:${om}`;
 };
 
+const toDateOnlyLocal = (d) =>
+    new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+
+const getCalendarDayDiff = (start, end) => {
+    try {
+        if (!start || !end) return 0;
+        const dayMs = 24 * 60 * 60 * 1000;
+        const s = toDateOnlyLocal(start);
+        const e = toDateOnlyLocal(end);
+        return Math.floor((e.getTime() - s.getTime()) / dayMs);
+    } catch (_) {
+        return 0;
+    }
+};
+
 const weekdayOptions = [
     { key: "mon", label: "Mon" },
     { key: "tue", label: "Tue" },
@@ -578,6 +593,7 @@ const buildRecurringPattern = ({
     /* ------------------------------ Save handler ---------------------------- */
 
     const handleSave = async () => {
+        let submitKindLabel = "appointment";
         try {
             if (!title.trim()) {
                 addToast({ title: "Title required", variant: "error" });
@@ -596,6 +612,10 @@ const buildRecurringPattern = ({
                 addToast({ title: "End must be after start", variant: "error" });
                 return;
             }
+
+            const calendarDayDiff = getCalendarDayDiff(s, e);
+            const submitAsEvent = calendarDayDiff >= 1;
+            submitKindLabel = submitAsEvent ? "event" : "appointment";
 
             if (recurrenceType && recurrenceType !== "none") {
                 if (recurrenceEndType === "until") {
@@ -677,21 +697,28 @@ const buildRecurringPattern = ({
                     // context (editScope/occurrenceStart) for the backend. Using
                     // the wrong updater can produce a 400 from the API.
                     const looksLikeGeneratedOccurrence = typeof event?.id === 'string' && event.id.includes('_');
-                    const updater =
-                        event?.kind === "appointment" || looksLikeGeneratedOccurrence
-                            ? calendarService.updateAppointment
-                            : calendarService.updateEvent;
+                    const isAppointmentUpdate =
+                        event?.kind === "appointment" || looksLikeGeneratedOccurrence;
 
-                    // Build payload
-                    const payload = {
-                        title: title.trim(),
-                        description: description.trim() || null,
-                        start: toOffsetISO(s),
-                        end: toOffsetISO(e),
-                        timezone,
-                        goalId: goalId || null,
-                        keyAreaId: keyAreaId || null,
-                    };
+                    // Build endpoint-specific payloads (DTO whitelist is strict)
+                    const payload = isAppointmentUpdate
+                        ? {
+                              title: title.trim(),
+                              description: description.trim() || null,
+                              start: toOffsetISO(s),
+                              end: toOffsetISO(e),
+                              timezone,
+                              goalId: goalId || null,
+                              keyAreaId: keyAreaId || null,
+                          }
+                        : {
+                              title: title.trim(),
+                              description: description.trim() || null,
+                              start: toOffsetISO(s),
+                              end: toOffsetISO(e),
+                              allDay: submitAsEvent,
+                              keyAreaId: keyAreaId || null,
+                          };
 
                     // Only include recurringPattern when we have an explicit value
                     // (string or null) — undefined means "don't change".
@@ -749,7 +776,9 @@ const buildRecurringPattern = ({
 
                     let updated;
                     try {
-                        updated = await updater(appointmentIdToUse, payload);
+                        updated = isAppointmentUpdate
+                            ? await calendarService.updateAppointment(appointmentIdToUse, payload)
+                            : await calendarService.updateEvent(appointmentIdToUse, payload);
                     } catch (err) {
                         // Print server response body (if present) to help debugging
                         try {
@@ -768,23 +797,35 @@ const buildRecurringPattern = ({
                 onUpdated &&
                     onUpdated({
                         ...updated,
+                        kind: updated?.kind || event?.kind || (submitAsEvent ? "event" : "appointment"),
                         recurringPattern: updated.recurringPattern ?? recurringPattern,
                     });
             } else {
-                const created = await calendarService.createAppointment({
-                    title: title.trim(),
-                    description: description.trim() || null,
-                    start: toOffsetISO(s),
-                    end: toOffsetISO(e),
-                    timezone,
-                    recurringPattern: recurringPattern || null,
-                    goalId: goalId || null,
-                    keyAreaId: keyAreaId || null,
-                });
+                const created = submitAsEvent
+                    ? await calendarService.createEvent({
+                        title: title.trim(),
+                        description: description.trim() || null,
+                        start: toOffsetISO(s),
+                        end: toOffsetISO(e),
+                        timezone,
+                        allDay: true,
+                        keyAreaId: keyAreaId || null,
+                    })
+                    : await calendarService.createAppointment({
+                        title: title.trim(),
+                        description: description.trim() || null,
+                        start: toOffsetISO(s),
+                        end: toOffsetISO(e),
+                        timezone,
+                        recurringPattern: recurringPattern || null,
+                        goalId: goalId || null,
+                        keyAreaId: keyAreaId || null,
+                    });
 
                 onCreated &&
                     onCreated({
                         ...created,
+                        kind: created?.kind || (submitAsEvent ? "event" : "appointment"),
                         recurringPattern: created.recurringPattern ?? recurringPattern,
                     });
                 // Clear any prior client-side conflict after successful create
@@ -792,7 +833,9 @@ const buildRecurringPattern = ({
             }
         } catch (err) {
             console.warn(
-                isEdit ? "Failed to update appointment" : "Failed to create appointment",
+                isEdit
+                    ? `Failed to update ${submitKindLabel}`
+                    : `Failed to create ${submitKindLabel}`,
                 err
             );
 
@@ -811,7 +854,9 @@ const buildRecurringPattern = ({
                 }
                 const composed = primary ? (extra ? `${primary} — ${extra}` : primary) : (extra || JSON.stringify(serverData));
                 addToast({
-                    title: isEdit ? "Update failed" : "Create failed",
+                    title: isEdit
+                        ? `Update ${submitKindLabel} failed`
+                        : `Create ${submitKindLabel} failed`,
                     description: String(composed),
                     variant: "error",
                 });
@@ -823,7 +868,9 @@ const buildRecurringPattern = ({
                 } catch (__) {}
             } else {
                 addToast({
-                    title: isEdit ? "Update failed" : "Create failed",
+                    title: isEdit
+                        ? `Update ${submitKindLabel} failed`
+                        : `Create ${submitKindLabel} failed`,
                     description: String(err?.message || err),
                     variant: "error",
                 });

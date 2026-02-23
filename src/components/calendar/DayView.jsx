@@ -923,52 +923,29 @@ export default function DayView({
                         try {
                           const dayStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), 0, 0, 0, 0);
                           const dayEnd = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), 23, 59, 59, 999);
-                          // combine side-loaded todos and events passed from container so multi-day tasks/events
-                          // (appointments) show in the all-day strip as they do in WeekView
-                          const combinedSource = [];
-                          // Prefer parent `todos` for up-to-date edits, but also include
-                          // `sideTodos` fetched locally (overlapping multi-day tasks).
-                          // Merge them and de-duplicate by id so tasks found by the
-                          // local overlap query are still visible even if the parent
-                          // passed a narrower set.
-                          const parentTodos = Array.isArray(todos) ? todos : [];
-                          const localTodos = Array.isArray(sideTodos) ? sideTodos : [];
-                          const mergedTodos = [
-                            ...parentTodos,
-                            ...localTodos.filter((lt) => !parentTodos.some((pt) => String(pt.id || pt._id) === String(lt.id || lt._id)))
-                          ];
-                          mergedTodos.forEach((t) => combinedSource.push({ ...t, __src: 'todo' }));
-                          const todoIds = new Set(mergedTodos.map((t) => String(t.id || t._id || t.taskId || t.task_id || "")));
-                          (Array.isArray(events) ? events : []).forEach((e) => {
-                            try {
-                              const linkedTaskId = String(e.taskId || e.task_id || "");
-                              if (linkedTaskId && todoIds.has(linkedTaskId)) return; // skip event; todo covers it
-                            } catch (_) {}
-                            combinedSource.push({ ...e, __src: 'event' });
-                          });
-                          // de-duplicate by id/title when both sources overlap
+                          const sourceEvents = Array.isArray(events) ? events : [];
                           const seen = new Set();
-                          const multiDay = combinedSource.filter((t) => {
+                          const multiDay = sourceEvents.filter((t) => {
                             try {
-                              // simple dedupe key
                               const dedupeId = String(t.id || t._id || t.eventId || (t.title || t.name || t.summary) || JSON.stringify(t)).slice(0, 128);
                               if (seen.has(dedupeId)) return false;
                               seen.add(dedupeId);
 
-                              const s = t.startDate || t.start || t.start_date || t.from || t.begin || t.date || t.dueDate || t.due_date || null;
-                              // For end date, MUST check endDate/end_date explicitly, do NOT use t.date as fallback
-                              const e = t.endDate || t.end || t.end_date || t.to || t.finish || t.dueDate || t.due_date || null;
+                              if (String(t?.kind || '').toLowerCase() === 'appointment') return false;
+
+                              const s = t.start || t.startAt || t.start_at || t.startDate || t.start_date || null;
+                              const e = t.end || t.endAt || t.end_at || t.endDate || t.end_date || null;
                               if (!s || !e) return false;
                               const sd = new Date(s);
                               const ed = new Date(e);
                               if (isNaN(sd.getTime()) || isNaN(ed.getTime())) return false;
-                              // Normalize end dates: treat a midnight end as the inclusive end-of-day so
-                              // an End Date of 2025-10-23 covers 2025-10-23 as expected.
+
+                              const sdDay = new Date(sd.getFullYear(), sd.getMonth(), sd.getDate(), 0, 0, 0, 0);
+                              const edDay = new Date(ed.getFullYear(), ed.getMonth(), ed.getDate(), 0, 0, 0, 0);
+                              const dayDiff = Math.floor((edDay.getTime() - sdDay.getTime()) / (24 * 60 * 60 * 1000));
+                              if (dayDiff < 1) return false;
+
                               const edAdjusted = adjustEndInclusive(ed);
-                              // include items that span more than a single calendar day (compare date-only using adjusted end)
-                              const sameDay = (sd.getFullYear() === edAdjusted.getFullYear() && sd.getMonth() === edAdjusted.getMonth() && sd.getDate() === edAdjusted.getDate());
-                              if (sameDay) return false;
-                              // include only those that overlap this day using the adjusted end
                               return sd <= dayEnd && edAdjusted >= dayStart;
                             } catch (_) { return false; }
                           });
@@ -982,9 +959,8 @@ export default function DayView({
                             <>
                               {visibleItems.map((t) => {
                             try {
-                              const s = t.startDate || t.start_date || t.date || t.dueDate || t.due_date || null;
-                              // For end date, MUST check endDate/end_date explicitly, do NOT use t.date as fallback
-                              const e = t.endDate || t.end_date || t.dueDate || t.due_date || null;
+                              const s = t.start || t.startAt || t.start_at || t.startDate || t.start_date || null;
+                              const e = t.end || t.endAt || t.end_at || t.endDate || t.end_date || null;
                               const sd = new Date(s);
                               const ed = new Date(e);
                               const edAdjusted = adjustEndInclusive(ed);
@@ -1008,7 +984,10 @@ export default function DayView({
                                 <div key={`allday-${t.id || title}`} className="w-full">
                                   <button
                                     type="button"
-                                    onClick={(e) => { try { e.stopPropagation(); } catch (_) {}; onTaskClick && onTaskClick(t); }}
+                                    onClick={(e) => {
+                                      try { e.stopPropagation(); } catch (_) {}
+                                      if (onEventClick) onEventClick(t);
+                                    }}
                                     className={`w-full flex items-center gap-3 px-3 py-2 rounded text-xs truncate ${bgClass || ''}`}
                                     style={{ ...(styleBar || {}), width: '100%' }}
                                     title={title}
@@ -1078,7 +1057,7 @@ export default function DayView({
                                               className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50"
                                               onClick={() => {
                                                 setAllDayOverflowOpen(false);
-                                                onTaskClick && onTaskClick(it);
+                                                if (onEventClick) onEventClick(it);
                                               }}
                                             >
                                               {title}
@@ -1286,6 +1265,11 @@ export default function DayView({
                         const start = parseDate(appt.startDate || appt.start_date || appt.start || appt.from || appt.begin || appt.date);
                         const end = parseDate(appt.endDate || appt.end_date || appt.end || appt.to || appt.finish || appt.date);
                         if (!start || !end) return null;
+
+                        const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 0, 0, 0, 0);
+                        const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate(), 0, 0, 0, 0);
+                        const dayDiff = Math.floor((endDay.getTime() - startDay.getTime()) / (24 * 60 * 60 * 1000));
+                        if (appt?.allDay || dayDiff >= 1) return null;
 
                         // skip appointments outside visible hours
                         const apptStartMins = start.getHours() * 60 + start.getMinutes() + start.getSeconds() / 60;

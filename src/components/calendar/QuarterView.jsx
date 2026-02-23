@@ -1,4 +1,4 @@
-import React, { useState, useRef, useLayoutEffect, useEffect } from "react";
+import React, { useState, useRef, useLayoutEffect, useEffect, useMemo } from "react";
 import { FaChevronLeft, FaChevronRight, FaChevronDown, FaPlus } from "react-icons/fa";
 import { useCalendarPreferences } from "../../hooks/useCalendarPreferences";
 
@@ -45,11 +45,9 @@ export default function QuarterView({
     onShiftDate,
     onSetDate,
     events,
-    todos = [],
     categories,
     onDayClick,
     onEventClick,
-    onTaskClick,
     view,
     onChangeView,
     filterType,
@@ -71,25 +69,96 @@ export default function QuarterView({
     // (replaced below with calendar-aligned weeks)
 
     // Helpers for day span checks
-    const getDayBounds = (date) => {
-        const start = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
-        const end = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
-        return { start, end };
+    const overlapsDayByCalendarDate = (rangeStart, rangeEnd, dayDate) => {
+        try {
+            const s = rangeStart ? new Date(rangeStart) : null;
+            const e = rangeEnd ? new Date(rangeEnd) : null;
+            if (!s && !e) return false;
+            const rs = s || e;
+            const re = e || s;
+            const startDateOnly = new Date(rs.getFullYear(), rs.getMonth(), rs.getDate(), 0, 0, 0, 0);
+            const endDateOnly = new Date(re.getFullYear(), re.getMonth(), re.getDate(), 0, 0, 0, 0);
+            const dayDateOnly = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), 0, 0, 0, 0);
+
+            const from = startDateOnly <= endDateOnly ? startDateOnly : endDateOnly;
+            const to = startDateOnly <= endDateOnly ? endDateOnly : startDateOnly;
+            return dayDateOnly >= from && dayDateOnly <= to;
+        } catch (_) {
+            return false;
+        }
     };
-    const overlapsDay = (rangeStart, rangeEnd, dayStart, dayEnd) => {
-        const s = rangeStart ? new Date(rangeStart) : null;
-        const e = rangeEnd ? new Date(rangeEnd) : null;
-        if (!s && !e) return false;
-        const rs = s || e;
-        const re = e || s;
-        return rs <= dayEnd && re >= dayStart;
+    const eventSpanByDate = (ev) => {
+        try {
+            const sRaw = ev?.start || ev?.startDate || ev?.start_at || null;
+            const eRaw = ev?.end || ev?.endDate || ev?.end_at || sRaw || null;
+            const s = sRaw ? new Date(sRaw) : null;
+            const e = eRaw ? new Date(eRaw) : null;
+            if (!s && !e) return null;
+            const sd = new Date((s || e).getFullYear(), (s || e).getMonth(), (s || e).getDate(), 0, 0, 0, 0);
+            const ed = new Date((e || s).getFullYear(), (e || s).getMonth(), (e || s).getDate(), 0, 0, 0, 0);
+            return sd <= ed ? { start: sd, end: ed } : { start: ed, end: sd };
+        } catch (_) {
+            return null;
+        }
     };
-    const taskSpan = (t) => {
-        // Prefer explicit start/end, otherwise use dueDate as both
-        const s = t.startDate || t.dueDate || t.endDate || null;
-        const e = t.endDate || t.dueDate || t.startDate || s || null;
-        return { s, e };
+    const sameDateOnly = (a, b) =>
+        a && b &&
+        a.getFullYear() === b.getFullYear() &&
+        a.getMonth() === b.getMonth() &&
+        a.getDate() === b.getDate();
+
+    const getEventKey = (ev, idx = 0) => {
+        try {
+            if (ev?.id) return String(ev.id);
+            const s = ev?.start || ev?.startDate || ev?.start_at || '';
+            const e = ev?.end || ev?.endDate || ev?.end_at || '';
+            const t = ev?.title || '';
+            return `${s}|${e}|${t}|${idx}`;
+        } catch (_) {
+            return `ev-${idx}`;
+        }
     };
+
+    const quarterEventLanes = useMemo(() => {
+        const source = (Array.isArray(events) ? events : [])
+            .filter((ev) => String(ev?.kind || '').toLowerCase() !== 'appointment' && !ev?.taskId && !ev?.task_id)
+            .map((ev, idx) => {
+                const span = eventSpanByDate(ev);
+                if (!span) return null;
+                return {
+                    ev,
+                    key: getEventKey(ev, idx),
+                    span,
+                    createdAt: new Date(ev?.createdAt || ev?.created_at || 0).getTime(),
+                    startTs: new Date(ev?.start || ev?.startDate || ev?.start_at || 0).getTime(),
+                    title: String(ev?.title || ''),
+                };
+            })
+            .filter(Boolean)
+            .sort((a, b) => {
+                if (a.startTs !== b.startTs) return a.startTs - b.startTs;
+                const ac = Number.isNaN(a.createdAt) ? Number.POSITIVE_INFINITY : a.createdAt;
+                const bc = Number.isNaN(b.createdAt) ? Number.POSITIVE_INFINITY : b.createdAt;
+                if (ac !== bc) return ac - bc;
+                return a.title.localeCompare(b.title);
+            });
+
+        const laneEnds = [];
+        const laneByKey = new Map();
+
+        for (const item of source) {
+            let lane = laneEnds.findIndex((endDate) => item.span.start > endDate);
+            if (lane === -1) {
+                lane = laneEnds.length;
+                laneEnds.push(item.span.end);
+            } else {
+                laneEnds[lane] = item.span.end;
+            }
+            laneByKey.set(item.key, lane);
+        }
+
+        return { laneByKey };
+    }, [events]);
 
     // Helper to get week number for a given date
     function getWeekNumberLocal(date) {
@@ -127,7 +196,7 @@ export default function QuarterView({
 
     const [showViewMenu, setShowViewMenu] = useState(false);
     const [popup, setPopup] = useState(null);
-    // popup: { iso: 'YYYY-MM-DD', events: [...], todos: [...], rect: DOMRect }
+    // popup: { iso: 'YYYY-MM-DD', events: [], rect: DOMRect }
     // refs to allow equalizing row heights across the three month columns
     const rowRefs = useRef([]); // rowRefs.current[mIdx][wIdx][dayIdx] = tr element
     const weekBlockRefs = useRef([]); // weekBlockRefs.current[mIdx][wIdx] = tbody element
@@ -225,7 +294,7 @@ export default function QuarterView({
         return () => {
             if (raf) cancelAnimationFrame(raf);
         };
-    }, [events, todos, view]);
+    }, [events, view]);
 
     useEffect(() => {
         const onResize = () => {
@@ -310,7 +379,7 @@ export default function QuarterView({
             container.removeEventListener("scroll", computeLines);
             if (rafId) cancelAnimationFrame(rafId);
         };
-    }, [events, todos, months]);
+    }, [events, months]);
 
     // Close popup on outside click or Esc
     useEffect(() => {
@@ -506,60 +575,152 @@ export default function QuarterView({
                                                                     </div>
                                                                 </div>
                                                                 {(() => {
-                                                                    const { start: dStart, end: dEnd } = getDayBounds(date);
-                                                                    const dayEvents = (events || []).filter((ev) => overlapsDay(ev.start, ev.end, dStart, dEnd));
-                                                                    const dayTodos = (todos || []).filter((t) => {
-                                                                        const { s, e } = taskSpan(t);
-                                                                        return overlapsDay(s, e, dStart, dEnd);
-                                                                    });
+                                                                    const dayEvents = (events || []).filter((ev) =>
+                                                                        overlapsDayByCalendarDate(ev.start, ev.end, date) &&
+                                                                        String(ev?.kind || '').toLowerCase() !== 'appointment' &&
+                                                                        !ev?.taskId &&
+                                                                        !ev?.task_id
+                                                                    );
+                                                                    const dayAppointments = (events || []).filter((ev) =>
+                                                                        overlapsDayByCalendarDate(ev.start, ev.end, date) &&
+                                                                        String(ev?.kind || '').toLowerCase() === 'appointment'
+                                                                    );
                                                                     // For quarter view we don't render chips inline. Instead show a '+' icon
-                                                                    // to the right which opens a popup listing all events and tasks for the date.
-                                                                    const chips = [];
-                                                                    for (const ev of dayEvents) {
-                                                                        const color = categories?.[ev.kind]?.color || 'bg-slate-300';
-                                                                        chips.push({ type: 'event', id: ev.id, title: ev.title || '(event)', color, taskId: ev.taskId, data: ev });
-                                                                    }
-                                                                    const eventTaskIds = new Set(dayEvents.map((e) => String(e.taskId || '')));
-                                                                    for (const t of dayTodos) {
-                                                                        if (eventTaskIds.has(String(t.id))) continue;
-                                                                        chips.push({ type: 'task', id: t.id, title: t.title || '(task)', color: '#7ED4E3', data: t });
-                                                                    }
-                                                                    if (chips.length === 0) return null;
+                                                                    // to the right which opens a popup listing appointments for the date.
+                                                                    if (dayEvents.length === 0 && dayAppointments.length === 0) return null;
                                                                     const iso = date.toISOString().slice(0,10);
+                                                                    const dayEventsSorted = [...dayEvents].sort((a, b) => {
+                                                                        try {
+                                                                            const as = new Date(a.start || a.startDate || a.start_at || 0).getTime();
+                                                                            const bs = new Date(b.start || b.startDate || b.start_at || 0).getTime();
+                                                                            if (as !== bs) return as - bs;
+                                                                            const ac = new Date(a.createdAt || a.created_at || 0).getTime();
+                                                                            const bc = new Date(b.createdAt || b.created_at || 0).getTime();
+                                                                            if (!Number.isNaN(ac) && !Number.isNaN(bc) && ac !== bc) return ac - bc;
+                                                                        } catch (_) {}
+                                                                        return String(a?.title || '').localeCompare(String(b?.title || ''));
+                                                                    });
+                                                                    const dayOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+                                                                    const isPopupOpen = popup && popup.iso === iso;
+                                                                    const dayEventsWithLane = dayEventsSorted.map((ev, idx) => ({
+                                                                        ev,
+                                                                        lane: quarterEventLanes.laneByKey.get(getEventKey(ev, idx)) ?? 0,
+                                                                    }));
+                                                                    const maxLane = dayEventsWithLane.reduce((m, x) => Math.max(m, x.lane), 0);
+                                                                    const totalColumns = Math.min(3, Math.max(1, maxLane + 1));
+                                                                    const visibleEvents = dayEventsWithLane
+                                                                        .filter((x) => x.lane < 3)
+                                                                        .sort((a, b) => a.lane - b.lane);
+                                                                    const moreCount = Math.max(0, dayEventsWithLane.length - visibleEvents.length);
                                                                     return (
-                                                                        <div className="ml-2 flex items-center">
-                                                                            <button
-                                                                                aria-label={`Show items for ${iso}`}
-                                                                                className="text-sm text-blue-700 hover:bg-slate-50 p-0.5 rounded inline-flex items-center"
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    setPopup({ iso, events: dayEvents, todos: dayTodos });
-                                                                                }}
-                                                                            >
-                                                                                <FaPlus size={12} />
-                                                                            </button>
-                                                                            {popup && popup.iso === iso && (
+                                                                        <div
+                                                                            className="ml-2 flex items-center"
+                                                                            style={{ position: 'absolute', left: 76, right: 8, top: -1, bottom: -1, zIndex: isPopupOpen ? 2000 : 20 }}
+                                                                        >
+                                                                            <div style={{ position: 'relative', flex: 1, height: '100%', marginRight: 24 }}>
+                                                                                {visibleEvents.map(({ ev, lane }, idx) => {
+                                                                                    const span = eventSpanByDate(ev);
+                                                                                    const startsHere = span ? sameDateOnly(span.start, dayOnly) : false;
+                                                                                    const endsHere = span ? sameDateOnly(span.end, dayOnly) : false;
+                                                                                    const leftPct = (lane / totalColumns) * 100;
+                                                                                    const widthPct = 100 / totalColumns;
+                                                                                    return (
+                                                                                        <button
+                                                                                            key={`qv-ev-${iso}-${ev.id || idx}`}
+                                                                                            type="button"
+                                                                                            className="group text-left px-2 text-[12px] font-medium text-white"
+                                                                                            style={{
+                                                                                                position: 'absolute',
+                                                                                                top: 0,
+                                                                                                bottom: 0,
+                                                                                                left: `calc(${leftPct}% + ${totalColumns > 1 ? 1 : 0}px)`,
+                                                                                                width: `calc(${widthPct}% - ${totalColumns > 1 ? 2 : 0}px)`,
+                                                                                                backgroundColor: '#6BC3D0',
+                                                                                                borderRadius: startsHere && endsHere ? 6 : startsHere ? '6px 6px 0 0' : endsHere ? '0 0 6px 6px' : 0,
+                                                                                                boxShadow: '0 0 0 1px rgba(0,0,0,0.03)',
+                                                                                                overflow: 'hidden',
+                                                                                            }}
+                                                                                            onClick={(e) => {
+                                                                                                e.stopPropagation();
+                                                                                                if (onEventClick) onEventClick(ev);
+                                                                                            }}
+                                                                                            title={ev.title || '(event)'}
+                                                                                        >
+                                                                                            <div className="w-full h-full flex items-center justify-between gap-2">
+                                                                                                <span className="truncate">{startsHere ? (ev.title || '(event)') : ''}</span>
+                                                                                                {startsHere && (
+                                                                                                    <span className="hidden group-hover:inline-flex items-center gap-1 shrink-0">
+                                                                                                        <button
+                                                                                                            type="button"
+                                                                                                            className="p-0.5 rounded hover:bg-black/10"
+                                                                                                            onClick={(e) => {
+                                                                                                                e.stopPropagation();
+                                                                                                                onEventClick && onEventClick(ev, 'edit');
+                                                                                                            }}
+                                                                                                            aria-label="Edit event"
+                                                                                                        >
+                                                                                                            <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 576 512" className="w-3 h-3" xmlns="http://www.w3.org/2000/svg"><path d="M402.3 344.9l32-32c5-5 13.7-1.5 13.7 5.7V448c0 35.3-28.7 64-64 64H64c-35.3 0-64-28.7-64-64V128c0-35.3 28.7-64 64-64h229.5c7.2 0 10.7 8.7 5.7 13.7l-32 32c-1.5 1.5-3.5 2.3-5.7 2.3H64v336h320V350.5c0-2.1.8-4.1 2.3-5.6zM566.6 54.6l-45.3-45.3c-12.5-12.5-32.8-12.5-45.2 0L184 301.4l-21.2 92.6c-2.3 10.1 6.8 19.2 16.9 16.9l92.6-21.2 292.2-292.2c12.5-12.5 12.5-32.8.1-45.2z"></path></svg>
+                                                                                                        </button>
+                                                                                                        <button
+                                                                                                            type="button"
+                                                                                                            className="p-0.5 rounded hover:bg-black/10"
+                                                                                                            onClick={(e) => {
+                                                                                                                e.stopPropagation();
+                                                                                                                onEventClick && onEventClick(ev, 'delete');
+                                                                                                            }}
+                                                                                                            aria-label="Delete event"
+                                                                                                        >
+                                                                                                            <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" className="w-3 h-3" xmlns="http://www.w3.org/2000/svg"><path d="M135.2 17.7L128 32H32C14.3 32 0 46.3 0 64s14.3 32 32 32h384c17.7 0 32-14.3 32-32s-14.3-32-32-32h-96l-7.2-14.3C307.4 6.8 296.3 0 284.2 0H163.8c-12.1 0-23.2 6.8-28.6 17.7zM416 128H32l21.2 339.4c1.7 26.6 23.8 44.6 50.4 44.6h240.8c26.6 0 48.7-18 50.4-44.6L416 128z"></path></svg>
+                                                                                                        </button>
+                                                                                                    </span>
+                                                                                                )}
+                                                                                            </div>
+                                                                                        </button>
+                                                                                    );
+                                                                                })}
+                                                                            </div>
+
+                                                                            <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                                                                                {moreCount > 0 && (
+                                                                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-300">
+                                                                                        +{moreCount}
+                                                                                    </span>
+                                                                                )}
+                                                                                {dayAppointments.length > 0 && (
+                                                                                    <button
+                                                                                        aria-label={`Show appointments for ${iso}`}
+                                                                                        className="text-sm text-blue-700 hover:bg-slate-50 p-0.5 rounded inline-flex items-center"
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            setPopup({ iso, appointments: dayAppointments });
+                                                                                        }}
+                                                                                    >
+                                                                                        <FaPlus size={12} />
+                                                                                    </button>
+                                                                                )}
+                                                                            </div>
+
+                                                                            {isPopupOpen && (
                                                                                 <div
                                                                                     id={`quarter-popup-${popup.iso}`}
-                                                                                    style={{ position: 'absolute', top: '100%', right: 0, width: 320, zIndex: 50 }}
+                                                                                    style={{ position: 'absolute', top: '100%', right: 0, width: 320, zIndex: 2100 }}
                                                                                     className="rounded-lg border bg-white shadow-lg p-3 text-sm mt-2"
                                                                                     onClick={(e) => e.stopPropagation()}
                                                                                 >
                                                                                     <div className="flex items-center justify-between mb-2">
-                                                                                        <div className="font-semibold">Items on {popup.iso}</div>
+                                                                                        <div className="font-semibold">Appointments on {popup.iso}</div>
                                                                                         <button className="text-gray-500 hover:text-gray-700" onClick={() => setPopup(null)} aria-label="Close">✕</button>
                                                                                     </div>
                                                                                     <div className="max-h-64 overflow-auto">
-                                                                                        {popup.events && popup.events.length > 0 && (
+                                                                                        {popup.appointments && popup.appointments.length > 0 && (
                                                                                             <div className="mb-2">
-                                                                                                <div className="text-xs text-gray-500 mb-1">Events</div>
-                                                                                                {popup.events.map((ev) => (
+                                                                                                <div className="text-xs text-gray-500 mb-1">Appointments</div>
+                                                                                                {popup.appointments.map((ev) => (
                                                                                                     <button
                                                                                                         key={`ev-${ev.id}`}
                                                                                                         className="w-full text-left px-2 py-1 rounded hover:bg-slate-50"
                                                                                                         onClick={() => {
                                                                                                             setPopup(null);
-                                                                                                            if (ev.taskId && onTaskClick) return onTaskClick(String(ev.taskId));
                                                                                                             return onEventClick && onEventClick(ev);
                                                                                                         }}
                                                                                                     >
@@ -568,24 +729,7 @@ export default function QuarterView({
                                                                                                 ))}
                                                                                             </div>
                                                                                         )}
-                                                                                        {popup.todos && popup.todos.length > 0 && (
-                                                                                            <div>
-                                                                                                <div className="text-xs text-gray-500 mb-1">Tasks</div>
-                                                                                                {popup.todos.map((t) => (
-                                                                                                    <button
-                                                                                                        key={`t-${t.id}`}
-                                                                                                        className="w-full text-left px-2 py-1 rounded hover:bg-slate-50"
-                                                                                                        onClick={() => {
-                                                                                                            setPopup(null);
-                                                                                                            return onTaskClick && onTaskClick(String(t.id));
-                                                                                                        }}
-                                                                                                    >
-                                                                                                        <div className="truncate">{t.title || '(task)'}</div>
-                                                                                                    </button>
-                                                                                                ))}
-                                                                                            </div>
-                                                                                        )}
-                                                                                        {(!popup.events || popup.events.length === 0) && (!popup.todos || popup.todos.length === 0) && (
+                                                                                        {(!popup.appointments || popup.appointments.length === 0) && (
                                                                                             <div className="text-gray-500">No items</div>
                                                                                         )}
                                                                                     </div>

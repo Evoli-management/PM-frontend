@@ -1995,7 +1995,13 @@ const CalendarContainer = () => {
                     }}
                     onCreated={(created) => {
                         setEvents((prev) => [...prev, created]);
-                        addToast({ title: "Appointment created", variant: "success" });
+                        addToast({
+                            title:
+                                String(created?.kind || "").toLowerCase() === "event"
+                                    ? "Event created"
+                                    : "Appointment created",
+                            variant: "success",
+                        });
                         setAppointmentModalOpen(false);
                         setAppointmentInitialStart(null);
                         setAppointmentInitialAllDay(false);
@@ -2053,7 +2059,13 @@ const CalendarContainer = () => {
                         setModalOpen(false);
                         setSelectedEvent(null);
                         setModalOpenSource(null);
-                        addToast({ title: "Appointment updated", variant: "success" });
+                        addToast({
+                            title:
+                                String(updated?.kind || selectedEvent?.kind || "").toLowerCase() === "event"
+                                    ? "Event updated"
+                                    : "Appointment updated",
+                            variant: "success",
+                        });
                     }}
                     
                     defaultDurationMinutes={30}
