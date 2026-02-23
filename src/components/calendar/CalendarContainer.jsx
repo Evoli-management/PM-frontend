@@ -123,6 +123,7 @@ const CalendarContainer = () => {
     // Real-time refresh support (polling when external sync is enabled)
     const [syncActive, setSyncActive] = useState(false);
     const [refreshTick, setRefreshTick] = useState(0);
+    const lastEventMoveRef = React.useRef({ key: "", at: 0 });
 
     // Listen for global appointment create requests (Quick Actions)
     useEffect(() => {
@@ -520,9 +521,10 @@ const CalendarContainer = () => {
             const taskId = typeof taskOrId === "string" ? taskOrId : taskOrId?.id;
             const effect = String(dropEffect || "").toLowerCase();
             const isCopyDrop = effect.includes("copy");
+            const isMoveDrop = effect.includes("move") || effect === "all";
 
             // If this was NOT a copy-drop and we dropped an existing task (id), update its start/end on the task service
-            if (!isCopyDrop && taskId && todos.find((t) => String(t.id) === String(taskId))) {
+            if (!isCopyDrop && isMoveDrop && taskId && todos.find((t) => String(t.id) === String(taskId))) {
                 try {
                     const svc = await getTaskService();
                     const existing = todos.find((t) => String(t.id) === String(taskId));
@@ -669,7 +671,8 @@ const CalendarContainer = () => {
             const activityId = typeof activityOrObj === "string" ? activityOrObj : activityOrObj?.id;
             const effect = String(dropEffect || "").toLowerCase();
             const isCopyDrop = effect.includes("copy");
-            if (!isCopyDrop && activityId && (Array.isArray(weekActivities) ? weekActivities : []).some((a) => String(a.id) === String(activityId))) {
+            const isMoveDrop = effect.includes("move") || effect === "all";
+            if (!isCopyDrop && isMoveDrop && activityId && (Array.isArray(weekActivities) ? weekActivities : []).some((a) => String(a.id) === String(activityId))) {
                 try {
                     const svc = await getActivityService();
                     const toISO = (d) => d.toISOString();
@@ -1422,6 +1425,35 @@ const CalendarContainer = () => {
             const payload = { start: toOffsetISO(newStartDate), end: toOffsetISO(targetEnd), timezone: tz };
             // Decide endpoint based on event kind in current state
             const current = events.find((e) => e.id === eventId);
+
+            // Ignore no-op moves where start/end are effectively unchanged.
+            try {
+                if (current?.start && current?.end) {
+                    const currentStartMs = new Date(current.start).getTime();
+                    const currentEndMs = new Date(current.end).getTime();
+                    const nextStartMs = new Date(newStartDate).getTime();
+                    const nextEndMs = new Date(targetEnd).getTime();
+                    if (
+                        !Number.isNaN(currentStartMs) &&
+                        !Number.isNaN(currentEndMs) &&
+                        Math.abs(currentStartMs - nextStartMs) < 1000 &&
+                        Math.abs(currentEndMs - nextEndMs) < 1000
+                    ) {
+                        return;
+                    }
+                }
+            } catch (_) {}
+
+            // Ignore immediate duplicate move requests for the same target.
+            try {
+                const moveKey = `${String(eventId)}|${payload.start}|${payload.end}`;
+                const now = Date.now();
+                if (lastEventMoveRef.current.key === moveKey && now - lastEventMoveRef.current.at < 1200) {
+                    return;
+                }
+                lastEventMoveRef.current = { key: moveKey, at: now };
+            } catch (_) {}
+
             const isAppointment = current?.kind === "appointment";
 
             // If this is a recurring appointment, prompt for edit scope (occurrence/future/series)
@@ -1739,6 +1771,7 @@ const CalendarContainer = () => {
                         loading={loading}
                         categories={EVENT_CATEGORIES}
                         onTaskDrop={handleTaskDrop}
+                        onActivityDrop={handleActivityDrop}
                         onEventMove={handleEventMove}
                         onEventClick={(ev, action) => (ev?.taskId ? openEditTask(ev.taskId) : openModal(ev, action))}
                         onDeleteRequest={(ev, mouseEvent) => handleDeleteRequest(ev, mouseEvent)}
@@ -2024,8 +2057,6 @@ const CalendarContainer = () => {
                     }}
                     
                     defaultDurationMinutes={30}
-                    // Show a delete action when the modal was opened from Month view
-                    showDelete={modalOpenSource === 'month'}
                     onDelete={() => { if (selectedEvent) handleDeleteEvent(selectedEvent); }}
                     // Allow modal to directly notify that an item was deleted
                     onDeleted={(deleted) => {

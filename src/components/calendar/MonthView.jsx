@@ -35,10 +35,6 @@ const EventOverlayItem = React.memo(function EventOverlayItem({
     return (
       <div
         title={ev.title}
-        onClick={(e) => {
-          e.stopPropagation();
-          onEventClick && onEventClick(ev, "edit-month");
-        }}
         style={{
           position: "absolute",
           left: o.left,
@@ -56,7 +52,7 @@ const EventOverlayItem = React.memo(function EventOverlayItem({
           boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
           ...styleBg,
         }}
-        className={`${classForBg} text-xs truncate whitespace-nowrap`}
+        className={`${classForBg} group text-xs truncate whitespace-nowrap`}
       >
         <span className="shrink-0 text-xs" style={{ pointerEvents: "none" }}>
           {categories?.[ev.kind]?.icon || ""}
@@ -67,6 +63,32 @@ const EventOverlayItem = React.memo(function EventOverlayItem({
         >
           {ev.title}
         </span>
+        <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            type="button"
+            className="p-0.5 rounded hover:bg-black/10 transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEventClick && onEventClick(ev, "edit-month");
+            }}
+            aria-label={`Edit ${ev.title}`}
+            title="Edit appointment"
+          >
+            <FaEdit className="w-2.5 h-2.5 text-blue-600" />
+          </button>
+          <button
+            type="button"
+            className="p-0.5 rounded hover:bg-black/10 transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEventClick && onEventClick(ev, "delete");
+            }}
+            aria-label={`Delete ${ev.title}`}
+            title="Delete appointment"
+          >
+            <FaTrash className="w-2.5 h-2.5 text-red-600" />
+          </button>
+        </div>
       </div>
     );
   } catch (e) {

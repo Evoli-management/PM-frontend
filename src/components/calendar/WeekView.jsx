@@ -353,6 +353,7 @@ const WeekView = ({
       e.stopPropagation();
       const [h, m] = slot.split(":");
       const date = new Date(day.getFullYear(), day.getMonth(), day.getDate(), Number(h), Number(m));
+      const dragEffect = e.dataTransfer.getData("dragEffect");
       const eventId = e.dataTransfer.getData("eventId");
       if (eventId) {
         const dur = parseInt(e.dataTransfer.getData("durationMs") || "0", 10);
@@ -362,18 +363,24 @@ const WeekView = ({
       }
       const taskId = e.dataTransfer.getData("taskId");
       if (taskId) {
-        const dropEffect = (e.dataTransfer.dropEffect && e.dataTransfer.dropEffect !== "none")
-          ? e.dataTransfer.dropEffect
+        const dropEffect = (dragEffect && dragEffect !== "none")
+          ? dragEffect
+          : (e.dataTransfer.dropEffect && e.dataTransfer.dropEffect !== "none")
+            ? e.dataTransfer.dropEffect
           : (e.dataTransfer.effectAllowed || "copy");
-        onTaskDrop && onTaskDrop(taskId, date, dropEffect);
+        const taskText = e.dataTransfer.getData("taskText") || e.dataTransfer.getData("text/plain");
+        onTaskDrop && onTaskDrop(taskId, date, dropEffect, taskText);
         return;
       }
       const activityId = e.dataTransfer.getData("activityId");
       if (activityId) {
-        const dropEffect = (e.dataTransfer.dropEffect && e.dataTransfer.dropEffect !== "none")
-          ? e.dataTransfer.dropEffect
+        const dropEffect = (dragEffect && dragEffect !== "none")
+          ? dragEffect
+          : (e.dataTransfer.dropEffect && e.dataTransfer.dropEffect !== "none")
+            ? e.dataTransfer.dropEffect
           : (e.dataTransfer.effectAllowed || "copy");
-        onActivityDrop && onActivityDrop(activityId, date, dropEffect);
+        const activityText = e.dataTransfer.getData("activityText") || e.dataTransfer.getData("text/plain");
+        onActivityDrop && onActivityDrop(activityId, date, dropEffect, activityText);
       }
     } catch (err) {
       console.warn("Drop failed", err);
