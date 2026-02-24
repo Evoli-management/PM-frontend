@@ -237,7 +237,9 @@ const WeekView = ({
 
   // Calculate week start (Monday) and days (respect workWeek preference)
   const weekStart = new Date(currentDate || new Date());
+  weekStart.setHours(0, 0, 0, 0);
   weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
+  weekStart.setHours(0, 0, 0, 0);
   const daysCount = workWeek ? 5 : 7;
   const days = Array.from({ length: daysCount }, (_, i) => {
     return new Date(
@@ -837,22 +839,103 @@ const WeekView = ({
                             const BAR_TOP = 8;
                             const BAR_HEIGHT = 26;
                             const BAR_GAP = 6;
+                            const toUtcDaySerial = (d) =>
+                              Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / dayMs;
+                            const dayDiff = (a, b) => toUtcDaySerial(a) - toUtcDaySerial(b);
+                            const resolveStartRaw = (t) =>
+                              t.startDate ||
+                              t.start_date ||
+                              t.start ||
+                              t.startAt ||
+                              t.start_at ||
+                              t.date ||
+                              t.dueDate ||
+                              t.due_date ||
+                              null;
+                            const resolveEndRaw = (t) =>
+                              t.endDate ||
+                              t.end_date ||
+                              t.end ||
+                              t.endAt ||
+                              t.end_at ||
+                              t.date ||
+                              t.dueDate ||
+                              t.due_date ||
+                              resolveStartRaw(t);
+                            const isDateOnlyLike = (raw) => {
+                              if (typeof raw !== "string") return false;
+                              return /^(\d{4})-(\d{2})-(\d{2})(?:[T\s]00:00(?::00(?:\.000)?)?(?:Z)?)?$/.test(
+                                raw.trim()
+                              );
+                            };
+                            const isPureDateString = (raw) => {
+                              if (typeof raw !== "string") return false;
+                              return /^(\d{4})-(\d{2})-(\d{2})$/.test(raw.trim());
+                            };
+                            const toDayStart = (raw, treatAsDateOnly = false) => {
+                              try {
+                                if (!raw) return null;
+                                if (typeof raw === "string" && isPureDateString(raw)) {
+                                  const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                                  if (m) {
+                                    return new Date(
+                                      Number(m[1]),
+                                      Number(m[2]) - 1,
+                                      Number(m[3]),
+                                      0,
+                                      0,
+                                      0,
+                                      0
+                                    );
+                                  }
+                                }
+                                if (raw instanceof Date && treatAsDateOnly) {
+                                  const isUtcMidnight =
+                                    raw.getUTCHours() === 0 &&
+                                    raw.getUTCMinutes() === 0 &&
+                                    raw.getUTCSeconds() === 0 &&
+                                    raw.getUTCMilliseconds() === 0;
+                                  if (isUtcMidnight) {
+                                    return new Date(
+                                      raw.getUTCFullYear(),
+                                      raw.getUTCMonth(),
+                                      raw.getUTCDate(),
+                                      0,
+                                      0,
+                                      0,
+                                      0
+                                    );
+                                  }
+                                }
+                                const d = new Date(raw);
+                                if (Number.isNaN(d.getTime())) return null;
+                                return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+                              } catch {
+                                return null;
+                              }
+                            };
+                            const toDayEnd = (raw, treatAsDateOnly = false) => {
+                              const s = toDayStart(raw, treatAsDateOnly);
+                              if (!s) return null;
+                              return new Date(s.getFullYear(), s.getMonth(), s.getDate(), 23, 59, 59, 999);
+                            };
 
                             const weekTasks = (Array.isArray(events) ? events : []).filter((t) => {
                               try {
                                 if (String(t?.kind || "").toLowerCase() === "appointment") return false;
-                                const s = t.start || t.startAt || t.start_at || t.startDate || t.start_date || null;
-                                const e = t.end || t.endAt || t.end_at || t.endDate || t.end_date || null;
-                                const sDt = s ? new Date(s) : null;
-                                const eDt = e ? new Date(e) : null;
-                                if (!sDt || !eDt) return false;
-                                const sStart = new Date(sDt.getFullYear(), sDt.getMonth(), sDt.getDate(), 0, 0, 0, 0);
-                                const eStartDay = new Date(eDt.getFullYear(), eDt.getMonth(), eDt.getDate(), 0, 0, 0, 0);
-                                const eEnd = new Date(eDt.getFullYear(), eDt.getMonth(), eDt.getDate(), 23, 59, 59, 999);
+                                const s = resolveStartRaw(t);
+                                const e = resolveEndRaw(t);
+                                const treatAsDateOnly = Boolean(
+                                  t?.allDay || t?.all_day || isDateOnlyLike(s) || isDateOnlyLike(e)
+                                );
+                                const sStart = toDayStart(s, treatAsDateOnly);
+                                const eStartDay = toDayStart(e, treatAsDateOnly);
+                                const eEnd = toDayEnd(e, treatAsDateOnly);
+                                if (!sStart || !eStartDay || !eEnd) return false;
                                 if (!(sStart <= endOfWeek && eEnd >= weekStart)) return false;
                                 if (eStartDay.getTime() <= sStart.getTime()) return false;
-                                const startIndex = Math.floor((sStart - weekStart) / dayMs);
-                                const endIndex = Math.floor((eEnd - weekStart) / dayMs);
+                                const startIndex = dayDiff(sStart, weekStart);
+                                const endIndex = dayDiff(eEnd, weekStart);
                                 return endIndex > startIndex;
                               } catch {
                                 return false;
@@ -861,16 +944,16 @@ const WeekView = ({
 
                             const normalized = weekTasks
                               .map((t) => {
-                                const s = t.start || t.startAt || t.start_at || t.startDate || t.start_date || null;
-                                const e = t.end || t.endAt || t.end_at || t.endDate || t.end_date || null;
-                                const sDt = s ? new Date(s) : null;
-                                const eDt = e ? new Date(e) : null;
-                                if (!sDt || !eDt) return null;
-
-                                const sStart = new Date(sDt.getFullYear(), sDt.getMonth(), sDt.getDate(), 0, 0, 0, 0);
-                                const eEnd = new Date(eDt.getFullYear(), eDt.getMonth(), eDt.getDate(), 23, 59, 59, 999);
-                                const rawStartIndex = Math.floor((sStart - weekStart) / dayMs);
-                                const rawEndIndex = Math.floor((eEnd - weekStart) / dayMs);
+                                const s = resolveStartRaw(t);
+                                const e = resolveEndRaw(t);
+                                const treatAsDateOnly = Boolean(
+                                  t?.allDay || t?.all_day || isDateOnlyLike(s) || isDateOnlyLike(e)
+                                );
+                                const sStart = toDayStart(s, treatAsDateOnly);
+                                const eEnd = toDayEnd(e, treatAsDateOnly);
+                                if (!sStart || !eEnd) return null;
+                                const rawStartIndex = dayDiff(sStart, weekStart);
+                                const rawEndIndex = dayDiff(eEnd, weekStart);
                                 const startIndex = Math.max(0, rawStartIndex);
                                 const endIndex = Math.min(daysCount - 1, rawEndIndex);
                                 if (endIndex < startIndex) return null;
@@ -928,6 +1011,67 @@ const WeekView = ({
 
                             return (
                               <>
+                                {/* Background day hit-areas for all-day quick-create */}
+                                <div
+                                  style={{
+                                    position: "absolute",
+                                    left: 0,
+                                    right: 0,
+                                    top: 0,
+                                    bottom: 0,
+                                    display: "flex",
+                                    zIndex: 1,
+                                  }}
+                                >
+                                  {days.map((date, idx) => (
+                                    <button
+                                      key={`all-day-create-${idx}`}
+                                      type="button"
+                                      className="flex-1 h-full min-h-[40px] hover:bg-slate-50/70 transition-colors"
+                                      style={{
+                                        border: "none",
+                                        background: "transparent",
+                                        outlineOffset: "-2px",
+                                      }}
+                                      aria-label="Click to create all-day event"
+                                      title="Click to create all-day event"
+                                      onClick={(e) => {
+                                        try {
+                                          e.stopPropagation();
+                                        } catch {}
+                                        const dt = new Date(
+                                          date.getFullYear(),
+                                          date.getMonth(),
+                                          date.getDate(),
+                                          0,
+                                          0,
+                                          0,
+                                          0
+                                        );
+                                        onQuickCreate && onQuickCreate(dt, { allDay: true });
+                                      }}
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter" || e.key === " ") {
+                                          e.preventDefault();
+                                          try {
+                                            e.stopPropagation();
+                                          } catch {}
+                                          const dt = new Date(
+                                            date.getFullYear(),
+                                            date.getMonth(),
+                                            date.getDate(),
+                                            0,
+                                            0,
+                                            0,
+                                            0
+                                          );
+                                          onQuickCreate && onQuickCreate(dt, { allDay: true });
+                                        }
+                                      }}
+                                    />
+                                  ))}
+                                </div>
+
                                 <div style={{ minHeight }} />
                                 {placed
                                   .filter((entry) => entry.lane < 2)
@@ -955,8 +1099,9 @@ const WeekView = ({
                                       top: `${topPx}px`,
                                       width: `${widthPct}%`,
                                       height: `${BAR_HEIGHT}px`,
+                                      zIndex: 10,
                                       boxSizing: "border-box",
-                                      paddingRight: continuesRight ? "18px" : undefined,
+                                      paddingRight: continuesRight ? "40px" : "24px",
                                       paddingLeft: continuesLeft ? "18px" : undefined,
                                       ...style,
                                     };
@@ -967,7 +1112,7 @@ const WeekView = ({
                                         onClick={() => {
                                           if (onEventClick) onEventClick(t);
                                         }}
-                                        className={`absolute left-0 rounded px-2 text-xs overflow-hidden cursor-pointer ${bgClass || ""}`}
+                                        className={`group absolute left-0 rounded px-2 text-xs overflow-hidden cursor-pointer ${bgClass || ""}`}
                                         style={barStyle}
                                         title={t.title || t.name}
                                       >
@@ -978,6 +1123,33 @@ const WeekView = ({
                                           />
                                         )}
                                         <div className="truncate font-medium leading-[26px]">{t.title || t.name}</div>
+                                        <div className="hidden group-hover:flex items-center gap-1 absolute right-1 top-1/2 -translate-y-1/2 z-20">
+                                          <button
+                                            type="button"
+                                            className="p-0.5 rounded hover:bg-black/10"
+                                            onClick={(e) => {
+                                              try { e.stopPropagation(); } catch {}
+                                              onEventClick && onEventClick(t, "edit");
+                                            }}
+                                            aria-label={`Edit ${t.title || t.name || "event"}`}
+                                            title="Edit event"
+                                          >
+                                            <FaEdit className="w-2.5 h-2.5 text-blue-600" />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="p-0.5 rounded hover:bg-black/10"
+                                            onClick={(e) => {
+                                              try { e.stopPropagation(); } catch {}
+                                              if (typeof onDeleteRequest === "function") return onDeleteRequest(t, e);
+                                              onEventClick && onEventClick(t, "delete");
+                                            }}
+                                            aria-label={`Delete ${t.title || t.name || "event"}`}
+                                            title="Delete event"
+                                          >
+                                            <FaTrash className="w-2.5 h-2.5 text-red-600" />
+                                          </button>
+                                        </div>
                                         {continuesRight && (
                                           <FaChevronRight
                                             className="w-4 h-4 absolute right-1 top-1 font-semibold"
@@ -1051,19 +1223,56 @@ const WeekView = ({
                                               </button>
                                             </div>
                                             <div className="py-1">
-                                              {(allDayOverflow?.items || []).map((it, idx) => (
-                                                <button
-                                                  key={`overflow-item-${it.id || idx}`}
-                                                  type="button"
-                                                  className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50"
-                                                  onClick={() => {
-                                                    setAllDayOverflow(null);
-                                                    if (onEventClick) onEventClick(it);
-                                                  }}
-                                                >
-                                                  {it.title || it.name || "Untitled"}
-                                                </button>
-                                              ))}
+                                              {(allDayOverflow?.items || []).map((it, idx) => {
+                                                const title = it.title || it.name || "Untitled";
+                                                return (
+                                                  <div
+                                                    key={`overflow-item-${it.id || idx}`}
+                                                    className="group w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50"
+                                                  >
+                                                    <button
+                                                      type="button"
+                                                      className="flex-1 text-left truncate"
+                                                      onClick={() => {
+                                                        setAllDayOverflow(null);
+                                                        if (onEventClick) onEventClick(it);
+                                                      }}
+                                                      title={title}
+                                                    >
+                                                      {title}
+                                                    </button>
+                                                    <span className="inline-flex items-center gap-1 shrink-0 overflow-hidden max-w-0 group-hover:max-w-12 transition-all duration-150">
+                                                      <button
+                                                        type="button"
+                                                        className="p-0.5 rounded hover:bg-black/10"
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          setAllDayOverflow(null);
+                                                          onEventClick && onEventClick(it, "edit");
+                                                        }}
+                                                        aria-label={`Edit ${title}`}
+                                                        title="Edit event"
+                                                      >
+                                                        <FaEdit className="w-2.5 h-2.5 text-blue-600" />
+                                                      </button>
+                                                      <button
+                                                        type="button"
+                                                        className="p-0.5 rounded hover:bg-black/10"
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          setAllDayOverflow(null);
+                                                          if (typeof onDeleteRequest === "function") return onDeleteRequest(it, e);
+                                                          onEventClick && onEventClick(it, "delete");
+                                                        }}
+                                                        aria-label={`Delete ${title}`}
+                                                        title="Delete event"
+                                                      >
+                                                        <FaTrash className="w-2.5 h-2.5 text-red-600" />
+                                                      </button>
+                                                    </span>
+                                                  </div>
+                                                );
+                                              })}
                                             </div>
                                           </div>
                                         )}
@@ -1342,7 +1551,22 @@ const WeekView = ({
                                     ? dayInnerWidth
                                     : Math.max(24, colWidth - 4);
 
-                                  const kindClass = categories[ev.kind]?.color || null;
+                                  const kindColor = (() => {
+                                    const ka = ev.keyAreaId || ev.key_area_id
+                                      ? keyAreaMap[String(ev.keyAreaId || ev.key_area_id)]
+                                      : null;
+                                    return ka?.color || categories?.[ev.kind]?.color || "#4DC3D8";
+                                  })();
+                                  const isKindTailwind =
+                                    typeof kindColor === "string" && kindColor.startsWith("bg-");
+                                  const kindClass = isKindTailwind ? kindColor : "";
+                                  const timedStyle = isKindTailwind
+                                    ? undefined
+                                    : {
+                                        backgroundColor: kindColor,
+                                        border: `1px solid ${kindColor}`,
+                                        color: getContrastTextColor(kindColor),
+                                      };
                                   const isResizingThis = resizing && String(resizing.id) === String(ev.id);
 
                                   return (
@@ -1359,10 +1583,8 @@ const WeekView = ({
                                       }}
                                     >
                                       <div
-                                        className={`rounded px-1.5 py-1 text-xs overflow-hidden group ${
-                                          kindClass || "bg-gray-200"
-                                        }`}
-                                        style={{ height: "100%", cursor: "pointer" }}
+                                        className={`rounded px-1.5 py-1 text-xs overflow-hidden group ${kindClass || ""}`}
+                                        style={{ height: "100%", cursor: "pointer", ...(timedStyle || {}) }}
                                         title={ev.title || "Appointment"}
                                         draggable
                                         onDragStart={(e) => {

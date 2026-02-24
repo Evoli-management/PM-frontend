@@ -1,5 +1,5 @@
 import React, { useState, useRef, useLayoutEffect, useEffect, useMemo } from "react";
-import { FaChevronLeft, FaChevronRight, FaChevronDown, FaPlus } from "react-icons/fa";
+import { FaChevronLeft, FaChevronRight, FaChevronDown, FaPlus, FaEdit, FaTrash } from "react-icons/fa";
 import { useCalendarPreferences } from "../../hooks/useCalendarPreferences";
 
 function getWeekNumber(date) {
@@ -39,6 +39,31 @@ function getWeeksInQuarter(months) {
     return rows;
 }
 
+function hexToRgb(hex) {
+    if (!hex) return null;
+    const h = String(hex).replace('#', '');
+    const bigint = parseInt(h.length === 3 ? h.split('').map((c) => c + c).join('') : h, 16);
+    if (Number.isNaN(bigint)) return null;
+    const r = (bigint >> 16) & 255;
+    const g = (bigint >> 8) & 255;
+    const b = bigint & 255;
+    return { r, g, b };
+}
+
+function getContrastTextColor(hex) {
+    try {
+        const c = hexToRgb(hex);
+        if (!c) return '#ffffff';
+        const srgb = [c.r, c.g, c.b]
+            .map((v) => v / 255)
+            .map((v) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)));
+        const lum = 0.2126 * srgb[0] + 0.7152 * srgb[1] + 0.0722 * srgb[2];
+        return lum > 0.6 ? '#0B4A53' : '#ffffff';
+    } catch (_) {
+        return '#ffffff';
+    }
+}
+
 // ...existing code...
 export default function QuarterView({
     currentDate,
@@ -54,6 +79,28 @@ export default function QuarterView({
     onChangeFilter,
 }) {
     const { formatDate } = useCalendarPreferences();
+    const [keyAreaMap, setKeyAreaMap] = useState({});
+
+    useEffect(() => {
+        let ignore = false;
+        (async () => {
+            try {
+                const mod = await import("../../services/keyAreaService");
+                const svc = mod?.default || mod;
+                const areas = await svc.list().catch(() => []);
+                const map = {};
+                (areas || []).forEach((a) => {
+                    if (a && a.id) map[String(a.id)] = a;
+                });
+                if (!ignore) setKeyAreaMap(map);
+            } catch (_) {
+                if (!ignore) setKeyAreaMap({});
+            }
+        })();
+        return () => {
+            ignore = true;
+        };
+    }, []);
     const today = new Date();
     const months = getQuarterMonths(currentDate || today, 0);
     // month display values
@@ -606,10 +653,9 @@ export default function QuarterView({
                                                                         ev,
                                                                         lane: quarterEventLanes.laneByKey.get(getEventKey(ev, idx)) ?? 0,
                                                                     }));
-                                                                    const maxLane = dayEventsWithLane.reduce((m, x) => Math.max(m, x.lane), 0);
-                                                                    const totalColumns = Math.min(3, Math.max(1, maxLane + 1));
+                                                                    const VISIBLE_LANES = 2;
                                                                     const visibleEvents = dayEventsWithLane
-                                                                        .filter((x) => x.lane < 3)
+                                                                        .filter((x) => x.lane < VISIBLE_LANES)
                                                                         .sort((a, b) => a.lane - b.lane);
                                                                     const moreCount = Math.max(0, dayEventsWithLane.length - visibleEvents.length);
                                                                     return (
@@ -617,25 +663,37 @@ export default function QuarterView({
                                                                             className="ml-2 flex items-center"
                                                                             style={{ position: 'absolute', left: 76, right: 8, top: -1, bottom: -1, zIndex: isPopupOpen ? 2000 : 20 }}
                                                                         >
-                                                                            <div style={{ position: 'relative', flex: 1, height: '100%', marginRight: 24 }}>
+                                                                            <div style={{ position: 'relative', flex: 1, height: '100%', marginRight: 24, overflow: 'hidden' }}>
                                                                                 {visibleEvents.map(({ ev, lane }, idx) => {
                                                                                     const span = eventSpanByDate(ev);
                                                                                     const startsHere = span ? sameDateOnly(span.start, dayOnly) : false;
                                                                                     const endsHere = span ? sameDateOnly(span.end, dayOnly) : false;
-                                                                                    const leftPct = (lane / totalColumns) * 100;
-                                                                                    const widthPct = 100 / totalColumns;
+                                                                                    const colIndex = lane % VISIBLE_LANES;
+                                                                                    const kindKey = ev.kind || ev.type || ev.kindName || null;
+                                                                                    const cat =
+                                                                                        kindKey && categories && categories[kindKey]
+                                                                                            ? categories[kindKey]
+                                                                                            : null;
+                                                                                    const bgClass = cat?.color || null;
+                                                                                    const ka = ev.keyAreaId || ev.key_area_id
+                                                                                        ? keyAreaMap[String(ev.keyAreaId || ev.key_area_id)]
+                                                                                        : null;
+                                                                                    const DEFAULT_BAR_COLOR = '#4DC3D8';
+                                                                                    const kaColor = ka?.color || null;
+                                                                                    const finalBg = bgClass ? null : (kaColor || DEFAULT_BAR_COLOR);
+                                                                                    const textColor = finalBg ? getContrastTextColor(finalBg) : '#ffffff';
                                                                                     return (
                                                                                         <button
                                                                                             key={`qv-ev-${iso}-${ev.id || idx}`}
                                                                                             type="button"
-                                                                                            className="group text-left px-2 text-[12px] font-medium text-white"
+                                                                                            className={`group text-left px-2 text-[12px] font-medium text-white ${bgClass || ''}`}
                                                                                             style={{
                                                                                                 position: 'absolute',
                                                                                                 top: 0,
                                                                                                 bottom: 0,
-                                                                                                left: `calc(${leftPct}% + ${totalColumns > 1 ? 1 : 0}px)`,
-                                                                                                width: `calc(${widthPct}% - ${totalColumns > 1 ? 2 : 0}px)`,
-                                                                                                backgroundColor: '#6BC3D0',
+                                                                                                left: colIndex === 0 ? 0 : 'calc(50% + 1px)',
+                                                                                                width: 'calc(50% - 1px)',
+                                                                                                ...(finalBg ? { backgroundColor: finalBg, border: `1px solid ${finalBg}`, color: textColor } : {}),
                                                                                                 borderRadius: startsHere && endsHere ? 6 : startsHere ? '6px 6px 0 0' : endsHere ? '0 0 6px 6px' : 0,
                                                                                                 boxShadow: '0 0 0 1px rgba(0,0,0,0.03)',
                                                                                                 overflow: 'hidden',
@@ -659,7 +717,7 @@ export default function QuarterView({
                                                                                                             }}
                                                                                                             aria-label="Edit event"
                                                                                                         >
-                                                                                                            <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 576 512" className="w-3 h-3" xmlns="http://www.w3.org/2000/svg"><path d="M402.3 344.9l32-32c5-5 13.7-1.5 13.7 5.7V448c0 35.3-28.7 64-64 64H64c-35.3 0-64-28.7-64-64V128c0-35.3 28.7-64 64-64h229.5c7.2 0 10.7 8.7 5.7 13.7l-32 32c-1.5 1.5-3.5 2.3-5.7 2.3H64v336h320V350.5c0-2.1.8-4.1 2.3-5.6zM566.6 54.6l-45.3-45.3c-12.5-12.5-32.8-12.5-45.2 0L184 301.4l-21.2 92.6c-2.3 10.1 6.8 19.2 16.9 16.9l92.6-21.2 292.2-292.2c12.5-12.5 12.5-32.8.1-45.2z"></path></svg>
+                                                                                                            <FaEdit className="w-3 h-3 text-blue-600" />
                                                                                                         </button>
                                                                                                         <button
                                                                                                             type="button"
@@ -670,7 +728,7 @@ export default function QuarterView({
                                                                                                             }}
                                                                                                             aria-label="Delete event"
                                                                                                         >
-                                                                                                            <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" className="w-3 h-3" xmlns="http://www.w3.org/2000/svg"><path d="M135.2 17.7L128 32H32C14.3 32 0 46.3 0 64s14.3 32 32 32h384c17.7 0 32-14.3 32-32s-14.3-32-32-32h-96l-7.2-14.3C307.4 6.8 296.3 0 284.2 0H163.8c-12.1 0-23.2 6.8-28.6 17.7zM416 128H32l21.2 339.4c1.7 26.6 23.8 44.6 50.4 44.6h240.8c26.6 0 48.7-18 50.4-44.6L416 128z"></path></svg>
+                                                                                                            <FaTrash className="w-3 h-3 text-red-600" />
                                                                                                         </button>
                                                                                                     </span>
                                                                                                 )}
@@ -692,7 +750,11 @@ export default function QuarterView({
                                                                                         className="text-sm text-blue-700 hover:bg-slate-50 p-0.5 rounded inline-flex items-center"
                                                                                         onClick={(e) => {
                                                                                             e.stopPropagation();
-                                                                                            setPopup({ iso, appointments: dayAppointments });
+                                                                                            setPopup((curr) =>
+                                                                                                curr && curr.iso === iso
+                                                                                                    ? null
+                                                                                                    : { iso, appointments: dayAppointments }
+                                                                                            );
                                                                                         }}
                                                                                     >
                                                                                         <FaPlus size={12} />
@@ -715,18 +777,55 @@ export default function QuarterView({
                                                                                         {popup.appointments && popup.appointments.length > 0 && (
                                                                                             <div className="mb-2">
                                                                                                 <div className="text-xs text-gray-500 mb-1">Appointments</div>
-                                                                                                {popup.appointments.map((ev) => (
-                                                                                                    <button
-                                                                                                        key={`ev-${ev.id}`}
-                                                                                                        className="w-full text-left px-2 py-1 rounded hover:bg-slate-50"
-                                                                                                        onClick={() => {
-                                                                                                            setPopup(null);
-                                                                                                            return onEventClick && onEventClick(ev);
-                                                                                                        }}
-                                                                                                    >
-                                                                                                        <div className="truncate">{ev.title || '(event)'}</div>
-                                                                                                    </button>
-                                                                                                ))}
+                                                                                                {popup.appointments.map((ev) => {
+                                                                                                    const title = ev.title || '(event)';
+                                                                                                    return (
+                                                                                                        <div
+                                                                                                            key={`ev-${ev.id}`}
+                                                                                                            className="group w-full flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-50"
+                                                                                                        >
+                                                                                                            <button
+                                                                                                                type="button"
+                                                                                                                className="flex-1 text-left truncate"
+                                                                                                                onClick={() => {
+                                                                                                                    setPopup(null);
+                                                                                                                    return onEventClick && onEventClick(ev);
+                                                                                                                }}
+                                                                                                                title={title}
+                                                                                                            >
+                                                                                                                <div className="truncate">{title}</div>
+                                                                                                            </button>
+                                                                                                            <span className="inline-flex items-center gap-1 shrink-0 overflow-hidden max-w-0 group-hover:max-w-12 transition-all duration-150">
+                                                                                                                <button
+                                                                                                                    type="button"
+                                                                                                                    className="p-0.5 rounded hover:bg-black/10"
+                                                                                                                    onClick={(e) => {
+                                                                                                                        e.stopPropagation();
+                                                                                                                        setPopup(null);
+                                                                                                                        onEventClick && onEventClick(ev, 'edit');
+                                                                                                                    }}
+                                                                                                                    aria-label={`Edit ${title}`}
+                                                                                                                    title="Edit event"
+                                                                                                                >
+                                                                                                                    <FaEdit className="w-3 h-3 text-blue-600" />
+                                                                                                                </button>
+                                                                                                                <button
+                                                                                                                    type="button"
+                                                                                                                    className="p-0.5 rounded hover:bg-black/10"
+                                                                                                                    onClick={(e) => {
+                                                                                                                        e.stopPropagation();
+                                                                                                                        setPopup(null);
+                                                                                                                        onEventClick && onEventClick(ev, 'delete');
+                                                                                                                    }}
+                                                                                                                    aria-label={`Delete ${title}`}
+                                                                                                                    title="Delete event"
+                                                                                                                >
+                                                                                                                    <FaTrash className="w-3 h-3 text-red-600" />
+                                                                                                                </button>
+                                                                                                            </span>
+                                                                                                        </div>
+                                                                                                    );
+                                                                                                })}
                                                                                             </div>
                                                                                         )}
                                                                                         {(!popup.appointments || popup.appointments.length === 0) && (
