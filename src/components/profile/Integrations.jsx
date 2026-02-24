@@ -69,7 +69,23 @@ export const Integrations = ({ showToast }) => {
                         showToast && showToast('Manual sync not supported for this integration', 'info');
                     }
                 } catch (err) {
-                    showToast && showToast(`Manual sync failed for ${type}`, 'error');
+                    // Detect token/authorization errors
+                    const errMsg = err?.response?.data?.error || err?.message || '';
+                    if (
+                        err?.response?.status === 400 ||
+                        /invalid(_grant|_token)/i.test(errMsg) ||
+                        /token.*expired/i.test(errMsg)
+                    ) {
+                        showToast && showToast('Your connection has expired. Please reconnect your account.', 'error');
+                        // Redirect to OAuth flow (Google as example, adjust as needed)
+                        if (type === 'googleTasks') {
+                            window.location.href = '/api/auth/google';
+                        } else if (type === 'microsoftToDo') {
+                            window.location.href = '/api/auth/microsoft';
+                        }
+                    } else {
+                        showToast && showToast(`Manual sync failed for ${type}`, 'error');
+                    }
                 } finally {
                     setSyncing(prev => ({ ...prev, [type]: false }));
                 }
@@ -165,7 +181,6 @@ export const Integrations = ({ showToast }) => {
             switch (type) {
                 case 'googleCalendar':
                     result = await calendarService.syncGoogleCalendar();
-                    // Optimistically mark as connected on successful OAuth callback
                     setIntegrations(prev => ({
                         ...prev,
                         googleCalendar: { ...prev.googleCalendar, connected: true }
@@ -181,7 +196,6 @@ export const Integrations = ({ showToast }) => {
                     showToast('Outlook Calendar connected and sync initiated!');
                     break;
                 case 'teams':
-                    // For now, just simulate connection
                     await new Promise(resolve => setTimeout(resolve, 1000));
                     const updates = { ...integrations };
                     updates.teams = { 
@@ -194,7 +208,6 @@ export const Integrations = ({ showToast }) => {
                     break;
             }
 
-            // Reload integrations to reconcile with backend; if backend still shows disconnected, just log
             const updated = await loadIntegrations();
             if (updated) {
                 if (type === 'googleCalendar' && !updated.googleCalendar?.connected) {
@@ -207,7 +220,19 @@ export const Integrations = ({ showToast }) => {
 
         } catch (error) {
             console.error('Connection error:', error);
-            if (error.message === 'OAuth cancelled by user') {
+            const errMsg = error?.response?.data?.error || error?.message || '';
+            if (
+                error?.response?.status === 400 ||
+                /invalid(_grant|_token)/i.test(errMsg) ||
+                /token.*expired/i.test(errMsg)
+            ) {
+                showToast('Your connection has expired. Please reconnect your account.', 'error');
+                if (type === 'googleCalendar' || type === 'googleTasks') {
+                    window.location.href = '/api/auth/google';
+                } else if (type === 'outlookCalendar' || type === 'microsoftToDo') {
+                    window.location.href = '/api/auth/microsoft';
+                }
+            } else if (error.message === 'OAuth cancelled by user') {
                 showToast('Connection cancelled', 'info');
             } else {
                 showToast(`Failed to connect ${type}`, 'error');
