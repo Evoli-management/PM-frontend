@@ -103,8 +103,7 @@ export default function DontForget() {
         if (viewMode !== "dont-forget") return;
         (async () => {
             try {
-                const list = await (await getKeyAreaService()).list({ includeTaskCount: false });
-                // Exclude Ideas/default area from choices
+                const list = await keyAreaService.list({ includeTaskCount: false });
                 setDfKeyAreas(list.filter((k) => !k.is_default && (k.title || "").toLowerCase() !== "ideas"));
             } catch (e) {
                 setDfKeyAreas([]);
@@ -117,8 +116,7 @@ export default function DontForget() {
         let cancelled = false;
         (async () => {
             try {
-                const svc = await getKeyAreaService();
-                const list = await svc.list({ includeTaskCount: false });
+                const list = await keyAreaService.list({ includeTaskCount: false });
                 if (cancelled) return;
                 // normalize titles to compare (handle "Don't Forget" vs "Dont Forget")
                 const normalize = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -139,20 +137,15 @@ export default function DontForget() {
                     // If we had local names but server lacks them, persist local names
                     if (localStored && (!found.listNames || Object.keys(found.listNames || {}).length === 0)) {
                         try {
-                            await svc.update(found.id, { listNames: localStored });
+                            await keyAreaService.update(found.id, { listNames: localStored });
                         } catch (e) {
                             // ignore persistence errors
                         }
                     }
                 } else {
-                    // No existing KA named DontForget - do NOT create one automatically.
-                    // Use local list names and continue without a Key Area. Tasks created from
-                    // the Don't Forget page will be created without a key_area_id.
                     setDfKeyAreaId(null);
                     const toUse = (localStored && Object.keys(localStored).length) ? localStored : { 1: 'List 1' };
                     setDfListNames(toUse);
-                    // Intentionally do not call svc.create/ svc.update here so we avoid
-                    // creating a server Key Area for users who prefer not to persist it.
                 }
             } catch (e) {
                 // If key areas cannot be fetched, keep local list names (already set from localStorage)
@@ -225,9 +218,8 @@ export default function DontForget() {
         let cancelled = false;
         (async () => {
             try {
-                const [uSvc, gSvc] = await Promise.all([getUsersService(), getGoals()]);
-                const usersArr = uSvc && typeof uSvc.list === "function" ? await uSvc.list() : [];
-                const goalsArr = gSvc && typeof gSvc.getGoals === "function" ? await gSvc.getGoals({ status: 'active' }) : [];
+                const usersArr = await usersService.list();
+                const goalsArr = await getGoals({ status: 'active' });
                 if (cancelled) return;
                 setUsers(usersArr || []);
                 setGoals(goalsArr || []);
@@ -251,7 +243,7 @@ export default function DontForget() {
         let cancelled = false;
         (async () => {
             try {
-                const data = await (await getTaskService()).list({ unassigned: true });
+                const data = await taskService.list({ unassigned: true });
                 if (!cancelled) {
                     // Map API fields to this view’s expected shape
                     const mapped = data.map((t) => ({
@@ -858,7 +850,7 @@ export default function DontForget() {
             if (payload?.keyAreaId) body.keyAreaId = payload.keyAreaId;
             if (payload?.key_area_id) body.keyAreaId = payload.key_area_id;
                 try {
-                    const created = await (await getTaskService()).create(body);
+                    const created = await taskService.create(body);
                     // Debug: log selected listIndex from payload and created response
                     try { console.log('[DontForget] payload.listIndex', payload?.listIndex, 'payload.list_index', payload?.list_index); } catch (e) {}
                     // Push to local list
@@ -953,7 +945,7 @@ export default function DontForget() {
             await Promise.all(
                 ids.map(async (id) => {
                     try {
-                        await (await getTaskService()).remove(id);
+                        await taskService.remove(id);
                         successCount++;
                         markSaving(id, 600);
                     } catch (e) {
@@ -995,7 +987,7 @@ export default function DontForget() {
         const newCompleted = !t.completed;
         const newStatus = newCompleted ? "done" : "open";
         try {
-            await (await getTaskService()).update(id, { status: newStatus });
+            await taskService.update(id, { status: newStatus });
             setTasks((prev) =>
                 prev.map((x) => (x.id === id ? { ...x, completed: newCompleted, status: newStatus } : x)),
             );
@@ -1007,7 +999,7 @@ export default function DontForget() {
     };
     const setPriority = async (id, p) => {
         try {
-            await (await getTaskService()).update(id, { priority: p });
+            await taskService.update(id, { priority: p });
             setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, priority: p } : t)));
             markSaving(id);
         } catch (e) {
@@ -1016,7 +1008,7 @@ export default function DontForget() {
     };
     const setStatus = async (id, s) => {
         try {
-            await (await getTaskService()).update(id, { status: s });
+            await taskService.update(id, { status: s });
             setTasks((prev) =>
                 prev.map((t) =>
                     t.id === id
@@ -1101,9 +1093,9 @@ export default function DontForget() {
         else if (key === 'start_date') patch.startDate = value ? new Date(value).toISOString() : null;
         else if (key === 'end_date') patch.endDate = value ? new Date(value).toISOString() : null;
         else if (key === 'dueDate' || key === 'deadline') patch.dueDate = value ? new Date(value).toISOString() : null;
-    else if (key === 'duration') patch.duration = value;
-    else if (key === 'priority') patch.priority = value;
-    else if (key === 'status') patch.status = value;
+        else if (key === 'duration') patch.duration = value;
+        else if (key === 'priority') patch.priority = value;
+        else if (key === 'status') patch.status = value;
         else {
             // Not backed by API: keep optimistic state only
             return;
@@ -1224,7 +1216,7 @@ export default function DontForget() {
         if (form.duration !== undefined) patch.duration = form.duration;
         if (form.keyAreaId) patch.keyAreaId = form.keyAreaId;
         try {
-            const updated = await (await getTaskService()).update(id, patch);
+            const updated = await taskService.update(id, patch);
             if (form.keyAreaId) {
                 // Task moved to a Key Area: remove from DF list and open it in Key Areas
                 setTasks((prev) => prev.filter((t) => t.id !== id));
@@ -1325,7 +1317,7 @@ export default function DontForget() {
         if (payload.key_area_id) patch.keyAreaId = payload.key_area_id;
 
         try {
-            const updated = await (await getTaskService()).update(id, patch);
+            const updated = await taskService.update(id, patch);
             // If moved to a Key Area, remove from DF and open in Key Areas
             if (payload.key_area_id) {
                 setTasks((prev) => prev.filter((t) => t.id !== id));
@@ -1404,7 +1396,7 @@ export default function DontForget() {
                     if (payload.duration !== undefined) patch.duration = payload.duration;
                     if (payload.key_area_id) patch.keyAreaId = payload.key_area_id;
                     try {
-                        if (Object.keys(patch).length > 0) await (await getTaskService()).update(id, patch);
+                        if (Object.keys(patch).length > 0) await taskService.update(id, patch);
                     } catch (e) {
                         console.warn("Failed to update (mass)", id, e);
                     }
@@ -1489,7 +1481,7 @@ export default function DontForget() {
         const task = assignModal.task;
         if (!task || !payload || !payload.key_area_id) return;
         try {
-            await (await getTaskService()).update(task.id, { keyAreaId: payload.key_area_id });
+            await taskService.update(task.id, { keyAreaId: payload.key_area_id });
             setTasks((prev) => prev.filter((t) => t.id !== task.id));
             // Remove any local DF mapping for the moved task
             try {
@@ -1546,7 +1538,7 @@ export default function DontForget() {
                                     onBack={() => setSelectedTask(null)}
                                     onSave={async (payload) => {
                                         try {
-                                            const updated = await (await getTaskService()).update(selectedTask.id, payload);
+                                            const updated = await taskService.update(selectedTask.id, payload);
                                             setTasks((prev) => prev.map((t) =>
                                                 t.id === selectedTask.id
                                                     ? {
