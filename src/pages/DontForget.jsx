@@ -641,8 +641,7 @@ export default function DontForget() {
             (async () => {
                 if (!dfKeyAreaId) return;
                 try {
-                    const svc = await getKeyAreaService();
-                    await svc.update(dfKeyAreaId, { listNames: next });
+                    await keyAreaService.update(dfKeyAreaId, { listNames: next });
                 } catch (e) {
                     // ignore persistence errors
                 }
@@ -1041,7 +1040,7 @@ export default function DontForget() {
     const deleteTask = async (id) => {
         try {
             markSaving(id);
-            await (await getTaskService()).remove(id);
+            await taskService.remove(id);
             setTasks((prev) => prev.filter((t) => t.id !== id));
             // Remove any local DF list mapping for this task
             try {
