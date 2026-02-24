@@ -1727,7 +1727,7 @@ const CalendarContainer = () => {
                         todos={todos}
                         categories={EVENT_CATEGORIES}
                         onDayClick={(date) => openAddModal(date, { defaultTab: "task" })}
-                        onEventClick={(ev) => (ev?.taskId ? openEditTask(ev.taskId) : openModal(ev))}
+                        onEventClick={(ev, action) => (ev?.taskId ? openEditTask(ev.taskId) : openModal(ev, action))}
                         onTaskClick={openEditTask}
                     />
                     </div>

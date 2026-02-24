@@ -363,9 +363,9 @@ const buildRecurringPattern = ({
     const [keyAreaId, setKeyAreaId] = useState(initialKeyArea);
 
     const [startDateStr, setStartDateStr] = useState(toYMD(initialStart));
-    const [startTimeStr, setStartTimeStr] = useState(() => (!isEdit && allDayDefault) ? "00:00" : toHM(initialStart));
+    const [startTimeStr, setStartTimeStr] = useState(() => (!isEdit ? "00:00" : toHM(initialStart)));
     const [endDateStr, setEndDateStr] = useState(toYMD(initialEnd));
-    const [endTimeStr, setEndTimeStr] = useState(() => (!isEdit && allDayDefault) ? "23:59" : toHM(initialEnd));
+    const [endTimeStr, setEndTimeStr] = useState(() => (!isEdit ? "00:00" : toHM(initialEnd)));
     const [saving, setSaving] = useState(false);
     const [clientConflict, setClientConflict] = useState(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -523,9 +523,9 @@ const buildRecurringPattern = ({
     const end = isEdit && (event?.end || event?.endAt || event?.end_at) ? new Date(event.end || event.endAt || event.end_at) : initialEnd;
 
         setStartDateStr(toYMD(start));
-        setStartTimeStr(toHM(start));
+        setStartTimeStr(isEdit ? toHM(start) : "00:00");
         setEndDateStr(toYMD(end));
-        setEndTimeStr(toHM(end));
+        setEndTimeStr(isEdit ? toHM(end) : "00:00");
 
         const p = parseRecurringPattern(
             event?.recurringPattern || event?.recurrence || "",
@@ -600,13 +600,22 @@ const buildRecurringPattern = ({
                 return;
             }
 
-            const s = combineDateTime(startDateStr, startTimeStr);
-            const e = combineDateTime(endDateStr, endTimeStr);
+            const sRaw = combineDateTime(startDateStr, startTimeStr);
+            const eRaw = combineDateTime(endDateStr, endTimeStr);
 
-            if (!s || !e) {
+            if (!sRaw || !eRaw) {
                 addToast({ title: "Start & End required", variant: "error" });
                 return;
             }
+
+            // In all-day flow, keep time fields visible in the form but ignore
+            // their submitted values and normalize to full-day boundaries.
+            const s = allDayDefault
+                ? new Date(sRaw.getFullYear(), sRaw.getMonth(), sRaw.getDate(), 0, 0, 0, 0)
+                : sRaw;
+            const e = allDayDefault
+                ? new Date(eRaw.getFullYear(), eRaw.getMonth(), eRaw.getDate(), 23, 59, 0, 0)
+                : eRaw;
 
             if (s >= e) {
                 addToast({ title: "End must be after start", variant: "error" });
@@ -614,7 +623,7 @@ const buildRecurringPattern = ({
             }
 
             const calendarDayDiff = getCalendarDayDiff(s, e);
-            const submitAsEvent = calendarDayDiff >= 1;
+            const submitAsEvent = allDayDefault || calendarDayDiff >= 1;
             submitKindLabel = submitAsEvent ? "event" : "appointment";
 
             if (recurrenceType && recurrenceType !== "none") {
@@ -809,6 +818,7 @@ const buildRecurringPattern = ({
                         end: toOffsetISO(e),
                         timezone,
                         allDay: true,
+                        recurringPattern: recurringPattern || null,
                         keyAreaId: keyAreaId || null,
                     })
                     : await calendarService.createAppointment({
@@ -1074,37 +1084,32 @@ const buildRecurringPattern = ({
                                 </div>
                             </div>
 
-                            {allDayDefault ? (
-                                <div className="text-xs text-slate-600 mt-2">
-                                    This will be created as an all-day event.
+                            <>
+                                <div>
+                                    <label className="text-sm font-medium text-slate-700">Start time</label>
+                                    <TimePicker
+                                        value={startTimeStr}
+                                        onChange={(v) => setStartTimeStr(v)}
+                                        use24Hour={use24Hour}
+                                        outerClassName="appointment-time-control mt-0 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50"
+                                        innerClassName="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                                        label="Start time"
+                                    />
                                 </div>
-                            ) : (
-                                <>
-                                    <div>
-                                        <label className="text-sm font-medium text-slate-700">Start time</label>
-                                        <TimePicker
-                                            value={startTimeStr}
-                                            onChange={(v) => setStartTimeStr(v)}
-                                            use24Hour={use24Hour}
-                                            outerClassName="appointment-time-control mt-0 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50"
-                                            innerClassName="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
-                                            label="Start time"
-                                        />
-                                    </div>
 
-                                    <div>
-                                        <label className="text-sm font-medium text-slate-700">End time</label>
-                                        <TimePicker
-                                            value={endTimeStr}
-                                            onChange={(v) => setEndTimeStr(v)}
-                                            use24Hour={use24Hour}
-                                            outerClassName="appointment-time-control mt-0 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50"
-                                            innerClassName="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
-                                            label="End time"
-                                        />
-                                    </div>
-                                </>
-                            )}
+                                <div>
+                                    <label className="text-sm font-medium text-slate-700">End time</label>
+                                    <TimePicker
+                                        value={endTimeStr}
+                                        onChange={(v) => setEndTimeStr(v)}
+                                        use24Hour={use24Hour}
+                                        outerClassName="appointment-time-control mt-0 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50"
+                                        innerClassName="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                                        label="End time"
+                                    />
+                                </div>
+
+                            </>
                         </div>
 
                         {/* separator column centered between left and right on md+ */}

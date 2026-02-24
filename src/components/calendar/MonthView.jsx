@@ -13,13 +13,15 @@ import { FaEdit, FaTrash } from "react-icons/fa";
 const EventOverlayItem = React.memo(function EventOverlayItem({
   o,
   categories,
+  keyAreaMap,
   tailwindColorCache,
   getContrastTextColor,
   onEventClick,
 }) {
   try {
     const ev = o.ev;
-    const color = categories?.[ev.kind]?.color || "bg-gray-200";
+    const ka = keyAreaMap?.[String(ev?.keyAreaId || ev?.key_area_id || "")];
+    const color = ka?.color || categories?.[ev.kind]?.color || "#4DC3D8";
     const isTailwind = typeof color === "string" && color.startsWith("bg-");
     const resolvedTailwind = isTailwind ? tailwindColorCache[color] : null;
     const resolved = !isTailwind ? color : resolvedTailwind;
@@ -641,13 +643,13 @@ export default function MonthView({
 
   const getAllDayStyle = (r) => {
     const ka = keyAreaMap?.[String(r?.task?.keyAreaId || r?.task?.key_area_id)];
-    let categoryColor = ka?.color || categories?.[r?.task?.kind]?.color;
+    let categoryColor = ka?.color || categories?.[r?.task?.kind]?.color || "#4DC3D8";
 
     const isTailwind = typeof categoryColor === "string" && categoryColor.startsWith("bg-");
     const isColorStr = typeof categoryColor === "string" && !isTailwind;
 
     const classForBg = isTailwind ? categoryColor : "";
-    const classForBgFinal = classForBg || "bg-gray-200";
+    const classForBgFinal = classForBg;
 
     const resolvedTailwind = isTailwind ? tailwindColorCache[categoryColor] : null;
     const resolved = isColorStr ? categoryColor : resolvedTailwind;
@@ -1654,7 +1656,7 @@ export default function MonthView({
                   return (
                     <div
                       key={`md-run-${idx}-${run.item?.task?.id || ""}`}
-                      className={classForBgFinal}
+                      className={`${classForBgFinal} group`}
                       style={{
                         position: "absolute",
                         top,
@@ -1680,6 +1682,32 @@ export default function MonthView({
                       <span className="truncate text-xs min-w-0 flex-1" style={{ pointerEvents: "none" }}>
                         {run.item?.task?.title}
                       </span>
+                      <span className="inline-flex items-center gap-1 shrink-0 overflow-hidden max-w-0 group-hover:max-w-12 transition-all duration-150">
+                        <button
+                          type="button"
+                          className="p-0.5 rounded hover:bg-black/10"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (typeof onEventClick === "function") onEventClick(run.item.task, "edit-month");
+                          }}
+                          aria-label={`Edit ${run.item?.task?.title || "event"}`}
+                          title="Edit event"
+                        >
+                          <FaEdit className="w-2.5 h-2.5 text-blue-600" />
+                        </button>
+                        <button
+                          type="button"
+                          className="p-0.5 rounded hover:bg-black/10"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (typeof onEventClick === "function") onEventClick(run.item.task, "delete");
+                          }}
+                          aria-label={`Delete ${run.item?.task?.title || "event"}`}
+                          title="Delete event"
+                        >
+                          <FaTrash className="w-2.5 h-2.5 text-red-600" />
+                        </button>
+                      </span>
                     </div>
                   );
                 })}
@@ -1700,7 +1728,11 @@ export default function MonthView({
                             className="text-blue-700 hover:bg-slate-50 p-0.5 rounded inline-flex items-center"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setAllDayOverflow({ dayIdx, items: [primary, ...hidden].filter(Boolean) });
+                              setAllDayOverflow((curr) =>
+                                curr && curr.dayIdx === dayIdx
+                                  ? null
+                                  : { dayIdx, items: [primary, ...hidden].filter(Boolean) }
+                              );
                             }}
                             title="Show all-day items"
                           >
@@ -1728,20 +1760,56 @@ export default function MonthView({
                             </button>
                           </div>
                           <div className="py-1">
-                            {(allDayOverflow.items || []).map((it, idx) => (
-                              <button
-                                key={`md-overflow-${idx}-${it?.task?.id || ""}`}
-                                type="button"
-                                className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50"
-                                onClick={() => {
-                                  setAllDayOverflow(null);
-                                  if (typeof onEventClick === "function") onEventClick(it.task);
-                                  else if (typeof onTaskClick === "function") onTaskClick(it.task);
-                                }}
-                              >
-                                {it?.task?.title || "Untitled"}
-                              </button>
-                            ))}
+                            {(allDayOverflow.items || []).map((it, idx) => {
+                              const title = it?.task?.title || "Untitled";
+                              return (
+                                <div
+                                  key={`md-overflow-${idx}-${it?.task?.id || ""}`}
+                                  className="group w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50"
+                                >
+                                  <button
+                                    type="button"
+                                    className="flex-1 text-left truncate"
+                                    onClick={() => {
+                                      setAllDayOverflow(null);
+                                      if (typeof onEventClick === "function") onEventClick(it.task);
+                                      else if (typeof onTaskClick === "function") onTaskClick(it.task);
+                                    }}
+                                    title={title}
+                                  >
+                                    {title}
+                                  </button>
+                                  <span className="inline-flex items-center gap-1 shrink-0 overflow-hidden max-w-0 group-hover:max-w-12 transition-all duration-150">
+                                    <button
+                                      type="button"
+                                      className="p-0.5 rounded hover:bg-black/10"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setAllDayOverflow(null);
+                                        if (typeof onEventClick === "function") onEventClick(it.task, "edit-month");
+                                      }}
+                                      aria-label={`Edit ${title}`}
+                                      title="Edit event"
+                                    >
+                                      <FaEdit className="w-2.5 h-2.5 text-blue-600" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="p-0.5 rounded hover:bg-black/10"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setAllDayOverflow(null);
+                                        if (typeof onEventClick === "function") onEventClick(it.task, "delete");
+                                      }}
+                                      aria-label={`Delete ${title}`}
+                                      title="Delete event"
+                                    >
+                                      <FaTrash className="w-2.5 h-2.5 text-red-600" />
+                                    </button>
+                                  </span>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       )}
@@ -1923,6 +1991,7 @@ export default function MonthView({
                         key={`evov-${idx}-${String(o.ev?.id || "")}`}
                         o={o}
                         categories={categories}
+                        keyAreaMap={keyAreaMap}
                         tailwindColorCache={tailwindColorCache}
                         getContrastTextColor={getContrastTextColor}
                         onEventClick={onEventClick}
@@ -1930,7 +1999,6 @@ export default function MonthView({
                     ))}
                   </div>
                 )}
-
                 {/* Today row overlay */}
                 {rowOverlay && rowOverlay.visible && (
                   <div

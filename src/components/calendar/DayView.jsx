@@ -84,6 +84,7 @@ export default function DayView({
   onActivityComplete,
   onActivityEdit,
   onActivityDelete,
+  onDeleteRequest,
 }) {
 
   // Always render the full 24-hour grid; non-working slots will be greyed
@@ -988,7 +989,7 @@ export default function DayView({
                                       try { e.stopPropagation(); } catch (_) {}
                                       if (onEventClick) onEventClick(t);
                                     }}
-                                    className={`w-full flex items-center gap-3 px-3 py-2 rounded text-xs truncate ${bgClass || ''}`}
+                                    className={`w-full group flex items-center gap-3 px-3 py-2 rounded text-xs truncate ${bgClass || ''}`}
                                     style={{ ...(styleBar || {}), width: '100%' }}
                                     title={title}
                                   >
@@ -1006,6 +1007,33 @@ export default function DayView({
                                           <path d="M285.476 272.971L91.132 467.314c-9.373 9.373-24.569 9.373-33.941 0l-22.667-22.667c-9.357-9.357-9.375-24.522-.04-33.901L188.505 256 34.484 101.255c-9.335-9.379-9.317-24.544.04-33.901l22.667-22.667c9.373-9.373 24.569-9.373 33.941 0L285.475 239.03c9.373 9.372 9.373 24.568.001 33.941z"></path>
                                         </svg>
                                       ) : ''}
+                                    </span>
+                                    <span className="hidden group-hover:inline-flex items-center gap-1 shrink-0">
+                                      <button
+                                        type="button"
+                                        className="p-0.5 rounded hover:bg-black/10"
+                                        onClick={(e) => {
+                                          try { e.stopPropagation(); } catch (_) {}
+                                          onEventClick && onEventClick(t, 'edit');
+                                        }}
+                                        aria-label={`Edit ${title}`}
+                                        title="Edit event"
+                                      >
+                                        <FaEdit className="w-2.5 h-2.5 text-blue-600" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="p-0.5 rounded hover:bg-black/10"
+                                        onClick={(e) => {
+                                          try { e.stopPropagation(); } catch (_) {}
+                                          if (typeof onDeleteRequest === 'function') return onDeleteRequest(t, e);
+                                          onEventClick && onEventClick(t, 'delete');
+                                        }}
+                                        aria-label={`Delete ${title}`}
+                                        title="Delete event"
+                                      >
+                                        <FaTrash className="w-2.5 h-2.5 text-red-600" />
+                                      </button>
                                     </span>
                                   </button>
                                 </div>
@@ -1051,17 +1079,51 @@ export default function DayView({
                                         {allDayOverflowItems.map((it, idx) => {
                                           const title = it.title || it.name || it.summary || "Untitled";
                                           return (
-                                            <button
+                                            <div
                                               key={`day-overflow-item-${it.id || idx}`}
-                                              type="button"
-                                              className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50"
-                                              onClick={() => {
-                                                setAllDayOverflowOpen(false);
-                                                if (onEventClick) onEventClick(it);
-                                              }}
+                                              className="group w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50"
                                             >
-                                              {title}
-                                            </button>
+                                              <button
+                                                type="button"
+                                                className="flex-1 text-left truncate"
+                                                onClick={() => {
+                                                  setAllDayOverflowOpen(false);
+                                                  if (onEventClick) onEventClick(it);
+                                                }}
+                                                title={title}
+                                              >
+                                                {title}
+                                              </button>
+                                              <span className="inline-flex items-center gap-1 shrink-0 overflow-hidden max-w-0 group-hover:max-w-12 transition-all duration-150">
+                                                <button
+                                                  type="button"
+                                                  className="p-0.5 rounded hover:bg-black/10"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setAllDayOverflowOpen(false);
+                                                    onEventClick && onEventClick(it, 'edit');
+                                                  }}
+                                                  aria-label={`Edit ${title}`}
+                                                  title="Edit event"
+                                                >
+                                                  <FaEdit className="w-2.5 h-2.5 text-blue-600" />
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  className="p-0.5 rounded hover:bg-black/10"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setAllDayOverflowOpen(false);
+                                                    if (typeof onDeleteRequest === 'function') return onDeleteRequest(it, e);
+                                                    onEventClick && onEventClick(it, 'delete');
+                                                  }}
+                                                  aria-label={`Delete ${title}`}
+                                                  title="Delete event"
+                                                >
+                                                  <FaTrash className="w-2.5 h-2.5 text-red-600" />
+                                                </button>
+                                              </span>
+                                            </div>
                                           );
                                         })}
                                       </div>
