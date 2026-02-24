@@ -1,10 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState, Suspense } from "react";
-import { syncService } from "../services/syncService";
-import authService from "../services/authService";
-import taskService from "../services/taskService";
-import keyAreaService from "../services/keyAreaService";
-import usersService from "../services/usersService";
-import { getGoals } from "../services/goalService";
 // keep rendering inline (match KeyAreas behavior)
 import { useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "../components/shared/Sidebar.jsx";
@@ -17,17 +11,45 @@ import EditTaskModal from "../components/key-areas/EditTaskModal.jsx";
 import TaskRow from "../components/key-areas/TaskRow.jsx";
 import TaskFullView from "../components/key-areas/TaskFullView";
 // Activity composer removed from DontForget: activities are not fetched here
+
+// Lazy getters for services to allow code-splitting
+let _taskService = null;
+const getTaskService = async () => {
+    if (_taskService) return _taskService;
+    const mod = await import("../services/taskService");
+    _taskService = mod.default || mod;
+    return _taskService;
+};
+
+let _keyAreaService = null;
+const getKeyAreaService = async () => {
+    if (_keyAreaService) return _keyAreaService;
+    const mod = await import("../services/keyAreaService");
+    _keyAreaService = mod.default || mod;
+    return _keyAreaService;
+};
+
+let _usersService = null;
+const getUsersService = async () => {
+    if (_usersService) return _usersService;
+    const mod = await import("../services/usersService");
+    _usersService = mod.default || mod;
+    return _usersService;
+};
+
+let _goalService = null;
+const getGoalService = async () => {
+    if (_goalService) return _goalService;
+    const mod = await import("../services/goalService");
+    _goalService = mod;
+    return _goalService;
+};
+
 // Note: activityService loader removed for DontForget (no activity fetching)
 
 export default function DontForget() {
     const location = useLocation();
     const navigate = useNavigate();
-
-    // Sync status state (for imported tasks)
-    const [user, setUser] = useState(null);
-    const [taskSyncStatus, setTaskSyncStatus] = useState(null);
-    const [syncStatusLoading, setSyncStatusLoading] = useState(false);
-    const [syncStatusError, setSyncStatusError] = useState(null);
 
     // Open Don't Forget view if ?dontforget=1
     const [viewMode, setViewMode] = useState("list");
@@ -35,39 +57,18 @@ export default function DontForget() {
 
     // Don’t Forget tasks: now server-backed (tasks without keyAreaId)
     const [tasks, setTasks] = useState([]);
-    // Fetch current user and then task sync status (only for imported tab)
-    useEffect(() => {
-        let cancelled = false;
-        async function fetchSyncStatus() {
-            try {
-                setSyncStatusError(null);
-                setSyncStatusLoading(true);
-                // Defensive: check authService and syncService exist
-                if (!authService || !syncService) {
-                    throw new Error("Sync services unavailable");
-                }
-                // Get user if not already loaded
-                let u = user;
-                if (!u) {
-                    const res = await authService.verifyToken?.();
-                    u = res?.user || res;
-                    if (!cancelled && u) setUser(u);
-                }
-                if (u?.id && syncService.getTaskSyncStatus) {
-                    const status = await syncService.getTaskSyncStatus(u.id);
-                    if (!cancelled) setTaskSyncStatus(status);
-                }
-            } catch (err) {
-                if (!cancelled) setSyncStatusError(err?.message || "Failed to load sync status");
-            } finally {
-                if (!cancelled) setSyncStatusLoading(false);
-            }
+    // DF header list names (local-only)
+    const [dfListNames, setDfListNames] = useState(() => {
+        try {
+            const raw = localStorage.getItem("dfListNames");
+            const parsed = raw ? JSON.parse(raw) : {};
+            // ensure at least List 1 exists
+            if (!parsed || Object.keys(parsed).length === 0) return { 1: "List 1" };
+            return parsed;
+        } catch {
+            return { 1: "List 1" };
         }
-        if (showImportedOnly) {
-            fetchSyncStatus();
-        }
-        return () => { cancelled = true; };
-    }, [user, showImportedOnly]);
+    });
     useEffect(() => {
         try {
             localStorage.setItem("dfListNames", JSON.stringify(dfListNames));
@@ -103,7 +104,8 @@ export default function DontForget() {
         if (viewMode !== "dont-forget") return;
         (async () => {
             try {
-                const list = await keyAreaService.list({ includeTaskCount: false });
+                const list = await (await getKeyAreaService()).list({ includeTaskCount: false });
+                // Exclude Ideas/default area from choices
                 setDfKeyAreas(list.filter((k) => !k.is_default && (k.title || "").toLowerCase() !== "ideas"));
             } catch (e) {
                 setDfKeyAreas([]);
@@ -116,7 +118,8 @@ export default function DontForget() {
         let cancelled = false;
         (async () => {
             try {
-                const list = await keyAreaService.list({ includeTaskCount: false });
+                const svc = await getKeyAreaService();
+                const list = await svc.list({ includeTaskCount: false });
                 if (cancelled) return;
                 // normalize titles to compare (handle "Don't Forget" vs "Dont Forget")
                 const normalize = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -137,15 +140,20 @@ export default function DontForget() {
                     // If we had local names but server lacks them, persist local names
                     if (localStored && (!found.listNames || Object.keys(found.listNames || {}).length === 0)) {
                         try {
-                            await keyAreaService.update(found.id, { listNames: localStored });
+                            await svc.update(found.id, { listNames: localStored });
                         } catch (e) {
                             // ignore persistence errors
                         }
                     }
                 } else {
+                    // No existing KA named DontForget - do NOT create one automatically.
+                    // Use local list names and continue without a Key Area. Tasks created from
+                    // the Don't Forget page will be created without a key_area_id.
                     setDfKeyAreaId(null);
                     const toUse = (localStored && Object.keys(localStored).length) ? localStored : { 1: 'List 1' };
                     setDfListNames(toUse);
+                    // Intentionally do not call svc.create/ svc.update here so we avoid
+                    // creating a server Key Area for users who prefer not to persist it.
                 }
             } catch (e) {
                 // If key areas cannot be fetched, keep local list names (already set from localStorage)
@@ -218,8 +226,9 @@ export default function DontForget() {
         let cancelled = false;
         (async () => {
             try {
-                const usersArr = await usersService.list();
-                const goalsArr = await getGoals({ status: 'active' });
+                const [uSvc, gSvc] = await Promise.all([getUsersService(), getGoalService()]);
+                const usersArr = uSvc && typeof uSvc.list === "function" ? await uSvc.list() : [];
+                const goalsArr = gSvc && typeof gSvc.getGoals === "function" ? await gSvc.getGoals({ status: 'active' }) : [];
                 if (cancelled) return;
                 setUsers(usersArr || []);
                 setGoals(goalsArr || []);
@@ -243,7 +252,7 @@ export default function DontForget() {
         let cancelled = false;
         (async () => {
             try {
-                const data = await taskService.list({ unassigned: true });
+                const data = await (await getTaskService()).list({ unassigned: true });
                 if (!cancelled) {
                     // Map API fields to this view’s expected shape
                     const mapped = data.map((t) => ({
@@ -393,60 +402,6 @@ export default function DontForget() {
         window.setDontForgetShowImported = setShowImportedOnly;
         return () => { delete window.setDontForgetShowImported; };
     }, []);
-
-    // --- Sync Status Banner (only for imported tab) ---
-    const renderSyncStatusBanner = () => {
-        if (!showImportedOnly) return null;
-        if (syncStatusLoading) {
-            return (
-                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-blue-900 flex items-center gap-2">
-                    <span className="animate-spin mr-2">🔄</span> Loading sync status...
-                </div>
-            );
-        }
-        if (syncStatusError) {
-            return (
-                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-800 flex items-center gap-2">
-                    <span>⚠️</span> {syncStatusError}
-                </div>
-            );
-        }
-        if (!taskSyncStatus) return null;
-        // Assume shape: { status, lastSyncAt, lastError }
-        const status = taskSyncStatus.status || taskSyncStatus.syncStatus || "unknown";
-        const lastSyncAt = taskSyncStatus.lastSyncAt || taskSyncStatus.last_sync_at;
-        const lastError = taskSyncStatus.lastError || taskSyncStatus.last_error;
-        const statusColor = status === "idle" ? "text-green-700" : status === "syncing" ? "text-blue-700" : status === "error" ? "text-red-700" : "text-gray-700";
-        const statusLabel = status === "idle" ? "Active" : status === "syncing" ? "Syncing..." : status === "error" ? "Error" : status;
-        const formatDate = (dateString) => {
-            if (!dateString) return "Never";
-            const date = new Date(dateString);
-            const now = new Date();
-            const diffMs = now - date;
-            const diffMins = Math.floor(diffMs / 60000);
-            const diffHours = Math.floor(diffMs / 3600000);
-            if (diffMins < 1) return "Just now";
-            if (diffMins < 60) return `${diffMins} min ago`;
-            if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-            return date.toLocaleString();
-        };
-        return (
-            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded flex flex-col gap-1">
-                <div className="flex items-center gap-2">
-                    <span className={statusColor + " font-semibold"}>Task Sync Status:</span>
-                    <span className={statusColor}>{statusLabel}</span>
-                    {lastSyncAt && (
-                        <span className="ml-4 text-gray-700">Last Sync: <span className="font-medium">{formatDate(lastSyncAt)}</span></span>
-                    )}
-                </div>
-                {lastError && (
-                    <div className="mt-1 text-red-700 flex items-center gap-2">
-                        <span>⚠️</span> <span>{lastError}</span>
-                    </div>
-                )}
-            </div>
-        );
-    };
     const [savingIds, setSavingIds] = useState(new Set());
     const [dfName, setDfName] = useState("");
     const [showComposer, setShowComposer] = useState(false);
@@ -587,7 +542,8 @@ export default function DontForget() {
         (async () => {
             if (!dfKeyAreaId) return;
             try {
-                await keyAreaService.update(dfKeyAreaId, { listNames: nextMap });
+                const svc = await getKeyAreaService();
+                await svc.update(dfKeyAreaId, { listNames: nextMap });
             } catch (e) {
                 // ignore persistence errors
             }
@@ -602,7 +558,8 @@ export default function DontForget() {
         (async () => {
             if (!dfKeyAreaId) return;
             try {
-                await keyAreaService.update(dfKeyAreaId, { listNames: nextMap });
+                const svc = await getKeyAreaService();
+                await svc.update(dfKeyAreaId, { listNames: nextMap });
             } catch (e) {
                 // ignore persistence errors
             }
@@ -641,7 +598,8 @@ export default function DontForget() {
             (async () => {
                 if (!dfKeyAreaId) return;
                 try {
-                    await keyAreaService.update(dfKeyAreaId, { listNames: next });
+                    const svc = await getKeyAreaService();
+                    await svc.update(dfKeyAreaId, { listNames: next });
                 } catch (e) {
                     // ignore persistence errors
                 }
@@ -691,7 +649,7 @@ export default function DontForget() {
                     // optimistic UI: show saving indicator while syncing
                     try { markSaving(id, 1200); } catch (e) {}
                     // send numeric listIndex to server
-                    await taskService.update(id, { listIndex: Number(value) });
+                    await (await getTaskService()).update(id, { listIndex: Number(value) });
                     // update local in-memory tasks to reflect server value
                     setTasks((prev) => prev.map((t) => (String(t.id) === String(id) ? { ...t, listIndex: Number(value) } : t)));
                 } catch (err) {
@@ -849,7 +807,7 @@ export default function DontForget() {
             if (payload?.keyAreaId) body.keyAreaId = payload.keyAreaId;
             if (payload?.key_area_id) body.keyAreaId = payload.key_area_id;
                 try {
-                    const created = await taskService.create(body);
+                    const created = await (await getTaskService()).create(body);
                     // Debug: log selected listIndex from payload and created response
                     try { console.log('[DontForget] payload.listIndex', payload?.listIndex, 'payload.list_index', payload?.list_index); } catch (e) {}
                     // Push to local list
@@ -944,7 +902,7 @@ export default function DontForget() {
             await Promise.all(
                 ids.map(async (id) => {
                     try {
-                        await taskService.remove(id);
+                        await (await getTaskService()).remove(id);
                         successCount++;
                         markSaving(id, 600);
                     } catch (e) {
@@ -986,7 +944,7 @@ export default function DontForget() {
         const newCompleted = !t.completed;
         const newStatus = newCompleted ? "done" : "open";
         try {
-            await taskService.update(id, { status: newStatus });
+            await (await getTaskService()).update(id, { status: newStatus });
             setTasks((prev) =>
                 prev.map((x) => (x.id === id ? { ...x, completed: newCompleted, status: newStatus } : x)),
             );
@@ -998,7 +956,7 @@ export default function DontForget() {
     };
     const setPriority = async (id, p) => {
         try {
-            await taskService.update(id, { priority: p });
+            await (await getTaskService()).update(id, { priority: p });
             setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, priority: p } : t)));
             markSaving(id);
         } catch (e) {
@@ -1007,7 +965,7 @@ export default function DontForget() {
     };
     const setStatus = async (id, s) => {
         try {
-            await taskService.update(id, { status: s });
+            await (await getTaskService()).update(id, { status: s });
             setTasks((prev) =>
                 prev.map((t) =>
                     t.id === id
@@ -1040,7 +998,7 @@ export default function DontForget() {
     const deleteTask = async (id) => {
         try {
             markSaving(id);
-            await taskService.remove(id);
+            await (await getTaskService()).remove(id);
             setTasks((prev) => prev.filter((t) => t.id !== id));
             // Remove any local DF list mapping for this task
             try {
@@ -1092,34 +1050,34 @@ export default function DontForget() {
         else if (key === 'start_date') patch.startDate = value ? new Date(value).toISOString() : null;
         else if (key === 'end_date') patch.endDate = value ? new Date(value).toISOString() : null;
         else if (key === 'dueDate' || key === 'deadline') patch.dueDate = value ? new Date(value).toISOString() : null;
-        else if (key === 'duration') patch.duration = value;
-        else if (key === 'priority') patch.priority = value;
-        else if (key === 'status') patch.status = value;
+    else if (key === 'duration') patch.duration = value;
+    else if (key === 'priority') patch.priority = value;
+    else if (key === 'status') patch.status = value;
         else {
             // Not backed by API: keep optimistic state only
             return;
         }
 
         try {
-            const updated = await taskService.update(id, patch);
+            const updated = await (await getTaskService()).update(id, patch);
             // reconcile server response into local task (format dates to YYYY-MM-DD)
             setTasks((prev) =>
                 prev.map((t) =>
                     t.id === id
                         ? {
-                            ...t,
-                            name: updated.title || t.name,
-                            notes: updated.description || t.notes || "",
-                            assignee: updated.assignee || t.assignee || "",
-                            start_date: updated.startDate ? updated.startDate.slice(0, 10) : (patch.startDate === null ? "" : t.start_date),
-                            end_date: updated.endDate ? updated.endDate.slice(0, 10) : (patch.endDate === null ? "" : t.end_date),
-                            dueDate: updated.dueDate ? updated.dueDate.slice(0, 10) : (patch.dueDate === null ? "" : t.dueDate),
-                            duration: updated.duration || t.duration || "",
-                            status: updated.status || t.status,
-                            priority: typeof updated.priority !== 'undefined' ? getPriorityLevel(updated.priority) : t.priority,
-                        }
-                        : t
-                )
+                              ...t,
+                              name: updated.title || t.name,
+                              notes: updated.description || t.notes || "",
+                              assignee: updated.assignee || t.assignee || "",
+                              start_date: updated.startDate ? updated.startDate.slice(0, 10) : (patch.startDate === null ? "" : t.start_date),
+                              end_date: updated.endDate ? updated.endDate.slice(0, 10) : (patch.endDate === null ? "" : t.end_date),
+                              dueDate: updated.dueDate ? updated.dueDate.slice(0, 10) : (patch.dueDate === null ? "" : t.dueDate),
+                              duration: updated.duration || t.duration || "",
+                              status: updated.status || t.status,
+                              priority: typeof updated.priority !== 'undefined' ? getPriorityLevel(updated.priority) : t.priority,
+                          }
+                        : t,
+                ),
             );
             // success
             markSaving(id);
@@ -1175,9 +1133,9 @@ export default function DontForget() {
     const confirmAssignAndOpen = async () => {
         const { task, kaId } = assignModal;
         if (!task || !kaId) return;
-        try {
-            // Assign to the selected Key Area (UUID) — omit listIndex (not supported by API)
-            await taskService.update(task.id, { keyAreaId: kaId });
+            try {
+                // Assign to the selected Key Area (UUID) — omit listIndex (not supported by API)
+            await (await getTaskService()).update(task.id, { keyAreaId: kaId });
             // Remove from DF view
             setTasks((prev) => prev.filter((t) => t.id !== task.id));
             // Remove any local DF list mapping for this task when moving to a Key Area
@@ -1215,7 +1173,7 @@ export default function DontForget() {
         if (form.duration !== undefined) patch.duration = form.duration;
         if (form.keyAreaId) patch.keyAreaId = form.keyAreaId;
         try {
-            const updated = await taskService.update(id, patch);
+            const updated = await (await getTaskService()).update(id, patch);
             if (form.keyAreaId) {
                 // Task moved to a Key Area: remove from DF list and open it in Key Areas
                 setTasks((prev) => prev.filter((t) => t.id !== id));
@@ -1316,7 +1274,7 @@ export default function DontForget() {
         if (payload.key_area_id) patch.keyAreaId = payload.key_area_id;
 
         try {
-            const updated = await taskService.update(id, patch);
+            const updated = await (await getTaskService()).update(id, patch);
             // If moved to a Key Area, remove from DF and open in Key Areas
             if (payload.key_area_id) {
                 setTasks((prev) => prev.filter((t) => t.id !== id));
@@ -1395,7 +1353,7 @@ export default function DontForget() {
                     if (payload.duration !== undefined) patch.duration = payload.duration;
                     if (payload.key_area_id) patch.keyAreaId = payload.key_area_id;
                     try {
-                        if (Object.keys(patch).length > 0) await taskService.update(id, patch);
+                        if (Object.keys(patch).length > 0) await (await getTaskService()).update(id, patch);
                     } catch (e) {
                         console.warn("Failed to update (mass)", id, e);
                     }
@@ -1480,7 +1438,7 @@ export default function DontForget() {
         const task = assignModal.task;
         if (!task || !payload || !payload.key_area_id) return;
         try {
-            await taskService.update(task.id, { keyAreaId: payload.key_area_id });
+            await (await getTaskService()).update(task.id, { keyAreaId: payload.key_area_id });
             setTasks((prev) => prev.filter((t) => t.id !== task.id));
             // Remove any local DF mapping for the moved task
             try {
@@ -1521,8 +1479,6 @@ export default function DontForget() {
                 >
                     <FaBars className="h-5 w-5 text-gray-600" />
                 </button>
-                {/* Sync status banner for imported tab */}
-                {renderSyncStatusBanner()}
                 {selectedTask ? (
                     <div>
                         <div className="bg-white rounded-xl border border-slate-200">
@@ -1537,7 +1493,7 @@ export default function DontForget() {
                                     onBack={() => setSelectedTask(null)}
                                     onSave={async (payload) => {
                                         try {
-                                            const updated = await taskService.update(selectedTask.id, payload);
+                                            const updated = await (await getTaskService()).update(selectedTask.id, payload);
                                             setTasks((prev) => prev.map((t) =>
                                                 t.id === selectedTask.id
                                                     ? {
