@@ -1,9 +1,17 @@
-
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 export const syncService = {
+  /**
+   * Trigger manual sync for a provider (Google Tasks or Microsoft To Do)
+   */
+  async triggerManualSync(provider) {
+    // POST to /sync/manual endpoint (assumed backend route)
+    // Adjust endpoint as needed to match backend
+    const response = await axios.post(`${API_URL}/sync/manual`, { provider });
+    return response.data;
+  },
   /**
    * Get calendar sync status for current user
    */
