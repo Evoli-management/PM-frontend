@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, Suspense } from "react";
+import { syncService } from "../services/syncService";
+import authService from "../services/authService";
 // keep rendering inline (match KeyAreas behavior)
 import { useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "../components/shared/Sidebar.jsx";
@@ -51,12 +53,44 @@ export default function DontForget() {
     const location = useLocation();
     const navigate = useNavigate();
 
+    // Sync status state (for imported tasks)
+    const [user, setUser] = useState(null);
+    const [taskSyncStatus, setTaskSyncStatus] = useState(null);
+    const [syncStatusLoading, setSyncStatusLoading] = useState(false);
+    const [syncStatusError, setSyncStatusError] = useState(null);
+
     // Open Don't Forget view if ?dontforget=1
     const [viewMode, setViewMode] = useState("list");
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
     // Don’t Forget tasks: now server-backed (tasks without keyAreaId)
     const [tasks, setTasks] = useState([]);
+        // Fetch current user and then task sync status (only for imported tab)
+        useEffect(() => {
+            let cancelled = false;
+            (async () => {
+                try {
+                    setSyncStatusError(null);
+                    setSyncStatusLoading(true);
+                    // Get user if not already loaded
+                    let u = user;
+                    if (!u) {
+                        const res = await authService.verifyToken();
+                        u = res?.user || res;
+                        if (!cancelled) setUser(u);
+                    }
+                    if (u?.id) {
+                        const status = await syncService.getTaskSyncStatus(u.id);
+                        if (!cancelled) setTaskSyncStatus(status);
+                    }
+                } catch (err) {
+                    if (!cancelled) setSyncStatusError(err?.message || "Failed to load sync status");
+                } finally {
+                    if (!cancelled) setSyncStatusLoading(false);
+                }
+            })();
+            return () => { cancelled = true; };
+        }, [user, showImportedOnly]);
     // DF header list names (local-only)
     const [dfListNames, setDfListNames] = useState(() => {
         try {
@@ -402,6 +436,60 @@ export default function DontForget() {
         window.setDontForgetShowImported = setShowImportedOnly;
         return () => { delete window.setDontForgetShowImported; };
     }, []);
+
+    // --- Sync Status Banner (only for imported tab) ---
+    const renderSyncStatusBanner = () => {
+        if (!showImportedOnly) return null;
+        if (syncStatusLoading) {
+            return (
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-blue-900 flex items-center gap-2">
+                    <span className="animate-spin mr-2">🔄</span> Loading sync status...
+                </div>
+            );
+        }
+        if (syncStatusError) {
+            return (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-800 flex items-center gap-2">
+                    <span>⚠️</span> {syncStatusError}
+                </div>
+            );
+        }
+        if (!taskSyncStatus) return null;
+        // Assume shape: { status, lastSyncAt, lastError }
+        const status = taskSyncStatus.status || taskSyncStatus.syncStatus || "unknown";
+        const lastSyncAt = taskSyncStatus.lastSyncAt || taskSyncStatus.last_sync_at;
+        const lastError = taskSyncStatus.lastError || taskSyncStatus.last_error;
+        const statusColor = status === "idle" ? "text-green-700" : status === "syncing" ? "text-blue-700" : status === "error" ? "text-red-700" : "text-gray-700";
+        const statusLabel = status === "idle" ? "Active" : status === "syncing" ? "Syncing..." : status === "error" ? "Error" : status;
+        const formatDate = (dateString) => {
+            if (!dateString) return "Never";
+            const date = new Date(dateString);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            if (diffMins < 1) return "Just now";
+            if (diffMins < 60) return `${diffMins} min ago`;
+            if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+            return date.toLocaleString();
+        };
+        return (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                    <span className={statusColor + " font-semibold"}>Task Sync Status:</span>
+                    <span className={statusColor}>{statusLabel}</span>
+                    {lastSyncAt && (
+                        <span className="ml-4 text-gray-700">Last Sync: <span className="font-medium">{formatDate(lastSyncAt)}</span></span>
+                    )}
+                </div>
+                {lastError && (
+                    <div className="mt-1 text-red-700 flex items-center gap-2">
+                        <span>⚠️</span> <span>{lastError}</span>
+                    </div>
+                )}
+            </div>
+        );
+    };
     const [savingIds, setSavingIds] = useState(new Set());
     const [dfName, setDfName] = useState("");
     const [showComposer, setShowComposer] = useState(false);
@@ -1479,6 +1567,8 @@ export default function DontForget() {
                 >
                     <FaBars className="h-5 w-5 text-gray-600" />
                 </button>
+                {/* Sync status banner for imported tab */}
+                {renderSyncStatusBanner()}
                 {selectedTask ? (
                     <div>
                         <div className="bg-white rounded-xl border border-slate-200">
