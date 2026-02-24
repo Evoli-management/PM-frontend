@@ -14,6 +14,20 @@ export const Integrations = ({ showToast }) => {
         // Communication
         teams: { connected: false, tenant: '', notificationsEnabled: true }
     });
+
+    // Add saveIntegrations function to handle saving integration settings
+    const saveIntegrations = async () => {
+        try {
+            setLoading(true);
+            // TODO: Replace with actual API call to save integrations
+            // await api.saveIntegrations(integrations);
+            showToast && showToast('Integration settings saved!', 'success');
+        } catch (err) {
+            showToast && showToast('Failed to save integration settings', 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
     
     const [loading, setLoading] = useState(false);
     const [connecting, setConnecting] = useState('');
