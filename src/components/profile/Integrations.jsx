@@ -4,6 +4,72 @@ import calendarService from '../../services/calendarService';
 import { syncService } from '../../services/syncService';
 
 export const Integrations = ({ showToast }) => {
+        // Connect integration handler
+        const connectIntegration = async (type) => {
+            setConnecting(type);
+            try {
+                let result;
+                switch (type) {
+                    case 'googleCalendar':
+                        result = await calendarService.syncGoogleCalendar();
+                        setIntegrations(prev => ({
+                            ...prev,
+                            googleCalendar: { ...prev.googleCalendar, connected: true }
+                        }));
+                        showToast && showToast('Google Calendar connected and sync initiated!');
+                        break;
+                    case 'outlookCalendar':
+                        result = await calendarService.syncMicrosoftCalendar();
+                        setIntegrations(prev => ({
+                            ...prev,
+                            outlookCalendar: { ...prev.outlookCalendar, connected: true }
+                        }));
+                        showToast && showToast('Outlook Calendar connected and sync initiated!');
+                        break;
+                    case 'googleTasks':
+                        // Implement Google Tasks connect logic here if needed
+                        showToast && showToast('Google Tasks connection not implemented.', 'info');
+                        break;
+                    case 'microsoftToDo':
+                        // Implement Microsoft To Do connect logic here if needed
+                        showToast && showToast('Microsoft To Do connection not implemented.', 'info');
+                        break;
+                    case 'teams':
+                        // Simulate Teams connection
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        setIntegrations(prev => ({
+                            ...prev,
+                            teams: { connected: true, tenant: 'My Organization', notificationsEnabled: true }
+                        }));
+                        showToast && showToast('Microsoft Teams connected!');
+                        break;
+                    default:
+                        showToast && showToast('Unknown integration type', 'error');
+                }
+                await loadIntegrations();
+            } catch (error) {
+                console.error('Connection error:', error);
+                const errMsg = error?.response?.data?.error || error?.message || '';
+                if (
+                    error?.response?.status === 400 ||
+                    /invalid(_grant|_token)/i.test(errMsg) ||
+                    /token.*expired/i.test(errMsg)
+                ) {
+                    showToast && showToast('Your connection has expired. Please reconnect your account.', 'error');
+                    if (type === 'googleCalendar' || type === 'googleTasks') {
+                        window.location.href = '/api/auth/google';
+                    } else if (type === 'outlookCalendar' || type === 'microsoftToDo') {
+                        window.location.href = '/api/auth/microsoft';
+                    }
+                } else if (error.message === 'OAuth cancelled by user') {
+                    showToast && showToast('Connection cancelled', 'info');
+                } else {
+                    showToast && showToast(`Failed to connect ${type}`, 'error');
+                }
+            } finally {
+                setConnecting('');
+            }
+        };
     const [integrations, setIntegrations] = useState({
         // Calendar Integrations
         googleCalendar: { connected: false, email: '', syncEnabled: true },
