@@ -218,16 +218,14 @@ export const Integrations = ({ showToast }) => {
                             >
                                 Disconnect
                             </button>
-                            {/* Sync Now button for task integrations */}
-                            {(type === 'googleTasks' || type === 'microsoftToDo') && (
-                                <button
-                                    onClick={() => handleManualSync(type)}
-                                    className="ml-2 text-sm bg-blue-500 hover:bg-blue-700 text-white px-3 py-1 rounded-md"
-                                    disabled={syncingType === type}
-                                >
-                                    {syncingType === type ? 'Syncing...' : 'Sync Now'}
-                                </button>
-                            )}
+                            {/* Sync Now button for all integrations */}
+                            <button
+                                onClick={() => handleManualSync(type)}
+                                className="ml-2 text-sm bg-blue-500 hover:bg-blue-700 text-white px-3 py-1 rounded-md"
+                                disabled={syncingType === type}
+                            >
+                                {syncingType === type ? 'Syncing...' : 'Sync Now'}
+                            </button>
                         </>
                     ) : (
                         <LoadingButton
