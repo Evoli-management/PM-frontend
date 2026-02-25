@@ -27,15 +27,12 @@ export const Integrations = ({ showToast }) => {
                         showToast && showToast('Outlook Calendar connected and sync initiated!');
                         break;
                     case 'googleTasks':
-                        // Implement Google Tasks connect logic here if needed
-                        showToast && showToast('Google Tasks connection not implemented.', 'info');
+                        window.location.href = '/api/auth/google';
                         break;
                     case 'microsoftToDo':
-                        // Implement Microsoft To Do connect logic here if needed
-                        showToast && showToast('Microsoft To Do connection not implemented.', 'info');
+                        window.location.href = '/api/auth/microsoft';
                         break;
                     case 'teams':
-                        // Simulate Teams connection
                         await new Promise(resolve => setTimeout(resolve, 1000));
                         setIntegrations(prev => ({
                             ...prev,
