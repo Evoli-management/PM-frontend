@@ -1,3 +1,15 @@
+/**
+ * Trigger sync for a user/provider via the sync service
+ * @param {string} userId
+ * @param {'google'|'microsoft'} provider
+ * @returns {Promise<object>} sync result
+ */
+export async function triggerSyncService(userId, provider) {
+  // TODO: Set this to your deployed sync service URL
+  const SYNC_SERVICE_URL = import.meta.env.VITE_SYNC_SERVICE_URL || 'https://practicalmanager-sync-dev.herokuapp.com';
+  const response = await axios.post(`${SYNC_SERVICE_URL}/trigger-sync`, { userId, provider });
+  return response.data;
+}
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';

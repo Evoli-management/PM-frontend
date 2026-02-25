@@ -56,20 +56,20 @@ export const Integrations = ({ showToast }) => {
             const handleManualSync = async (type) => {
                 setSyncing(prev => ({ ...prev, [type]: true }));
                 try {
-                    // TODO: Replace with actual userId from context/auth
                     const userId = window?.currentUserId || 'demo-user';
-                    // Call syncService to trigger sync for the provider
                     if (type === 'googleTasks' || type === 'microsoftToDo') {
-                        // This will trigger backend sync and return status
-                        await import('../../services/syncService').then(({ syncService }) =>
-                            syncService.getTaskSyncStatus(userId)
-                        );
-                        showToast && showToast(`${type === 'googleTasks' ? 'Google Tasks' : 'Microsoft To Do'} sync complete!`, 'success');
+                        // Call new sync service trigger endpoint
+                        const provider = type === 'googleTasks' ? 'google' : 'microsoft';
+                        const { success, created, updated, skipped, error } = await import('../../services/syncService').then(m => m.triggerSyncService(userId, provider));
+                        if (success) {
+                            showToast && showToast(`${type === 'googleTasks' ? 'Google Tasks' : 'Microsoft To Do'} sync complete! (${created} created, ${updated} updated, ${skipped} skipped)`, 'success');
+                        } else {
+                            showToast && showToast(`Sync failed: ${error || 'Unknown error'}`, 'error');
+                        }
                     } else {
                         showToast && showToast('Manual sync not supported for this integration', 'info');
                     }
                 } catch (err) {
-                    // Detect token/authorization errors
                     const errMsg = err?.response?.data?.error || err?.message || '';
                     if (
                         err?.response?.status === 400 ||
@@ -77,7 +77,6 @@ export const Integrations = ({ showToast }) => {
                         /token.*expired/i.test(errMsg)
                     ) {
                         showToast && showToast('Your connection has expired. Please reconnect your account.', 'error');
-                        // Redirect to OAuth flow (Google as example, adjust as needed)
                         if (type === 'googleTasks') {
                             window.location.href = '/api/auth/google';
                         } else if (type === 'microsoftToDo') {
