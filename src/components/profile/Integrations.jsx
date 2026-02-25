@@ -27,10 +27,33 @@ export const Integrations = ({ showToast }) => {
                         showToast && showToast('Outlook Calendar connected and sync initiated!');
                         break;
                     case 'googleTasks':
-                        window.location.href = '/api/auth/google';
+                        // Use same OAuth flow as calendar
+                        try {
+                            const res = await calendarService.syncGoogleTasks();
+                            if (res && res.success) {
+                                setIntegrations(prev => ({
+                                    ...prev,
+                                    googleTasks: { ...prev.googleTasks, connected: true }
+                                }));
+                                showToast && showToast('Google Tasks connected and sync initiated!');
+                            }
+                        } catch (error) {
+                            throw error;
+                        }
                         break;
                     case 'microsoftToDo':
-                        window.location.href = '/api/auth/microsoft';
+                        try {
+                            const res = await calendarService.syncMicrosoftToDo();
+                            if (res && res.success) {
+                                setIntegrations(prev => ({
+                                    ...prev,
+                                    microsoftToDo: { ...prev.microsoftToDo, connected: true }
+                                }));
+                                showToast && showToast('Microsoft To Do connected and sync initiated!');
+                            }
+                        } catch (error) {
+                            throw error;
+                        }
                         break;
                     case 'teams':
                         await new Promise(resolve => setTimeout(resolve, 1000));
