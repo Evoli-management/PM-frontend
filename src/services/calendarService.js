@@ -3,6 +3,22 @@ import apiClient from "./apiClient";
 const base = "/calendar";
 
 const calendarService = {
+            // Trigger backend sync after OAuth
+            async syncGoogleCalendarData() {
+                // Calls backend sync endpoint for Google Calendar
+                const res = await apiClient.post(`${base}/sync/google`);
+                return res.data;
+            },
+            async syncMicrosoftCalendarData() {
+                // Calls backend sync endpoint for Microsoft Calendar
+                const res = await apiClient.post(`${base}/sync/microsoft`);
+                return res.data;
+            },
+            async syncGoogleTasksData() {
+                // Calls backend sync endpoint for Google Tasks
+                const res = await apiClient.post(`${base}/sync/google-tasks`);
+                return res.data;
+            },
         async syncGoogleTasks() {
             // Get OAuth URL from backend
             const res = await apiClient.get(`${base}/oauth/google-tasks`);

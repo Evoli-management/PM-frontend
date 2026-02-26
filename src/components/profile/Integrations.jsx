@@ -12,30 +12,40 @@ export const Integrations = ({ showToast }) => {
                 switch (type) {
                     case 'googleCalendar':
                         result = await calendarService.syncGoogleCalendar();
-                        setIntegrations(prev => ({
-                            ...prev,
-                            googleCalendar: { ...prev.googleCalendar, connected: true }
-                        }));
-                        showToast && showToast('Google Calendar connected and sync initiated!');
+                        if (result && result.success) {
+                            // Trigger backend sync after OAuth
+                            await calendarService.syncGoogleCalendarData();
+                            setIntegrations(prev => ({
+                                ...prev,
+                                googleCalendar: { ...prev.googleCalendar, connected: true }
+                            }));
+                            showToast && showToast('Google Calendar connected and sync initiated!');
+                            await loadIntegrations();
+                        }
                         break;
                     case 'outlookCalendar':
                         result = await calendarService.syncMicrosoftCalendar();
-                        setIntegrations(prev => ({
-                            ...prev,
-                            outlookCalendar: { ...prev.outlookCalendar, connected: true }
-                        }));
-                        showToast && showToast('Outlook Calendar connected and sync initiated!');
+                        if (result && result.success) {
+                            await calendarService.syncMicrosoftCalendarData();
+                            setIntegrations(prev => ({
+                                ...prev,
+                                outlookCalendar: { ...prev.outlookCalendar, connected: true }
+                            }));
+                            showToast && showToast('Outlook Calendar connected and sync initiated!');
+                            await loadIntegrations();
+                        }
                         break;
                     case 'googleTasks':
-                        // Use same OAuth flow as calendar
                         try {
                             const res = await calendarService.syncGoogleTasks();
                             if (res && res.success) {
+                                await calendarService.syncGoogleTasksData();
                                 setIntegrations(prev => ({
                                     ...prev,
                                     googleTasks: { ...prev.googleTasks, connected: true }
                                 }));
                                 showToast && showToast('Google Tasks connected and sync initiated!');
+                                await loadIntegrations();
                             }
                         } catch (error) {
                             throw error;
