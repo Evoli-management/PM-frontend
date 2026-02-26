@@ -12,9 +12,8 @@ export const Integrations = ({ showToast }) => {
                 switch (type) {
                     case 'googleCalendar':
                         result = await calendarService.syncGoogleCalendar();
-                        if (result && result.success) {
-                            // Trigger backend sync after OAuth
-                            await calendarService.syncGoogleCalendarData();
+                        if (result && result.success && result.accessToken) {
+                            await calendarService.syncGoogleCalendarData(result.accessToken);
                             setIntegrations(prev => ({
                                 ...prev,
                                 googleCalendar: { ...prev.googleCalendar, connected: true }
@@ -25,8 +24,8 @@ export const Integrations = ({ showToast }) => {
                         break;
                     case 'outlookCalendar':
                         result = await calendarService.syncMicrosoftCalendar();
-                        if (result && result.success) {
-                            await calendarService.syncMicrosoftCalendarData();
+                        if (result && result.success && result.accessToken) {
+                            await calendarService.syncMicrosoftCalendarData(result.accessToken);
                             setIntegrations(prev => ({
                                 ...prev,
                                 outlookCalendar: { ...prev.outlookCalendar, connected: true }
@@ -38,8 +37,8 @@ export const Integrations = ({ showToast }) => {
                     case 'googleTasks':
                         try {
                             const res = await calendarService.syncGoogleTasks();
-                            if (res && res.success) {
-                                await calendarService.syncGoogleTasksData();
+                            if (res && res.success && res.accessToken) {
+                                await calendarService.syncGoogleTasksData(res.accessToken);
                                 setIntegrations(prev => ({
                                     ...prev,
                                     googleTasks: { ...prev.googleTasks, connected: true }

@@ -4,19 +4,19 @@ const base = "/calendar";
 
 const calendarService = {
             // Trigger backend sync after OAuth
-            async syncGoogleCalendarData() {
-                // Calls backend sync endpoint for Google Calendar
-                const res = await apiClient.post(`${base}/sync/google`);
+            async syncGoogleCalendarData(accessToken) {
+                // Calls backend sync endpoint for Google Calendar with accessToken
+                const res = await apiClient.post(`${base}/sync/google`, { accessToken });
                 return res.data;
             },
-            async syncMicrosoftCalendarData() {
-                // Calls backend sync endpoint for Microsoft Calendar
-                const res = await apiClient.post(`${base}/sync/microsoft`);
+            async syncMicrosoftCalendarData(accessToken) {
+                // Calls backend sync endpoint for Microsoft Calendar with accessToken
+                const res = await apiClient.post(`${base}/sync/microsoft`, { accessToken });
                 return res.data;
             },
-            async syncGoogleTasksData() {
-                // Calls backend sync endpoint for Google Tasks
-                const res = await apiClient.post(`${base}/sync/google-tasks`);
+            async syncGoogleTasksData(accessToken) {
+                // Calls backend sync endpoint for Google Tasks with accessToken
+                const res = await apiClient.post(`${base}/sync/google-tasks`, { accessToken });
                 return res.data;
             },
         async syncGoogleTasks() {
