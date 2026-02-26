@@ -85,10 +85,11 @@ export const Integrations = ({ showToast }) => {
                     /token.*expired/i.test(errMsg)
                 ) {
                     showToast && showToast('Your connection has expired. Please reconnect your account.', 'error');
+                    const apiBase = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? '/api' : 'https://practicalmanager-4241d0bfc5ed.herokuapp.com/api');
                     if (type === 'googleCalendar' || type === 'googleTasks') {
-                        window.location.href = '/api/auth/google';
+                        window.location.href = `${apiBase}/auth/google`;
                     } else if (type === 'outlookCalendar' || type === 'microsoftToDo') {
-                        window.location.href = '/api/auth/microsoft';
+                        window.location.href = `${apiBase}/auth/microsoft`;
                     }
                 } else if (error.message === 'OAuth cancelled by user') {
                     showToast && showToast('Connection cancelled', 'info');
