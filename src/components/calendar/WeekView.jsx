@@ -1102,7 +1102,7 @@ const WeekView = ({
                                       height: `${BAR_HEIGHT}px`,
                                       zIndex: 10,
                                       boxSizing: "border-box",
-                                      paddingRight: continuesRight ? "40px" : "24px",
+                                      paddingRight: continuesRight ? "56px" : "32px",
                                       paddingLeft: continuesLeft ? "18px" : undefined,
                                       ...style,
                                     };
@@ -1124,7 +1124,10 @@ const WeekView = ({
                                           />
                                         )}
                                         <div className="truncate font-medium leading-[26px]">{t.title || t.name}</div>
-                                        <div className="flex items-center gap-1 absolute right-1 top-1/2 -translate-y-1/2 z-20">
+                                        <div
+                                          className="flex items-center gap-1 absolute top-1/2 -translate-y-1/2 z-20"
+                                          style={{ right: continuesRight ? "18px" : "4px" }}
+                                        >
                                           <button
                                             type="button"
                                             className="p-0.5 rounded hover:bg-black/10"
