@@ -3,6 +3,177 @@ import apiClient from "./apiClient";
 const base = "/calendar";
 
 const calendarService = {
+            // Trigger backend sync after OAuth
+            async syncGoogleCalendarData(accessToken) {
+                // Calls backend sync endpoint for Google Calendar with accessToken
+                const res = await apiClient.post(`${base}/sync/google`, { accessToken });
+                return res.data;
+            },
+            async syncMicrosoftCalendarData(accessToken) {
+                // Calls backend sync endpoint for Microsoft Calendar with accessToken
+                const res = await apiClient.post(`${base}/sync/microsoft`, { accessToken });
+                return res.data;
+            },
+            async syncGoogleTasksData(accessToken) {
+                // Calls backend sync endpoint for Google Tasks with accessToken
+                const res = await apiClient.post(`${base}/sync/google-tasks`, { accessToken });
+                return res.data;
+            },
+        async syncGoogleTasks() {
+            // Get OAuth URL from backend
+            const res = await apiClient.get(`${base}/oauth/google-tasks`);
+            const { authUrl } = res.data;
+            return new Promise((resolve, reject) => {
+                const popup = window.open(authUrl, 'google-tasks-oauth', 'width=500,height=600,scrollbars=yes,resizable=yes');
+                let resolved = false;
+                const cleanup = () => {
+                    if (resolved) return;
+                    resolved = true;
+                    window.removeEventListener('message', messageHandler);
+                    window.removeEventListener('storage', storageHandler);
+                    if (broadcastChannel) {
+                        try { broadcastChannel.close(); } catch(e) {}
+                    }
+                    clearInterval(checkClosed);
+                    try { popup.close(); } catch(e) {}
+                };
+                const messageHandler = async (event) => {
+                    if (event.data && event.data.provider === 'google-tasks') {
+                        cleanup();
+                        if (event.data.success === true) {
+                            resolve({ success: true });
+                        } else {
+                            reject(new Error('OAuth cancelled by user'));
+                        }
+                    }
+                };
+                window.addEventListener('message', messageHandler);
+                let broadcastChannel;
+                try {
+                    broadcastChannel = new BroadcastChannel('oauth-callback');
+                    broadcastChannel.onmessage = (event) => {
+                        if (event.data && event.data.provider === 'google-tasks') {
+                            cleanup();
+                            if (event.data.success === true) {
+                                resolve({ success: true });
+                            } else {
+                                reject(new Error('OAuth cancelled by user'));
+                            }
+                        }
+                    };
+                } catch (e) {}
+                const storageHandler = (event) => {
+                    if (event.key === 'oauth-callback' && event.newValue) {
+                        try {
+                            const data = JSON.parse(event.newValue);
+                            if (data.provider === 'google-tasks') {
+                                cleanup();
+                                if (data.success === true) {
+                                    resolve({ success: true });
+                                } else {
+                                    reject(new Error('OAuth cancelled by user'));
+                                }
+                            }
+                        } catch (e) {}
+                    }
+                };
+                window.addEventListener('storage', storageHandler);
+                const checkClosed = setInterval(() => {
+                    try {
+                        if (popup && popup.closed) {
+                            clearInterval(checkClosed);
+                            if (!resolved) {
+                                setTimeout(() => {
+                                    if (!resolved) {
+                                        cleanup();
+                                        reject(new Error('OAuth cancelled by user'));
+                                    }
+                                }, 2000);
+                            }
+                            return;
+                        }
+                    } catch (e) {}
+                }, 500);
+            });
+        },
+
+        async syncMicrosoftToDo() {
+            // Get OAuth URL from backend
+            const res = await apiClient.get(`${base}/oauth/microsoft-todo`);
+            const { authUrl } = res.data;
+            return new Promise((resolve, reject) => {
+                const popup = window.open(authUrl, 'microsoft-todo-oauth', 'width=500,height=600,scrollbars=yes,resizable=yes');
+                let resolved = false;
+                const cleanup = () => {
+                    if (resolved) return;
+                    resolved = true;
+                    window.removeEventListener('message', messageHandler);
+                    window.removeEventListener('storage', storageHandler);
+                    if (broadcastChannel) {
+                        try { broadcastChannel.close(); } catch(e) {}
+                    }
+                    clearInterval(checkClosed);
+                    try { popup.close(); } catch(e) {}
+                };
+                const messageHandler = async (event) => {
+                    if (event.data && event.data.provider === 'microsoft-todo') {
+                        cleanup();
+                        if (event.data.success === true) {
+                            resolve({ success: true });
+                        } else {
+                            reject(new Error('OAuth cancelled by user'));
+                        }
+                    }
+                };
+                window.addEventListener('message', messageHandler);
+                let broadcastChannel;
+                try {
+                    broadcastChannel = new BroadcastChannel('oauth-callback');
+                    broadcastChannel.onmessage = (event) => {
+                        if (event.data && event.data.provider === 'microsoft-todo') {
+                            cleanup();
+                            if (event.data.success === true) {
+                                resolve({ success: true });
+                            } else {
+                                reject(new Error('OAuth cancelled by user'));
+                            }
+                        }
+                    };
+                } catch (e) {}
+                const storageHandler = (event) => {
+                    if (event.key === 'oauth-callback' && event.newValue) {
+                        try {
+                            const data = JSON.parse(event.newValue);
+                            if (data.provider === 'microsoft-todo') {
+                                cleanup();
+                                if (data.success === true) {
+                                    resolve({ success: true });
+                                } else {
+                                    reject(new Error('OAuth cancelled by user'));
+                                }
+                            }
+                        } catch (e) {}
+                    }
+                };
+                window.addEventListener('storage', storageHandler);
+                const checkClosed = setInterval(() => {
+                    try {
+                        if (popup && popup.closed) {
+                            clearInterval(checkClosed);
+                            if (!resolved) {
+                                setTimeout(() => {
+                                    if (!resolved) {
+                                        cleanup();
+                                        reject(new Error('OAuth cancelled by user'));
+                                    }
+                                }, 2000);
+                            }
+                            return;
+                        }
+                    } catch (e) {}
+                }, 500);
+            });
+        },
     async listEvents({ from, to, view } = {}) {
         const params = { from, to };
         if (view && (view === "day" || view === "week")) params.view = view;
