@@ -1794,43 +1794,36 @@ export default function MonthView({
                   const all = Array.isArray(dayInfo.all) ? dayInfo.all : [];
                   const hidden = dayInfo.hidden || [];
                   if (all.length === 0) return null;
-                  const rowDate = new Date(year, month, dayIdx + 1, 0, 0, 0, 0);
                   return (
                     <div key={`ad-${dayIdx}`} style={{ position: "absolute", top: row.top, height: row.height, left: 0, right: 0 }}>
-                      <div
-                        className="absolute top-1 flex items-center justify-center"
-                        style={{
-                          pointerEvents: "auto",
-                          right: 0,
-                          width: `${ALL_DAY_ACTION_GUTTER}px`,
-                        }}
-                      >
-                        <button
-                          type="button"
-                          data-month-all-day-overflow-trigger="true"
-                          className="inline-flex items-center justify-center px-1 text-base leading-none text-sky-600 hover:text-sky-700"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (hidden.length > 0) {
+                      {hidden.length > 0 && (
+                        <div
+                          className="absolute top-1 flex items-center justify-center"
+                          style={{
+                            pointerEvents: "auto",
+                            right: 0,
+                            width: `${ALL_DAY_ACTION_GUTTER}px`,
+                          }}
+                        >
+                          <button
+                            type="button"
+                            data-month-all-day-overflow-trigger="true"
+                            className="inline-flex items-center justify-center px-1 text-base leading-none text-sky-600 hover:text-sky-700"
+                            onClick={(e) => {
+                              e.stopPropagation();
                               setAllDayOverflow((curr) =>
                                 curr && curr.dayIdx === dayIdx
                                   ? null
-                                  : { dayIdx, items: all }
+                                  : { dayIdx, items: hidden }
                               );
-                              return;
-                            }
-                            if (typeof onQuickCreate === "function") {
-                              try {
-                                onQuickCreate(rowDate, { allDay: true });
-                              } catch (_) {}
-                            }
-                          }}
-                          title={hidden.length > 0 ? "Show all-day items" : "Create all-day event"}
-                          aria-label={hidden.length > 0 ? "Show all-day items" : "Create all-day event"}
-                        >
-                          +
-                        </button>
-                      </div>
+                            }}
+                            title="Show more all-day items"
+                            aria-label="Show more all-day items"
+                          >
+                            +
+                          </button>
+                        </div>
+                      )}
 
                       {allDayOverflow && allDayOverflow.dayIdx === dayIdx && (
                         <div
