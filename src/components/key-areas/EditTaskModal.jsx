@@ -50,12 +50,20 @@ export default function EditTaskModal({
   availableLists = [1],
   currentUserId = null,
   // optional mapping of parent list names (used by DontForget)
-  parentListNames = {},
+  parentListNames = null,
   // optional custom modal title (used for mass-editing banner)
   modalTitle = undefined,
   // When true, editing a Don't Forget task (no Key Area required)
   isDontForgetMode = false,
 }) {
+  const hasSameListNames = (a, b) => {
+    const aObj = a && typeof a === 'object' ? a : {};
+    const bObj = b && typeof b === 'object' ? b : {};
+    const aKeys = Object.keys(aObj);
+    const bKeys = Object.keys(bObj);
+    if (aKeys.length !== bKeys.length) return false;
+    return aKeys.every((k) => String(aObj[k] ?? '') === String(bObj[k] ?? ''));
+  };
   // Draggable and resizable hooks for modern modal
   const { position, isDragging, handleMouseDown, handleMouseMove, handleMouseUp, resetPosition } = useDraggable();
   const { size, isDraggingResize, handleResizeMouseDown } = useResizable(500, 490);
@@ -351,21 +359,23 @@ export default function EditTaskModal({
     const kaId = keyAreaId;
     if (!kaId) {
       // If no key area selected, prefer parent-provided list names (DontForget flow)
-      setListNames(parentListNames && Object.keys(parentListNames).length ? parentListNames : {});
+      const fallback = parentListNames && Object.keys(parentListNames).length ? parentListNames : {};
+      setListNames((prev) => (hasSameListNames(prev, fallback) ? prev : fallback));
       return;
     }
     const selectedArea = (localKeyAreas && localKeyAreas.length ? localKeyAreas : keyAreas).find(
       (a) => String(a.id) === String(kaId)
     );
     if (selectedArea?.listNames) {
-      setListNames(selectedArea.listNames || {});
+      const nextListNames = selectedArea.listNames || {};
+      setListNames((prev) => (hasSameListNames(prev, nextListNames) ? prev : nextListNames));
       // If current list is not in the new key area's lists, reset to first available
       const availableListIndices = Object.keys(selectedArea.listNames || {});
       if (availableListIndices.length > 0 && !availableListIndices.includes(String(listIndex))) {
         setListIndex(Number(availableListIndices[0]));
       }
     } else {
-      setListNames({});
+      setListNames((prev) => (Object.keys(prev || {}).length === 0 ? prev : {}));
     }
   }, [keyAreaId, localKeyAreas, keyAreas, parentListNames]);
 

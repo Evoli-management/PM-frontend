@@ -98,6 +98,28 @@ body {
     border-radius: 999px;
 }
 
+/* Vertical-only hover scrollbar (keeps horizontal scroll behavior unchanged) */
+.hover-scrollbar-y {
+    scrollbar-width: thin; /* Firefox */
+}
+.hover-scrollbar-y::-webkit-scrollbar:vertical {
+    width: 4px;
+}
+.hover-scrollbar-y:hover::-webkit-scrollbar:vertical {
+    width: 4px;
+}
+.hover-scrollbar-y:hover::-webkit-scrollbar-track:vertical {
+    background: transparent;
+}
+.hover-scrollbar-y::-webkit-scrollbar-thumb:vertical {
+    background: transparent;
+    border-radius: 999px;
+}
+.hover-scrollbar-y:hover::-webkit-scrollbar-thumb:vertical {
+    background: #b9c0cd;
+    border-radius: 999px;
+}
+
 /* Hide native date picker icon; we provide our own 📅 trigger */
 input[type="date"].hide-native-date-icon::-webkit-calendar-picker-indicator {
     opacity: 0;

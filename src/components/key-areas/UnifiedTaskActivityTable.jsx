@@ -35,6 +35,7 @@ export default function UnifiedTaskActivityTable({
     onMassEdit
 }) {
     const [selectedItems, setSelectedItems] = useState(new Set());
+    const selectAllRef = useRef(null);
     const [sortField, setSortField] = useState(null);
     const [sortDirection, setSortDirection] = useState('asc');
     const [keyAreaFilter, setKeyAreaFilter] = useState('');
@@ -96,6 +97,52 @@ export default function UnifiedTaskActivityTable({
         return items;
     }, [tasks, activities, showTasks, showActivities, viewTab]);
 
+    const normalizeText = (v) => String(v || '').trim().toLowerCase();
+    const getResolvedResponsibleId = (item) => {
+        const directId =
+            item.assigneeId ||
+            item.assignee_id ||
+            item.responsibleId ||
+            item.responsible_id ||
+            item.delegatedToUserId ||
+            item.delegated_to_user_id ||
+            item.assignee?.id ||
+            item.responsible?.id ||
+            '';
+
+        if (directId) return directId;
+
+        const rawResponsible =
+            item.assignee?.name ||
+            item.assignee?.email ||
+            item.responsible?.name ||
+            item.responsible?.email ||
+            item.assignee ||
+            item.responsible ||
+            '';
+
+        const normalized = normalizeText(rawResponsible);
+        if (!normalized) return '';
+        if (normalized === 'me' || normalized === 'myself') return currentUserId || '';
+
+        const matched = users.find((u) => {
+            const uid = u.id || u.member_id;
+            const first = u.firstname || '';
+            const last = u.lastname || '';
+            const name = u.name || `${first} ${last}`.trim();
+            const email = u.email || '';
+            const nName = normalizeText(name);
+            const nEmail = normalizeText(email);
+            return (
+                normalizeText(uid) === normalized ||
+                nName === normalized ||
+                nEmail === normalized ||
+                (nEmail && normalized.includes(nEmail))
+            );
+        });
+        return matched ? (matched.id || matched.member_id || '') : '';
+    };
+
     // Filter items
     const filteredItems = useMemo(() => {
         let filtered = allItems;
@@ -112,7 +159,7 @@ export default function UnifiedTaskActivityTable({
         if (responsibleFilter) {
             filtered = filtered.filter(item => {
                 const assignee = item.assignee || item.responsible || '';
-                const assigneeId = item.assigneeId || item.assignee_id || item.responsibleId || item.responsible_id;
+                const assigneeId = getResolvedResponsibleId(item);
                 return String(assigneeId || '') === String(responsibleFilter) || String(assignee) === String(responsibleFilter);
             });
         }
@@ -177,8 +224,8 @@ export default function UnifiedTaskActivityTable({
                     aVal = (a.delegatedByUser && `${a.delegatedByUser.firstName || ''} ${a.delegatedByUser.lastName || ''}`.trim()) || (aDelegator ? `${aDelegator.name || aDelegator.firstname || ''} ${aDelegator.lastname || ''}`.trim() : '');
                     bVal = (b.delegatedByUser && `${b.delegatedByUser.firstName || ''} ${b.delegatedByUser.lastName || ''}`.trim()) || (bDelegator ? `${bDelegator.name || bDelegator.firstname || ''} ${bDelegator.lastname || ''}`.trim() : '');
                 } else {
-                    const aUserId = a.assigneeId || a.assignee_id || a.responsibleId || a.responsible_id || a.delegatedToUserId || a.delegated_to_user_id;
-                    const bUserId = b.assigneeId || b.assignee_id || b.responsibleId || b.responsible_id || b.delegatedToUserId || b.delegated_to_user_id;
+                    const aUserId = getResolvedResponsibleId(a);
+                    const bUserId = getResolvedResponsibleId(b);
                     const aUser = users.find(u => String(u.id || u.member_id) === String(aUserId));
                     const bUser = users.find(u => String(u.id || u.member_id) === String(bUserId));
                     aVal = aUser ? `${aUser.name || aUser.firstname || ''} ${aUser.lastname || ''}`.trim() : (a.assignee || a.responsible || '');
@@ -229,6 +276,27 @@ export default function UnifiedTaskActivityTable({
             newSelected.add(itemId);
         }
         setSelectedItems(newSelected);
+    };
+
+    const allVisibleItemIds = useMemo(() => sortedItems.map((item) => item.itemId), [sortedItems]);
+    const allVisibleSelected =
+        allVisibleItemIds.length > 0 && allVisibleItemIds.every((id) => selectedItems.has(id));
+    const someVisibleSelected =
+        allVisibleItemIds.some((id) => selectedItems.has(id)) && !allVisibleSelected;
+
+    useEffect(() => {
+        if (!selectAllRef.current) return;
+        selectAllRef.current.indeterminate = someVisibleSelected;
+    }, [someVisibleSelected]);
+
+    const toggleSelectAllVisible = () => {
+        const next = new Set(selectedItems);
+        if (allVisibleSelected) {
+            allVisibleItemIds.forEach((id) => next.delete(id));
+        } else {
+            allVisibleItemIds.forEach((id) => next.add(id));
+        }
+        setSelectedItems(next);
     };
 
     const handleCompleteToggle = (item, e) => {
@@ -442,7 +510,7 @@ export default function UnifiedTaskActivityTable({
         
         // For other views, show assignee/responsible
         // For activities, delegatedToUserId represents the assigned user
-        const id = item.assigneeId || item.assignee_id || item.responsibleId || item.responsible_id || item.delegatedToUserId || item.delegated_to_user_id;
+        const id = getResolvedResponsibleId(item);
         const user = users.find(u => String(u.id || u.member_id) === String(id));
         if (user) return `${user.name || user.firstname || ''} ${user.lastname || ''}`.trim();
         return item.assignee || item.responsible || '';
@@ -666,7 +734,7 @@ export default function UnifiedTaskActivityTable({
     };
 
     return (
-        <div className="flex flex-col h-full min-h-0 bg-white border border-slate-200 rounded-lg overflow-hidden">
+        <div className="flex flex-col h-full min-h-0 w-full bg-white border border-slate-200 rounded-lg overflow-hidden">
             {/* Special Header for Delegated View */}
             {viewTab === 'delegated' && (
                 <div className="px-4 py-3 bg-white border-b border-slate-200">
@@ -766,11 +834,20 @@ export default function UnifiedTaskActivityTable({
             </div>
 
             {/* Table */}
-            <div className="flex-1 h-0 min-h-0 overflow-y-auto overflow-x-auto -mx-2 sm:mx-0">
-                <table className="min-w-full text-sm whitespace-nowrap sm:whitespace-normal">
-                    <thead className="bg-slate-50 border border-slate-200 text-slate-700">
+            <div className="flex-1 h-0 min-h-0 overflow-y-auto overflow-x-auto hover-scrollbar-y">
+                <table className="min-w-full table-fixed text-sm whitespace-nowrap sm:whitespace-normal">
+                    <thead className="sticky top-0 z-10 bg-slate-50 border border-slate-200 text-slate-700">
                         <tr>
-                            <th className="w-8 px-2 sm:px-3 py-2 text-left"></th>
+                            <th className="w-8 px-2 sm:px-3 py-2 text-left">
+                                <input
+                                    ref={selectAllRef}
+                                    type="checkbox"
+                                    aria-label="Select all visible items"
+                                    checked={allVisibleSelected}
+                                    onChange={toggleSelectAllVisible}
+                                    onClick={(e) => e.stopPropagation()}
+                                />
+                            </th>
                             {columns.includes('title') && (
                                 <>
                                   <th className="px-2 sm:px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100" onClick={() => handleSort('title')}>
@@ -854,7 +931,7 @@ export default function UnifiedTaskActivityTable({
                             const deadlineValueInput = toDateOnly(deadlineValue);
                             const keyAreaIdValue = item.keyAreaId || item.key_area_id || item.key_area || item.keyArea || '';
                             // For activities, delegatedToUserId represents the assigned user
-                            const responsibleIdValue = item.assigneeId || item.assignee_id || item.responsibleId || item.responsible_id || item.delegatedToUserId || item.delegated_to_user_id || '';
+                            const responsibleIdValue = getResolvedResponsibleId(item);
                             const responsibleNameValue = viewTab === 'delegated'
                                 ? getResponsibleLabel(item)
                                 : (item.assignee || item.responsible || getUserName(responsibleIdValue));
@@ -865,7 +942,7 @@ export default function UnifiedTaskActivityTable({
                                     key={item.itemId}
                                     className={`border-t border-slate-200 hover:bg-slate-50 cursor-pointer transition-colors ${isCompleted ? 'bg-slate-50/70' : ''}`}
                                 >
-                                    <td className="px-3 py-2 align-top text-center">
+                                    <td className="w-8 px-2 sm:px-3 py-2 align-top text-center">
                                         <div className="relative inline-flex items-center gap-2">
                                             <input
                                                 aria-label={`Select ${titleValue || 'item'}`}
@@ -1008,14 +1085,12 @@ export default function UnifiedTaskActivityTable({
                                         </td>
                                     )}
                                     {columns.includes('responsible') && viewTab === 'delegated' && (
-                                        <td className="px-3 py-2 align-top text-slate-800">
+                                        <td className="w-40 px-3 py-2 align-top text-slate-800">
                                             <span>{responsibleNameValue || '—'}</span>
                                         </td>
                                     )}
                                     {columns.includes('responsible') && viewTab !== 'delegated' && (
-                                        <td
-                                            className="px-3 py-2 align-top text-slate-800"
-                                        >
+                                        <td className="w-40 px-3 py-2 align-top text-slate-800">
                                             <select
                                                 className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-sm w-20"
                                                 value={String(responsibleIdValue || '')}
@@ -1033,7 +1108,7 @@ export default function UnifiedTaskActivityTable({
                                     )}
                                     {columns.includes('keyArea') && (
                                         <td
-                                            className="px-3 py-2 align-top text-slate-800"
+                                            className="w-32 px-3 py-2 align-top text-slate-800"
                                             onDoubleClick={(e) => {
                                                 e.stopPropagation();
                                                 startEdit(item, 'keyAreaId', String(keyAreaIdValue || ''));
@@ -1062,7 +1137,7 @@ export default function UnifiedTaskActivityTable({
                                     )}
                                     {columns.includes('tab') && (
                                         <td
-                                            className="px-3 py-2 align-top text-center text-slate-800"
+                                            className="w-20 px-3 py-2 align-top text-center text-slate-800"
                                             onDoubleClick={(e) => {
                                                 e.stopPropagation();
                                                 startEdit(item, 'listIndex', String(item.list_index ?? item.listIndex ?? item.list ?? ''));
@@ -1135,7 +1210,7 @@ export default function UnifiedTaskActivityTable({
                                     )}
                                     {columns.includes('startDate') && (
                                         <td
-                                            className="px-3 py-2 align-top text-slate-800"
+                                            className="w-28 px-3 py-2 align-top text-slate-800"
                                             onDoubleClick={(e) => {
                                                 e.stopPropagation();
                                                 startEdit(item, 'startDate', startDateValue);
@@ -1158,7 +1233,7 @@ export default function UnifiedTaskActivityTable({
                                     )}
                                     {columns.includes('endDate') && (
                                         <td
-                                            className="px-3 py-2 align-top text-slate-800"
+                                            className="w-28 px-3 py-2 align-top text-slate-800"
                                             onDoubleClick={(e) => {
                                                 e.stopPropagation();
                                                 startEdit(item, 'endDate', endDateValue);
@@ -1181,7 +1256,7 @@ export default function UnifiedTaskActivityTable({
                                     )}
                                     {columns.includes('deadline') && (
                                         <td
-                                            className="px-3 py-2 align-top text-slate-800"
+                                            className="w-28 px-3 py-2 align-top text-slate-800"
                                             onDoubleClick={(e) => {
                                                 e.stopPropagation();
                                                 startEdit(item, 'deadline', deadlineValueInput);
