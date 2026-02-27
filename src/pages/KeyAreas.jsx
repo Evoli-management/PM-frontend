@@ -3358,18 +3358,7 @@ export default function KeyAreas() {
                         />
                     </div>
                     
-                    <div className="max-w-full overflow-x-hidden pb-1 min-h-full">
-                        <div className="flex items-center justify-between gap-4 mb-0 p-0 pb-0">
-                            <div className="flex items-center gap-4">
-                                <button
-                                    className="md:hidden p-2 rounded-lg hover:bg-slate-100 text-slate-700"
-                                    onClick={() => setMobileSidebarOpen(true)}
-                                    aria-label="Open sidebar"
-                                >
-                                    <FaBars />
-                                </button>
-                            </div>
-                        </div>
+                    <div className="max-w-full overflow-x-hidden pb-1 min-h-full flex flex-col">
                         <div className="px-1 md:px-2">
                             {/* Header / Search / New KA */}
                             <div
@@ -3947,7 +3936,7 @@ export default function KeyAreas() {
                                                                     {/* Actions column removed — actions available via row menu */}
                                                                 </tr>
                                                             </thead>
-                                                            <tbody className="bg-white block max-h-[calc(100vh-520px)] overflow-y-auto overflow-x-hidden">
+                                                            <tbody className="bg-white block max-h-[calc(100vh-520px)] overflow-y-auto overflow-x-hidden hover-scrollbar">
                                                                 {sortedTasks.map((t) => {
                                                                     const q = computeEisenhowerQuadrant({
                                                                         deadline: t.deadline,
@@ -4601,7 +4590,7 @@ export default function KeyAreas() {
 
                         {/* DELEGATED TAB: Two-section layout - pending at top, all delegated below */}
                         {viewTab === 'delegated' && (
-                            <div className="flex-1 overflow-auto px-4 py-4" style={{ display: selectedTaskFull ? "none" : undefined }}>
+                            <div className="flex-1 min-h-0 h-0 overflow-hidden px-4 py-4 flex flex-col gap-4" style={{ display: selectedTaskFull ? "none" : undefined }}>
                                 {/* Section 1: Pending Delegations */}
                                 <PendingDelegationsSection
                                     pendingTasks={pendingDelegations}
@@ -4664,10 +4653,59 @@ export default function KeyAreas() {
                                 />
 
                                 {/* Section 2: All Delegated Tasks with filters */}
-                                <div>
-                                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                                        All Delegated Tasks ({allTasks.length})
-                                    </h3>
+                                <div className="flex-1 min-h-0 h-0 flex flex-col">
+                                    <div className="flex-1 min-h-0 h-0">
+                                        <UnifiedTaskActivityTable
+                                            viewTab={viewTab}
+                                            tasks={allTasks}
+                                            activities={Object.values(activitiesByTask).flat()}
+                                            keyAreas={keyAreas}
+                                            users={users}
+                                            goals={goals}
+                                            currentUserId={currentUserId}
+                                            onTaskClick={(task) => {
+                                                setSelectedTaskFull(task);
+                                                setTaskFullInitialTab("activities");
+                                            }}
+                                            onActivityClick={(activity) => {
+                                                const task = allTasks.find(t => String(t.id) === String(activity.taskId || activity.task_id));
+                                                if (task) {
+                                                    setSelectedTaskFull(task);
+                                                    setTaskFullInitialTab("activities");
+                                                }
+                                            }}
+                                            onTaskUpdate={async (id, updatedTask) => {
+                                                try {
+                                                    if (updatedTask.delegatedToUserId) {
+                                                        const svc = await getTaskService();
+                                                        const delegatedToMe = await svc.list({ delegatedTo: true });
+                                                        setAllTasks(delegatedToMe || []);
+                                                    } else {
+                                                        const result = await api.updateTask(id, updatedTask);
+                                                        setAllTasks(prev => prev.map(t => t.id === id ? result : t));
+                                                    }
+                                                } catch (error) {
+                                                    console.error('Failed to update task:', error);
+                                                }
+                                            }}
+                                            onTaskDelete={async (id) => {
+                                                try {
+                                                    await api.deleteTask(id);
+                                                    setAllTasks(prev => prev.filter(t => t.id !== id));
+                                                } catch (error) {
+                                                    console.error('Failed to delete task:', error);
+                                                }
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Unified Table View for TODO, ACTIVITY TRAP tabs */}
+                        {(viewTab === 'todo' || viewTab === 'activity-trap') && (
+                            <div className="flex-1 min-h-0 h-0 overflow-hidden px-4 py-4 flex flex-col" style={{ display: selectedTaskFull ? "none" : undefined }}>
+                                <div className="flex-1 min-h-0 h-0">
                                     <UnifiedTaskActivityTable
                                         viewTab={viewTab}
                                         tasks={allTasks}
@@ -4689,11 +4727,24 @@ export default function KeyAreas() {
                                         }}
                                         onTaskUpdate={async (id, updatedTask) => {
                                             try {
+                                                // If delegation happened, refresh the task list for the current view
                                                 if (updatedTask.delegatedToUserId) {
-                                                    const svc = await getTaskService();
-                                                    const delegatedToMe = await svc.list({ delegatedTo: true });
-                                                    setAllTasks(delegatedToMe || []);
+                                                    // Task was delegated, reload the appropriate view
+                                                    if (viewTab === 'todo') {
+                                                        const svc = await getTaskService();
+                                                        const allUserTasks = await svc.list({});
+                                                        setAllTasks(allUserTasks || []);
+                                                    } else if (viewTab === 'activity-trap') {
+                                                        const svc = await getTaskService();
+                                                        const trapTasks = await svc.list({ withoutGoal: true });
+                                                        setAllTasks(trapTasks || []);
+                                                    } else if (selectedKA) {
+                                                        // Active tasks view - reload selected key area tasks
+                                                        const rows = await api.listTasks(selectedKA.id);
+                                                        setAllTasks(rows || []);
+                                                    }
                                                 } else {
+                                                    // Normal update
                                                     const result = await api.updateTask(id, updatedTask);
                                                     setAllTasks(prev => prev.map(t => t.id === id ? result : t));
                                                 }
@@ -4709,105 +4760,44 @@ export default function KeyAreas() {
                                                 console.error('Failed to delete task:', error);
                                             }
                                         }}
+                                        onActivityUpdate={async (id, updatedActivity) => {
+                                            try {
+                                                const activityService = await getActivityService();
+                                                const result = await activityService.update(id, updatedActivity);
+                                                // Update the activities in state
+                                                setActivitiesByTask(prev => {
+                                                    const updated = { ...prev };
+                                                    for (let key in updated) {
+                                                        updated[key] = updated[key].map(a => a.id === id ? result : a);
+                                                    }
+                                                    return updated;
+                                                });
+                                            } catch (error) {
+                                                console.error('Failed to update activity:', error);
+                                            }
+                                        }}
+                                        onActivityDelete={async (id) => {
+                                            try {
+                                                const activityService = await getActivityService();
+                                                await activityService.remove(id);
+                                                // Remove the activity from state
+                                                setActivitiesByTask(prev => {
+                                                    const updated = { ...prev };
+                                                    for (let key in updated) {
+                                                        updated[key] = updated[key].filter(a => a.id !== id);
+                                                    }
+                                                    return updated;
+                                                });
+                                            } catch (error) {
+                                                console.error('Failed to delete activity:', error);
+                                            }
+                                        }}
+                                        onMassEdit={(selected) => {
+                                            // TODO: Implement mass edit modal
+                                            console.log('Mass edit:', selected);
+                                        }}
                                     />
                                 </div>
-                            </div>
-                        )}
-
-                        {/* Unified Table View for TODO, ACTIVITY TRAP tabs */}
-                        {(viewTab === 'todo' || viewTab === 'activity-trap') && (
-                            <div className="flex-1 overflow-auto px-4 py-4" style={{ display: selectedTaskFull ? "none" : undefined }}>
-                                <UnifiedTaskActivityTable
-                                    viewTab={viewTab}
-                                    tasks={allTasks}
-                                    activities={Object.values(activitiesByTask).flat()}
-                                    keyAreas={keyAreas}
-                                    users={users}
-                                    goals={goals}
-                                    currentUserId={currentUserId}
-                                    onTaskClick={(task) => {
-                                        setSelectedTaskFull(task);
-                                        setTaskFullInitialTab("activities");
-                                    }}
-                                    onActivityClick={(activity) => {
-                                        const task = allTasks.find(t => String(t.id) === String(activity.taskId || activity.task_id));
-                                        if (task) {
-                                            setSelectedTaskFull(task);
-                                            setTaskFullInitialTab("activities");
-                                        }
-                                    }}
-                                    onTaskUpdate={async (id, updatedTask) => {
-                                        try {
-                                            // If delegation happened, refresh the task list for the current view
-                                            if (updatedTask.delegatedToUserId) {
-                                                // Task was delegated, reload the appropriate view
-                                                if (viewTab === 'todo') {
-                                                    const svc = await getTaskService();
-                                                    const allUserTasks = await svc.list({});
-                                                    setAllTasks(allUserTasks || []);
-                                                } else if (viewTab === 'activity-trap') {
-                                                    const svc = await getTaskService();
-                                                    const trapTasks = await svc.list({ withoutGoal: true });
-                                                    setAllTasks(trapTasks || []);
-                                                } else if (selectedKA) {
-                                                    // Active tasks view - reload selected key area tasks
-                                                    const rows = await api.listTasks(selectedKA.id);
-                                                    setAllTasks(rows || []);
-                                                }
-                                            } else {
-                                                // Normal update
-                                                const result = await api.updateTask(id, updatedTask);
-                                                setAllTasks(prev => prev.map(t => t.id === id ? result : t));
-                                            }
-                                        } catch (error) {
-                                            console.error('Failed to update task:', error);
-                                        }
-                                    }}
-                                    onTaskDelete={async (id) => {
-                                        try {
-                                            await api.deleteTask(id);
-                                            setAllTasks(prev => prev.filter(t => t.id !== id));
-                                        } catch (error) {
-                                            console.error('Failed to delete task:', error);
-                                        }
-                                    }}
-                                    onActivityUpdate={async (id, updatedActivity) => {
-                                        try {
-                                            const activityService = await getActivityService();
-                                            const result = await activityService.update(id, updatedActivity);
-                                            // Update the activities in state
-                                            setActivitiesByTask(prev => {
-                                                const updated = { ...prev };
-                                                for (let key in updated) {
-                                                    updated[key] = updated[key].map(a => a.id === id ? result : a);
-                                                }
-                                                return updated;
-                                            });
-                                        } catch (error) {
-                                            console.error('Failed to update activity:', error);
-                                        }
-                                    }}
-                                    onActivityDelete={async (id) => {
-                                        try {
-                                            const activityService = await getActivityService();
-                                            await activityService.remove(id);
-                                            // Remove the activity from state
-                                            setActivitiesByTask(prev => {
-                                                const updated = { ...prev };
-                                                for (let key in updated) {
-                                                    updated[key] = updated[key].filter(a => a.id !== id);
-                                                }
-                                                return updated;
-                                            });
-                                        } catch (error) {
-                                            console.error('Failed to delete activity:', error);
-                                        }
-                                    }}
-                                    onMassEdit={(selected) => {
-                                        // TODO: Implement mass edit modal
-                                        console.log('Mass edit:', selected);
-                                    }}
-                                />
                             </div>
                         )}
 

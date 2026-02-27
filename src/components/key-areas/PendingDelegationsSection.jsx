@@ -203,16 +203,7 @@ export default function PendingDelegationsSection({
     );
   }
   if (!pendingTasks || pendingTasks.length === 0) {
-    return (
-      <div className="mb-8 p-6 bg-green-50 border border-green-200 rounded-lg text-center">
-        <p className="text-green-800 font-medium">
-          ✓ No pending delegations
-        </p>
-        <p className="text-green-700 text-sm">
-          You're all caught up! All delegations have been accepted or rejected.
-        </p>
-      </div>
-    );
+    return null;
   }
 
   const normalizedTitles = new Set(
@@ -244,25 +235,25 @@ export default function PendingDelegationsSection({
     <>
       {/* Pending Delegations Section */}
       <div className="mb-8">
-        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
-          <h3 className="text-lg font-semibold text-yellow-900 mb-4">
+        <div className="bg-white border border-slate-200 rounded-lg p-4 mb-4">
+          <h3 className="text-lg font-semibold text-slate-900 mb-4">
             Pending Delegations ({pendingTasks.length})
           </h3>
 
           {/* Table for pending delegations */}
-          <div className="bg-white rounded-lg border border-yellow-200 overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-yellow-100 border-b border-yellow-200">
+          <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+            <table className="min-w-full text-sm whitespace-nowrap sm:whitespace-normal">
+              <thead className="bg-slate-50 border-b border-slate-200 text-slate-700">
                 <tr>
-                  <th className="px-2 py-2 text-center w-8 font-semibold text-gray-700">Type</th>
-                  <th className="px-2 py-2 text-center w-6 font-semibold text-gray-700">Prior</th>
-                  <th className="px-4 py-2 text-left font-semibold text-gray-700">Title</th>
-                  <th className="px-4 py-2 text-left font-semibold text-gray-700">Deadline</th>
-                  <th className="px-4 py-2 text-left font-semibold text-gray-700">Received From</th>
-                  <th className="px-4 py-2 text-center font-semibold text-gray-700">Actions</th>
+                  <th className="px-2 sm:px-3 py-2 text-center w-8 font-semibold">Type</th>
+                  <th className="px-2 sm:px-3 py-2 text-center w-6 font-semibold">Prior</th>
+                  <th className="px-2 sm:px-3 py-2 text-left font-semibold">Title</th>
+                  <th className="px-2 sm:px-3 py-2 text-left font-semibold">Deadline</th>
+                  <th className="px-2 sm:px-3 py-2 text-left font-semibold">Received From</th>
+                  <th className="px-2 sm:px-3 py-2 text-center font-semibold">Actions</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="bg-white">
                 <AnimatePresence mode="popLayout">
                   {pendingTasks.map((item) => (
                     <motion.tr
@@ -271,16 +262,16 @@ export default function PendingDelegationsSection({
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: -100 }}
                       transition={{ duration: 0.2 }}
-                      className="border-b border-gray-200 hover:bg-yellow-50"
+                      className="border-b border-slate-200 hover:bg-slate-50"
                     >
-                      <td className="px-2 py-3 text-center">
+                      <td className="px-2 sm:px-3 py-3 text-center">
                         {item.type === 'task' ? (
                           <FaSquare title="Task" className="text-blue-600 mx-auto" />
                         ) : (
                           <FaListUl title="Activity" className="text-purple-600 mx-auto" />
                         )}
                       </td>
-                      <td className="px-2 py-3 text-center">
+                      <td className="px-2 sm:px-3 py-3 text-center">
                         {item.priority === 'high' && (
                           <FaExclamation 
                             title="High Priority" 
@@ -297,14 +288,14 @@ export default function PendingDelegationsSection({
                           <div className="text-gray-400 mx-auto text-xs">—</div>
                         )}
                       </td>
-                      <td className="px-4 py-3 font-medium text-gray-900">{item.title}</td>
-                      <td className="px-4 py-3 text-gray-600">
+                      <td className="px-2 sm:px-3 py-3 font-medium text-slate-900">{item.title}</td>
+                      <td className="px-2 sm:px-3 py-3 text-slate-600">
                         {formatDate(item.dueDate || item.deadline)}
                       </td>
-                      <td className="px-4 py-3 text-gray-600">
+                      <td className="px-2 sm:px-3 py-3 text-slate-600">
                         {getDelegatorName(item)}
                       </td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-2 sm:px-3 py-3 text-center">
                         <div className="flex items-center justify-center gap-2">
                           <button
                             onClick={() => handleAcceptClick(item)}

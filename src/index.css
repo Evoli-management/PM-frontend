@@ -77,6 +77,27 @@ body {
     display: none; /* Chrome, Safari, Opera */
 }
 
+/* Hide vertical scrollbar by default; reveal on hover at the container right edge */
+.hover-scrollbar {
+    scrollbar-width: none; /* Firefox */
+}
+.hover-scrollbar::-webkit-scrollbar {
+    width: 0;
+}
+.hover-scrollbar:hover {
+    scrollbar-width: thin; /* Firefox */
+}
+.hover-scrollbar:hover::-webkit-scrollbar {
+    width: 4px;
+}
+.hover-scrollbar:hover::-webkit-scrollbar-track {
+    background: transparent;
+}
+.hover-scrollbar:hover::-webkit-scrollbar-thumb {
+    background: #b9c0cd;
+    border-radius: 999px;
+}
+
 /* Hide native date picker icon; we provide our own 📅 trigger */
 input[type="date"].hide-native-date-icon::-webkit-calendar-picker-indicator {
     opacity: 0;
