@@ -774,9 +774,6 @@ export default function MonthView({
       if (bottomHScrollRef.current && Math.abs((bottomHScrollRef.current.scrollLeft || 0) - safeLeft) > 0.5) {
         bottomHScrollRef.current.scrollLeft = safeLeft;
       }
-      if (rightBodyScrollRef.current && Math.abs((rightBodyScrollRef.current.scrollLeft || 0) - safeLeft) > 0.5) {
-        rightBodyScrollRef.current.scrollLeft = safeLeft;
-      }
     } catch (_) {}
   };
 
@@ -1120,16 +1117,13 @@ export default function MonthView({
     };
 
     window.addEventListener("resize", onResize);
-    const onBodyScroll = () => {
-      scheduleSyncHeights(80);
-      setTimeout(() => processBatch(0), 0);
-    };
-    bodyWrap.addEventListener("scroll", onBodyScroll, { passive: true });
+    // Horizontal scrolling should not trigger heavy overlay recomputation.
+    // Overlays are positioned relative to the table content, so horizontal
+    // movement is handled natively by the scroller itself.
 
     return () => {
       cancelled = true;
       window.removeEventListener("resize", onResize);
-      bodyWrap.removeEventListener("scroll", onBodyScroll);
       if (chunkTimerRef.current) clearTimeout(chunkTimerRef.current);
     };
   }, [events, HOUR_SLOTS, year, month, daysInMonth, WORK_START, WORK_END, tailwindColorCache]);
