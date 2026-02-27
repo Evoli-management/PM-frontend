@@ -1,5 +1,5 @@
 import React, { useState, useRef, useLayoutEffect, useEffect, useMemo } from "react";
-import { FaChevronLeft, FaChevronRight, FaChevronDown, FaPlus, FaEdit, FaTrash } from "react-icons/fa";
+import { FaChevronLeft, FaChevronRight, FaChevronDown, FaEdit, FaTrash } from "react-icons/fa";
 import { useCalendarPreferences } from "../../hooks/useCalendarPreferences";
 
 function getWeekNumber(date) {
@@ -72,6 +72,7 @@ export default function QuarterView({
     events,
     categories,
     onDayClick,
+    onQuickCreate,
     onEventClick,
     view,
     onChangeView,
@@ -204,7 +205,8 @@ export default function QuarterView({
             laneByKey.set(item.key, lane);
         }
 
-        return { laneByKey };
+        const maxLaneCount = Math.max(1, laneEnds.length);
+        return { laneByKey, maxLaneCount };
     }, [events]);
 
     // Helper to get week number for a given date
@@ -243,6 +245,7 @@ export default function QuarterView({
 
     const [showViewMenu, setShowViewMenu] = useState(false);
     const [popup, setPopup] = useState(null);
+    const [selectedDateIso, setSelectedDateIso] = useState(null);
     // popup: { iso: 'YYYY-MM-DD', events: [], rect: DOMRect }
     // refs to allow equalizing row heights across the three month columns
     const rowRefs = useRef([]); // rowRefs.current[mIdx][wIdx][dayIdx] = tr element
@@ -599,15 +602,32 @@ export default function QuarterView({
                                             className="bg-white border border-blue-200 my-1"
                                         >
                                             {week.days.map((date, dayIdx) => {
+                                                const iso = date.toISOString().slice(0, 10);
+                                                const isSelectedDate = selectedDateIso === iso;
                                                 const isWeekend = date.getDay() === 0 || date.getDay() === 6;
                                                 const showWeekNum = dayIndexMonday(date) === 0; // show only on Monday
                                                 const rowBorderClass = dayIdx < week.days.length - 1 ? "border-b border-blue-100" : "";
                                                 return (
                                                     <tr ref={(el) => setRowRef(mIdx, wIdx, dayIdx, el)} key={dayIdx} className="bg-white">
                                                         <td
-                                                            className={`px-3 py-3 text-left align-top ${rowBorderClass}`}
-                                                            data-date={date.toISOString().slice(0,10)}
-                                                            style={{ minWidth: 80, position: 'relative' }}
+                                                            className={`px-3 py-3 text-left align-top ${rowBorderClass} ${isSelectedDate ? "bg-blue-50/70" : ""}`}
+                                                            data-date={iso}
+                                                            style={{
+                                                                minWidth: 80,
+                                                                position: 'relative',
+                                                                boxShadow: isSelectedDate ? "inset 0 0 0 2px rgba(59, 130, 246, 0.35)" : undefined,
+                                                                cursor: typeof onQuickCreate === "function" ? "pointer" : undefined,
+                                                            }}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setSelectedDateIso(iso);
+                                                            }}
+                                                            onDoubleClick={(e) => {
+                                                                e.stopPropagation();
+                                                                if (typeof onQuickCreate !== "function") return;
+                                                                const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+                                                                onQuickCreate(dayStart, { allDay: true });
+                                                            }}
                                                         >
                                                             <div className={`text-sm font-semibold flex items-center justify-between ${isWeekend ? 'text-red-500' : 'text-gray-700'}`}>
                                                                 <div className="flex flex-col w-20 pr-2">
@@ -635,7 +655,6 @@ export default function QuarterView({
                                                                     // For quarter view we don't render chips inline. Instead show a '+' icon
                                                                     // to the right which opens a popup listing appointments for the date.
                                                                     if (dayEvents.length === 0 && dayAppointments.length === 0) return null;
-                                                                    const iso = date.toISOString().slice(0,10);
                                                                     const dayEventsSorted = [...dayEvents].sort((a, b) => {
                                                                         try {
                                                                             const as = new Date(a.start || a.startDate || a.start_at || 0).getTime();
@@ -653,22 +672,32 @@ export default function QuarterView({
                                                                         ev,
                                                                         lane: quarterEventLanes.laneByKey.get(getEventKey(ev, idx)) ?? 0,
                                                                     }));
-                                                                    const VISIBLE_LANES = 2;
                                                                     const visibleEvents = dayEventsWithLane
-                                                                        .filter((x) => x.lane < VISIBLE_LANES)
                                                                         .sort((a, b) => a.lane - b.lane);
-                                                                    const moreCount = Math.max(0, dayEventsWithLane.length - visibleEvents.length);
+                                                                    // Keep lane columns stable across the quarter so bars
+                                                                    // do not expand/shift when adjacent events end.
+                                                                    const laneCount = Math.max(1, quarterEventLanes.maxLaneCount || 1);
+                                                                    const ACTION_GUTTER_WIDTH = 22;
                                                                     return (
                                                                         <div
                                                                             className="ml-2 flex items-center"
                                                                             style={{ position: 'absolute', left: 76, right: 8, top: -1, bottom: -1, zIndex: isPopupOpen ? 2000 : 20 }}
                                                                         >
-                                                                            <div style={{ position: 'relative', flex: 1, height: '100%', marginRight: 24, overflow: 'hidden' }}>
+                                                                            <div
+                                                                                style={{
+                                                                                    position: 'absolute',
+                                                                                    left: 0,
+                                                                                    right: `${ACTION_GUTTER_WIDTH}px`,
+                                                                                    top: 0,
+                                                                                    bottom: 0,
+                                                                                    overflow: 'hidden',
+                                                                                }}
+                                                                            >
                                                                                 {visibleEvents.map(({ ev, lane }, idx) => {
                                                                                     const span = eventSpanByDate(ev);
                                                                                     const startsHere = span ? sameDateOnly(span.start, dayOnly) : false;
                                                                                     const endsHere = span ? sameDateOnly(span.end, dayOnly) : false;
-                                                                                    const colIndex = lane % VISIBLE_LANES;
+                                                                                    const colIndex = Math.max(0, Math.min(laneCount - 1, Number(lane) || 0));
                                                                                     const kindKey = ev.kind || ev.type || ev.kindName || null;
                                                                                     const cat =
                                                                                         kindKey && categories && categories[kindKey]
@@ -691,8 +720,8 @@ export default function QuarterView({
                                                                                                 position: 'absolute',
                                                                                                 top: 0,
                                                                                                 bottom: 0,
-                                                                                                left: colIndex === 0 ? 0 : 'calc(50% + 1px)',
-                                                                                                width: 'calc(50% - 1px)',
+                                                                                                left: `calc(${(colIndex * 100) / laneCount}% + 1px)`,
+                                                                                                width: `calc(${100 / laneCount}% - 2px)`,
                                                                                                 ...(finalBg ? { backgroundColor: finalBg, border: `1px solid ${finalBg}`, color: textColor } : {}),
                                                                                                 borderRadius: startsHere && endsHere ? 6 : startsHere ? '6px 6px 0 0' : endsHere ? '0 0 6px 6px' : 0,
                                                                                                 boxShadow: '0 0 0 1px rgba(0,0,0,0.03)',
@@ -738,16 +767,14 @@ export default function QuarterView({
                                                                                 })}
                                                                             </div>
 
-                                                                            <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                                                                                {moreCount > 0 && (
-                                                                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-300">
-                                                                                        +{moreCount}
-                                                                                    </span>
-                                                                                )}
+                                                                            <div
+                                                                                className="absolute right-0 top-0 bottom-0 flex flex-col items-center justify-center gap-1"
+                                                                                style={{ width: `${ACTION_GUTTER_WIDTH}px` }}
+                                                                            >
                                                                                 {dayAppointments.length > 0 && (
                                                                                     <button
                                                                                         aria-label={`Show appointments for ${iso}`}
-                                                                                        className="text-sm text-blue-700 hover:bg-slate-50 p-0.5 rounded inline-flex items-center"
+                                                                                        className="inline-flex items-center justify-center px-1 text-base leading-none text-sky-600 hover:text-sky-700"
                                                                                         onClick={(e) => {
                                                                                             e.stopPropagation();
                                                                                             setPopup((curr) =>
@@ -757,7 +784,7 @@ export default function QuarterView({
                                                                                             );
                                                                                         }}
                                                                                     >
-                                                                                        <FaPlus size={12} />
+                                                                                        +
                                                                                     </button>
                                                                                 )}
                                                                             </div>

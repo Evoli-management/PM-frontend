@@ -66,6 +66,7 @@ const WeekView = ({
   const [showViewMenu, setShowViewMenu] = useState(false);
   const [colOverlay, setColOverlay] = useState(null);
   const [allDayOverflow, setAllDayOverflow] = useState(null);
+  const [hoveredQuickCreateCell, setHoveredQuickCreateCell] = useState(null);
 
   // Fixed time column width; day columns will flex to fill available space
   const TIME_COL_PX = 80; // matches w-20
@@ -1112,7 +1113,7 @@ const WeekView = ({
                                         onClick={() => {
                                           if (onEventClick) onEventClick(t);
                                         }}
-                                        className={`group absolute left-0 rounded px-2 text-xs overflow-hidden cursor-pointer ${bgClass || ""}`}
+                                        className={`group absolute left-0 rounded px-2 pr-3 text-xs overflow-visible cursor-pointer ${bgClass || ""}`}
                                         style={barStyle}
                                         title={t.title || t.name}
                                       >
@@ -1123,7 +1124,7 @@ const WeekView = ({
                                           />
                                         )}
                                         <div className="truncate font-medium leading-[26px]">{t.title || t.name}</div>
-                                        <div className="hidden group-hover:flex items-center gap-1 absolute right-1 top-1/2 -translate-y-1/2 z-20">
+                                        <div className="flex items-center gap-1 absolute right-1 top-1/2 -translate-y-1/2 z-20">
                                           <button
                                             type="button"
                                             className="p-0.5 rounded hover:bg-black/10"
@@ -1535,6 +1536,12 @@ const WeekView = ({
                                   const topPx = (evStartMins - startMinutes) * pxPerMinute;
                                   const durationMins = Math.max(15, evEndMins - evStartMins);
                                   const heightPx = Math.max(18, durationMins * pxPerMinute);
+                                  // Keep slot boundary lines visible between back-to-back appointments.
+                                  const startsOnSlotBoundary = evStartMins % Math.max(1, slotSize) === 0;
+                                  const topInsetPx = (evStartMins > startMinutes && startsOnSlotBoundary) ? 1 : 0;
+                                  const bottomInsetPx = 1;
+                                  const renderedTopPx = topPx + topInsetPx;
+                                  const renderedHeightPx = Math.max(16, heightPx - topInsetPx - bottomInsetPx);
 
                                   const concurrent = dayEvents.filter((other) => isOverlapping(entry, other));
                                   const visualColumns = Math.min(3, Math.max(1, concurrent.length));
@@ -1574,16 +1581,16 @@ const WeekView = ({
                                       key={`ov-${dIdx}-${i}-${ev.id || i}`}
                                       style={{
                                         position: "absolute",
-                                        top: topPx + "px",
+                                        top: renderedTopPx + "px",
                                         left: leftPx + "px",
                                         width: widthPx + "px",
-                                        height: Math.max(18, heightPx) + "px",
+                                        height: renderedHeightPx + "px",
                                         zIndex: 20,
                                         pointerEvents: "auto",
                                       }}
                                     >
                                       <div
-                                        className={`rounded px-1.5 py-1 text-xs overflow-hidden group ${kindClass || ""}`}
+                                        className={`rounded px-1.5 py-1 pr-2 text-xs overflow-visible group ${kindClass || ""}`}
                                         style={{ height: "100%", cursor: "pointer", ...(timedStyle || {}) }}
                                         title={ev.title || "Appointment"}
                                         draggable
@@ -1687,7 +1694,7 @@ const WeekView = ({
                                                 {ev.title}
                                               </span>
                                             </div>
-                                            <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <div className="flex items-center gap-0.5 shrink-0">
                                               <button
                                                 className="p-0 rounded hover:bg-black/10 transition-colors flex-shrink-0"
                                                 onClick={(e) => {
@@ -1724,7 +1731,7 @@ const WeekView = ({
                                             <span className="truncate whitespace-nowrap text-[11px] min-w-0 flex-1 leading-4 font-medium" tabIndex={0} aria-label={ev.title}>
                                               {ev.title}
                                             </span>
-                                            <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <div className="flex items-center gap-0.5 shrink-0">
                                               <button
                                                 className="p-0.5 rounded hover:bg-black/10 transition-colors"
                                                 onClick={(e) => {
@@ -1874,6 +1881,13 @@ const WeekView = ({
 
                         {/* RIGHT: grid cells */}
                         {days.map((date, dIdx) => {
+                          const dayKey = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+                          const previewSlotCount = Math.max(1, Math.ceil(30 / Math.max(1, slotSize)));
+                          const isHoverPreview =
+                            hoveredQuickCreateCell &&
+                            hoveredQuickCreateCell.dayKey === dayKey &&
+                            index >= hoveredQuickCreateCell.slotIndex &&
+                            index < hoveredQuickCreateCell.slotIndex + previewSlotCount;
                           return (
                             <div
                               key={dIdx}
@@ -1884,7 +1898,7 @@ const WeekView = ({
                                 height: ITEM_SIZE,
                                 boxSizing: "border-box",
                                 cursor: "pointer",
-                                backgroundColor: slotIsWorking ? undefined : NON_WORK_BG,
+                                backgroundColor: isHoverPreview ? "rgba(191, 219, 254, 0.65)" : (slotIsWorking ? undefined : NON_WORK_BG),
                                 opacity: slotIsWorking ? 1 : NON_WORK_OPACITY,
                                 borderRightWidth: "2px",
                                 borderRightStyle: "dashed",
@@ -1902,6 +1916,14 @@ const WeekView = ({
                                 const [h, m] = slot.split(":");
                                 const dt = new Date(date.getFullYear(), date.getMonth(), date.getDate(), Number(h), Number(m));
                                 onQuickCreate && onQuickCreate(dt);
+                              }}
+                              onMouseEnter={() => {
+                                setHoveredQuickCreateCell({ dayKey, slotIndex: index });
+                              }}
+                              onMouseLeave={() => {
+                                setHoveredQuickCreateCell((prev) =>
+                                  prev && prev.dayKey === dayKey && prev.slotIndex === index ? null : prev
+                                );
                               }}
                             >
                               {slotSize === 30 && (

@@ -137,6 +137,7 @@ export default function DayView({
   const justResizedRef = useRef(false);
   // State to track which time slot is being dragged over
   const [dragOverSlot, setDragOverSlot] = useState(null);
+  const [hoveredQuickCreateSlot, setHoveredQuickCreateSlot] = useState(null);
   const [allDayOverflowOpen, setAllDayOverflowOpen] = useState(false);
   const [allDayOverflowItems, setAllDayOverflowItems] = useState([]);
   const allDayPopupRef = useRef(null);
@@ -989,26 +990,19 @@ export default function DayView({
                                       try { e.stopPropagation(); } catch (_) {}
                                       if (onEventClick) onEventClick(t);
                                     }}
-                                    className={`w-full group flex items-center gap-3 px-3 py-2 rounded text-xs truncate ${bgClass || ''}`}
+                                    className={`w-full group flex items-center gap-2 px-3 py-2 rounded text-xs overflow-hidden ${bgClass || ''}`}
                                     style={{ ...(styleBar || {}), width: '100%' }}
                                     title={title}
                                   >
-                                    <span className="shrink-0 text-sm" style={{ color: textColor || ((styleBar && styleBar.color) || undefined) }}>
+                                    <span className="shrink-0 inline-flex items-center justify-center w-4 text-sm" style={{ color: textColor || ((styleBar && styleBar.color) || undefined) }}>
                                         {startedBefore ? (
                                           <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 320 512" className="w-4 h-4 inline-block flex-shrink-0" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg" style={{ color: textColor || ((styleBar && styleBar.color) || undefined) }}>
                                             <path d="M34.52 239.03L228.87 44.69c9.37-9.37 24.57-9.37 33.94 0l22.67 22.67c9.36 9.36 9.37 24.52.04 33.9L131.49 256l154.02 154.75c9.34 9.38 9.32 24.54-.04 33.9l-22.67 22.67c-9.37 9.37-24.57 9.37-33.94 0L34.52 272.97c-9.37-9.37-9.37-24.57 0-33.94z"></path>
                                           </svg>
                                         ) : ''}
                                     </span>
-                                    <span className="flex-1 truncate">{title}</span>
-                                    <span className="shrink-0 text-sm" style={{ color: textColor || ((styleBar && styleBar.color) || undefined) }}>
-                                      {endsAfter ? (
-                                        <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 320 512" className="w-4 h-4 inline-block flex-shrink-0" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg" style={{ color: textColor || ((styleBar && styleBar.color) || undefined) }}>
-                                          <path d="M285.476 272.971L91.132 467.314c-9.373 9.373-24.569 9.373-33.941 0l-22.667-22.667c-9.357-9.357-9.375-24.522-.04-33.901L188.505 256 34.484 101.255c-9.335-9.379-9.317-24.544.04-33.901l22.667-22.667c9.373-9.373 24.569-9.373 33.941 0L285.475 239.03c9.373 9.372 9.373 24.568.001 33.941z"></path>
-                                        </svg>
-                                      ) : ''}
-                                    </span>
-                                    <span className="hidden group-hover:inline-flex items-center gap-1 shrink-0">
+                                    <span className="flex-1 truncate font-medium leading-[26px]">{title}</span>
+                                    <span className="inline-flex items-center gap-1 shrink-0 ml-2">
                                       <button
                                         type="button"
                                         className="p-0.5 rounded hover:bg-black/10"
@@ -1034,6 +1028,13 @@ export default function DayView({
                                       >
                                         <FaTrash className="w-2.5 h-2.5 text-red-600" />
                                       </button>
+                                    </span>
+                                    <span className="shrink-0 inline-flex items-center justify-center w-4 text-sm" style={{ color: textColor || ((styleBar && styleBar.color) || undefined) }}>
+                                      {endsAfter ? (
+                                        <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 320 512" className="w-4 h-4 inline-block flex-shrink-0" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg" style={{ color: textColor || ((styleBar && styleBar.color) || undefined) }}>
+                                          <path d="M285.476 272.971L91.132 467.314c-9.373 9.373-24.569 9.373-33.941 0l-22.667-22.667c-9.357-9.357-9.375-24.522-.04-33.901L188.505 256 34.484 101.255c-9.335-9.379-9.317-24.544.04-33.901l22.667-22.667c9.373-9.373 24.569-9.373 33.941 0L285.475 239.03c9.373 9.372 9.373 24.568.001 33.941z"></path>
+                                        </svg>
+                                      ) : ''}
                                     </span>
                                   </button>
                                 </div>
@@ -1181,6 +1182,7 @@ export default function DayView({
                     {(() => {
                       const segmentsPerHour = Math.floor(60 / slotMinutes);
                       const segmentHeight = (HOUR_HEIGHT * slotMinutes) / 60;
+                      const previewSlotCount = Math.max(1, Math.ceil(30 / Math.max(1, slotMinutes)));
 
                       const rows = [];
 
@@ -1202,14 +1204,23 @@ export default function DayView({
                           const slotIsWorking = isWorkingTime ? isWorkingTime(slotTimeStr) : true;
                           const slotKey = `${h}-${minute}`;
                           const isDraggedOver = dragOverSlot === slotKey;
+                          const slotIndex = h * segmentsPerHour + i;
+                          const hoveredStartIndex =
+                            hoveredQuickCreateSlot && hoveredQuickCreateSlot.segmentsPerHour === segmentsPerHour
+                              ? hoveredQuickCreateSlot.index
+                              : null;
+                          const isHoverPreview =
+                            hoveredStartIndex !== null &&
+                            slotIndex >= hoveredStartIndex &&
+                            slotIndex < hoveredStartIndex + previewSlotCount;
 
                           rows.push(
                             <div
                               key={slotKey}
                               role="button"
                               tabIndex={0}
-                              className={`w-full ${borderClasses} transition-colors ${isDraggedOver ? 'bg-blue-100 border-blue-300' : ''}`}
-                              style={{ height: segmentHeight, cursor: "pointer", backgroundColor: isDraggedOver ? undefined : (slotIsWorking ? undefined : '#f8fafc') }}
+                              className={`w-full ${borderClasses} transition-colors ${(isDraggedOver || isHoverPreview) ? 'bg-blue-100 border-blue-300' : ''}`}
+                              style={{ height: segmentHeight, cursor: "pointer", backgroundColor: (isDraggedOver || isHoverPreview) ? undefined : (slotIsWorking ? undefined : '#f8fafc') }}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 if (typeof onQuickCreate === "function") {
@@ -1225,6 +1236,14 @@ export default function DayView({
                                   );
                                   onQuickCreate(dt);
                                 }
+                              }}
+                              onMouseEnter={() => {
+                                setHoveredQuickCreateSlot({ index: slotIndex, segmentsPerHour });
+                              }}
+                              onMouseLeave={() => {
+                                setHoveredQuickCreateSlot((prev) =>
+                                  prev && prev.index === slotIndex && prev.segmentsPerHour === segmentsPerHour ? null : prev
+                                );
                               }}
                               onKeyDown={(e) => {
                                 if (e.key === "Enter" || e.key === " ") {
@@ -1374,6 +1393,11 @@ export default function DayView({
                         const topPx = Math.max(0, ((apptStartMins - startMinutes) / 60) * HOUR_HEIGHT);
                         const durationMins = Math.max(15, (apptEndMins - apptStartMins));
                         const heightPx = Math.max(18, (durationMins / 60) * HOUR_HEIGHT);
+                        const startsOnSlotBoundary = apptStartMins % Math.max(1, slotMinutes) === 0;
+                        const topInsetPx = (apptStartMins > startMinutes && startsOnSlotBoundary) ? 1 : 0;
+                        const bottomInsetPx = 1;
+                        const renderedTopPx = topPx + topInsetPx;
+                        const renderedHeightPx = Math.max(16, heightPx - topInsetPx - bottomInsetPx);
 
                         // color resolution: category -> keyArea -> default
                         const kindKey = appt.kind || appt.type || appt.kindName || null;
@@ -1407,8 +1431,8 @@ export default function DayView({
                         const style = bgClass
                           ? undefined
                           : {
-                              top: topPx + 'px',
-                              height: heightPx + 'px',
+                              top: renderedTopPx + 'px',
+                              height: renderedHeightPx + 'px',
                               ...laneAwareStyle,
                               backgroundColor: finalBg,
                               borderColor: finalBg,
@@ -1420,8 +1444,8 @@ export default function DayView({
                         return (
                           <div
                             key={`appt-${appt.id || originalIndex}-${title}`}
-                            className={`absolute rounded px-2 py-1 text-xs overflow-hidden flex items-center gap-2 group ${bgClass || ''}`}
-                            style={bgClass ? { top: topPx + 'px', height: heightPx + 'px', ...laneAwareStyle, zIndex: 5 } : { ...style, zIndex: 5 }}
+                            className={`absolute rounded px-1.5 py-1 pr-2 text-xs overflow-hidden group ${bgClass || ''}`}
+                            style={bgClass ? { top: renderedTopPx + 'px', height: renderedHeightPx + 'px', ...laneAwareStyle, zIndex: 5 } : { ...style, zIndex: 5 }}
                             draggable
                             onDragStart={(e) => {
                               try {
@@ -1485,8 +1509,37 @@ export default function DayView({
                             }}
                             title={title}
                           >
-                            <span className="shrink-0">{categories[appt.kind]?.icon || ""}</span>
-                            <span className="truncate whitespace-nowrap text-xs min-w-0 flex-1 cursor-grab active:cursor-grabbing" tabIndex={0} aria-label={title}>{title}</span>
+                            <div className="relative h-full flex items-center gap-1 w-full min-w-0 pr-10">
+                              <span className="shrink-0">{categories[appt.kind]?.icon || ""}</span>
+                              <span className="truncate whitespace-nowrap text-[11px] min-w-0 flex-1 leading-4 font-medium cursor-grab active:cursor-grabbing" tabIndex={0} aria-label={title}>{title}</span>
+
+                              <div className="flex items-center gap-1 shrink-0 absolute right-1 top-1/2 -translate-y-1/2">
+                                <button
+                                  className="p-0.5 rounded hover:bg-black/10 transition-colors"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onEventClick && onEventClick(appt, 'edit');
+                                  }}
+                                  aria-label={`Edit ${title}`}
+                                  title="Edit appointment"
+                                >
+                                  <FaEdit className="w-2.5 h-2.5 text-blue-600" />
+                                </button>
+                                <button
+                                  className="p-0.5 rounded hover:bg-black/10 transition-colors"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    // prefer explicit delete handler so parent can show a popover anchored to the click
+                                    if (typeof onDeleteRequest === 'function') return onDeleteRequest(appt, e);
+                                    onEventClick && onEventClick(appt, 'delete');
+                                  }}
+                                  aria-label={`Delete ${title}`}
+                                  title="Delete appointment"
+                                >
+                                  <FaTrash className="w-2.5 h-2.5 text-red-600" />
+                                </button>
+                              </div>
+                            </div>
 
                             {/* top resize handle */}
                             <div
@@ -1505,34 +1558,6 @@ export default function DayView({
                               className="absolute left-0 right-0 h-2 -bottom-1 cursor-ns-resize"
                               style={{ zIndex: 10 }}
                             />
-
-                            {/* Action Icons - shown on hover */}
-                            <div className="hidden group-hover:flex items-center gap-1 ml-2">
-                              <button
-                                className="p-1 rounded hover:bg-black/10 transition-colors"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onEventClick && onEventClick(appt, 'edit');
-                                }}
-                                aria-label={`Edit ${title}`}
-                                title="Edit appointment"
-                              >
-                                <FaEdit className="w-3 h-3 text-blue-600" />
-                              </button>
-                              <button
-                                className="p-1 rounded hover:bg-black/10 transition-colors"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  // prefer explicit delete handler so parent can show a popover anchored to the click
-                                  if (typeof onDeleteRequest === 'function') return onDeleteRequest(appt, e);
-                                  onEventClick && onEventClick(appt, 'delete');
-                                }}
-                                aria-label={`Delete ${title}`}
-                                title="Delete appointment"
-                              >
-                                <FaTrash className="w-3 h-3 text-red-600" />
-                              </button>
-                            </div>
 
                             {/* live preview will be rendered after the mapping (global) */}
                           </div>

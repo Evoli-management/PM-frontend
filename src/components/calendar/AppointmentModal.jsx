@@ -276,7 +276,7 @@ const buildRecurringPattern = ({
     const AppointmentModal = ({
         startDate,
         event = null,
-        defaultDurationMinutes = 60,
+        defaultDurationMinutes = 30,
         allDayDefault = false,
         onClose,
         onCreated,
@@ -363,14 +363,51 @@ const buildRecurringPattern = ({
     const [keyAreaId, setKeyAreaId] = useState(initialKeyArea);
 
     const [startDateStr, setStartDateStr] = useState(toYMD(initialStart));
-    const [startTimeStr, setStartTimeStr] = useState(() => (!isEdit ? "00:00" : toHM(initialStart)));
+    const [startTimeStr, setStartTimeStr] = useState(() => toHM(initialStart));
     const [endDateStr, setEndDateStr] = useState(toYMD(initialEnd));
-    const [endTimeStr, setEndTimeStr] = useState(() => (!isEdit ? "00:00" : toHM(initialEnd)));
+    const [endTimeStr, setEndTimeStr] = useState(() => toHM(initialEnd));
     const [saving, setSaving] = useState(false);
     const [clientConflict, setClientConflict] = useState(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [deleteScopeChoice, setDeleteScopeChoice] = useState('occurrence');
     const [deleting, setDeleting] = useState(false);
+    const modalEntityLabel = useMemo(() => {
+        if (isEdit) {
+            const kind = String(event?.kind || "").toLowerCase();
+            return kind === "appointment" || kind === "appointment_exception"
+                ? "Appointment"
+                : "Event";
+        }
+        const s = combineDateTime(startDateStr, startTimeStr);
+        const e = combineDateTime(endDateStr, endTimeStr);
+        const createAsEvent =
+            allDayDefault || (s && e ? getCalendarDayDiff(s, e) >= 1 : false);
+        return createAsEvent ? "Event" : "Appointment";
+    }, [
+        isEdit,
+        event?.kind,
+        allDayDefault,
+        startDateStr,
+        startTimeStr,
+        endDateStr,
+        endTimeStr,
+    ]);
+
+    const handleStartDateChange = (nextStartDate) => {
+        setStartDateStr(nextStartDate);
+        setEndDateStr((prevEndDate) => {
+            if (!nextStartDate || !prevEndDate) return prevEndDate;
+            return nextStartDate > prevEndDate ? nextStartDate : prevEndDate;
+        });
+    };
+
+    const handleEndDateChange = (nextEndDate) => {
+        setEndDateStr(nextEndDate);
+        setStartDateStr((prevStartDate) => {
+            if (!nextEndDate || !prevStartDate) return prevStartDate;
+            return nextEndDate < prevStartDate ? nextEndDate : prevStartDate;
+        });
+    };
 
     /* ------------------------- Recurrence state/UI -------------------------- */
 
@@ -430,6 +467,7 @@ const buildRecurringPattern = ({
 
     const startRef = useRef(null);
     const endRef = useRef(null);
+    const recurrenceUntilRef = useRef(null);
 
     const { position, isDragging, handleMouseDown, handleMouseMove, handleMouseUp, resetPosition } = useDraggable();
     const { size, isDraggingResize, handleResizeMouseDown } = useResizable(600, 560);
@@ -523,9 +561,9 @@ const buildRecurringPattern = ({
     const end = isEdit && (event?.end || event?.endAt || event?.end_at) ? new Date(event.end || event.endAt || event.end_at) : initialEnd;
 
         setStartDateStr(toYMD(start));
-        setStartTimeStr(isEdit ? toHM(start) : "00:00");
+        setStartTimeStr(toHM(start));
         setEndDateStr(toYMD(end));
-        setEndTimeStr(isEdit ? toHM(end) : "00:00");
+        setEndTimeStr(toHM(end));
 
         const p = parseRecurringPattern(
             event?.recurringPattern || event?.recurrence || "",
@@ -975,7 +1013,9 @@ const buildRecurringPattern = ({
                     onMouseDown={handleMouseDown}
                 >
                     <h3 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xl font-semibold text-slate-900">
-                        {isEdit ? "Edit Appointment" : "Create Appointment"}
+                        {isEdit
+                            ? `Edit ${modalEntityLabel}`
+                            : `Create ${modalEntityLabel}`}
                     </h3>
                     <div className="flex items-center justify-end">
                         <button
@@ -1009,7 +1049,7 @@ const buildRecurringPattern = ({
                             id="appointment-title"
                             required
                             className="left-focus mt-0 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50"
-                            placeholder="Appointment title"
+                            placeholder={`${modalEntityLabel} title`}
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
                             autoFocus
@@ -1031,7 +1071,7 @@ const buildRecurringPattern = ({
                                         type="date"
                                         className="left-focus no-calendar w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 py-2 pr-11 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50"
                                         value={startDateStr}
-                                        onChange={(e) => setStartDateStr(e.target.value)}
+                                        onChange={(e) => handleStartDateChange(e.target.value)}
                                         required
                                     />
                                     <button
@@ -1063,7 +1103,7 @@ const buildRecurringPattern = ({
                                         type="date"
                                         className="left-focus no-calendar w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 py-2 pr-11 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50"
                                         value={endDateStr}
-                                        onChange={(e) => setEndDateStr(e.target.value)}
+                                        onChange={(e) => handleEndDateChange(e.target.value)}
                                         required
                                     />
                                     <button
@@ -1232,10 +1272,20 @@ const buildRecurringPattern = ({
                     </div>
 
                     {/* Recurrence */}
-                    {showRecurrence && (
-                        <div className="mt-2 rounded-lg border border-slate-200 p-3">
-                            <div className="mt-2 flex items-start gap-3">
-                                <div className="flex-1">
+                    <div className="mt-2 rounded-lg border border-slate-200 p-3">
+                        <button
+                            type="button"
+                            className="flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                            onClick={() => setShowRecurrence((s) => !s)}
+                            aria-expanded={showRecurrence}
+                        >
+                            <span aria-hidden className="text-sm">🔁</span>
+                            <span>Recurrence</span>
+                        </button>
+                        {showRecurrence && (
+                            <div className="mt-3 border-t border-slate-200 pt-3">
+                                <div className="flex items-start gap-3">
+                                    <div className="flex-1">
                                     <div className="flex items-center gap-3">
                                         <label className="text-sm font-medium text-slate-700">
                                             Repeat
@@ -1257,7 +1307,7 @@ const buildRecurringPattern = ({
                                         </select>
                                     </div>
 
-                                    <div className="mt-2">
+                                        <div className="mt-2">
                                         {recurrenceType === "weekly" && (
                                             <div className="flex flex-wrap gap-2">
                                                 {weekdayOptions.map((d) => (
@@ -1354,7 +1404,7 @@ const buildRecurringPattern = ({
                                             </div>
                                         )}
 
-                                        {recurrenceType !== "none" && (
+                                            {recurrenceType !== "none" && (
                                             <div className="mt-3 border-t border-slate-200 pt-3">
                                                 <label className="text-sm font-medium text-slate-700">
                                                     Ends
@@ -1376,7 +1426,7 @@ const buildRecurringPattern = ({
                                                         <span>No end date</span>
                                                     </label>
 
-                                                    <label className="inline-flex items-center gap-2 text-sm">
+                                                    <label className="inline-flex items-center gap-2 text-sm flex-wrap">
                                                         <input
                                                             type="radio"
                                                             name="rec-end"
@@ -1392,17 +1442,40 @@ const buildRecurringPattern = ({
                                                             }}
                                                         />
                                                         <span>End by</span>
-                                                        <input
-                                                            type="date"
-                                                            className="ml-2 rounded-md border border-slate-300 px-2 py-1"
-                                                            value={recurrenceEndType === "until" ? (recurrenceUntilDate || "") : ""}
-                                                            onChange={(e) => {
-                                                                setRecurrenceUntilDate(
-                                                                    e.target.value
-                                                                );
-                                                                setRecurrenceTouched(true);
-                                                            }}
-                                                        />
+                                                        <div className="relative ml-2">
+                                                            <input
+                                                                ref={recurrenceUntilRef}
+                                                                type="date"
+                                                                className="no-calendar w-full appearance-none rounded-md border border-slate-300 bg-white px-2 py-1 pr-9"
+                                                                value={recurrenceUntilDate || ""}
+                                                                onFocus={() => {
+                                                                    setRecurrenceEndType("until");
+                                                                }}
+                                                                onChange={(e) => {
+                                                                    setRecurrenceEndType("until");
+                                                                    setRecurrenceUntilDate(
+                                                                        e.target.value
+                                                                    );
+                                                                    setRecurrenceTouched(true);
+                                                                }}
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                className="absolute right-2 top-1/2 -translate-y-1/2 text-green-600"
+                                                                aria-label="Open recurrence end date picker"
+                                                                onClick={() => {
+                                                                    try {
+                                                                        setRecurrenceEndType("until");
+                                                                        recurrenceUntilRef.current?.showPicker?.();
+                                                                        recurrenceUntilRef.current?.focus?.();
+                                                                    } catch {
+                                                                        /* ignore */
+                                                                    }
+                                                                }}
+                                                            >
+                                                                📅
+                                                            </button>
+                                                        </div>
                                                     </label>
 
                                                     <label className="inline-flex items-center gap-2 text-sm">
@@ -1424,7 +1497,11 @@ const buildRecurringPattern = ({
                                                             min="1"
                                                             className="ml-2 w-20 rounded-md border border-slate-300 px-2 py-1"
                                                             value={recurrenceCount}
+                                                            onFocus={() => {
+                                                                setRecurrenceEndType("count");
+                                                            }}
                                                             onChange={(e) => {
+                                                                setRecurrenceEndType("count");
                                                                 setRecurrenceCount(
                                                                     Number(e.target.value || 1)
                                                                 );
@@ -1435,12 +1512,13 @@ const buildRecurringPattern = ({
                                                     </label>
                                                 </div>
                                             </div>
-                                        )}
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    )}
+                        )}
+                    </div>
 
                     {/* Apply to: occurrence / future / whole series (edit mode, recurring) */}
                     {isRecurringInstance && (
@@ -1507,21 +1585,7 @@ const buildRecurringPattern = ({
                     
 
                     {/* Footer */}
-                    <div className="flex w-full items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                            <button
-                                type="button"
-                                className="flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                                onClick={() => setShowRecurrence((s) => !s)}
-                                aria-expanded={showRecurrence}
-                            >
-                                <span aria-hidden className="text-sm">
-                                    🔁
-                                </span>
-                                <span>Recurrence</span>
-                            </button>
-                        </div>
-
+                    <div className="flex w-full items-center justify-end gap-2">
                         <div className="flex items-center gap-2">
                             <button
                                 type="submit"
@@ -1672,13 +1736,6 @@ const buildRecurringPattern = ({
                                 onClick={onClose}
                             >
                                 Cancel
-                            </button>
-                            <button
-                                type="button"
-                                className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                                disabled
-                            >
-                                Help
                             </button>
                         </div>
                     </div>

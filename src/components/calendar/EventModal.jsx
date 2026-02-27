@@ -84,6 +84,22 @@ const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEv
         return dt;
     };
 
+    const handleStartDateChange = (nextStartDate) => {
+        setStartDate(nextStartDate);
+        setEndDate((prevEndDate) => {
+            if (!nextStartDate || !prevEndDate) return prevEndDate;
+            return nextStartDate > prevEndDate ? nextStartDate : prevEndDate;
+        });
+    };
+
+    const handleEndDateChange = (nextEndDate) => {
+        setEndDate(nextEndDate);
+        setStartDate((prevStartDate) => {
+            if (!nextEndDate || !prevStartDate) return prevStartDate;
+            return nextEndDate < prevStartDate ? nextEndDate : prevStartDate;
+        });
+    };
+
     const onConfirm = async () => {
         try {
             if (!title.trim()) {
@@ -261,7 +277,7 @@ const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEv
                                     type="date"
                                     className="w-full border rounded px-2 py-1"
                                     value={startDate}
-                                    onChange={(e) => setStartDate(e.target.value)}
+                                    onChange={(e) => handleStartDateChange(e.target.value)}
                                 />
                             </div>
                             <div>
@@ -293,7 +309,7 @@ const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEv
                                     type="date"
                                     className="w-full border rounded px-2 py-1"
                                     value={endDate}
-                                    onChange={(e) => setEndDate(e.target.value)}
+                                    onChange={(e) => handleEndDateChange(e.target.value)}
                                 />
                             </div>
                             <div>
