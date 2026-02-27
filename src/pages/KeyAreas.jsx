@@ -3358,7 +3358,7 @@ export default function KeyAreas() {
                         />
                     </div>
                     
-                    <div className="max-w-full overflow-x-hidden pb-1 min-h-full flex flex-col">
+                    <div className="flex-1 h-full min-h-0 max-w-full overflow-x-hidden pb-0 flex flex-col">
                         <div className="px-1 md:px-2">
                             {/* Header / Search / New KA */}
                             <div
@@ -4590,7 +4590,7 @@ export default function KeyAreas() {
 
                         {/* DELEGATED TAB: Two-section layout - pending at top, all delegated below */}
                         {viewTab === 'delegated' && (
-                            <div className="flex-1 min-h-0 h-0 overflow-hidden px-4 py-4 flex flex-col gap-4" style={{ display: selectedTaskFull ? "none" : undefined }}>
+                            <div className="flex-1 h-[calc(100vh-200px)] min-h-0 overflow-hidden flex flex-col gap-4 px-1 md:px-2" style={{ display: selectedTaskFull ? "none" : undefined }}>
                                 {/* Section 1: Pending Delegations */}
                                 <PendingDelegationsSection
                                     pendingTasks={pendingDelegations}
@@ -4653,8 +4653,8 @@ export default function KeyAreas() {
                                 />
 
                                 {/* Section 2: All Delegated Tasks with filters */}
-                                <div className="flex-1 min-h-0 h-0 flex flex-col">
-                                    <div className="flex-1 min-h-0 h-0">
+                                <div className="flex-1 min-h-0 flex flex-col">
+                                    <div className="flex-1 min-h-0">
                                         <UnifiedTaskActivityTable
                                             viewTab={viewTab}
                                             tasks={allTasks}
@@ -4704,8 +4704,8 @@ export default function KeyAreas() {
 
                         {/* Unified Table View for TODO, ACTIVITY TRAP tabs */}
                         {(viewTab === 'todo' || viewTab === 'activity-trap') && (
-                            <div className="flex-1 min-h-0 h-0 overflow-hidden px-4 py-4 flex flex-col" style={{ display: selectedTaskFull ? "none" : undefined }}>
-                                <div className="flex-1 min-h-0 h-0">
+                            <div className="flex-1 h-[calc(100vh-200px)] min-h-0 overflow-hidden flex flex-col px-1 md:px-2" style={{ display: selectedTaskFull ? "none" : undefined }}>
+                                <div className="flex-1 min-h-0">
                                     <UnifiedTaskActivityTable
                                         viewTab={viewTab}
                                         tasks={allTasks}
@@ -4793,8 +4793,12 @@ export default function KeyAreas() {
                                             }
                                         }}
                                         onMassEdit={(selected) => {
-                                            // TODO: Implement mass edit modal
-                                            console.log('Mass edit:', selected);
+                                            const taskIds = Array.isArray(selected?.taskIds)
+                                                ? selected.taskIds.map((id) => String(id))
+                                                : [];
+                                            if (taskIds.length === 0) return;
+                                            setSelectedIds(new Set(taskIds));
+                                            setShowMassEditModal(true);
                                         }}
                                     />
                                 </div>
@@ -5053,72 +5057,72 @@ export default function KeyAreas() {
                                     />
                                 )}
 
-                                {/* Mass Edit Modal */}
-                                {showMassEditModal && selectedIds.size > 0 && (
-                                    <EditTaskModal
-                                        isOpen={true}
-                                        initialData={{
-                                            type: 'bulk',
-                                            count: selectedIds.size,
-                                            key_area_id: (() => {
-                                                const firstId = Array.from(selectedIds)[0];
-                                                const firstTask = allTasks.find((t) => String(t.id) === String(firstId));
-                                                return firstTask?.key_area_id || firstTask?.keyAreaId || selectedKA?.id || null;
-                                            })(),
-                                        }}
-                                        onSave={async (payload) => {
-                                            // Apply bulk edit to all selected tasks
-                                            const updates = [];
-                                            for (const id of Array.from(selectedIds)) {
-                                                const original = allTasks.find((t) => String(t.id) === String(id));
-                                                if (!original) continue;
-                                                const next = { ...original };
-                                                
-                                                // Apply only the fields that are being edited
-                                                if (payload.assignee) next.assignee = payload.assignee;
-                                                if (payload.status) next.status = payload.status;
-                                                if (payload.priority) next.priority = payload.priority;
-                                                if (payload.start_date) next.start_date = payload.start_date;
-                                                if (payload.deadline) next.deadline = payload.deadline;
-                                                if (payload.end_date) next.end_date = payload.end_date;
-                                                
-                                                next.eisenhower_quadrant = computeEisenhowerQuadrant({
-                                                    deadline: next.deadline,
-                                                    end_date: next.end_date,
-                                                    start_date: next.start_date,
-                                                    priority: next.priority,
-                                                    status: next.status,
-                                                    key_area_id: next.key_area_id,
-                                                });
-                                                
-                                                // eslint-disable-next-line no-await-in-loop
-                                                const saved = await api.updateTask(next.id, next);
-                                                updates.push(saved);
-                                            }
-                                            
-                                            // Update state
-                                            setAllTasks((prev) => {
-                                                const map = new Map(prev.map((t) => [String(t.id), t]));
-                                                updates.forEach((u) => map.set(String(u.id), { ...map.get(String(u.id)), ...u }));
-                                                return Array.from(map.values());
-                                            });
-                                            
-                                            setShowMassEditModal(false);
-                                            clearSelection();
-                                        }}
-                                        onCancel={() => setShowMassEditModal(false)}
-                                        isSaving={false}
-                                        keyAreas={keyAreas}
-                                        users={users}
-                                        goals={goals}
-                                        availableLists={availableListNumbers}
-                                    />
-                                )}
-
                                 {/* Tasks list rendering moved inside the Task Lists card above */}
 
                                 {/* Kanban/Calendar already rendered above based on view */}
                             </div>
+                        )}
+
+                        {/* Mass Edit Modal */}
+                        {showMassEditModal && selectedIds.size > 0 && (
+                            <EditTaskModal
+                                isOpen={true}
+                                initialData={{
+                                    type: 'bulk',
+                                    count: selectedIds.size,
+                                    key_area_id: (() => {
+                                        const firstId = Array.from(selectedIds)[0];
+                                        const firstTask = allTasks.find((t) => String(t.id) === String(firstId));
+                                        return firstTask?.key_area_id || firstTask?.keyAreaId || selectedKA?.id || null;
+                                    })(),
+                                }}
+                                onSave={async (payload) => {
+                                    // Apply bulk edit to all selected tasks
+                                    const updates = [];
+                                    for (const id of Array.from(selectedIds)) {
+                                        const original = allTasks.find((t) => String(t.id) === String(id));
+                                        if (!original) continue;
+                                        const next = { ...original };
+                                        
+                                        // Apply only the fields that are being edited
+                                        if (payload.assignee) next.assignee = payload.assignee;
+                                        if (payload.status) next.status = payload.status;
+                                        if (payload.priority) next.priority = payload.priority;
+                                        if (payload.start_date) next.start_date = payload.start_date;
+                                        if (payload.deadline) next.deadline = payload.deadline;
+                                        if (payload.end_date) next.end_date = payload.end_date;
+                                        
+                                        next.eisenhower_quadrant = computeEisenhowerQuadrant({
+                                            deadline: next.deadline,
+                                            end_date: next.end_date,
+                                            start_date: next.start_date,
+                                            priority: next.priority,
+                                            status: next.status,
+                                            key_area_id: next.key_area_id,
+                                        });
+                                        
+                                        // eslint-disable-next-line no-await-in-loop
+                                        const saved = await api.updateTask(next.id, next);
+                                        updates.push(saved);
+                                    }
+                                    
+                                    // Update state
+                                    setAllTasks((prev) => {
+                                        const map = new Map(prev.map((t) => [String(t.id), t]));
+                                        updates.forEach((u) => map.set(String(u.id), { ...map.get(String(u.id)), ...u }));
+                                        return Array.from(map.values());
+                                    });
+                                    
+                                    setShowMassEditModal(false);
+                                    clearSelection();
+                                }}
+                                onCancel={() => setShowMassEditModal(false)}
+                                isSaving={false}
+                                keyAreas={keyAreas}
+                                users={users}
+                                goals={goals}
+                                availableLists={availableListNumbers}
+                            />
                         )}
                         
                         {/* Modals Container */}
