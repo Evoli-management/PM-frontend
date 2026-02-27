@@ -1354,25 +1354,6 @@ const CalendarContainer = () => {
                     keyAreaId: form.keyAreaId || undefined,
                 });
                 addToast({ title: "Task added", variant: "success" });
-                // Immediately create a calendar event at the selected time for this new task
-                try {
-                    let start = new Date(when);
-                    // No business-hours restriction; default event length is 60 minutes
-                    const end = new Date(start.getTime() + 60 * 60000);
-                    const ev = await calendarService.createEvent({
-                        title: form.title,
-                        start: start.toISOString(),
-                        end: end.toISOString(),
-                        allDay: false,
-                        taskId: createdTask.id,
-                        keyAreaId: form.keyAreaId || undefined,
-                        kind: "custom",
-                    });
-                    setEvents((prev) => [...prev, ev]);
-                } catch (e) {
-                    // Event creation failure shouldn't block task creation
-                    console.warn("Failed to create calendar event for task", e);
-                }
             }
             await refreshTodosForRange();
         } catch (e) {
@@ -1727,6 +1708,7 @@ const CalendarContainer = () => {
                         todos={todos}
                         categories={EVENT_CATEGORIES}
                         onDayClick={(date) => openAddModal(date, { defaultTab: "task" })}
+                        onQuickCreate={handleQuickCreate}
                         onEventClick={(ev, action) => (ev?.taskId ? openEditTask(ev.taskId) : openModal(ev, action))}
                         onTaskClick={openEditTask}
                     />
@@ -1748,7 +1730,7 @@ const CalendarContainer = () => {
                         onTaskClick={openEditTask}
                         onTaskDrop={handleTaskDrop}
                         onQuickCreate={handleQuickCreate}
-                        enableQuickCreate={false}
+                        enableQuickCreate={true}
                     />
                     </div>
                 )}
@@ -1947,27 +1929,6 @@ const CalendarContainer = () => {
                                     };
                                     const createdTask = await svc.create(body);
                                     addToast({ title: 'Task added', variant: 'success' });
-
-                                    // If modal provided a date+time, create a calendar event for this task
-                                    try {
-                                        if (data.date && data.time) {
-                                            let start = new Date(`${data.date}T${data.time}`);
-                                            // No business-hours restriction; default event length is 60 minutes
-                                            const end = new Date(start.getTime() + 60 * 60000);
-                                            const ev = await calendarService.createEvent({
-                                                title: createdTask.title,
-                                                start: start.toISOString(),
-                                                end: end.toISOString(),
-                                                allDay: false,
-                                                taskId: createdTask.id,
-                                                keyAreaId: body.keyAreaId || undefined,
-                                                kind: 'custom',
-                                            });
-                                            setEvents((prev) => [...prev, ev]);
-                                        }
-                                    } catch (e) {
-                                        console.warn('Failed to create calendar event for new task', e);
-                                    }
 
                                     await refreshTodosForRange();
                                     setAddModalOpen(false);

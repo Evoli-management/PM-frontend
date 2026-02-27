@@ -6,7 +6,7 @@ import React, {
   useMemo,
 } from "react";
 import { useCalendarPreferences } from "../../hooks/useCalendarPreferences";
-import { FaChevronLeft, FaChevronRight, FaChevronDown, FaPlus } from "react-icons/fa";
+import { FaChevronLeft, FaChevronRight, FaChevronDown } from "react-icons/fa";
 import { FaEdit, FaTrash } from "react-icons/fa";
 
 // Memoized small renderers to avoid re-renders during MonthView updates
@@ -273,6 +273,7 @@ export default function MonthView({
   const LANE_GAP = 6;
   const LANE_HEIGHT = 18;
   const CENTERED_BAR_WIDTH = 60;
+  const ALL_DAY_ACTION_GUTTER = 16;
 
   let DEBUG = false;
   try {
@@ -352,6 +353,8 @@ export default function MonthView({
 
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [pickerYear, setPickerYear] = useState(baseDate.getFullYear());
+  const [selectedSlot, setSelectedSlot] = useState(null);
+  const canQuickCreate = enableQuickCreate && typeof onQuickCreate === "function";
 
   function parseColorToRgb(input) {
     if (!input || typeof input !== "string") return null;
@@ -589,8 +592,14 @@ export default function MonthView({
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [allDayOverflow]);
 
+  const MAX_VISIBLE_MULTI_DAY_LANES = 2;
+
   const allDayByDay = useMemo(() => {
-    const out = Array.from({ length: daysInMonth }, () => ({ primary: null, hidden: [] }));
+    const out = Array.from({ length: daysInMonth }, () => ({
+      visible: [],
+      hidden: [],
+      all: [],
+    }));
     if (!rangeTasks || rangeTasks.length === 0) return out;
 
     for (let i = 0; i < daysInMonth; i++) {
@@ -603,22 +612,29 @@ export default function MonthView({
         const bt = String(b.task?.title || "");
         return at.localeCompare(bt);
       });
-      out[i] = { primary: overlaps[0], hidden: overlaps.slice(1) };
+      out[i] = {
+        visible: overlaps.slice(0, MAX_VISIBLE_MULTI_DAY_LANES),
+        hidden: overlaps.slice(MAX_VISIBLE_MULTI_DAY_LANES),
+        all: overlaps,
+      };
     }
     return out;
   }, [rangeTasks, daysInMonth, year, month]);
 
-  const primaryRuns = useMemo(() => {
+  const visibleRuns = useMemo(() => {
     const byKey = new Map();
     allDayByDay.forEach((info, idx) => {
-      if (!info.primary) return;
-      const r = info.primary;
-      const key = String(
-        r.task?.id ||
-        `${r.start?.toISOString?.() || ""}|${r.end?.toISOString?.() || ""}|${r.task?.title || ""}`
-      );
-      if (!byKey.has(key)) byKey.set(key, { key, item: r, days: [] });
-      byKey.get(key).days.push(idx);
+      const visible = Array.isArray(info.visible) ? info.visible : [];
+      if (visible.length === 0) return;
+      visible.forEach((r, lane) => {
+        const itemKey = String(
+          r.task?.id ||
+            `${r.start?.toISOString?.() || ""}|${r.end?.toISOString?.() || ""}|${r.task?.title || ""}`
+        );
+        const key = `${itemKey}::${lane}`;
+        if (!byKey.has(key)) byKey.set(key, { key, item: r, lane, days: [] });
+        byKey.get(key).days.push(idx);
+      });
     });
 
     const runs = [];
@@ -632,13 +648,26 @@ export default function MonthView({
           prev = cur;
           continue;
         }
-        runs.push({ item: entry.item, startIdx: runStart, endIdx: prev });
+        runs.push({
+          item: entry.item,
+          lane: entry.lane,
+          startIdx: runStart,
+          endIdx: prev,
+        });
         runStart = cur;
         prev = cur;
       }
-      runs.push({ item: entry.item, startIdx: runStart, endIdx: prev });
+      runs.push({
+        item: entry.item,
+        lane: entry.lane,
+        startIdx: runStart,
+        endIdx: prev,
+      });
     }
-    return runs;
+    return runs.sort((a, b) => {
+      if (a.lane !== b.lane) return a.lane - b.lane;
+      return a.startIdx - b.startIdx;
+    });
   }, [allDayByDay]);
 
   const getAllDayStyle = (r) => {
@@ -1564,6 +1593,9 @@ export default function MonthView({
               </thead>
               <tbody>
                 {monthDays.map((date, idx) => {
+                  const dayKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+                    date.getDate()
+                  ).padStart(2, "0")}`;
                   const isWeekend = date.getDay() === 0 || date.getDay() === 6;
                   const isToday =
                     date.getDate() === (currentDate || today).getDate() &&
@@ -1612,7 +1644,36 @@ export default function MonthView({
                           borderBottom: "1px solid rgba(226,232,240,0.35)",
                           borderLeft: "2px solid rgba(226,232,240,1)",
                           borderRight: "2px solid rgba(226,232,240,1)",
+                          backgroundColor:
+                            selectedSlot &&
+                            selectedSlot.type === "allDay" &&
+                            selectedSlot.dayKey === dayKey
+                              ? "rgba(59, 130, 246, 0.12)"
+                              : undefined,
                         }}
+                        onClick={(e) => {
+                          try {
+                            e.stopPropagation();
+                          } catch {}
+                          setSelectedSlot({ type: "allDay", dayKey });
+                        }}
+                        onDoubleClick={(e) => {
+                          try {
+                            e.stopPropagation();
+                          } catch {}
+                          if (!canQuickCreate) return;
+                          const dt = new Date(
+                            date.getFullYear(),
+                            date.getMonth(),
+                            date.getDate(),
+                            0,
+                            0,
+                            0,
+                            0
+                          );
+                          onQuickCreate(dt, { allDay: true });
+                        }}
+                        title={canQuickCreate ? "Double-click to create all-day event" : undefined}
                       >
                         <span className="sr-only">all day</span>
                       </td>
@@ -1635,17 +1696,32 @@ export default function MonthView({
                   pointerEvents: "none",
                 }}
               >
-                {primaryRuns.map((run, idx) => {
+                {visibleRuns.map((run, idx) => {
                   const startRow = overlayMetrics.rows[run.startIdx];
                   const endRow = overlayMetrics.rows[run.endIdx];
                   if (!startRow || !endRow) return null;
 
+                  const laneCount = Math.max(1, MAX_VISIBLE_MULTI_DAY_LANES);
+                  const laneGap = 4;
+                  const horizontalPadding = 4;
+                  const barsAvailableWidth = Math.max(
+                    20,
+                    overlayMetrics.colWidth - ALL_DAY_ACTION_GUTTER - horizontalPadding * 2
+                  );
+                  const usableWidth = Math.max(
+                    20,
+                    barsAvailableWidth - laneGap * (laneCount - 1)
+                  );
                   const barWidth = Math.max(
                     20,
-                    Math.min(overlayMetrics.colWidth - 12, CENTERED_BAR_WIDTH)
+                    Math.floor(usableWidth / laneCount)
+                  );
+                  const laneIndex = Math.max(
+                    0,
+                    Math.min(laneCount - 1, Number(run.lane) || 0)
                   );
                   const left = Math.round(
-                    Math.max(4, (overlayMetrics.colWidth - barWidth) / 2)
+                    horizontalPadding + laneIndex * (barWidth + laneGap)
                   );
 
                   const top = startRow.top + 2;
@@ -1715,31 +1791,46 @@ export default function MonthView({
                 {allDayByDay.map((dayInfo, dayIdx) => {
                   const row = overlayMetrics.rows[dayIdx];
                   if (!row) return null;
-                  const primary = dayInfo.primary;
+                  const all = Array.isArray(dayInfo.all) ? dayInfo.all : [];
                   const hidden = dayInfo.hidden || [];
-                  if (!primary && hidden.length === 0) return null;
+                  if (all.length === 0) return null;
+                  const rowDate = new Date(year, month, dayIdx + 1, 0, 0, 0, 0);
                   return (
                     <div key={`ad-${dayIdx}`} style={{ position: "absolute", top: row.top, height: row.height, left: 0, right: 0 }}>
-                      {hidden.length > 0 && (
-                        <div className="absolute right-1 top-1 flex items-center gap-1" style={{ pointerEvents: "auto" }}>
-                          <button
-                            type="button"
-                            data-month-all-day-overflow-trigger="true"
-                            className="text-blue-700 hover:bg-slate-50 p-0.5 rounded inline-flex items-center"
-                            onClick={(e) => {
-                              e.stopPropagation();
+                      <div
+                        className="absolute top-1 flex items-center justify-center"
+                        style={{
+                          pointerEvents: "auto",
+                          right: 0,
+                          width: `${ALL_DAY_ACTION_GUTTER}px`,
+                        }}
+                      >
+                        <button
+                          type="button"
+                          data-month-all-day-overflow-trigger="true"
+                          className="inline-flex items-center justify-center px-1 text-base leading-none text-sky-600 hover:text-sky-700"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (hidden.length > 0) {
                               setAllDayOverflow((curr) =>
                                 curr && curr.dayIdx === dayIdx
                                   ? null
-                                  : { dayIdx, items: [primary, ...hidden].filter(Boolean) }
+                                  : { dayIdx, items: all }
                               );
-                            }}
-                            title="Show all-day items"
-                          >
-                            <FaPlus size={12} />
-                          </button>
-                        </div>
-                      )}
+                              return;
+                            }
+                            if (typeof onQuickCreate === "function") {
+                              try {
+                                onQuickCreate(rowDate, { allDay: true });
+                              } catch (_) {}
+                            }
+                          }}
+                          title={hidden.length > 0 ? "Show all-day items" : "Create all-day event"}
+                          aria-label={hidden.length > 0 ? "Show all-day items" : "Create all-day event"}
+                        >
+                          +
+                        </button>
+                      </div>
 
                       {allDayOverflow && allDayOverflow.dayIdx === dayIdx && (
                         <div
@@ -1889,7 +1980,7 @@ export default function MonthView({
                               <td
                                 key={hIdx}
                                 className={`vpc-monthly-area-cell vpc-monthly-cell relative px-1 py-0 text-center align-top ${
-                                  enableQuickCreate ? "cursor-pointer" : ""
+                                  canQuickCreate ? "cursor-pointer" : ""
                                 }`}
                                 style={{
                                   height: "25px",
@@ -1901,27 +1992,36 @@ export default function MonthView({
                                   borderBottom: "1px solid rgba(226,232,240,0.35)",
                                   backgroundColor: isWorking ? undefined : NON_WORK_BG,
                                   opacity: isWorking ? 1 : NON_WORK_OPACITY,
+                                  boxShadow:
+                                    selectedSlot &&
+                                    selectedSlot.type === "timed" &&
+                                    selectedSlot.dayKey === dayKey &&
+                                    selectedSlot.slot === h
+                                      ? "inset 0 0 0 2px rgba(59, 130, 246, 0.35)"
+                                      : undefined,
                                 }}
                                 onClick={(e) => {
                                   try {
                                     e.stopPropagation();
                                   } catch {}
-                                  if (enableQuickCreate && onEventClick) onEventClick({ day: date, hour: h });
-                                  if (enableQuickCreate && typeof onQuickCreate === "function") {
-                                    const [hr, min] = h.split(":");
-                                    const dt = new Date(
-                                      date.getFullYear(),
-                                      date.getMonth(),
-                                      date.getDate(),
-                                      parseInt(hr, 10) || 0,
-                                      parseInt(min, 10) || 0,
-                                      0,
-                                      0
-                                    );
-                                    try {
-                                      onQuickCreate(dt);
-                                    } catch (_) {}
-                                  }
+                                  setSelectedSlot({ type: "timed", dayKey, slot: h });
+                                }}
+                                onDoubleClick={(e) => {
+                                  try {
+                                    e.stopPropagation();
+                                  } catch {}
+                                  if (!canQuickCreate) return;
+                                  const [hr, min] = h.split(":");
+                                  const dt = new Date(
+                                    date.getFullYear(),
+                                    date.getMonth(),
+                                    date.getDate(),
+                                    parseInt(hr, 10) || 0,
+                                    parseInt(min, 10) || 0,
+                                    0,
+                                    0
+                                  );
+                                  onQuickCreate(dt);
                                 }}
                                 onDrop={(e) => {
                                   try {
@@ -1942,7 +2042,7 @@ export default function MonthView({
                                     if (task) onTaskDrop(task, dt, dropEffect);
                                   } catch {}
                                 }}
-                                title={enableQuickCreate ? "Click to add appointment" : undefined}
+                                title={canQuickCreate ? "Double-click to create appointment" : undefined}
                               >
                                 {/* timed events are rendered as overlays */}
                               </td>

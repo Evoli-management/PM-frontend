@@ -374,14 +374,12 @@ export default function CreateTaskModal({
                             </div>
                         </div>
                     </div>
-                    <div className="mt-6 flex items-center justify-between">
-                        <span></span>
+                    <div className="mt-6 flex items-center justify-end">
                         <div className="flex items-center gap-2">
                             <button type="submit" className="rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-4 py-2 text-sm">
                                 OK
                             </button>
                             <button type="button" className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50" onClick={onClose}>Cancel</button>
-                            <button type="button" className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Help</button>
                         </div>
                     </div>
                 </form>
