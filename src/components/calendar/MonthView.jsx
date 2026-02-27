@@ -577,6 +577,28 @@ export default function MonthView({
   const rangeTasks = buildRangeTasks;
   const lanesCount = useMemo(() => Math.min(rangeTasks.length, 20), [rangeTasks.length]);
 
+  // Assign a stable lane per all-day range across the whole month so bars do not
+  // jump between columns from one day to the next.
+  const stableRangeTasks = useMemo(() => {
+    const src = Array.isArray(rangeTasks) ? [...rangeTasks] : [];
+    if (src.length === 0) return [];
+
+    const sorted = src.sort((a, b) => {
+      const byStart = (a.start?.getTime?.() || 0) - (b.start?.getTime?.() || 0);
+      if (byStart !== 0) return byStart;
+      if (b.spanDays !== a.spanDays) return b.spanDays - a.spanDays;
+      return String(a.task?.title || "").localeCompare(String(b.task?.title || ""));
+    });
+
+    const laneEnd = []; // Date per lane (inclusive end)
+    return sorted.map((r) => {
+      let lane = 0;
+      while (lane < laneEnd.length && !(laneEnd[lane] < r.start)) lane += 1;
+      laneEnd[lane] = r.end;
+      return { ...r, lane };
+    });
+  }, [rangeTasks]);
+
   const [allDayOverflow, setAllDayOverflow] = useState(null);
   const allDayPopupRef = useRef(null);
 
@@ -600,17 +622,16 @@ export default function MonthView({
       hidden: [],
       all: [],
     }));
-    if (!rangeTasks || rangeTasks.length === 0) return out;
+    if (!stableRangeTasks || stableRangeTasks.length === 0) return out;
 
     for (let i = 0; i < daysInMonth; i++) {
       const dayDate = new Date(year, month, i + 1);
-      const overlaps = rangeTasks.filter((r) => r.start <= dayDate && r.end >= dayDate);
+      const overlaps = stableRangeTasks.filter((r) => r.start <= dayDate && r.end >= dayDate);
       if (overlaps.length === 0) continue;
       overlaps.sort((a, b) => {
+        if ((a.lane ?? 0) !== (b.lane ?? 0)) return (a.lane ?? 0) - (b.lane ?? 0);
         if (b.spanDays !== a.spanDays) return b.spanDays - a.spanDays;
-        const at = String(a.task?.title || "");
-        const bt = String(b.task?.title || "");
-        return at.localeCompare(bt);
+        return String(a.task?.title || "").localeCompare(String(b.task?.title || ""));
       });
       out[i] = {
         visible: overlaps.slice(0, MAX_VISIBLE_MULTI_DAY_LANES),
@@ -619,14 +640,15 @@ export default function MonthView({
       };
     }
     return out;
-  }, [rangeTasks, daysInMonth, year, month]);
+  }, [stableRangeTasks, daysInMonth, year, month]);
 
   const visibleRuns = useMemo(() => {
     const byKey = new Map();
     allDayByDay.forEach((info, idx) => {
       const visible = Array.isArray(info.visible) ? info.visible : [];
       if (visible.length === 0) return;
-      visible.forEach((r, lane) => {
+      visible.forEach((r) => {
+        const lane = Number.isFinite(Number(r?.lane)) ? Number(r.lane) : 0;
         const itemKey = String(
           r.task?.id ||
             `${r.start?.toISOString?.() || ""}|${r.end?.toISOString?.() || ""}|${r.task?.title || ""}`
