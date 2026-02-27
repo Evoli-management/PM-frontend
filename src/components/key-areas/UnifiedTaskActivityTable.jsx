@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { format } from 'date-fns';
-import { FaCheck, FaTimes, FaTrash, FaLock, FaLockOpen, FaExternalLinkAlt, FaStop, FaAlignJustify, FaBan, FaSquare, FaListUl, FaExclamation, FaArrowDown } from 'react-icons/fa';
+import { FaCheck, FaTimes, FaTrash, FaLock, FaLockOpen, FaExternalLinkAlt, FaStop, FaAlignJustify, FaBan, FaSquare, FaListUl, FaEllipsisV } from 'react-icons/fa';
 import { toDateOnly } from '../../utils/keyareasHelpers';
 import taskDelegationService from '../../services/taskDelegationService';
 import activityDelegationService from '../../services/activityDelegationService';
@@ -35,8 +35,8 @@ export default function UnifiedTaskActivityTable({
     onMassEdit
 }) {
     const [selectedItems, setSelectedItems] = useState(new Set());
-    const [sortField, setSortField] = useState('priority');
-    const [sortDirection, setSortDirection] = useState('desc');
+    const [sortField, setSortField] = useState(null);
+    const [sortDirection, setSortDirection] = useState('asc');
     const [keyAreaFilter, setKeyAreaFilter] = useState('');
     const [responsibleFilter, setResponsibleFilter] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
@@ -52,6 +52,18 @@ export default function UnifiedTaskActivityTable({
     const [selectedKeyArea, setSelectedKeyArea] = useState('');
     const [selectedTaskForActivity, setSelectedTaskForActivity] = useState(''); // For accept-into-task
     const [respondingTaskId, setRespondingTaskId] = useState(null);
+    const [openRowMenuId, setOpenRowMenuId] = useState(null);
+
+    useEffect(() => {
+        if (!openRowMenuId) return;
+        const onDown = (e) => {
+            if (e.target.closest('[data-row-actions-menu]')) return;
+            if (e.target.closest('[data-row-actions-btn]')) return;
+            setOpenRowMenuId(null);
+        };
+        document.addEventListener('mousedown', onDown);
+        return () => document.removeEventListener('mousedown', onDown);
+    }, [openRowMenuId]);
 
     // Flatten tasks and activities into single array
     const allItems = useMemo(() => {
@@ -119,6 +131,7 @@ export default function UnifiedTaskActivityTable({
 
     // Sort items
     const sortedItems = useMemo(() => {
+        if (!sortField) return filteredItems;
         const sorted = [...filteredItems];
         sorted.sort((a, b) => {
             let aVal = a[sortField];
@@ -145,7 +158,48 @@ export default function UnifiedTaskActivityTable({
                 aVal = priorityMap[String(aVal || 'medium').toLowerCase()] || 2;
                 bVal = priorityMap[String(bVal || 'medium').toLowerCase()] || 2;
             }
-            
+
+            if (sortField === 'keyArea') {
+                const aKaId = a.keyAreaId || a.key_area_id || a.key_area || a.keyArea || '';
+                const bKaId = b.keyAreaId || b.key_area_id || b.key_area || b.keyArea || '';
+                const aKa = keyAreas.find(k => String(k.id) === String(aKaId));
+                const bKa = keyAreas.find(k => String(k.id) === String(bKaId));
+                aVal = aKa?.name || aKa?.title || aKa?.keyArea || '';
+                bVal = bKa?.name || bKa?.title || bKa?.keyArea || '';
+            }
+
+            if (sortField === 'responsible') {
+                if (viewTab === 'delegated') {
+                    const aDelegatorId = a.delegatedByUserId || a.delegated_by_user_id;
+                    const bDelegatorId = b.delegatedByUserId || b.delegated_by_user_id;
+                    const aDelegator = users.find(u => String(u.id || u.member_id) === String(aDelegatorId));
+                    const bDelegator = users.find(u => String(u.id || u.member_id) === String(bDelegatorId));
+                    aVal = (a.delegatedByUser && `${a.delegatedByUser.firstName || ''} ${a.delegatedByUser.lastName || ''}`.trim()) || (aDelegator ? `${aDelegator.name || aDelegator.firstname || ''} ${aDelegator.lastname || ''}`.trim() : '');
+                    bVal = (b.delegatedByUser && `${b.delegatedByUser.firstName || ''} ${b.delegatedByUser.lastName || ''}`.trim()) || (bDelegator ? `${bDelegator.name || bDelegator.firstname || ''} ${bDelegator.lastname || ''}`.trim() : '');
+                } else {
+                    const aUserId = a.assigneeId || a.assignee_id || a.responsibleId || a.responsible_id || a.delegatedToUserId || a.delegated_to_user_id;
+                    const bUserId = b.assigneeId || b.assignee_id || b.responsibleId || b.responsible_id || b.delegatedToUserId || b.delegated_to_user_id;
+                    const aUser = users.find(u => String(u.id || u.member_id) === String(aUserId));
+                    const bUser = users.find(u => String(u.id || u.member_id) === String(bUserId));
+                    aVal = aUser ? `${aUser.name || aUser.firstname || ''} ${aUser.lastname || ''}`.trim() : (a.assignee || a.responsible || '');
+                    bVal = bUser ? `${bUser.name || bUser.firstname || ''} ${bUser.lastname || ''}`.trim() : (b.assignee || b.responsible || '');
+                }
+            }
+
+            if (sortField === 'tab') {
+                aVal = Number(a.list_index ?? a.listIndex ?? a.list ?? 0);
+                bVal = Number(b.list_index ?? b.listIndex ?? b.list ?? 0);
+            }
+
+            if (sortField === 'goal') {
+                const aGoalId = a.goalId || a.goal_id || '';
+                const bGoalId = b.goalId || b.goal_id || '';
+                const aGoal = goals.find(g => String(g.id) === String(aGoalId));
+                const bGoal = goals.find(g => String(g.id) === String(bGoalId));
+                aVal = aGoal?.title || aGoal?.name || '';
+                bVal = bGoal?.title || bGoal?.name || '';
+            }
+
             if (aVal === bVal) return 0;
             const comparison = aVal < bVal ? -1 : 1;
             return sortDirection === 'asc' ? comparison : -comparison;
@@ -154,12 +208,17 @@ export default function UnifiedTaskActivityTable({
     }, [filteredItems, sortField, sortDirection]);
 
     const handleSort = (field) => {
-        if (sortField === field) {
-            setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-        } else {
+        if (sortField !== field) {
             setSortField(field);
-            setSortDirection('desc');
+            setSortDirection('asc');
+            return;
         }
+        if (sortDirection === 'asc') {
+            setSortDirection('desc');
+            return;
+        }
+        setSortField(null);
+        setSortDirection('asc');
     };
 
     const toggleSelectItem = (itemId) => {
@@ -416,13 +475,13 @@ export default function UnifiedTaskActivityTable({
     // Column configuration based on viewTab
     const columns = useMemo(() => {
         if (viewTab === 'delegated') {
-            return ['priority', 'title', 'deadline', 'keyArea', 'responsible'];
+            return ['title', 'responsible', 'keyArea', 'priority', 'deadline'];
         } else if (viewTab === 'todo') {
-            return ['priority', 'title', 'tab', 'startDate', 'endDate', 'deadline', 'keyArea', 'responsible'];
+            return ['title', 'responsible', 'keyArea', 'tab', 'priority', 'startDate', 'endDate', 'deadline'];
         } else if (viewTab === 'activity-trap') {
-            return ['priority', 'title', 'tab', 'goal', 'startDate', 'endDate', 'deadline', 'keyArea'];
+            return ['title', 'keyArea', 'tab', 'goal', 'priority', 'startDate', 'endDate', 'deadline'];
         }
-        return ['priority', 'title', 'startDate', 'endDate', 'deadline', 'keyArea', 'responsible'];
+        return ['title', 'responsible', 'keyArea', 'priority', 'startDate', 'endDate', 'deadline'];
     }, [viewTab]);
 
     const getKeyAreaName = (keyAreaId) => {
@@ -607,31 +666,39 @@ export default function UnifiedTaskActivityTable({
     };
 
     return (
-        <div className="flex flex-col h-full ta-legacy">
+        <div className="flex flex-col h-full min-h-0 bg-white border border-slate-200 rounded-lg overflow-hidden">
             {/* Special Header for Delegated View */}
             {viewTab === 'delegated' && (
-                <div className="px-4 py-3 bg-white border-b ta-header">
-                    <h3 className="text-lg font-semibold text-center ta-accent">Delegated Tasks</h3>
+                <div className="px-4 py-3 bg-white border-b border-slate-200">
+                    <h3 className="text-lg font-semibold text-center text-slate-900">Delegated Tasks</h3>
                 </div>
             )}
 
             {/* Filters Row */}
-            <div className="flex items-center justify-between gap-3 px-4 py-2 bg-white border-b flex-wrap ta-filters-row">
+            <div className="flex items-center justify-between gap-3 px-4 py-3 bg-white border-b border-slate-200 flex-wrap">
                 <div className="flex items-center gap-3 flex-wrap">
-                    <span className="text-sm font-medium ta-filter-label">Filter:</span>
+                    <span className="text-sm font-medium text-slate-700">Filter:</span>
 
                     {/* Task/Activity Toggle Buttons */}
                     <div className="flex items-center gap-2">
                         <button
                             onClick={() => setShowTasks(!showTasks)}
-                            className={`ta-toggle-btn ${showTasks ? 'is-active' : ''}`}
+                            className={`inline-flex items-center justify-center w-8 h-8 rounded-md border transition ${
+                                showTasks
+                                    ? 'bg-blue-50 border-blue-200 text-blue-700'
+                                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                            }`}
                             title="Filter tasks"
                         >
                             <FaStop className="text-xs" />
                         </button>
                         <button
                             onClick={() => setShowActivities(!showActivities)}
-                            className={`ta-toggle-btn ${showActivities ? 'is-active' : ''}`}
+                            className={`inline-flex items-center justify-center w-8 h-8 rounded-md border transition ${
+                                showActivities
+                                    ? 'bg-blue-50 border-blue-200 text-blue-700'
+                                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                            }`}
                             title="Filter activities"
                         >
                             <FaAlignJustify className="text-xs" />
@@ -642,7 +709,7 @@ export default function UnifiedTaskActivityTable({
                     <select
                         value={keyAreaFilter}
                         onChange={(e) => setKeyAreaFilter(e.target.value)}
-                        className="ta-filter-control"
+                        className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-200"
                     >
                         <option value="">Key Area</option>
                         {keyAreas.map((ka, idx) => (
@@ -657,7 +724,7 @@ export default function UnifiedTaskActivityTable({
                         <select
                             value={responsibleFilter}
                             onChange={(e) => setResponsibleFilter(e.target.value)}
-                            className="ta-filter-control"
+                            className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-200"
                         >
                             <option value="">Responsible</option>
                             {users.map(user => (
@@ -677,20 +744,18 @@ export default function UnifiedTaskActivityTable({
                             placeholder="Search"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="ta-filter-control ta-search-input"
+                            className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-200"
                         />
-                        <span className="ta-accent cursor-pointer">🔍</span>
+                        <span className="text-slate-500 cursor-default">🔍</span>
                     </div>
 
                     {/* Mass Edit - hidden for delegated view */}
                     {viewTab !== 'delegated' && (
                         <div className="flex items-center gap-2">
-                            <span className="text-sm ta-selected-count">{selectedItems.size} selected</span>
+                            <span className="text-sm text-slate-600">{selectedItems.size} selected</span>
                             <button
                                 onClick={handleMassEdit}
-                                className={`ta-mass-edit-btn ${
-                                    selectedItems.size === 0 ? 'is-disabled' : ''
-                                }`}
+                                className="px-3 py-2 rounded-md text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
                                 disabled={selectedItems.size === 0}
                             >
                                 Mass edit
@@ -701,61 +766,73 @@ export default function UnifiedTaskActivityTable({
             </div>
 
             {/* Table */}
-            <div className="flex-1 overflow-auto">
-                <table className="w-full text-sm ta-table">
-                    <thead className="bg-slate-50 sticky top-0 ta-thead">
+            <div className="flex-1 h-0 min-h-0 overflow-y-auto overflow-x-auto -mx-2 sm:mx-0">
+                <table className="min-w-full text-sm whitespace-nowrap sm:whitespace-normal">
+                    <thead className="bg-slate-50 border border-slate-200 text-slate-700">
                         <tr>
-                            <th className="w-8 p-2"></th>
-                            {columns.includes('priority') && (
-                                <th className="w-12 p-2 cursor-pointer" onClick={() => handleSort('priority')}>
-                                    Pr {sortField === 'priority' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                </th>
-                            )}
+                            <th className="w-8 px-2 sm:px-3 py-2 text-left"></th>
                             {columns.includes('title') && (
                                 <>
-                                  {viewTab === 'delegated' && (
-                                    <th className="px-2 py-2 text-center w-6 font-semibold text-gray-700">
-                                      Prior
-                                    </th>
-                                  )}
-                                  <th className="p-2 text-left cursor-pointer" onClick={() => handleSort('title')}>
+                                  <th className="px-2 sm:px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100" onClick={() => handleSort('title')}>
                                       Title {sortField === 'title' && (sortDirection === 'asc' ? '↑' : '↓')}
                                   </th>
                                 </>
                             )}
+                            {columns.includes('responsible') && (
+                                <th
+                                    className="w-40 px-2 sm:px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                    onClick={() => handleSort('responsible')}
+                                >
+                                    {viewTab === 'delegated' ? 'Received From' : 'Responsible'} {sortField === 'responsible' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                </th>
+                            )}
+                            {columns.includes('keyArea') && (
+                                <th
+                                    className="w-32 px-2 sm:px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                    onClick={() => handleSort('keyArea')}
+                                >
+                                    Key Area {sortField === 'keyArea' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                </th>
+                            )}
                             {columns.includes('tab') && (
-                                <th className="w-20 p-2">Tab</th>
+                                <th
+                                    className="w-20 px-2 sm:px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                    onClick={() => handleSort('tab')}
+                                >
+                                    Tab {sortField === 'tab' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                </th>
+                            )}
+                            {columns.includes('priority') && (
+                                <th className="w-28 px-2 sm:px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100" onClick={() => handleSort('priority')}>
+                                    Priority {sortField === 'priority' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                </th>
                             )}
                             {columns.includes('goal') && (
-                                <th className="w-32 p-2">Goal</th>
+                                <th
+                                    className="w-40 px-2 sm:px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                    onClick={() => handleSort('goal')}
+                                >
+                                    Goal {sortField === 'goal' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                </th>
                             )}
                             {columns.includes('startDate') && (
-                                <th className="w-28 p-2 cursor-pointer" onClick={() => handleSort('startDate')}>
+                                <th className="w-28 px-2 sm:px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100" onClick={() => handleSort('startDate')}>
                                     Start {sortField === 'startDate' && (sortDirection === 'asc' ? '↑' : '↓')}
                                 </th>
                             )}
                             {columns.includes('endDate') && (
-                                <th className="w-28 p-2 cursor-pointer" onClick={() => handleSort('endDate')}>
+                                <th className="w-28 px-2 sm:px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100" onClick={() => handleSort('endDate')}>
                                     End {sortField === 'endDate' && (sortDirection === 'asc' ? '↑' : '↓')}
                                 </th>
                             )}
                             {columns.includes('deadline') && (
-                                <th className="w-28 p-2 cursor-pointer" onClick={() => handleSort('dueDate')}>
+                                <th className="w-28 px-2 sm:px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100" onClick={() => handleSort('dueDate')}>
                                     Deadline {sortField === 'dueDate' && (sortDirection === 'asc' ? '↑' : '↓')}
                                 </th>
                             )}
-                            {columns.includes('keyArea') && (
-                                <th className="w-32 p-2">Key Area</th>
-                            )}
-                            {columns.includes('responsible') && (
-                                <th className="w-40 p-2">{viewTab === 'delegated' ? 'Received From' : 'Responsible'}</th>
-                            )}
-                            {viewTab !== 'delegated' && (
-                                <th className="w-24 p-2 text-center">Actions</th>
-                            )}
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="bg-white">
                         {sortedItems.map((item) => {
                             const deadlineValue = item.deadline || item.dueDate || item.due_date;
                             const overdue = isOverdue(deadlineValue, item.endDate || item.end_date);
@@ -786,73 +863,101 @@ export default function UnifiedTaskActivityTable({
                             return (
                                 <tr
                                     key={item.itemId}
-                                    className={`border-b hover:bg-gray-50 ${overdue ? 'bg-red-50' : ''} ${isCompleted ? 'opacity-60' : ''}`}
+                                    className={`border-t border-slate-200 hover:bg-slate-50 cursor-pointer transition-colors ${isCompleted ? 'bg-slate-50/70' : ''}`}
                                 >
-                                    <td className="p-2 text-center">
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedItems.has(item.itemId)}
-                                            onChange={(e) => {
-                                                e.stopPropagation();
-                                                toggleSelectItem(item.itemId);
-                                            }}
-                                            onClick={(e) => e.stopPropagation()}
-                                        />
-                                    </td>
-                                    {columns.includes('priority') && (
-                                        <td
-                                            className="p-2 text-center font-bold ta-priority"
-                                            onDoubleClick={(e) => {
-                                                e.stopPropagation();
-                                                const raw = item.priority ?? item.priority_level ?? item.priorityLevel;
-                                                const val = (() => {
-                                                    if (raw === 1 || String(raw) === '1' || String(raw).toLowerCase() === 'low') return 'low';
-                                                    if (raw === 3 || String(raw) === '3' || String(raw).toLowerCase() === 'high') return 'high';
-                                                    return 'normal';
-                                                })();
-                                                startEdit(item, 'priority', val);
-                                            }}
-                                        >
-                                            {editingCell === priorityKey ? (
-                                                <select
-                                                    autoFocus
-                                                    className="w-full border rounded px-2 py-1 text-xs"
-                                                    value={editValue}
-                                                    onChange={(e) => saveEdit(item, 'priority', e.target.value)}
-                                                    onBlur={cancelEdit}
-                                                    onClick={(e) => e.stopPropagation()}
+                                    <td className="px-3 py-2 align-top text-center">
+                                        <div className="relative inline-flex items-center gap-2">
+                                            <input
+                                                aria-label={`Select ${titleValue || 'item'}`}
+                                                type="checkbox"
+                                                checked={selectedItems.has(item.itemId)}
+                                                onChange={(e) => {
+                                                    e.stopPropagation();
+                                                    toggleSelectItem(item.itemId);
+                                                }}
+                                                onClick={(e) => e.stopPropagation()}
+                                            />
+                                            <div className="relative">
+                                                <button
+                                                    type="button"
+                                                    data-row-actions-btn="true"
+                                                    aria-haspopup="menu"
+                                                    aria-expanded={openRowMenuId === item.itemId ? 'true' : 'false'}
+                                                    className="p-1 rounded hover:bg-slate-100 text-slate-600"
+                                                    title="More actions"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setOpenRowMenuId((prev) => (prev === item.itemId ? null : item.itemId));
+                                                    }}
                                                 >
-                                                    <option value="low">Low</option>
-                                                    <option value="normal">Normal</option>
-                                                    <option value="high">High</option>
-                                                </select>
-                                            ) : (
-                                                <span>{getPriorityIcon(item.priority)}</span>
-                                            )}
-                                        </td>
-                                    )}
-                                    {viewTab === 'delegated' && (
-                                        <td className="px-2 py-3 text-center">
-                                          {item.priority === 'high' && (
-                                            <FaExclamation 
-                                              title="High Priority" 
-                                              className="text-red-600 mx-auto inline-block" 
-                                            />
-                                          )}
-                                          {item.priority === 'low' && (
-                                            <FaArrowDown 
-                                              title="Low Priority" 
-                                              className="text-blue-600 mx-auto inline-block" 
-                                            />
-                                          )}
-                                          {(!item.priority || item.priority === 'normal') && (
-                                            <div className="text-gray-400 mx-auto text-xs">—</div>
-                                          )}
-                                        </td>
-                                      )}
+                                                    <FaEllipsisV />
+                                                </button>
+                                                {openRowMenuId === item.itemId && (
+                                                    <div
+                                                        data-row-actions-menu="true"
+                                                        className="absolute left-0 mt-1 z-20 min-w-[170px] rounded-md border border-slate-200 bg-white shadow-lg"
+                                                    >
+                                                        <button
+                                                            type="button"
+                                                            className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setOpenRowMenuId(null);
+                                                                if (item.type === 'task' && onTaskClick) onTaskClick(item);
+                                                                if (item.type === 'activity' && onActivityClick) onActivityClick(item);
+                                                            }}
+                                                        >
+                                                            <FaExternalLinkAlt size={12} />
+                                                            Open details
+                                                        </button>
+                                                        {viewTab !== 'delegated' && (
+                                                            <>
+                                                                <button
+                                                                    type="button"
+                                                                    className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleCompleteToggle(item, e);
+                                                                        setOpenRowMenuId(null);
+                                                                    }}
+                                                                >
+                                                                    {isCompleted ? <FaTimes size={12} /> : <FaCheck size={12} />}
+                                                                    {isCompleted ? 'Mark as not completed' : 'Mark as completed'}
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleTogglePrivate(item, e);
+                                                                        setOpenRowMenuId(null);
+                                                                    }}
+                                                                >
+                                                                    {isPrivate ? <FaLockOpen size={12} /> : <FaLock size={12} />}
+                                                                    {isPrivate ? 'Mark as public' : 'Mark as private'}
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleDelete(item, e);
+                                                                        setOpenRowMenuId(null);
+                                                                    }}
+                                                                >
+                                                                    <FaTrash size={12} />
+                                                                    Delete
+                                                                </button>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </td>
                                     {columns.includes('title') && (
                                         <td 
-                                            className="p-2 hover:bg-blue-100"
+                                            className="px-3 py-2 align-top"
                                             onClick={() => {
                                                 if (editingCell === titleKey) return;
                                                 if (item.type === 'task' && onTaskClick) {
@@ -875,13 +980,12 @@ export default function UnifiedTaskActivityTable({
                                                         <FaListUl title="Activity" className="text-purple-600 flex-shrink-0" />
                                                       )}
                                                       <div className="flex-grow min-w-0">
-                                                        <p className="font-medium text-gray-900 truncate">{titleValue || 'Untitled'}</p>
-                                                        <p className="text-xs text-gray-500">From: {responsibleNameValue || '—'}</p>
+                                                        <p className="text-sm font-medium text-slate-900 truncate">{titleValue || 'Untitled'}</p>
+                                                        <p className="text-xs text-slate-500">From: {responsibleNameValue || '—'}</p>
                                                       </div>
                                                     </>
                                                 ) : (
                                                     <>
-                                                      {item.type === 'task' ? '📦' : '📋'}
                                                       {editingCell === titleKey ? (
                                                         <input
                                                             autoFocus
@@ -896,16 +1000,69 @@ export default function UnifiedTaskActivityTable({
                                                             onClick={(e) => e.stopPropagation()}
                                                         />
                                                       ) : (
-                                                        <span className={isCompleted ? 'line-through text-gray-500' : ''}>{titleValue || 'Untitled'}</span>
+                                                        <span className={`text-sm ${isCompleted ? 'line-through text-slate-400' : 'text-slate-800'}`}>{titleValue || 'Untitled'}</span>
                                                       )}
                                                     </>
                                                 )}
                                             </div>
                                         </td>
                                     )}
+                                    {columns.includes('responsible') && viewTab === 'delegated' && (
+                                        <td className="px-3 py-2 align-top text-slate-800">
+                                            <span>{responsibleNameValue || '—'}</span>
+                                        </td>
+                                    )}
+                                    {columns.includes('responsible') && viewTab !== 'delegated' && (
+                                        <td
+                                            className="px-3 py-2 align-top text-slate-800"
+                                        >
+                                            <select
+                                                className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-sm w-20"
+                                                value={String(responsibleIdValue || '')}
+                                                onChange={(e) => saveEdit(item, 'responsibleId', e.target.value)}
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <option value="">—</option>
+                                                {users.map((user) => (
+                                                    <option key={user.id || user.member_id} value={user.id || user.member_id}>
+                                                        {user.name || user.firstname} {user.lastname || ''}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </td>
+                                    )}
+                                    {columns.includes('keyArea') && (
+                                        <td
+                                            className="px-3 py-2 align-top text-slate-800"
+                                            onDoubleClick={(e) => {
+                                                e.stopPropagation();
+                                                startEdit(item, 'keyAreaId', String(keyAreaIdValue || ''));
+                                            }}
+                                        >
+                                            {editingCell === keyAreaKey ? (
+                                                <select
+                                                    autoFocus
+                                                    className="w-full border rounded px-2 py-1 text-xs"
+                                                    value={editValue}
+                                                    onChange={(e) => saveEdit(item, 'keyAreaId', e.target.value)}
+                                                    onBlur={cancelEdit}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    <option value="">Key Area</option>
+                                                    {keyAreas.map((ka, idx) => (
+                                                        <option key={ka.id} value={ka.id}>
+                                                            {idx + 1}. {ka.name || ka.title}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            ) : (
+                                                <span>{getKeyAreaName(keyAreaIdValue)}</span>
+                                            )}
+                                        </td>
+                                    )}
                                     {columns.includes('tab') && (
                                         <td
-                                            className="p-2 text-xs text-center"
+                                            className="px-3 py-2 align-top text-center text-slate-800"
                                             onDoubleClick={(e) => {
                                                 e.stopPropagation();
                                                 startEdit(item, 'listIndex', String(item.list_index ?? item.listIndex ?? item.list ?? ''));
@@ -926,9 +1083,30 @@ export default function UnifiedTaskActivityTable({
                                             )}
                                         </td>
                                     )}
+                                    {columns.includes('priority') && (
+                                        <td
+                                            className="px-3 py-2 align-top text-slate-800 w-28"
+                                        >
+                                            <select
+                                                className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-sm w-full"
+                                                value={(() => {
+                                                    const raw = item.priority ?? item.priority_level ?? item.priorityLevel;
+                                                    if (raw === 1 || String(raw) === '1' || String(raw).toLowerCase() === 'low') return 'low';
+                                                    if (raw === 3 || String(raw) === '3' || String(raw).toLowerCase() === 'high') return 'high';
+                                                    return 'normal';
+                                                })()}
+                                                onChange={(e) => saveEdit(item, 'priority', e.target.value)}
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <option value="low">Low</option>
+                                                <option value="normal">Normal</option>
+                                                <option value="high">High</option>
+                                            </select>
+                                        </td>
+                                    )}
                                     {columns.includes('goal') && (
                                         <td
-                                            className="p-2 text-xs"
+                                            className="px-3 py-2 align-top text-slate-800 w-40"
                                             onDoubleClick={(e) => {
                                                 e.stopPropagation();
                                                 startEdit(item, 'goalId', String(goalIdValue || ''));
@@ -957,7 +1135,7 @@ export default function UnifiedTaskActivityTable({
                                     )}
                                     {columns.includes('startDate') && (
                                         <td
-                                            className="p-2 text-xs"
+                                            className="px-3 py-2 align-top text-slate-800"
                                             onDoubleClick={(e) => {
                                                 e.stopPropagation();
                                                 startEdit(item, 'startDate', startDateValue);
@@ -980,7 +1158,7 @@ export default function UnifiedTaskActivityTable({
                                     )}
                                     {columns.includes('endDate') && (
                                         <td
-                                            className="p-2 text-xs"
+                                            className="px-3 py-2 align-top text-slate-800"
                                             onDoubleClick={(e) => {
                                                 e.stopPropagation();
                                                 startEdit(item, 'endDate', endDateValue);
@@ -1003,7 +1181,7 @@ export default function UnifiedTaskActivityTable({
                                     )}
                                     {columns.includes('deadline') && (
                                         <td
-                                            className={`p-2 text-xs ${overdue ? 'text-red-600 font-bold' : ''}`}
+                                            className="px-3 py-2 align-top text-slate-800"
                                             onDoubleClick={(e) => {
                                                 e.stopPropagation();
                                                 startEdit(item, 'deadline', deadlineValueInput);
@@ -1022,131 +1200,6 @@ export default function UnifiedTaskActivityTable({
                                             ) : (
                                                 <span>{formatDate(deadlineValue)}</span>
                                             )}
-                                        </td>
-                                    )}
-                                    {columns.includes('keyArea') && (
-                                        <td
-                                            className="p-2 text-xs"
-                                            onDoubleClick={(e) => {
-                                                e.stopPropagation();
-                                                startEdit(item, 'keyAreaId', String(keyAreaIdValue || ''));
-                                            }}
-                                        >
-                                            {editingCell === keyAreaKey ? (
-                                                <select
-                                                    autoFocus
-                                                    className="w-full border rounded px-2 py-1 text-xs"
-                                                    value={editValue}
-                                                    onChange={(e) => saveEdit(item, 'keyAreaId', e.target.value)}
-                                                    onBlur={cancelEdit}
-                                                    onClick={(e) => e.stopPropagation()}
-                                                >
-                                                    <option value="">Key Area</option>
-                                                    {keyAreas.map((ka, idx) => (
-                                                        <option key={ka.id} value={ka.id}>
-                                                            {idx + 1}. {ka.name || ka.title}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                            ) : (
-                                                <span>{getKeyAreaName(keyAreaIdValue)}</span>
-                                            )}
-                                        </td>
-                                    )}
-                                    {columns.includes('responsible') && viewTab === 'delegated' && (
-                                        <td className="p-2 text-xs">
-                                            <span>{responsibleNameValue || '—'}</span>
-                                        </td>
-                                    )}
-                                    {columns.includes('responsible') && viewTab !== 'delegated' && (
-                                        <td
-                                            className="p-2 text-xs"
-                                            onDoubleClick={(e) => {
-                                                e.stopPropagation();
-                                                startEdit(item, 'responsibleId', String(responsibleIdValue || ''));
-                                            }}
-                                        >
-                                            {editingCell === responsibleKey ? (
-                                                <select
-                                                    autoFocus
-                                                    className="w-full border rounded px-2 py-1 text-xs"
-                                                    value={editValue}
-                                                    onChange={(e) => saveEdit(item, 'responsibleId', e.target.value)}
-                                                    onBlur={cancelEdit}
-                                                    onClick={(e) => e.stopPropagation()}
-                                                >
-                                                    <option value="">Responsible</option>
-                                                    {users.map((user) => (
-                                                        <option key={user.id || user.member_id} value={user.id || user.member_id}>
-                                                            {user.name || user.firstname} {user.lastname || ''}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                            ) : (
-                                                <span>{responsibleNameValue || '—'}</span>
-                                            )}
-                                        </td>
-                                    )}
-                                    {viewTab !== 'delegated' && (
-                                        <td className="p-2 text-center">
-                                            <div className="flex items-center justify-center gap-2">
-                                                {/* Open Details Link */}
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        if (item.type === 'task' && onTaskClick) {
-                                                            onTaskClick(item);
-                                                        } else if (item.type === 'activity' && onActivityClick) {
-                                                            onActivityClick(item);
-                                                        }
-                                                    }}
-                                                    className="ta-accent hover:opacity-80 p-1"
-                                                    title="Open details"
-                                                >
-                                                    <FaExternalLinkAlt size={14} />
-                                                </button>
-
-                                                {/* Toggle Complete */}
-                                                {isCompleted ? (
-                                                    <button
-                                                        onClick={(e) => handleCompleteToggle(item, e)}
-                                                        className="text-gray-400 hover:text-red-600 p-1"
-                                                        title="Mark as not completed"
-                                                    >
-                                                        <FaTimes size={14} />
-                                                    </button>
-                                                ) : (
-                                                    <button
-                                                        onClick={(e) => handleCompleteToggle(item, e)}
-                                                        className="text-gray-400 hover:text-green-600 p-1"
-                                                        title="Mark as completed"
-                                                    >
-                                                        <FaCheck size={14} />
-                                                    </button>
-                                                )}
-
-                                                {/* Toggle Private/Public */}
-                                                <button
-                                                    onClick={(e) => handleTogglePrivate(item, e)}
-                                                    className={`p-1 ${isPrivate ? 'text-yellow-600' : 'text-gray-400'}`}
-                                                    title={isPrivate ? 'Mark as public' : 'Mark as private'}
-                                                >
-                                                    {isPrivate ? (
-                                                        <FaLock size={14} />
-                                                    ) : (
-                                                        <FaLockOpen size={14} />
-                                                    )}
-                                                </button>
-
-                                                {/* Delete */}
-                                                <button
-                                                    onClick={(e) => handleDelete(item, e)}
-                                                    className="text-gray-400 hover:text-red-700 p-1"
-                                                    title="Delete"
-                                                >
-                                                    <FaTrash size={14} />
-                                                </button>
-                                            </div>
                                         </td>
                                     )}
                                 </tr>

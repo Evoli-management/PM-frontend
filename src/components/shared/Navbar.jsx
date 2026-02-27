@@ -25,6 +25,9 @@ export default function Navbar() {
     const quickRef = useRef(null);
     const quickButtonRef = useRef(null);
     const activeMenuRef = useRef(null);
+    const activeMenuButtonRef = useRef(null);
+    const activeMenuPopupRef = useRef(null);
+    const [activeMenuPosition, setActiveMenuPosition] = useState({ top: 0, left: 0 });
 
     // Close the profile/settings popover when clicking outside
     useEffect(() => {
@@ -32,6 +35,7 @@ export default function Navbar() {
             const node = menuRef.current;
             const qnode = quickRef.current;
             const activeNode = activeMenuRef.current;
+            const activePopupNode = activeMenuPopupRef.current;
             // Close profile menu if click outside
             if (open && node && !node.contains(e.target)) {
                 setOpen(false);
@@ -40,7 +44,12 @@ export default function Navbar() {
             if (openQuick && qnode && !qnode.contains(e.target)) {
                 setOpenQuick(false);
             }
-            if (openActiveMenu && activeNode && !activeNode.contains(e.target)) {
+            if (
+                openActiveMenu &&
+                activeNode &&
+                !activeNode.contains(e.target) &&
+                !(activePopupNode && activePopupNode.contains(e.target))
+            ) {
                 setOpenActiveMenu(false);
             }
         };
@@ -506,6 +515,27 @@ export default function Navbar() {
         return () => window.removeEventListener('dashboard-prefs-updated', handler);
     }, []);
 
+    const updateActiveMenuPosition = () => {
+        if (!activeMenuButtonRef.current) return;
+        const rect = activeMenuButtonRef.current.getBoundingClientRect();
+        setActiveMenuPosition({
+            top: rect.bottom + 4,
+            left: rect.left,
+        });
+    };
+
+    useEffect(() => {
+        if (!openActiveMenu) return;
+        updateActiveMenuPosition();
+        const onReposition = () => updateActiveMenuPosition();
+        window.addEventListener('resize', onReposition);
+        window.addEventListener('scroll', onReposition, true);
+        return () => {
+            window.removeEventListener('resize', onReposition);
+            window.removeEventListener('scroll', onReposition, true);
+        };
+    }, [openActiveMenu]);
+
     // Don't render navbar on public pages
     if (isPublicRoute) {
         return null;
@@ -558,35 +588,43 @@ export default function Navbar() {
                     
                 {showKeyAreaTabs && (
                     <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-4 text-xs font-semibold overflow-x-auto whitespace-nowrap navbar-keyarea-tabs">
+                        <div className="flex items-center gap-4 text-xs font-semibold overflow-x-auto overflow-y-visible whitespace-nowrap navbar-keyarea-tabs">
                             <div className="relative" ref={activeMenuRef}>
                                 <button
+                                    ref={activeMenuButtonRef}
                                     type="button"
-                                    onClick={() => setOpenActiveMenu((prev) => !prev)}
-                                    className={`px-2 py-2 rounded transition flex items-center gap-1 ${
+                                    onClick={() => {
+                                        if (!openActiveMenu) updateActiveMenuPosition();
+                                        setOpenActiveMenu((prev) => !prev);
+                                    }}
+                                    className={`px-2 py-2 rounded transition inline-flex items-center gap-1 ${
                                         activeKeyAreaView === 'active-tasks'
                                             ? 'text-blue-600 border-b-2 border-blue-600'
                                             : 'text-slate-600 hover:text-slate-900'
                                     }`}
                                 >
-                                    {activeTasksLabel}
-                                    <span className="text-[10px]">▾</span>
+                                    <span>{activeTasksLabel}</span>
+                                    <span className="text-[11px] text-slate-500">▾</span>
                                 </button>
-                                {openActiveMenu && (
-                                    <div className="absolute left-0 mt-2 w-40 rounded-md border border-gray-200 bg-white shadow-lg z-50">
+                                {openActiveMenu && createPortal(
+                                    <div
+                                        ref={activeMenuPopupRef}
+                                        className="fixed w-44 rounded-md border border-slate-300 bg-white shadow-md z-[220] overflow-hidden"
+                                        style={{ top: `${activeMenuPosition.top}px`, left: `${activeMenuPosition.left}px` }}
+                                    >
                                         <button
                                             type="button"
                                             onClick={() => {
                                                 navigate('/key-areas?view=active-tasks&active=active');
                                                 setOpenActiveMenu(false);
                                             }}
-                                            className={`w-full text-left px-3 py-2 text-xs font-semibold uppercase tracking-wide transition ${
+                                            className={`w-full text-left px-4 py-2.5 text-sm transition ${
                                                 activeKeyAreaView === 'active-tasks' && activeKeyAreaFilter === 'active'
-                                                    ? 'text-blue-600'
-                                                    : 'text-slate-600 hover:text-slate-900'
+                                                    ? 'text-slate-900'
+                                                    : 'text-slate-700 hover:bg-slate-50'
                                             }`}
                                         >
-                                            ACTIVE TASKS
+                                            Active tasks
                                         </button>
                                         <button
                                             type="button"
@@ -594,15 +632,16 @@ export default function Navbar() {
                                                 navigate('/key-areas?view=active-tasks&active=all');
                                                 setOpenActiveMenu(false);
                                             }}
-                                            className={`w-full text-left px-3 py-2 text-xs font-semibold uppercase tracking-wide transition ${
+                                            className={`w-full text-left px-4 py-2.5 text-sm transition ${
                                                 activeKeyAreaView === 'active-tasks' && activeKeyAreaFilter === 'all'
-                                                    ? 'text-blue-600'
-                                                    : 'text-slate-600 hover:text-slate-900'
+                                                    ? 'text-slate-900'
+                                                    : 'text-slate-700 hover:bg-slate-50'
                                             }`}
                                         >
-                                            ALL TASKS
+                                            All Tasks
                                         </button>
-                                    </div>
+                                    </div>,
+                                    document.body
                                 )}
                             </div>
                             <button
