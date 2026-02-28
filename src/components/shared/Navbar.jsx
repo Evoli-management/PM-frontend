@@ -63,6 +63,7 @@ export default function Navbar() {
     const showKeyAreaTabs = location.pathname.startsWith('/key-areas') || location.pathname === '/my-focus';
     const showTeamsTabs = location.pathname.startsWith('/teams');
     const showGiveStrokesTabs = location.pathname.startsWith('/give-strokes');
+    const showGoalsTabs = location.pathname.startsWith('/goals');
     const widgetsRef = useRef(null);
     const [searchResults, setSearchResults] = useState([]);
     const [showSearchResults, setShowSearchResults] = useState(false);
@@ -609,8 +610,8 @@ export default function Navbar() {
                                         setOpenActiveMenu((prev) => !prev);
                                     }}
                                     className={`px-2 py-2 rounded transition inline-flex items-center gap-1 ${activeKeyAreaView === 'active-tasks'
-                                            ? 'text-blue-600 border-b-2 border-blue-600'
-                                            : 'text-slate-600 hover:text-slate-900'
+                                        ? 'text-blue-600 border-b-2 border-blue-600'
+                                        : 'text-slate-600 hover:text-slate-900'
                                         }`}
                                 >
                                     <span>{activeTasksLabel}</span>
@@ -629,8 +630,8 @@ export default function Navbar() {
                                                 setOpenActiveMenu(false);
                                             }}
                                             className={`w-full text-left px-4 py-2.5 text-sm transition ${activeKeyAreaView === 'active-tasks' && activeKeyAreaFilter === 'active'
-                                                    ? 'text-slate-900'
-                                                    : 'text-slate-700 hover:bg-slate-50'
+                                                ? 'text-slate-900'
+                                                : 'text-slate-700 hover:bg-slate-50'
                                                 }`}
                                         >
                                             Active tasks
@@ -642,8 +643,8 @@ export default function Navbar() {
                                                 setOpenActiveMenu(false);
                                             }}
                                             className={`w-full text-left px-4 py-2.5 text-sm transition ${activeKeyAreaView === 'active-tasks' && activeKeyAreaFilter === 'all'
-                                                    ? 'text-slate-900'
-                                                    : 'text-slate-700 hover:bg-slate-50'
+                                                ? 'text-slate-900'
+                                                : 'text-slate-700 hover:bg-slate-50'
                                                 }`}
                                         >
                                             All Tasks
@@ -656,8 +657,8 @@ export default function Navbar() {
                                 type="button"
                                 onClick={() => navigate('/key-areas?view=delegated')}
                                 className={`px-2 py-2 rounded transition ${activeKeyAreaView === 'delegated'
-                                        ? 'text-blue-600 border-b-2 border-blue-600'
-                                        : 'text-slate-600 hover:text-slate-900'
+                                    ? 'text-blue-600 border-b-2 border-blue-600'
+                                    : 'text-slate-600 hover:text-slate-900'
                                     }`}
                             >
                                 DELEGATED
@@ -666,8 +667,8 @@ export default function Navbar() {
                                 type="button"
                                 onClick={() => navigate('/key-areas?view=todo')}
                                 className={`px-2 py-2 rounded transition ${activeKeyAreaView === 'todo'
-                                        ? 'text-blue-600 border-b-2 border-blue-600'
-                                        : 'text-slate-600 hover:text-slate-900'
+                                    ? 'text-blue-600 border-b-2 border-blue-600'
+                                    : 'text-slate-600 hover:text-slate-900'
                                     }`}
                             >
                                 TO-DO (RED)
@@ -676,8 +677,8 @@ export default function Navbar() {
                                 type="button"
                                 onClick={() => navigate('/key-areas?view=activity-trap')}
                                 className={`px-2 py-2 rounded transition ${activeKeyAreaView === 'activity-trap'
-                                        ? 'text-blue-600 border-b-2 border-blue-600'
-                                        : 'text-slate-600 hover:text-slate-900'
+                                    ? 'text-blue-600 border-b-2 border-blue-600'
+                                    : 'text-slate-600 hover:text-slate-900'
                                     }`}
                             >
                                 ACTIVITY TRAP
@@ -686,8 +687,8 @@ export default function Navbar() {
                                 type="button"
                                 onClick={() => navigate('/my-focus')}
                                 className={`px-2 py-2 rounded transition ${activeKeyAreaView === 'my-focus'
-                                        ? 'text-blue-600 border-b-2 border-blue-600'
-                                        : 'text-slate-600 hover:text-slate-900'
+                                    ? 'text-blue-600 border-b-2 border-blue-600'
+                                    : 'text-slate-600 hover:text-slate-900'
                                     }`}
                             >
                                 MY FOCUS
@@ -702,8 +703,8 @@ export default function Navbar() {
                                 type="button"
                                 onClick={() => navigate('/teams?tab=teams-members')}
                                 className={`px-2 py-2 rounded transition ${activeTeamsTab === 'teams-members'
-                                        ? 'text-blue-600 border-b-2 border-blue-600'
-                                        : 'text-slate-600 hover:text-slate-900'
+                                    ? 'text-blue-600 border-b-2 border-blue-600'
+                                    : 'text-slate-600 hover:text-slate-900'
                                     }`}
                             >
                                 OVERVIEW
@@ -712,8 +713,8 @@ export default function Navbar() {
                                 type="button"
                                 onClick={() => navigate('/teams?tab=organization')}
                                 className={`px-2 py-2 rounded transition ${activeTeamsTab === 'organization'
-                                        ? 'text-blue-600 border-b-2 border-blue-600'
-                                        : 'text-slate-600 hover:text-slate-900'
+                                    ? 'text-blue-600 border-b-2 border-blue-600'
+                                    : 'text-slate-600 hover:text-slate-900'
                                     }`}
                             >
                                 MY ORGANISATION
@@ -723,8 +724,8 @@ export default function Navbar() {
                                     type="button"
                                     onClick={() => navigate('/teams?tab=myteams')}
                                     className={`px-2 py-2 rounded transition ${activeTeamsTab === 'myteams'
-                                            ? 'text-blue-600 border-b-2 border-blue-600'
-                                            : 'text-slate-600 hover:text-slate-900'
+                                        ? 'text-blue-600 border-b-2 border-blue-600'
+                                        : 'text-slate-600 hover:text-slate-900'
                                         }`}
                                 >
                                     MY TEAMS
@@ -734,8 +735,8 @@ export default function Navbar() {
                                 type="button"
                                 onClick={() => navigate('/teams?tab=myreport')}
                                 className={`px-2 py-2 rounded transition ${activeTeamsTab === 'myreport'
-                                        ? 'text-blue-600 border-b-2 border-blue-600'
-                                        : 'text-slate-600 hover:text-slate-900'
+                                    ? 'text-blue-600 border-b-2 border-blue-600'
+                                    : 'text-slate-600 hover:text-slate-900'
                                     }`}
                             >
                                 MY REPORT
@@ -750,8 +751,8 @@ export default function Navbar() {
                                 type="button"
                                 onClick={() => navigate('/give-strokes?tab=give')}
                                 className={`px-2 py-2 rounded transition ${activeGiveStrokesTab === 'give'
-                                        ? 'text-blue-600 border-b-2 border-blue-600'
-                                        : 'text-slate-600 hover:text-slate-900'
+                                    ? 'text-blue-600 border-b-2 border-blue-600'
+                                    : 'text-slate-600 hover:text-slate-900'
                                     }`}
                             >
                                 GIVE STROKES
@@ -760,8 +761,8 @@ export default function Navbar() {
                                 type="button"
                                 onClick={() => navigate('/give-strokes?tab=account')}
                                 className={`px-2 py-2 rounded transition ${activeGiveStrokesTab === 'account'
-                                        ? 'text-blue-600 border-b-2 border-blue-600'
-                                        : 'text-slate-600 hover:text-slate-900'
+                                    ? 'text-blue-600 border-b-2 border-blue-600'
+                                    : 'text-slate-600 hover:text-slate-900'
                                     }`}
                             >
                                 STROKE ACCOUNT
@@ -798,6 +799,38 @@ export default function Navbar() {
                         </div>
                     </div>
                 )}
+                {/* Goals Tab Group: My Goals | Quick Goals | Reports */}
+                {showGoalsTabs && !showKeyAreaTabs && !showTeamsTabs && !showGiveStrokesTabs && (() => {
+                    const params = new URLSearchParams(location.search || '');
+                    const goalsTab = params.get('tab') || 'goals';
+                    return (
+                        <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-4 text-xs font-semibold overflow-x-auto whitespace-nowrap navbar-keyarea-tabs">
+                                <button
+                                    type="button"
+                                    onClick={() => navigate('/goals')}
+                                    className={`px-2 py-2 rounded transition ${goalsTab === 'goals' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-600 hover:text-slate-900'}`}
+                                >
+                                    MY GOALS
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => window.dispatchEvent(new CustomEvent('pm-goals-quick-panel', { detail: { open: true } }))}
+                                    className="px-2 py-2 rounded transition text-slate-600 hover:text-slate-900"
+                                >
+                                    QUICK GOALS
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => navigate('/goals?tab=report')}
+                                    className={`px-2 py-2 rounded transition ${goalsTab === 'report' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-600 hover:text-slate-900'}`}
+                                >
+                                    REPORTS
+                                </button>
+                            </div>
+                        </div>
+                    );
+                })()}
                 <div className="relative flex items-center gap-3 ml-auto flex-shrink-0">
                     <div className="relative">
                         <button
