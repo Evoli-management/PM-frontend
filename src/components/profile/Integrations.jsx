@@ -137,11 +137,21 @@ export const Integrations = ({ showToast }) => {
                     email: syncStatus.google.email || '',
                     syncEnabled: true
                 };
+                // Google Tasks shares the same OAuth as Google Calendar
+                updates.googleTasks = {
+                    connected: syncStatus.google.connected,
+                    syncEnabled: true
+                };
             }
             if (syncStatus.microsoft) {
                 updates.outlookCalendar = {
                     connected: syncStatus.microsoft.connected,
                     email: syncStatus.microsoft.email || '',
+                    syncEnabled: true
+                };
+                // Microsoft To Do shares the same OAuth as Outlook Calendar
+                updates.microsoftToDo = {
+                    connected: syncStatus.microsoft.connected,
                     syncEnabled: true
                 };
             }

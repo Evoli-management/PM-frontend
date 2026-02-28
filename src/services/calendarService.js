@@ -38,7 +38,7 @@ const calendarService = {
                     try { popup.close(); } catch(e) {}
                 };
                 const messageHandler = async (event) => {
-                    if (event.data && event.data.provider === 'google-tasks') {
+                    if (event.data && (event.data.provider === 'google-tasks' || event.data.provider === 'google')) {
                         cleanup();
                         if (event.data.success === true) {
                             resolve({ success: true });
@@ -52,7 +52,7 @@ const calendarService = {
                 try {
                     broadcastChannel = new BroadcastChannel('oauth-callback');
                     broadcastChannel.onmessage = (event) => {
-                        if (event.data && event.data.provider === 'google-tasks') {
+                        if (event.data && (event.data.provider === 'google-tasks' || event.data.provider === 'google')) {
                             cleanup();
                             if (event.data.success === true) {
                                 resolve({ success: true });
@@ -66,7 +66,7 @@ const calendarService = {
                     if (event.key === 'oauth-callback' && event.newValue) {
                         try {
                             const data = JSON.parse(event.newValue);
-                            if (data.provider === 'google-tasks') {
+                            if (data.provider === 'google-tasks' || data.provider === 'google') {
                                 cleanup();
                                 if (data.success === true) {
                                     resolve({ success: true });
@@ -116,7 +116,7 @@ const calendarService = {
                     try { popup.close(); } catch(e) {}
                 };
                 const messageHandler = async (event) => {
-                    if (event.data && event.data.provider === 'microsoft-todo') {
+                    if (event.data && (event.data.provider === 'microsoft-todo' || event.data.provider === 'graph')) {
                         cleanup();
                         if (event.data.success === true) {
                             resolve({ success: true });
@@ -130,7 +130,7 @@ const calendarService = {
                 try {
                     broadcastChannel = new BroadcastChannel('oauth-callback');
                     broadcastChannel.onmessage = (event) => {
-                        if (event.data && event.data.provider === 'microsoft-todo') {
+                        if (event.data && (event.data.provider === 'microsoft-todo' || event.data.provider === 'graph')) {
                             cleanup();
                             if (event.data.success === true) {
                                 resolve({ success: true });
@@ -144,7 +144,7 @@ const calendarService = {
                     if (event.key === 'oauth-callback' && event.newValue) {
                         try {
                             const data = JSON.parse(event.newValue);
-                            if (data.provider === 'microsoft-todo') {
+                            if (data.provider === 'microsoft-todo' || data.provider === 'graph') {
                                 cleanup();
                                 if (data.success === true) {
                                     resolve({ success: true });
