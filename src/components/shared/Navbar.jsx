@@ -83,6 +83,17 @@ export default function Navbar() {
     // Global inline reminder modal state (listens for events)
     const [globalReminderOpen, setGlobalReminderOpen] = useState(false);
     const [globalReminderObj, setGlobalReminderObj] = useState(null);
+    // Reactive state for Don't Forget imported tab active state
+    // (window.pmDontForgetShowImported can't trigger re-renders, so use state)
+    const [dfImportedActive, setDfImportedActive] = useState(false);
+    useEffect(() => {
+        const handler = (e) => {
+            const val = e?.detail?.value;
+            if (typeof val === 'boolean') setDfImportedActive(val);
+        };
+        window.addEventListener('pm-dontforget-toggle-imported', handler);
+        return () => window.removeEventListener('pm-dontforget-toggle-imported', handler);
+    }, []);
 
     // Handle global search functionality across entire system
     const handleSearch = async (searchTerm) => {
@@ -107,8 +118,8 @@ export default function Navbar() {
             { title: "Team", route: "/teams", type: "page", description: "Team collaboration and management" },
             { title: "Profile Settings", route: "/profile", type: "page", description: "User profile and settings" },
         ];
-        
-        const matchingPages = pageItems.filter(item => 
+
+        const matchingPages = pageItems.filter(item =>
             item.title.toLowerCase().includes(searchLower) ||
             item.description.toLowerCase().includes(searchLower)
         );
@@ -125,12 +136,12 @@ export default function Navbar() {
             // Search tasks globally
             try {
                 const tasks = await taskService.getTasks();
-                const matchingTasks = tasks.filter(task => 
+                const matchingTasks = tasks.filter(task =>
                     task.title?.toLowerCase().includes(searchLower) ||
                     task.description?.toLowerCase().includes(searchLower) ||
                     task.name?.toLowerCase().includes(searchLower)
                 ).slice(0, 5); // Limit results
-                
+
                 matchingTasks.forEach(task => {
                     results.push({
                         title: task.title || task.name || 'Untitled Task',
@@ -139,7 +150,7 @@ export default function Navbar() {
                         description: task.description || 'Task'
                     });
                 });
-                
+
                 // Update results with tasks
                 setSearchResults([...results]);
             } catch (e) {
@@ -149,12 +160,12 @@ export default function Navbar() {
             // Search activities globally
             try {
                 const activities = await activityService.getActivities();
-                const matchingActivities = activities.filter(activity => 
+                const matchingActivities = activities.filter(activity =>
                     activity.title?.toLowerCase().includes(searchLower) ||
                     activity.description?.toLowerCase().includes(searchLower) ||
                     activity.name?.toLowerCase().includes(searchLower)
                 ).slice(0, 5);
-                
+
                 matchingActivities.forEach(activity => {
                     results.push({
                         title: activity.title || activity.name || 'Untitled Activity',
@@ -170,12 +181,12 @@ export default function Navbar() {
             // Search goals globally
             try {
                 const goals = await goalService.getGoals();
-                const matchingGoals = goals.filter(goal => 
+                const matchingGoals = goals.filter(goal =>
                     goal.title?.toLowerCase().includes(searchLower) ||
                     goal.description?.toLowerCase().includes(searchLower) ||
                     goal.name?.toLowerCase().includes(searchLower)
                 ).slice(0, 5);
-                
+
                 matchingGoals.forEach(goal => {
                     results.push({
                         title: goal.title || goal.name || 'Untitled Goal',
@@ -191,11 +202,11 @@ export default function Navbar() {
             // Search key areas globally
             try {
                 const keyAreas = await keyAreaService.getKeyAreas();
-                const matchingKeyAreas = keyAreas.filter(area => 
+                const matchingKeyAreas = keyAreas.filter(area =>
                     area.name?.toLowerCase().includes(searchLower) ||
                     area.description?.toLowerCase().includes(searchLower)
                 ).slice(0, 5);
-                
+
                 matchingKeyAreas.forEach(area => {
                     results.push({
                         title: area.name || 'Untitled Key Area',
@@ -211,12 +222,12 @@ export default function Navbar() {
             // Search calendar appointments globally
             try {
                 const appointments = await calendarService.getAppointments();
-                const matchingAppointments = appointments.filter(appointment => 
+                const matchingAppointments = appointments.filter(appointment =>
                     appointment.title?.toLowerCase().includes(searchLower) ||
                     appointment.description?.toLowerCase().includes(searchLower) ||
                     appointment.summary?.toLowerCase().includes(searchLower)
                 ).slice(0, 5);
-                
+
                 matchingAppointments.forEach(appointment => {
                     results.push({
                         title: appointment.title || appointment.summary || 'Untitled Appointment',
@@ -241,7 +252,7 @@ export default function Navbar() {
     // Update dropdown position based on search input position
     const updateDropdownPosition = () => {
         if (!searchRef.current) return;
-        
+
         const rect = searchRef.current.getBoundingClientRect();
         setDropdownPosition({
             top: rect.bottom + window.scrollY,
@@ -254,12 +265,12 @@ export default function Navbar() {
     const handleSearchChange = (e) => {
         const value = e.target.value;
         setSearch(value);
-        
+
         // Clear previous timeout
         if (window.searchTimeout) {
             clearTimeout(window.searchTimeout);
         }
-        
+
         // Debounce search to avoid too many API calls
         window.searchTimeout = setTimeout(() => {
             handleSearch(value);
@@ -367,7 +378,7 @@ export default function Navbar() {
 
     const handleGlobalReminderSave = (saved) => {
         // Notify any listeners (e.g., reminders lists) to reload
-        try { window.dispatchEvent(new CustomEvent('reminder-saved', { detail: { reminder: saved } })); } catch (err) {}
+        try { window.dispatchEvent(new CustomEvent('reminder-saved', { detail: { reminder: saved } })); } catch (err) { }
         handleGlobalReminderClose();
     };
 
@@ -424,7 +435,7 @@ export default function Navbar() {
             if (type === 'dontforget') {
                 navigate('/tasks?dontforget=1');
                 setTimeout(() => {
-                    try { window.dispatchEvent(new CustomEvent('open-create-modal', { detail: { type: 'dontforget' } })); } catch (_) {}
+                    try { window.dispatchEvent(new CustomEvent('open-create-modal', { detail: { type: 'dontforget' } })); } catch (_) { }
                 }, 50);
                 return;
             }
@@ -432,7 +443,7 @@ export default function Navbar() {
             if (type === 'appointment') {
                 navigate('/calendar');
                 setTimeout(() => {
-                    try { window.dispatchEvent(new CustomEvent('open-create-appointment', { detail: { start: new Date().toISOString() } })); } catch (_) {}
+                    try { window.dispatchEvent(new CustomEvent('open-create-appointment', { detail: { start: new Date().toISOString() } })); } catch (_) { }
                 }, 50);
                 return;
             }
@@ -465,7 +476,7 @@ export default function Navbar() {
                 setOpenQuick(false);
                 try {
                     if (quickButtonRef.current) quickButtonRef.current.focus();
-                } catch (err) {}
+                } catch (err) { }
             }
         };
 
@@ -568,24 +579,24 @@ export default function Navbar() {
     return (
         <header
             className="bg-gray-50 text-slate-800 z-[100] border-b border-gray-200 fixed top-0 left-0 right-0 h-16"
-            // style={{
-            //     background: 'linear-gradient(90deg, #dff7f9 0%, #a7eaf0 50%, #59d2df 100%)',
-            // }}
+        // style={{
+        //     background: 'linear-gradient(90deg, #dff7f9 0%, #a7eaf0 50%, #59d2df 100%)',
+        // }}
         >
             <div className="w-full px-2 md:px-4 h-16 flex items-center gap-4">
-                    <Link to="/dashboard" className="font-bold tracking-wide flex items-center gap-2 flex-shrink-0">
-                        <img
-                            src={`${import.meta.env.BASE_URL}logo.png`}
-                            alt="Practical Manager"
-                            className="hidden md:block h-7 object-contain"
-                                style={{ maxHeight: '32px' }}
-                        />
-                        <span className="sr-only">Practical Manager</span>
-                    </Link>
-                    
-                    {/* Compact search icon (replaces large centered search bar) */}
-                    {/* Placed visually with other header actions for a cleaner layout */}
-                    
+                <Link to="/dashboard" className="font-bold tracking-wide flex items-center gap-2 flex-shrink-0">
+                    <img
+                        src={`${import.meta.env.BASE_URL}logo.png`}
+                        alt="Practical Manager"
+                        className="hidden md:block h-7 object-contain"
+                        style={{ maxHeight: '32px' }}
+                    />
+                    <span className="sr-only">Practical Manager</span>
+                </Link>
+
+                {/* Compact search icon (replaces large centered search bar) */}
+                {/* Placed visually with other header actions for a cleaner layout */}
+
                 {showKeyAreaTabs && (
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-4 text-xs font-semibold overflow-x-auto overflow-y-visible whitespace-nowrap navbar-keyarea-tabs">
@@ -597,11 +608,10 @@ export default function Navbar() {
                                         if (!openActiveMenu) updateActiveMenuPosition();
                                         setOpenActiveMenu((prev) => !prev);
                                     }}
-                                    className={`px-2 py-2 rounded transition inline-flex items-center gap-1 ${
-                                        activeKeyAreaView === 'active-tasks'
+                                    className={`px-2 py-2 rounded transition inline-flex items-center gap-1 ${activeKeyAreaView === 'active-tasks'
                                             ? 'text-blue-600 border-b-2 border-blue-600'
                                             : 'text-slate-600 hover:text-slate-900'
-                                    }`}
+                                        }`}
                                 >
                                     <span>{activeTasksLabel}</span>
                                     <span className="text-[11px] text-slate-500">▾</span>
@@ -618,11 +628,10 @@ export default function Navbar() {
                                                 navigate('/key-areas?view=active-tasks&active=active');
                                                 setOpenActiveMenu(false);
                                             }}
-                                            className={`w-full text-left px-4 py-2.5 text-sm transition ${
-                                                activeKeyAreaView === 'active-tasks' && activeKeyAreaFilter === 'active'
+                                            className={`w-full text-left px-4 py-2.5 text-sm transition ${activeKeyAreaView === 'active-tasks' && activeKeyAreaFilter === 'active'
                                                     ? 'text-slate-900'
                                                     : 'text-slate-700 hover:bg-slate-50'
-                                            }`}
+                                                }`}
                                         >
                                             Active tasks
                                         </button>
@@ -632,11 +641,10 @@ export default function Navbar() {
                                                 navigate('/key-areas?view=active-tasks&active=all');
                                                 setOpenActiveMenu(false);
                                             }}
-                                            className={`w-full text-left px-4 py-2.5 text-sm transition ${
-                                                activeKeyAreaView === 'active-tasks' && activeKeyAreaFilter === 'all'
+                                            className={`w-full text-left px-4 py-2.5 text-sm transition ${activeKeyAreaView === 'active-tasks' && activeKeyAreaFilter === 'all'
                                                     ? 'text-slate-900'
                                                     : 'text-slate-700 hover:bg-slate-50'
-                                            }`}
+                                                }`}
                                         >
                                             All Tasks
                                         </button>
@@ -647,44 +655,40 @@ export default function Navbar() {
                             <button
                                 type="button"
                                 onClick={() => navigate('/key-areas?view=delegated')}
-                                className={`px-2 py-2 rounded transition ${
-                                    activeKeyAreaView === 'delegated'
+                                className={`px-2 py-2 rounded transition ${activeKeyAreaView === 'delegated'
                                         ? 'text-blue-600 border-b-2 border-blue-600'
                                         : 'text-slate-600 hover:text-slate-900'
-                                }`}
+                                    }`}
                             >
                                 DELEGATED
                             </button>
                             <button
                                 type="button"
                                 onClick={() => navigate('/key-areas?view=todo')}
-                                className={`px-2 py-2 rounded transition ${
-                                    activeKeyAreaView === 'todo'
+                                className={`px-2 py-2 rounded transition ${activeKeyAreaView === 'todo'
                                         ? 'text-blue-600 border-b-2 border-blue-600'
                                         : 'text-slate-600 hover:text-slate-900'
-                                }`}
+                                    }`}
                             >
                                 TO-DO (RED)
                             </button>
                             <button
                                 type="button"
                                 onClick={() => navigate('/key-areas?view=activity-trap')}
-                                className={`px-2 py-2 rounded transition ${
-                                    activeKeyAreaView === 'activity-trap'
+                                className={`px-2 py-2 rounded transition ${activeKeyAreaView === 'activity-trap'
                                         ? 'text-blue-600 border-b-2 border-blue-600'
                                         : 'text-slate-600 hover:text-slate-900'
-                                }`}
+                                    }`}
                             >
                                 ACTIVITY TRAP
                             </button>
                             <button
                                 type="button"
                                 onClick={() => navigate('/my-focus')}
-                                className={`px-2 py-2 rounded transition ${
-                                    activeKeyAreaView === 'my-focus'
+                                className={`px-2 py-2 rounded transition ${activeKeyAreaView === 'my-focus'
                                         ? 'text-blue-600 border-b-2 border-blue-600'
                                         : 'text-slate-600 hover:text-slate-900'
-                                }`}
+                                    }`}
                             >
                                 MY FOCUS
                             </button>
@@ -697,22 +701,20 @@ export default function Navbar() {
                             <button
                                 type="button"
                                 onClick={() => navigate('/teams?tab=teams-members')}
-                                className={`px-2 py-2 rounded transition ${
-                                    activeTeamsTab === 'teams-members'
+                                className={`px-2 py-2 rounded transition ${activeTeamsTab === 'teams-members'
                                         ? 'text-blue-600 border-b-2 border-blue-600'
                                         : 'text-slate-600 hover:text-slate-900'
-                                }`}
+                                    }`}
                             >
                                 OVERVIEW
                             </button>
                             <button
                                 type="button"
                                 onClick={() => navigate('/teams?tab=organization')}
-                                className={`px-2 py-2 rounded transition ${
-                                    activeTeamsTab === 'organization'
+                                className={`px-2 py-2 rounded transition ${activeTeamsTab === 'organization'
                                         ? 'text-blue-600 border-b-2 border-blue-600'
                                         : 'text-slate-600 hover:text-slate-900'
-                                }`}
+                                    }`}
                             >
                                 MY ORGANISATION
                             </button>
@@ -720,11 +722,10 @@ export default function Navbar() {
                                 <button
                                     type="button"
                                     onClick={() => navigate('/teams?tab=myteams')}
-                                    className={`px-2 py-2 rounded transition ${
-                                        activeTeamsTab === 'myteams'
+                                    className={`px-2 py-2 rounded transition ${activeTeamsTab === 'myteams'
                                             ? 'text-blue-600 border-b-2 border-blue-600'
                                             : 'text-slate-600 hover:text-slate-900'
-                                    }`}
+                                        }`}
                                 >
                                     MY TEAMS
                                 </button>
@@ -732,11 +733,10 @@ export default function Navbar() {
                             <button
                                 type="button"
                                 onClick={() => navigate('/teams?tab=myreport')}
-                                className={`px-2 py-2 rounded transition ${
-                                    activeTeamsTab === 'myreport'
+                                className={`px-2 py-2 rounded transition ${activeTeamsTab === 'myreport'
                                         ? 'text-blue-600 border-b-2 border-blue-600'
                                         : 'text-slate-600 hover:text-slate-900'
-                                }`}
+                                    }`}
                             >
                                 MY REPORT
                             </button>
@@ -749,22 +749,20 @@ export default function Navbar() {
                             <button
                                 type="button"
                                 onClick={() => navigate('/give-strokes?tab=give')}
-                                className={`px-2 py-2 rounded transition ${
-                                    activeGiveStrokesTab === 'give'
+                                className={`px-2 py-2 rounded transition ${activeGiveStrokesTab === 'give'
                                         ? 'text-blue-600 border-b-2 border-blue-600'
                                         : 'text-slate-600 hover:text-slate-900'
-                                }`}
+                                    }`}
                             >
                                 GIVE STROKES
                             </button>
                             <button
                                 type="button"
                                 onClick={() => navigate('/give-strokes?tab=account')}
-                                className={`px-2 py-2 rounded transition ${
-                                    activeGiveStrokesTab === 'account'
+                                className={`px-2 py-2 rounded transition ${activeGiveStrokesTab === 'account'
                                         ? 'text-blue-600 border-b-2 border-blue-600'
                                         : 'text-slate-600 hover:text-slate-900'
-                                }`}
+                                    }`}
                             >
                                 STROKE ACCOUNT
                             </button>
@@ -782,7 +780,7 @@ export default function Navbar() {
                                     window.dispatchEvent(new CustomEvent('pm-dontforget-toggle-imported', { detail: { value: false } }));
                                     if (typeof window.setDontForgetShowImported === 'function') window.setDontForgetShowImported(false);
                                 }}
-                                className={`px-2 py-2 rounded transition ${window.pmDontForgetShowImported === false ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-600 hover:text-slate-900'}`}
+                                className={`px-2 py-2 rounded transition ${!dfImportedActive ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-600 hover:text-slate-900'}`}
                             >
                                 ALL TASKS
                             </button>
@@ -793,7 +791,7 @@ export default function Navbar() {
                                     window.dispatchEvent(new CustomEvent('pm-dontforget-toggle-imported', { detail: { value: true } }));
                                     if (typeof window.setDontForgetShowImported === 'function') window.setDontForgetShowImported(true);
                                 }}
-                                className={`px-2 py-2 rounded transition ${window.pmDontForgetShowImported === true ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-600 hover:text-slate-900'}`}
+                                className={`px-2 py-2 rounded transition ${dfImportedActive ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-600 hover:text-slate-900'}`}
                             >
                                 IMPORTED TASKS
                             </button>
@@ -817,7 +815,7 @@ export default function Navbar() {
                                             if (el) el.focus();
                                             updateDropdownPosition();
                                         }
-                                    } catch (e) {}
+                                    } catch (e) { }
                                 }, 0);
                             }}
                         >
@@ -878,7 +876,7 @@ export default function Navbar() {
                                 aria-expanded={openWidgets ? "true" : "false"}
                                 title="Widgets"
                             >
-                                    <FaTh className="text-black w-4 h-4" />
+                                <FaTh className="text-black w-4 h-4" />
                             </button>
 
                             {openWidgets && (
@@ -992,8 +990,8 @@ export default function Navbar() {
                                     role="menuitem"
                                     tabIndex={0}
                                     className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
-                                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpenQuick(false); try { window.location.hash = '#/key-areas'; } catch(ex){ window.location.href = '/#/key-areas'; } } }}
-                                    onClick={() => { setOpenQuick(false); try { window.location.hash = '#/key-areas'; } catch(e){ window.location.href = '/#/key-areas'; } }}
+                                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpenQuick(false); try { window.location.hash = '#/key-areas'; } catch (ex) { window.location.href = '/#/key-areas'; } } }}
+                                    onClick={() => { setOpenQuick(false); try { window.location.hash = '#/key-areas'; } catch (e) { window.location.href = '/#/key-areas'; } }}
                                 >
                                     Edit Key Areas
                                 </button>
@@ -1064,7 +1062,7 @@ export default function Navbar() {
                                     className="block px-3 py-2 text-sm hover:bg-slate-50"
                                     onClick={() => setOpen(false)}
                                 >
-                                   Profile & Settings
+                                    Profile & Settings
                                 </Link>
                                 <div className="border-t border-gray-200 my-1"></div>
                                 <button

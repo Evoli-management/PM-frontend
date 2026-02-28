@@ -9,6 +9,7 @@ import { FaCheck, FaExclamation, FaLongArrowAltDown, FaTimes, FaTrash, FaBars, F
 import CreateTaskModal from "../components/key-areas/CreateTaskModal.jsx";
 import EditTaskModal from "../components/key-areas/EditTaskModal.jsx";
 import TaskRow from "../components/key-areas/TaskRow.jsx";
+import SyncSourceBadge from "../components/tasks/SyncSourceBadge.jsx";
 import TaskFullView from "../components/key-areas/TaskFullView";
 // Activity composer removed from DontForget: activities are not fetched here
 
@@ -72,7 +73,7 @@ export default function DontForget() {
     useEffect(() => {
         try {
             localStorage.setItem("dfListNames", JSON.stringify(dfListNames));
-        } catch {}
+        } catch { }
     }, [dfListNames]);
 
     // Optional per-list descriptions shown when a list has no tasks
@@ -87,7 +88,7 @@ export default function DontForget() {
     useEffect(() => {
         try {
             localStorage.setItem('dfListDescriptions', JSON.stringify(dfListDescriptions));
-        } catch (e) {}
+        } catch (e) { }
     }, [dfListDescriptions]);
 
     // (List descriptions feature removed) dfListDescriptions remains for potential future use
@@ -99,7 +100,7 @@ export default function DontForget() {
     // Users and goals to pre-populate selects in Create/Edit modals
     const [users, setUsers] = useState([]);
     const [goals, setGoals] = useState([]);
-    const { addToast } = useToast ? useToast() : { addToast: () => {} };
+    const { addToast } = useToast ? useToast() : { addToast: () => { } };
     useEffect(() => {
         if (viewMode !== "dont-forget") return;
         (async () => {
@@ -178,24 +179,24 @@ export default function DontForget() {
         try {
             const raw = window.localStorage.getItem('keyareas.visibleColumns');
             if (raw) return { ...defaultVisible, ...(JSON.parse(raw) || {}) };
-        } catch (e) {}
+        } catch (e) { }
         return defaultVisible;
     });
     const [showCompleted, setShowCompleted] = useState(() => {
         try {
             const raw = window.localStorage.getItem('keyareas.showCompleted');
             if (raw !== null) return raw === 'true';
-        } catch (e) {}
+        } catch (e) { }
         return true;
     });
     const [showColumnsMenu, setShowColumnsMenu] = useState(false);
     const columnsMenuRef = useRef(null);
     const columnsButtonRef = useRef(null);
     const columnsMenuPopupRef = useRef(null);
-    useEffect(() => { try { window.localStorage.setItem('keyareas.visibleColumns', JSON.stringify(visibleColumns)); } catch (e) {} }, [visibleColumns]);
+    useEffect(() => { try { window.localStorage.setItem('keyareas.visibleColumns', JSON.stringify(visibleColumns)); } catch (e) { } }, [visibleColumns]);
     const [headerKey, setHeaderKey] = useState(0);
-    useEffect(() => { try { setHeaderKey((k) => k + 1); } catch (e) {} }, [visibleColumns]);
-    useEffect(() => { try { window.localStorage.setItem('keyareas.showCompleted', String(!!showCompleted)); } catch (e) {} }, [showCompleted]);
+    useEffect(() => { try { setHeaderKey((k) => k + 1); } catch (e) { } }, [visibleColumns]);
+    useEffect(() => { try { window.localStorage.setItem('keyareas.showCompleted', String(!!showCompleted)); } catch (e) { } }, [showCompleted]);
     // close columns menu on outside click / Escape
     useEffect(() => {
         if (!showColumnsMenu) return;
@@ -218,7 +219,7 @@ export default function DontForget() {
     // The columns popup is rendered as an absolutely-positioned element inside
     // the relative header wrapper so it scrolls with the main content (match KeyAreas).
 
-    
+
 
     // Fetch current user and goals to pass into modals so dropdowns are pre-populated
     useEffect(() => {
@@ -275,7 +276,11 @@ export default function DontForget() {
                         keyArea: "", // DF has no key area
                         listIndex: t.listIndex || t.list_index || 1,
                         completed: t.status === "done", // FE semantic
-                        imported: false,
+                        // Use real imported value from API — imported tasks come from Google/Microsoft sync
+                        imported: typeof t.imported === 'boolean' ? t.imported : !!t.imported,
+                        // Expose provider IDs so SyncSourceBadge can show the right icon
+                        googleId: t.googleId || t.google_id || null,
+                        outlookId: t.outlookId || t.outlook_id || null,
                     }));
                     // Apply any locally-stored DF list overrides so user selections persist
                     setTasks(applyDfMapTo(mapped));
@@ -327,9 +332,9 @@ export default function DontForget() {
                     quadrant: typeof created.eisenhowerQuadrant !== 'undefined' && created.eisenhowerQuadrant !== null ? Number(created.eisenhowerQuadrant) : 3,
                     goal: "",
                     tags: "",
-                    start_date: created.startDate ? (created.startDate.slice ? created.startDate.slice(0,10) : created.startDate) : "",
-                    dueDate: created.dueDate ? (created.dueDate.slice ? created.dueDate.slice(0,10) : created.dueDate) : "",
-                    end_date: created.endDate ? (created.endDate.slice ? created.endDate.slice(0,10) : created.endDate) : "",
+                    start_date: created.startDate ? (created.startDate.slice ? created.startDate.slice(0, 10) : created.startDate) : "",
+                    dueDate: created.dueDate ? (created.dueDate.slice ? created.dueDate.slice(0, 10) : created.dueDate) : "",
+                    end_date: created.endDate ? (created.endDate.slice ? created.endDate.slice(0, 10) : created.endDate) : "",
                     duration: created.duration || "",
                     time: "",
                     notes: created.description || "",
@@ -343,7 +348,7 @@ export default function DontForget() {
                 try {
                     const assigned = mapped.listIndex || mapped.list_index || 1;
                     setDfTaskListMap((p) => ({ ...(p || {}), [mapped.id]: assigned }));
-                } catch (e) {}
+                } catch (e) { }
             } catch (err) {
                 console.error('Failed to apply dontforget-created event', err);
             }
@@ -397,10 +402,19 @@ export default function DontForget() {
     const [showImportedOnly, setShowImportedOnly] = useState(false);
     // For backward compatibility, keep showImported as always true (for now)
     const [showImported, setShowImported] = useState(true);
-    // Expose setter for Navbar tab group
+    // Expose setter for Navbar tab group (both old global fn approach and new event approach)
     useEffect(() => {
         window.setDontForgetShowImported = setShowImportedOnly;
-        return () => { delete window.setDontForgetShowImported; };
+        // Also listen for the custom event dispatched by the Navbar tabs
+        const handler = (e) => {
+            const val = e?.detail?.value;
+            if (typeof val === 'boolean') setShowImportedOnly(val);
+        };
+        window.addEventListener('pm-dontforget-toggle-imported', handler);
+        return () => {
+            delete window.setDontForgetShowImported;
+            window.removeEventListener('pm-dontforget-toggle-imported', handler);
+        };
     }, []);
     const [savingIds, setSavingIds] = useState(new Set());
     const [dfName, setDfName] = useState("");
@@ -445,7 +459,7 @@ export default function DontForget() {
             try {
                 // eslint-disable-next-line no-console
                 console.log('[DontForget] global ka-request-edit-task received for', tsk && tsk.id);
-            } catch (e) {}
+            } catch (e) { }
             const form = {
                 name: tsk.name || "",
                 notes: tsk.notes || "",
@@ -493,20 +507,20 @@ export default function DontForget() {
     const [selectedDfList, setSelectedDfList] = useState(() => {
         try {
             const raw = Object.keys(dfListNames || {});
-            if (raw && raw.length) return Number(raw.sort((a,b) => a-b)[0]) || 1;
-        } catch {}
+            if (raw && raw.length) return Number(raw.sort((a, b) => a - b)[0]) || 1;
+        } catch { }
         return 1;
     });
     const [dfSortField, setDfSortField] = useState(() => {
         try {
             return window.localStorage.getItem('dontforget.sortField') || null;
-        } catch (_) {}
+        } catch (_) { }
         return null;
     });
     const [dfSortDirection, setDfSortDirection] = useState(() => {
         try {
             return window.localStorage.getItem('dontforget.sortDirection') || null;
-        } catch (_) {}
+        } catch (_) { }
         return null;
     });
     useEffect(() => {
@@ -521,7 +535,7 @@ export default function DontForget() {
             } else {
                 window.localStorage.removeItem('dontforget.sortField');
             }
-        } catch (_) {}
+        } catch (_) { }
     }, [dfSortField]);
     useEffect(() => {
         try {
@@ -530,7 +544,7 @@ export default function DontForget() {
             } else {
                 window.localStorage.removeItem('dontforget.sortDirection');
             }
-        } catch (_) {}
+        } catch (_) { }
     }, [dfSortDirection]);
     const getDfListName = (n) => (dfListNames?.[n] ? dfListNames[n] : `List ${n}`);
     const addDfList = () => {
@@ -622,7 +636,7 @@ export default function DontForget() {
     useEffect(() => {
         try {
             localStorage.setItem('dfTaskListMap', JSON.stringify(dfTaskListMap));
-        } catch (e) {}
+        } catch (e) { }
     }, [dfTaskListMap]);
 
     // Sync changes to dfTaskListMap to server so list membership is persisted across devices.
@@ -647,7 +661,7 @@ export default function DontForget() {
                 const value = curr[id];
                 try {
                     // optimistic UI: show saving indicator while syncing
-                    try { markSaving(id, 1200); } catch (e) {}
+                    try { markSaving(id, 1200); } catch (e) { }
                     // send numeric listIndex to server
                     await (await getTaskService()).update(id, { listIndex: Number(value) });
                     // update local in-memory tasks to reflect server value
@@ -679,9 +693,10 @@ export default function DontForget() {
         () => {
             let arr = (tasks || []).filter((t) => {
                 if (t.keyArea) return false;
-                // Legacy-style imported filter: show only imported if tab active, else all
-                if (showImportedOnly && !t.imported) return false;
-                if (!showImportedOnly && !(showImported || !t.imported)) return false;
+                // Imported tab: show only imported tasks, skip listIndex filter
+                if (showImportedOnly) return !!t.imported;
+                // Regular lists: hide imported tasks from the normal lists (they belong to Imported tab)
+                if (t.imported) return false;
                 if (!(showCompleted || !t.completed)) return false;
                 // Only include tasks that belong to the selected DF list
                 const idx = Number(t.listIndex ?? t.list_index ?? 1);
@@ -742,12 +757,12 @@ export default function DontForget() {
                         default:
                             return 0;
                     }
-                    
+
                     // Handle empty values
                     if (!aVal && !bVal) return 0;
                     if (!aVal) return 1;
                     if (!bVal) return -1;
-                    
+
                     // Compare values
                     let comparison = 0;
                     if (typeof aVal === 'string' && typeof bVal === 'string') {
@@ -755,11 +770,11 @@ export default function DontForget() {
                     } else {
                         comparison = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
                     }
-                    
+
                     return dfSortDirection === 'asc' ? comparison : -comparison;
                 });
             }
-            
+
             return arr;
         },
         [tasks, showImported, showCompleted, selectedDfList, dfSortField, dfSortDirection],
@@ -790,8 +805,8 @@ export default function DontForget() {
                 dueDate: payload?.dueDate
                     ? new Date(payload.dueDate).toISOString()
                     : payload?.deadline
-                    ? new Date(payload.deadline).toISOString()
-                    : undefined,
+                        ? new Date(payload.deadline).toISOString()
+                        : undefined,
                 duration: payload?.duration ? String(payload.duration) : undefined,
                 goalId: payload?.goal_id || payload?.goalId || payload?.goal || null,
                 // Only include status/priority if provided, else let backend defaults apply
@@ -802,53 +817,53 @@ export default function DontForget() {
                 // Debug: log payload being sent to the API
                 // eslint-disable-next-line no-console
                 console.log('[DontForget] creating task payload', body);
-            } catch (e) {}
+            } catch (e) { }
             // support keyArea naming variants
             if (payload?.keyAreaId) body.keyAreaId = payload.keyAreaId;
             if (payload?.key_area_id) body.keyAreaId = payload.key_area_id;
-                try {
-                    const created = await (await getTaskService()).create(body);
-                    // Debug: log selected listIndex from payload and created response
-                    try { console.log('[DontForget] payload.listIndex', payload?.listIndex, 'payload.list_index', payload?.list_index); } catch (e) {}
-                    // Push to local list
-                    if (!payload?.keyAreaId) {
-                        const newItem = {
-                            id: created.id,
-                            name: created.title,
-                            assignee: created.assignee || "",
-                            status: created.status || "open",
-                            priority: getPriorityLevel(created.priority),
-                            quadrant: (function (v, fallback) {
-                                if (typeof v !== 'undefined' && v !== null) return Number(v);
-                                if (typeof fallback !== 'undefined' && fallback !== null) {
-                                    const s = String(fallback || '').trim();
-                                    if (/^Q?\d$/.test(s)) return Number(s.replace(/^Q/, '')) || 3;
-                                }
-                                return 3;
-                            })(created.eisenhowerQuadrant, payload?.quadrant),
-                            goal: payload?.goal || "",
-                            tags: payload?.tags || "",
-                            start_date: created.startDate ? created.startDate.slice(0, 10) : "",
-                            dueDate: created.dueDate ? created.dueDate.slice(0, 10) : "",
-                            end_date: created.endDate ? created.endDate.slice(0, 10) : "",
-                            duration: created.duration || "",
-                            time: payload?.time || "",
-                            notes: created.description || "",
-                            keyArea: "",
-                            listIndex: payload?.listIndex ?? payload?.list_index ?? selectedDfList ?? 1,
-                            completed: created.status === 'done',
-                            imported: !!payload?.imported,
-                        };
-                        // Debug: show the new item being inserted locally
-                        try { console.log('[DontForget] new DF task item', newItem); } catch (e) {}
-                        setTasks((prev) => [...prev, newItem]);
-                        // Persist the chosen list for this new task so it survives refresh
-                        try {
-                            setDfTaskListMap((prev) => ({ ...(prev || {}), [created.id]: newItem.listIndex }));
-                        } catch (e) {}
-                    }
-                    setDfName("");
-                } catch (err) {
+            try {
+                const created = await (await getTaskService()).create(body);
+                // Debug: log selected listIndex from payload and created response
+                try { console.log('[DontForget] payload.listIndex', payload?.listIndex, 'payload.list_index', payload?.list_index); } catch (e) { }
+                // Push to local list
+                if (!payload?.keyAreaId) {
+                    const newItem = {
+                        id: created.id,
+                        name: created.title,
+                        assignee: created.assignee || "",
+                        status: created.status || "open",
+                        priority: getPriorityLevel(created.priority),
+                        quadrant: (function (v, fallback) {
+                            if (typeof v !== 'undefined' && v !== null) return Number(v);
+                            if (typeof fallback !== 'undefined' && fallback !== null) {
+                                const s = String(fallback || '').trim();
+                                if (/^Q?\d$/.test(s)) return Number(s.replace(/^Q/, '')) || 3;
+                            }
+                            return 3;
+                        })(created.eisenhowerQuadrant, payload?.quadrant),
+                        goal: payload?.goal || "",
+                        tags: payload?.tags || "",
+                        start_date: created.startDate ? created.startDate.slice(0, 10) : "",
+                        dueDate: created.dueDate ? created.dueDate.slice(0, 10) : "",
+                        end_date: created.endDate ? created.endDate.slice(0, 10) : "",
+                        duration: created.duration || "",
+                        time: payload?.time || "",
+                        notes: created.description || "",
+                        keyArea: "",
+                        listIndex: payload?.listIndex ?? payload?.list_index ?? selectedDfList ?? 1,
+                        completed: created.status === 'done',
+                        imported: !!payload?.imported,
+                    };
+                    // Debug: show the new item being inserted locally
+                    try { console.log('[DontForget] new DF task item', newItem); } catch (e) { }
+                    setTasks((prev) => [...prev, newItem]);
+                    // Persist the chosen list for this new task so it survives refresh
+                    try {
+                        setDfTaskListMap((prev) => ({ ...(prev || {}), [created.id]: newItem.listIndex }));
+                    } catch (e) { }
+                }
+                setDfName("");
+            } catch (err) {
                 // Log detailed API error to console to help debug
                 // eslint-disable-next-line no-console
                 console.error('[DontForget] create task failed', err?.response?.status, err?.response?.data || err.message || err);
@@ -912,17 +927,17 @@ export default function DontForget() {
                 }),
             );
             setTasks((prev) => prev.filter((t) => !selectedIds.has(t.id)));
-            
+
             // Provide user feedback
             if (failCount > 0) {
-                addToast && addToast({ 
-                    message: `Deleted ${successCount} task${successCount !== 1 ? 's' : ''}, failed to delete ${failCount} task${failCount !== 1 ? 's' : ''}`, 
-                    type: "warning" 
+                addToast && addToast({
+                    message: `Deleted ${successCount} task${successCount !== 1 ? 's' : ''}, failed to delete ${failCount} task${failCount !== 1 ? 's' : ''}`,
+                    type: "warning"
                 });
             } else if (successCount > 0) {
-                addToast && addToast({ 
-                    message: `Deleted ${successCount} task${successCount !== 1 ? 's' : ''}`, 
-                    type: "success" 
+                addToast && addToast({
+                    message: `Deleted ${successCount} task${successCount !== 1 ? 's' : ''}`,
+                    type: "success"
                 });
             }
         } catch (e) {
@@ -949,7 +964,7 @@ export default function DontForget() {
                 prev.map((x) => (x.id === id ? { ...x, completed: newCompleted, status: newStatus } : x)),
             );
             markSaving(id);
-                // No toast in Don't Forget list to match KeyAreas behavior
+            // No toast in Don't Forget list to match KeyAreas behavior
         } catch (e) {
             console.error("Failed to update status", e);
         }
@@ -1006,7 +1021,7 @@ export default function DontForget() {
                     const { [id]: _removed, ...rest } = prev || {};
                     return rest;
                 });
-            } catch (e) {}
+            } catch (e) { }
             // Clear selection if this was a selected task
             setSelectedIds((prev) => {
                 const next = new Set(prev);
@@ -1050,9 +1065,9 @@ export default function DontForget() {
         else if (key === 'start_date') patch.startDate = value ? new Date(value).toISOString() : null;
         else if (key === 'end_date') patch.endDate = value ? new Date(value).toISOString() : null;
         else if (key === 'dueDate' || key === 'deadline') patch.dueDate = value ? new Date(value).toISOString() : null;
-    else if (key === 'duration') patch.duration = value;
-    else if (key === 'priority') patch.priority = value;
-    else if (key === 'status') patch.status = value;
+        else if (key === 'duration') patch.duration = value;
+        else if (key === 'priority') patch.priority = value;
+        else if (key === 'status') patch.status = value;
         else {
             // Not backed by API: keep optimistic state only
             return;
@@ -1065,17 +1080,17 @@ export default function DontForget() {
                 prev.map((t) =>
                     t.id === id
                         ? {
-                              ...t,
-                              name: updated.title || t.name,
-                              notes: updated.description || t.notes || "",
-                              assignee: updated.assignee || t.assignee || "",
-                              start_date: updated.startDate ? updated.startDate.slice(0, 10) : (patch.startDate === null ? "" : t.start_date),
-                              end_date: updated.endDate ? updated.endDate.slice(0, 10) : (patch.endDate === null ? "" : t.end_date),
-                              dueDate: updated.dueDate ? updated.dueDate.slice(0, 10) : (patch.dueDate === null ? "" : t.dueDate),
-                              duration: updated.duration || t.duration || "",
-                              status: updated.status || t.status,
-                              priority: typeof updated.priority !== 'undefined' ? getPriorityLevel(updated.priority) : t.priority,
-                          }
+                            ...t,
+                            name: updated.title || t.name,
+                            notes: updated.description || t.notes || "",
+                            assignee: updated.assignee || t.assignee || "",
+                            start_date: updated.startDate ? updated.startDate.slice(0, 10) : (patch.startDate === null ? "" : t.start_date),
+                            end_date: updated.endDate ? updated.endDate.slice(0, 10) : (patch.endDate === null ? "" : t.end_date),
+                            dueDate: updated.dueDate ? updated.dueDate.slice(0, 10) : (patch.dueDate === null ? "" : t.dueDate),
+                            duration: updated.duration || t.duration || "",
+                            status: updated.status || t.status,
+                            priority: typeof updated.priority !== 'undefined' ? getPriorityLevel(updated.priority) : t.priority,
+                        }
                         : t,
                 ),
             );
@@ -1088,7 +1103,7 @@ export default function DontForget() {
             try {
                 const msg = err?.response?.data?.message || err?.message || 'Failed to save';
                 addToast && addToast({ type: 'error', message: msg });
-            } catch (e) {}
+            } catch (e) { }
         }
     };
 
@@ -1133,8 +1148,8 @@ export default function DontForget() {
     const confirmAssignAndOpen = async () => {
         const { task, kaId } = assignModal;
         if (!task || !kaId) return;
-            try {
-                // Assign to the selected Key Area (UUID) — omit listIndex (not supported by API)
+        try {
+            // Assign to the selected Key Area (UUID) — omit listIndex (not supported by API)
             await (await getTaskService()).update(task.id, { keyAreaId: kaId });
             // Remove from DF view
             setTasks((prev) => prev.filter((t) => t.id !== task.id));
@@ -1144,7 +1159,7 @@ export default function DontForget() {
                     const { [task.id]: _removed, ...rest } = prev || {};
                     return rest;
                 });
-            } catch (e) {}
+            } catch (e) { }
             setAssignModal({ open: false, task: null, kaId: "", listIndex: 1 });
             // Navigate and open full task view
             navigate({ pathname: "/key-areas", search: `?ka=${kaId}&openKA=1&task=${task.id}` });
@@ -1182,7 +1197,7 @@ export default function DontForget() {
                         const { [id]: _removed, ...rest } = prev || {};
                         return rest;
                     });
-                } catch (e) {}
+                } catch (e) { }
                 navigate({ pathname: "/key-areas", search: `?ka=${form.keyAreaId}&openKA=1&task=${id}` });
             } else {
                 // Update local task (including client-only fields)
@@ -1190,31 +1205,31 @@ export default function DontForget() {
                     prev.map((t) =>
                         t.id === id
                             ? {
-                                  ...t,
-                                  name: updated.title,
-                                  notes: updated.description || form.notes || "",
-                                  assignee: updated.assignee || form.assignee || "",
-                                  start_date: updated.startDate
-                                      ? updated.startDate.slice(0, 10)
-                                      : form.start_date || "",
-                                  end_date: updated.endDate ? updated.endDate.slice(0, 10) : form.end_date || "",
-                                  dueDate: updated.dueDate ? updated.dueDate.slice(0, 10) : form.dueDate || "",
-                                  duration: updated.duration || form.duration || "",
-                                  status: updated.status || form.status || "open",
-                                  priority: getPriorityLevel(updated.priority ?? form.priority),
-                                  quadrant: (function (v, fallback) {
-                                      if (typeof v !== 'undefined' && v !== null) return Number(v);
-                                      if (typeof fallback !== 'undefined' && fallback !== null) {
-                                          const s = String(fallback || '').trim();
-                                          if (/^Q?\d$/.test(s)) return Number(s.replace(/^Q/, '')) || 3;
-                                      }
-                                      return 3;
-                                  })(updated.eisenhowerQuadrant, form.quadrant || t.quadrant),
-                                  goal: form.goal || t.goal,
-                                  tags: form.tags || t.tags,
-                                  time: form.time || t.time,
-                                  listIndex: form.listIndex || t.listIndex || 1,
-                              }
+                                ...t,
+                                name: updated.title,
+                                notes: updated.description || form.notes || "",
+                                assignee: updated.assignee || form.assignee || "",
+                                start_date: updated.startDate
+                                    ? updated.startDate.slice(0, 10)
+                                    : form.start_date || "",
+                                end_date: updated.endDate ? updated.endDate.slice(0, 10) : form.end_date || "",
+                                dueDate: updated.dueDate ? updated.dueDate.slice(0, 10) : form.dueDate || "",
+                                duration: updated.duration || form.duration || "",
+                                status: updated.status || form.status || "open",
+                                priority: getPriorityLevel(updated.priority ?? form.priority),
+                                quadrant: (function (v, fallback) {
+                                    if (typeof v !== 'undefined' && v !== null) return Number(v);
+                                    if (typeof fallback !== 'undefined' && fallback !== null) {
+                                        const s = String(fallback || '').trim();
+                                        if (/^Q?\d$/.test(s)) return Number(s.replace(/^Q/, '')) || 3;
+                                    }
+                                    return 3;
+                                })(updated.eisenhowerQuadrant, form.quadrant || t.quadrant),
+                                goal: form.goal || t.goal,
+                                tags: form.tags || t.tags,
+                                time: form.time || t.time,
+                                listIndex: form.listIndex || t.listIndex || 1,
+                            }
                             : t,
                     ),
                 );
@@ -1223,7 +1238,7 @@ export default function DontForget() {
                     if (form.listIndex !== undefined) {
                         setDfTaskListMap((prev) => ({ ...(prev || {}), [id]: form.listIndex }));
                     }
-                } catch (e) {}
+                } catch (e) { }
             }
             setEditModal({ open: false, id: null, form: null });
             markSaving(id);
@@ -1283,36 +1298,36 @@ export default function DontForget() {
                         const { [id]: _removed, ...rest } = prev || {};
                         return rest;
                     });
-                } catch (e) {}
+                } catch (e) { }
                 navigate({ pathname: "/key-areas", search: `?ka=${payload.key_area_id}&openKA=1&task=${id}` });
             } else {
                 setTasks((prev) =>
                     prev.map((t) =>
                         t.id === id
                             ? {
-                                  ...t,
-                                  name: updated.title,
-                                  notes: updated.description || payload.description || "",
-                                  assignee: updated.assignee || payload.assignee || "",
-                                  start_date: updated.startDate ? updated.startDate.slice(0, 10) : payload.start_date || "",
-                                  end_date: updated.endDate ? updated.endDate.slice(0, 10) : payload.end_date || "",
-                                  dueDate: updated.dueDate ? updated.dueDate.slice(0, 10) : payload.deadline || "",
-                                  duration: updated.duration || payload.duration || "",
-                                  status: updated.status || payload.status || "open",
-                                  priority: getPriorityLevel(updated.priority ?? payload.priority),
-                                  quadrant: (function (v, fallback) {
-                                      if (typeof v !== 'undefined' && v !== null) return Number(v);
-                                      if (typeof fallback !== 'undefined' && fallback !== null) {
-                                          const s = String(fallback || '').trim();
-                                          if (/^Q?\d$/.test(s)) return Number(s.replace(/^Q/, '')) || 3;
-                                      }
-                                      return 3;
-                                  })(updated.eisenhowerQuadrant, payload.quadrant || t.quadrant),
-                                  goal: payload.goal || t.goal,
-                                  tags: payload.tags || t.tags,
-                                  time: payload.time || t.time,
-                                  listIndex: payload.list_index || t.listIndex || 1,
-                              }
+                                ...t,
+                                name: updated.title,
+                                notes: updated.description || payload.description || "",
+                                assignee: updated.assignee || payload.assignee || "",
+                                start_date: updated.startDate ? updated.startDate.slice(0, 10) : payload.start_date || "",
+                                end_date: updated.endDate ? updated.endDate.slice(0, 10) : payload.end_date || "",
+                                dueDate: updated.dueDate ? updated.dueDate.slice(0, 10) : payload.deadline || "",
+                                duration: updated.duration || payload.duration || "",
+                                status: updated.status || payload.status || "open",
+                                priority: getPriorityLevel(updated.priority ?? payload.priority),
+                                quadrant: (function (v, fallback) {
+                                    if (typeof v !== 'undefined' && v !== null) return Number(v);
+                                    if (typeof fallback !== 'undefined' && fallback !== null) {
+                                        const s = String(fallback || '').trim();
+                                        if (/^Q?\d$/.test(s)) return Number(s.replace(/^Q/, '')) || 3;
+                                    }
+                                    return 3;
+                                })(updated.eisenhowerQuadrant, payload.quadrant || t.quadrant),
+                                goal: payload.goal || t.goal,
+                                tags: payload.tags || t.tags,
+                                time: payload.time || t.time,
+                                listIndex: payload.list_index || t.listIndex || 1,
+                            }
                             : t,
                     ),
                 );
@@ -1321,7 +1336,7 @@ export default function DontForget() {
                     if (payload.list_index !== undefined) {
                         setDfTaskListMap((prev) => ({ ...(prev || {}), [id]: payload.list_index }));
                     }
-                } catch (e) {}
+                } catch (e) { }
             }
             setEditModal({ open: false, id: null, form: null });
             markSaving(id);
@@ -1396,7 +1411,7 @@ export default function DontForget() {
                         });
                         return next;
                     });
-                } catch (e) {}
+                } catch (e) { }
             }
 
             // If mass edit included list_index updates, persist them
@@ -1410,7 +1425,7 @@ export default function DontForget() {
                         return next;
                     });
                 }
-            } catch (e) {}
+            } catch (e) { }
 
             ids.forEach((id) => markSaving(id, 800));
             setEditModal({ open: false, id: null, form: null });
@@ -1446,7 +1461,7 @@ export default function DontForget() {
                     const { [task.id]: _removed, ...rest } = prev || {};
                     return rest;
                 });
-            } catch (e) {}
+            } catch (e) { }
             setAssignModal({ open: false, task: null, kaId: "", listIndex: 1 });
             navigate({ pathname: "/key-areas", search: `?ka=${payload.key_area_id}&openKA=1&task=${task.id}` });
         } catch (e) {
@@ -1457,15 +1472,15 @@ export default function DontForget() {
 
     return (
         <div className="flex min-h-screen overflow-x-hidden">
-            <Sidebar 
-                user={{ name: "Hussein" }} 
+            <Sidebar
+                user={{ name: "Hussein" }}
                 mobileOpen={mobileSidebarOpen}
                 onMobileClose={() => setMobileSidebarOpen(false)}
             />
 
             {/* Mobile backdrop */}
             {mobileSidebarOpen && (
-                <div 
+                <div
                     className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
                     onClick={() => setMobileSidebarOpen(false)}
                 />
@@ -1497,17 +1512,17 @@ export default function DontForget() {
                                             setTasks((prev) => prev.map((t) =>
                                                 t.id === selectedTask.id
                                                     ? {
-                                                          ...t,
-                                                          name: updated.title,
-                                                          notes: updated.description || t.notes || "",
-                                                          assignee: updated.assignee || t.assignee || "",
-                                                          start_date: updated.startDate ? updated.startDate.slice(0, 10) : t.start_date || "",
-                                                          end_date: updated.endDate ? updated.endDate.slice(0, 10) : t.end_date || "",
-                                                          dueDate: updated.dueDate ? updated.dueDate.slice(0, 10) : t.dueDate || "",
-                                                          duration: updated.duration || t.duration || "",
-                                                          status: updated.status || t.status || "open",
-                                                          priority: getPriorityLevel(updated.priority ?? t.priority),
-                                                      }
+                                                        ...t,
+                                                        name: updated.title,
+                                                        notes: updated.description || t.notes || "",
+                                                        assignee: updated.assignee || t.assignee || "",
+                                                        start_date: updated.startDate ? updated.startDate.slice(0, 10) : t.start_date || "",
+                                                        end_date: updated.endDate ? updated.endDate.slice(0, 10) : t.end_date || "",
+                                                        dueDate: updated.dueDate ? updated.dueDate.slice(0, 10) : t.dueDate || "",
+                                                        duration: updated.duration || t.duration || "",
+                                                        status: updated.status || t.status || "open",
+                                                        priority: getPriorityLevel(updated.priority ?? t.priority),
+                                                    }
                                                     : t
                                             ));
                                             setSelectedTask(null);
@@ -1524,7 +1539,7 @@ export default function DontForget() {
                                         try {
                                             // eslint-disable-next-line no-console
                                             console.log('[DontForget] onRequestEdit received for task', tsk && tsk.id);
-                                        } catch (e) {}
+                                        } catch (e) { }
                                         const form = {
                                             name: tsk.name || "",
                                             notes: tsk.notes || "",
@@ -1679,11 +1694,10 @@ export default function DontForget() {
                                                                 setView(opt.key);
                                                                 setShowViewMenu(false);
                                                             }}
-                                                            className={`block w-full text-left px-3 py-2 text-sm ${
-                                                                view === opt.key
-                                                                    ? "bg-blue-100 text-blue-700 font-semibold"
-                                                                    : "text-slate-800 hover:bg-slate-50"
-                                                            }`}
+                                                            className={`block w-full text-left px-3 py-2 text-sm ${view === opt.key
+                                                                ? "bg-blue-100 text-blue-700 font-semibold"
+                                                                : "text-slate-800 hover:bg-slate-50"
+                                                                }`}
                                                         >
                                                             {opt.label}
                                                         </button>
@@ -1735,340 +1749,346 @@ export default function DontForget() {
                                 </div>
 
                                 <div className="mb-4">
-                                        <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 space-y-6">
-                                {/* Header area */}
-                                <div className="grid grid-cols-3 gap-4">
-                                    <div className="col-span-3 md:col-span-2">
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            <div className="text-sm font-semibold whitespace-nowrap mr-1">
-                                                Task Lists
-                                            </div>
-                                            <div
-                                                ref={chipsRef}
-                                                className="flex items-center gap-1 overflow-x-auto bg-slate-100 border border-slate-200 rounded-lg px-1 py-0.5"
-                                            >
-                                                {availableDfLists.map((n) => (
-                                                    <div className="relative" key={`df-list-${n}`}>
-                                                        <button
-                                                            className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-sm font-semibold border transition ${
-                                                                selectedDfList === n
-                                                                    ? 'bg-white text-slate-900 border-slate-300 shadow'
-                                                                    : 'bg-transparent text-slate-800 border-transparent hover:bg-slate-200'
-                                                            }`}
-                                                            title={`List ${n}`}
-                                                            type="button"
-                                                            onClick={() => setSelectedDfList(n)}
-                                                        >
-                                                            <span>{getDfListName(n)}</span>
-                                                            <span
-                                                                aria-haspopup="menu"
-                                                                aria-expanded={openDfListMenu === n}
-                                                                title={`Options for ${getDfListName(n)}`}
-                                                                className="ml-1 p-1 rounded cursor-pointer text-slate-600 hover:bg-slate-100"
-                                                                role="button"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    const rect = e.currentTarget.getBoundingClientRect();
-                                                                    const scrollX = window.scrollX;
-                                                                    const scrollY = window.scrollY;
-                                                                    // Match Key Areas: place below the icon, left-aligned
-                                                                    const gap = 6;
-                                                                    const top = rect.bottom + scrollY + gap;
-                                                                    const left = rect.left + scrollX;
-                                                                    setDfListMenuPos({ top, left });
-                                                                    setOpenDfListMenu((v) => (v === n ? null : n));
-                                                                }}
+                                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 space-y-6">
+                                        {/* Header area */}
+                                        <div className="grid grid-cols-3 gap-4">
+                                            <div className="col-span-3 md:col-span-2">
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <div className="text-sm font-semibold whitespace-nowrap mr-1">
+                                                        Task Lists
+                                                    </div>
+                                                    <div
+                                                        ref={chipsRef}
+                                                        className="flex items-center gap-1 overflow-x-auto bg-slate-100 border border-slate-200 rounded-lg px-1 py-0.5"
+                                                    >
+                                                        {availableDfLists.map((n) => (
+                                                            <div className="relative" key={`df-list-${n}`}>
+                                                                <button
+                                                                    className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-sm font-semibold border transition ${selectedDfList === n
+                                                                        ? 'bg-white text-slate-900 border-slate-300 shadow'
+                                                                        : 'bg-transparent text-slate-800 border-transparent hover:bg-slate-200'
+                                                                        }`}
+                                                                    title={`List ${n}`}
+                                                                    type="button"
+                                                                    onClick={() => setSelectedDfList(n)}
+                                                                >
+                                                                    <span>{getDfListName(n)}</span>
+                                                                    <span
+                                                                        aria-haspopup="menu"
+                                                                        aria-expanded={openDfListMenu === n}
+                                                                        title={`Options for ${getDfListName(n)}`}
+                                                                        className="ml-1 p-1 rounded cursor-pointer text-slate-600 hover:bg-slate-100"
+                                                                        role="button"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            const rect = e.currentTarget.getBoundingClientRect();
+                                                                            const scrollX = window.scrollX;
+                                                                            const scrollY = window.scrollY;
+                                                                            // Match Key Areas: place below the icon, left-aligned
+                                                                            const gap = 6;
+                                                                            const top = rect.bottom + scrollY + gap;
+                                                                            const left = rect.left + scrollX;
+                                                                            setDfListMenuPos({ top, left });
+                                                                            setOpenDfListMenu((v) => (v === n ? null : n));
+                                                                        }}
+                                                                    >
+                                                                        <svg
+                                                                            stroke="currentColor"
+                                                                            fill="currentColor"
+                                                                            strokeWidth="0"
+                                                                            viewBox="0 0 192 512"
+                                                                            className="w-3.5 h-3.5"
+                                                                            height="1em"
+                                                                            width="1em"
+                                                                            xmlns="http://www.w3.org/2000/svg"
+                                                                        >
+                                                                            <path d="M96 184c39.8 0 72 32.2 72 72s-32.2 72-72 72-72-32.2-72-72 32.2-72 72-72zM24 80c0 39.8 32.2 72 72 72s72-32.2 72-72S135.8 8 96 8 24 40.2 24 80zm0 352c0 39.8 32.2 72 72 72s72-32.2 72-72-32.2-72-72-72-72 32.2-72 72z"></path>
+                                                                        </svg>
+                                                                    </span>
+                                                                </button>
+                                                                {openDfListMenu === n && (
+                                                                    <>
+                                                                        <div
+                                                                            className="fixed inset-0 z-40"
+                                                                            onClick={() => setOpenDfListMenu(null)}
+                                                                        />
+                                                                        <div
+                                                                            role="menu"
+                                                                            className="fixed z-50 w-32 bg-white border border-slate-200 rounded-lg shadow"
+                                                                            style={{
+                                                                                top: `${dfListMenuPos.top}px`,
+                                                                                left: `${dfListMenuPos.left}px`,
+                                                                            }}
+                                                                        >
+                                                                            {/* Edit description removed per request */}
+                                                                            <button
+                                                                                role="menuitem"
+                                                                                className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
+                                                                                onClick={() => {
+                                                                                    renameDfList(n);
+                                                                                    setOpenDfListMenu(null);
+                                                                                }}
+                                                                            >
+                                                                                Rename
+                                                                            </button>
+                                                                            <button
+                                                                                role="menuitem"
+                                                                                className="block w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                                                                                onClick={() => deleteDfList(n)}
+                                                                            >
+                                                                                Delete
+                                                                            </button>
+                                                                        </div>
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                        <div className="flex items-center">
+                                                            <button
+                                                                title="Add list"
+                                                                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-sm font-semibold border transition bg-transparent text-slate-800 border-transparent hover:bg-slate-200"
+                                                                onClick={addDfList}
                                                             >
                                                                 <svg
                                                                     stroke="currentColor"
                                                                     fill="currentColor"
                                                                     strokeWidth="0"
-                                                                    viewBox="0 0 192 512"
-                                                                    className="w-3.5 h-3.5"
+                                                                    viewBox="0 0 448 512"
                                                                     height="1em"
                                                                     width="1em"
                                                                     xmlns="http://www.w3.org/2000/svg"
                                                                 >
-                                                                    <path d="M96 184c39.8 0 72 32.2 72 72s-32.2 72-72 72-72-32.2-72-72 32.2-72 72-72zM24 80c0 39.8 32.2 72 72 72s72-32.2 72-72S135.8 8 96 8 24 40.2 24 80zm0 352c0 39.8 32.2 72 72 72s72-32.2 72-72-32.2-72-72-72-72 32.2-72 72z"></path>
+                                                                    <path d="M416 208H272V64c0-17.67-14.33-32-32-32h-32c-17.67 0-32 14.33-32 32v144H32c-17.67 0-32 14.33-32 32v32c0 17.67-14.33 32 32 32h144v144c0 17.67 0 32 32 32h32c17.67 0 32-14.33 32-32V304h144c17.67 0 32-14.33 32-32v-32c0-17.67-14.33-32-32-32z"></path>
                                                                 </svg>
-                                                            </span>
-                                                        </button>
-                                                        {openDfListMenu === n && (
-                                                            <>
-                                                                <div
-                                                                    className="fixed inset-0 z-40"
-                                                                    onClick={() => setOpenDfListMenu(null)}
-                                                                />
-                                                                <div
-                                                                    role="menu"
-                                                                    className="fixed z-50 w-32 bg-white border border-slate-200 rounded-lg shadow"
-                                                                    style={{
-                                                                        top: `${dfListMenuPos.top}px`,
-                                                                        left: `${dfListMenuPos.left}px`,
-                                                                    }}
-                                                                >
-                                                                    {/* Edit description removed per request */}
-                                                                    <button
-                                                                        role="menuitem"
-                                                                        className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
-                                                                        onClick={() => {
-                                                                            renameDfList(n);
-                                                                            setOpenDfListMenu(null);
-                                                                        }}
-                                                                    >
-                                                                        Rename
-                                                                    </button>
-                                                                    <button
-                                                                        role="menuitem"
-                                                                        className="block w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                                                                        onClick={() => deleteDfList(n)}
-                                                                    >
-                                                                        Delete
-                                                                    </button>
-                                                                </div>
-                                                            </>
-                                                        )}
+                                                            </button>
+                                                        </div>
                                                     </div>
-                                                ))}
-                                                <div className="flex items-center">
-                                                    <button
-                                                        title="Add list"
-                                                        className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-sm font-semibold border transition bg-transparent text-slate-800 border-transparent hover:bg-slate-200"
-                                                        onClick={addDfList}
-                                                    >
-                                                        <svg
-                                                            stroke="currentColor"
-                                                            fill="currentColor"
-                                                            strokeWidth="0"
-                                                            viewBox="0 0 448 512"
-                                                            height="1em"
-                                                            width="1em"
-                                                            xmlns="http://www.w3.org/2000/svg"
-                                                        >
-                                                            <path d="M416 208H272V64c0-17.67-14.33-32-32-32h-32c-17.67 0-32 14.33-32 32v144H32c-17.67 0-32 14.33-32 32v32c0 17.67-14.33 32 32 32h144v144c0 17.67 0 32 32 32h32c17.67 0 32-14.33 32-32V304h144c17.67 0 32-14.33 32-32v-32c0-17.67-14.33-32-32-32z"></path>
-                                                        </svg>
-                                                    </button>
                                                 </div>
                                             </div>
+                                            <div className="col-span-3 md:col-span-1 flex items-center justify-end gap-3">
+                                                <span className="text-sm text-gray-600" aria-live="polite">
+                                                    {selectedIds.size} selected
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    disabled={selectedIds.size === 0}
+                                                    className="px-4 py-2 rounded-md text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+                                                    aria-label="Open mass edit"
+                                                    title="Select tasks to enable mass edit"
+                                                    onClick={() => {
+                                                        if (selectedIds.size === 0) return;
+                                                        // For mass edit we intentionally open the EditTaskModal with
+                                                        // empty initial fields so the user can set values that will
+                                                        // be applied to all selected tasks (don't prefill from first task).
+                                                        setEditModal({ open: true, id: null, form: {} });
+                                                        setMassEditingMode(true);
+                                                    }}
+                                                >
+                                                    Mass Edit
+                                                </button>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div className="col-span-3 md:col-span-1 flex items-center justify-end gap-3">
-                                        <span className="text-sm text-gray-600" aria-live="polite">
-                                            {selectedIds.size} selected
-                                        </span>
-                                        <button
-                                            type="button"
-                                            disabled={selectedIds.size === 0}
-                                            className="px-4 py-2 rounded-md text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
-                                            aria-label="Open mass edit"
-                                            title="Select tasks to enable mass edit"
-                                            onClick={() => {
-                                                    if (selectedIds.size === 0) return;
-                                                    // For mass edit we intentionally open the EditTaskModal with
-                                                    // empty initial fields so the user can set values that will
-                                                    // be applied to all selected tasks (don't prefill from first task).
-                                                    setEditModal({ open: true, id: null, form: {} });
-                                                    setMassEditingMode(true);
-                                                }}
-                                        >
-                                            Mass Edit
-                                        </button>
-                                    </div>
-                                </div>
-                                {/* Mass edit now uses the shared EditTaskModal component. Click "Mass Edit" to open it pre-filled from the first selected task. */}
-                                    <div className="overflow-x-auto -mx-2 sm:mx-0">
-                                        <table className="min-w-full text-sm whitespace-nowrap sm:whitespace-normal">
-                                            {dontForgetTasks.length > 0 && (
-                                                <thead key={headerKey} className="bg-slate-50 border border-slate-200 text-slate-700">
-                                                    <tr>
-                                                        <th className="px-2 sm:px-3 py-2 text-left w-8">
-                                                            <input
-                                                                aria-label="Select all visible"
-                                                                type="checkbox"
-                                                                onChange={toggleSelectAllVisible}
-                                                                checked={
-                                                                    dontForgetTasks.length > 0 &&
-                                                                    dontForgetTasks.every((t) => isSelected(t.id))
-                                                                }
-                                                            />
-                                                        </th>
-                                                        <th 
-                                                            className="px-2 sm:px-3 py-2 text-left font-semibold w-40 sm:w-[220px] cursor-pointer hover:bg-slate-100"
-                                                            onClick={() => handleDfSort('title')}
-                                                        >
-                                                            Task {dfSortField === 'title' && (dfSortDirection === 'asc' ? '↑' : '↓')}
-                                                        </th>
-                                                        {visibleColumns.responsible && (
-                                                            <th 
-                                                                className="px-2 sm:px-3 py-2 text-left font-semibold hidden sm:table-cell cursor-pointer hover:bg-slate-100"
-                                                                onClick={() => handleDfSort('responsible')}
-                                                            >
-                                                                Responsible {dfSortField === 'responsible' && (dfSortDirection === 'asc' ? '↑' : '↓')}
+                                        {/* Mass edit now uses the shared EditTaskModal component. Click "Mass Edit" to open it pre-filled from the first selected task. */}
+                                        <div className="overflow-x-auto -mx-2 sm:mx-0">
+                                            <table className="min-w-full text-sm whitespace-nowrap sm:whitespace-normal">
+                                                {dontForgetTasks.length > 0 && (
+                                                    <thead key={headerKey} className="bg-slate-50 border border-slate-200 text-slate-700">
+                                                        <tr>
+                                                            <th className="px-2 sm:px-3 py-2 text-left w-8">
+                                                                <input
+                                                                    aria-label="Select all visible"
+                                                                    type="checkbox"
+                                                                    onChange={toggleSelectAllVisible}
+                                                                    checked={
+                                                                        dontForgetTasks.length > 0 &&
+                                                                        dontForgetTasks.every((t) => isSelected(t.id))
+                                                                    }
+                                                                />
                                                             </th>
-                                                        )}
-                                                        <th 
-                                                            className="px-2 sm:px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
-                                                            onClick={() => handleDfSort('status')}
-                                                        >
-                                                            Status {dfSortField === 'status' && (dfSortDirection === 'asc' ? '↑' : '↓')}
-                                                        </th>
-                                                        {visibleColumns.priority && (
-                                                            <th 
-                                                                className="px-2 sm:px-3 py-2 text-left font-semibold hidden md:table-cell cursor-pointer hover:bg-slate-100"
-                                                                onClick={() => handleDfSort('priority')}
+                                                            <th
+                                                                className="px-2 sm:px-3 py-2 text-left font-semibold w-40 sm:w-[220px] cursor-pointer hover:bg-slate-100"
+                                                                onClick={() => handleDfSort('title')}
                                                             >
-                                                                Priority {dfSortField === 'priority' && (dfSortDirection === 'asc' ? '↑' : '↓')}
+                                                                Task {dfSortField === 'title' && (dfSortDirection === 'asc' ? '↑' : '↓')}
                                                             </th>
-                                                        )}
-                                                        {visibleColumns.quadrant && (
-                                                            <th 
-                                                                className="px-2 sm:px-3 py-2 text-left font-semibold hidden lg:table-cell cursor-pointer hover:bg-slate-100"
-                                                                onClick={() => handleDfSort('quadrant')}
+                                                            {visibleColumns.responsible && (
+                                                                <th
+                                                                    className="px-2 sm:px-3 py-2 text-left font-semibold hidden sm:table-cell cursor-pointer hover:bg-slate-100"
+                                                                    onClick={() => handleDfSort('responsible')}
+                                                                >
+                                                                    Responsible {dfSortField === 'responsible' && (dfSortDirection === 'asc' ? '↑' : '↓')}
+                                                                </th>
+                                                            )}
+                                                            <th
+                                                                className="px-2 sm:px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                                                onClick={() => handleDfSort('status')}
                                                             >
-                                                                Quadrant {dfSortField === 'quadrant' && (dfSortDirection === 'asc' ? '↑' : '↓')}
+                                                                Status {dfSortField === 'status' && (dfSortDirection === 'asc' ? '↑' : '↓')}
                                                             </th>
-                                                        )}
-                                                        {visibleColumns.start_date && (
-                                                            <th 
-                                                                className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell cursor-pointer hover:bg-slate-100"
-                                                                onClick={() => handleDfSort('start_date')}
-                                                            >
-                                                                Start Date {dfSortField === 'start_date' && (dfSortDirection === 'asc' ? '↑' : '↓')}
-                                                            </th>
-                                                        )}
-                                                        {visibleColumns.end_date && (
-                                                            <th 
-                                                                className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell cursor-pointer hover:bg-slate-100"
-                                                                onClick={() => handleDfSort('end_date')}
-                                                            >
-                                                                End date {dfSortField === 'end_date' && (dfSortDirection === 'asc' ? '↑' : '↓')}
-                                                            </th>
-                                                        )}
-                                                        {visibleColumns.deadline && (
-                                                            <th 
-                                                                className="px-2 sm:px-3 py-2 text-left font-semibold hidden lg:table-cell cursor-pointer hover:bg-slate-100"
-                                                                onClick={() => handleDfSort('deadline')}
-                                                            >
-                                                                Deadline {dfSortField === 'deadline' && (dfSortDirection === 'asc' ? '↑' : '↓')}
-                                                            </th>
-                                                        )}
-                                                        {visibleColumns.duration && (
-                                                            <th 
-                                                                className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell cursor-pointer hover:bg-slate-100"
-                                                                onClick={() => handleDfSort('duration')}
-                                                            >
-                                                                Duration {dfSortField === 'duration' && (dfSortDirection === 'asc' ? '↑' : '↓')}
-                                                            </th>
-                                                        )}
-                                                        {visibleColumns.completed && (
-                                                            <th 
-                                                                className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell cursor-pointer hover:bg-slate-100"
-                                                                onClick={() => handleDfSort('completed')}
-                                                            >
-                                                                Completed {dfSortField === 'completed' && (dfSortDirection === 'asc' ? '↑' : '↓')}
-                                                            </th>
-                                                        )}
-                                                        {/* Actions column removed — use row menu instead */}
-                                                    </tr>
-                                                </thead>
-                                            )}
-                                            <tbody className="bg-white">
-                                                {dontForgetTasks.map((task) => (
-                                                    <TaskRow
-                                                        key={task.id}
-                                                        t={{ ...task, title: task.name, deadline: task.dueDate }}
-                                                        q={task.quadrant}
-                                                        goals={goals}
-                                                        goalMap={null}
-                                                        visibleColumns={visibleColumns}
-                                                        disableOpen={true}
-                                                        updateField={updateField}
-                                                        enableInlineEditing={!massEditingMode}
-                                                        isSaving={savingIds.has(task.id)}
-                                                        users={users}
-                                                        currentUserId={null}
-                                                        isSelected={isSelected(task.id)}
-                                                        onToggleSelect={() => toggleSelect(task.id)}
-                                                        onOpenTask={() => openFullTaskView(task)}
-                                                        onStatusChange={(s) => setStatus(task.id, s)}
-                                                        onToggleActivitiesRow={() => {}}
-                                                        activityCount={0}
-                                                        getPriorityLevel={null}
-                                                        toDateOnly={toDateOnly}
-                                                        formatDuration={formatDurationDays}
-                                                        onMouseEnter={() => {}}
-                                                        expandedActivity={false}
-                                                        onEditClick={() => {
-                                                            const form = {
-                                                                name: task.name || "",
-                                                                notes: task.notes || "",
-                                                                assignee: task.assignee || "",
-                                                                status: task.status || "open",
-                                                                priority: getPriorityLevel(task.priority || undefined),
-                                                                start_date: task.start_date || "",
-                                                                end_date: task.end_date || "",
-                                                                dueDate: task.dueDate || "",
-                                                                duration: task.duration || "",
-                                                                keyAreaId: null,
-                                                                listIndex: task.listIndex || 1,
-                                                                goal: task.goal || "",
-                                                                tags: task.tags || "",
-                                                                time: task.time || "",
-                                                                completionDate: task.completionDate || null,
-                                                            };
-                                                            setEditModal({ open: true, id: task.id, form });
-                                                            setMassEditingMode(false);
-                                                        }}
-                                                        onDeleteClick={() => deleteTask(task.id)}
-                                                    />
-                                                ))}
-
-                                                {/* Footer action: moved out of table into a right-aligned div below */}
-
-                                                {dontForgetTasks.length === 0 && (
-                                                    <tr>
-                                                        <td className="px-6 py-8 text-gray-500" colSpan={12}>
-                                                            {showImportedOnly
-                                                                ? "No Imported tasks currently..."
-                                                                : `This list has no tasks yet. Click "Add Task" to create one for ${getDfListName(selectedDfList)}.`}
-                                                        </td>
-                                                    </tr>
+                                                            {visibleColumns.priority && (
+                                                                <th
+                                                                    className="px-2 sm:px-3 py-2 text-left font-semibold hidden md:table-cell cursor-pointer hover:bg-slate-100"
+                                                                    onClick={() => handleDfSort('priority')}
+                                                                >
+                                                                    Priority {dfSortField === 'priority' && (dfSortDirection === 'asc' ? '↑' : '↓')}
+                                                                </th>
+                                                            )}
+                                                            {visibleColumns.quadrant && (
+                                                                <th
+                                                                    className="px-2 sm:px-3 py-2 text-left font-semibold hidden lg:table-cell cursor-pointer hover:bg-slate-100"
+                                                                    onClick={() => handleDfSort('quadrant')}
+                                                                >
+                                                                    Quadrant {dfSortField === 'quadrant' && (dfSortDirection === 'asc' ? '↑' : '↓')}
+                                                                </th>
+                                                            )}
+                                                            {visibleColumns.start_date && (
+                                                                <th
+                                                                    className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell cursor-pointer hover:bg-slate-100"
+                                                                    onClick={() => handleDfSort('start_date')}
+                                                                >
+                                                                    Start Date {dfSortField === 'start_date' && (dfSortDirection === 'asc' ? '↑' : '↓')}
+                                                                </th>
+                                                            )}
+                                                            {visibleColumns.end_date && (
+                                                                <th
+                                                                    className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell cursor-pointer hover:bg-slate-100"
+                                                                    onClick={() => handleDfSort('end_date')}
+                                                                >
+                                                                    End date {dfSortField === 'end_date' && (dfSortDirection === 'asc' ? '↑' : '↓')}
+                                                                </th>
+                                                            )}
+                                                            {visibleColumns.deadline && (
+                                                                <th
+                                                                    className="px-2 sm:px-3 py-2 text-left font-semibold hidden lg:table-cell cursor-pointer hover:bg-slate-100"
+                                                                    onClick={() => handleDfSort('deadline')}
+                                                                >
+                                                                    Deadline {dfSortField === 'deadline' && (dfSortDirection === 'asc' ? '↑' : '↓')}
+                                                                </th>
+                                                            )}
+                                                            {visibleColumns.duration && (
+                                                                <th
+                                                                    className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell cursor-pointer hover:bg-slate-100"
+                                                                    onClick={() => handleDfSort('duration')}
+                                                                >
+                                                                    Duration {dfSortField === 'duration' && (dfSortDirection === 'asc' ? '↑' : '↓')}
+                                                                </th>
+                                                            )}
+                                                            {visibleColumns.completed && (
+                                                                <th
+                                                                    className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell cursor-pointer hover:bg-slate-100"
+                                                                    onClick={() => handleDfSort('completed')}
+                                                                >
+                                                                    Completed {dfSortField === 'completed' && (dfSortDirection === 'asc' ? '↑' : '↓')}
+                                                                </th>
+                                                            )}
+                                                            {/* Actions column removed — use row menu instead */}
+                                                        </tr>
+                                                    </thead>
                                                 )}
-                                            </tbody>
-                                        </table>
-                                    </div>
+                                                <tbody className="bg-white">
+                                                    {dontForgetTasks.map((task) => (
+                                                        <React.Fragment key={task.id}>
+                                                            <TaskRow
+                                                                t={{ ...task, title: task.name, deadline: task.dueDate }}
+                                                                q={task.quadrant}
+                                                                goals={goals}
+                                                                goalMap={null}
+                                                                visibleColumns={visibleColumns}
+                                                                disableOpen={true}
+                                                                updateField={updateField}
+                                                                enableInlineEditing={!massEditingMode}
+                                                                isSaving={savingIds.has(task.id)}
+                                                                users={users}
+                                                                currentUserId={null}
+                                                                isSelected={isSelected(task.id)}
+                                                                onToggleSelect={() => toggleSelect(task.id)}
+                                                                onOpenTask={() => openFullTaskView(task)}
+                                                                onStatusChange={(s) => setStatus(task.id, s)}
+                                                                onToggleActivitiesRow={() => { }}
+                                                                activityCount={0}
+                                                                getPriorityLevel={null}
+                                                                toDateOnly={toDateOnly}
+                                                                formatDuration={formatDurationDays}
+                                                                onMouseEnter={() => { }}
+                                                                expandedActivity={false}
+                                                                onEditClick={() => {
+                                                                    const form = {
+                                                                        name: task.name || "",
+                                                                        notes: task.notes || "",
+                                                                        assignee: task.assignee || "",
+                                                                        status: task.status || "open",
+                                                                        priority: getPriorityLevel(task.priority || undefined),
+                                                                        start_date: task.start_date || "",
+                                                                        end_date: task.end_date || "",
+                                                                        dueDate: task.dueDate || "",
+                                                                        duration: task.duration || "",
+                                                                        keyAreaId: null,
+                                                                        listIndex: task.listIndex || 1,
+                                                                        goal: task.goal || "",
+                                                                        tags: task.tags || "",
+                                                                        time: task.time || "",
+                                                                        completionDate: task.completionDate || null,
+                                                                    };
+                                                                    setEditModal({ open: true, id: task.id, form });
+                                                                    setMassEditingMode(false);
+                                                                }}
+                                                                onDeleteClick={() => deleteTask(task.id)}
+                                                                extraBadge={task.imported ? (
+                                                                    <SyncSourceBadge
+                                                                        googleId={task.googleId}
+                                                                        outlookId={task.outlookId}
+                                                                        style={{ marginLeft: 6 }}
+                                                                    />
+                                                                ) : null}
+                                                            />
+                                                        </React.Fragment>
+                                                    ))}
+                                                    {/* Footer action: moved out of table into a right-aligned div below */}
 
-                                    <div className="flex justify-end pr-10 pt-3">
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                // ensure composer defaults to selected DF list
-                                                setShowComposer(true);
+                                                    {dontForgetTasks.length === 0 && (
+                                                        <tr>
+                                                            <td className="px-6 py-8 text-gray-500" colSpan={12}>
+                                                                {showImportedOnly
+                                                                    ? "No Imported tasks currently..."
+                                                                    : `This list has no tasks yet. Click "Add Task" to create one for ${getDfListName(selectedDfList)}.`}
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        <div className="flex justify-end pr-10 pt-3">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    // ensure composer defaults to selected DF list
+                                                    setShowComposer(true);
+                                                }}
+                                                className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                aria-label="Add task"
+                                            >
+                                                Add Task
+                                            </button>
+                                        </div>
+
+                                        <CreateTaskModal
+                                            isOpen={Boolean(showComposer)}
+                                            initialData={{ list_index: selectedDfList || (availableDfLists && availableDfLists[0]) || 1 }}
+                                            onSave={(data) => {
+                                                // CreateTaskModal returns fields like title, deadline, key_area_id, list_index
+                                                // normalize names to the existing addDontForgetTask expectations
+                                                const mapped = {
+                                                    ...data,
+                                                    name: data?.title || data?.name,
+                                                    dueDate: data?.dueDate || data?.deadline,
+                                                    keyAreaId: data?.keyAreaId || data?.key_area_id || null,
+                                                    listIndex: data?.listIndex || data?.list_index,
+                                                };
+                                                addDontForgetTask(mapped);
+                                                setShowComposer(false);
                                             }}
-                                            className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                            aria-label="Add task"
-                                        >
-                                            Add Task
-                                        </button>
-                                    </div>
-
-                                    <CreateTaskModal
-                                        isOpen={Boolean(showComposer)}
-                                        initialData={{ list_index: selectedDfList || (availableDfLists && availableDfLists[0]) || 1 }}
-                                        onSave={(data) => {
-                                            // CreateTaskModal returns fields like title, deadline, key_area_id, list_index
-                                            // normalize names to the existing addDontForgetTask expectations
-                                            const mapped = {
-                                                ...data,
-                                                name: data?.title || data?.name,
-                                                dueDate: data?.dueDate || data?.deadline,
-                                                keyAreaId: data?.keyAreaId || data?.key_area_id || null,
-                                                listIndex: data?.listIndex || data?.list_index,
-                                            };
-                                            addDontForgetTask(mapped);
-                                            setShowComposer(false);
-                                        }}
-                                        onCancel={() => setShowComposer(false)}
+                                            onCancel={() => setShowComposer(false)}
                                             isSaving={false}
                                             keyAreas={dfKeyAreas}
                                             availableLists={availableDfLists}
@@ -2077,48 +2097,48 @@ export default function DontForget() {
                                             goals={goals}
                                             isDontForgetMode={true}
                                             currentUserId={null}
-                                    />
+                                        />
 
-                                <EditTaskModal
-                                    isOpen={Boolean(editModal.open)}
-                                    initialData={_mapEditInitial()}
-                                    onCancel={() => {
-                                        setEditModal({ open: false, id: null, form: null });
-                                        setMassEditingMode(false);
-                                    }}
-                                    onSave={(payload) => {
-                                        if (massEditingMode) return handleMassEditSave(payload);
-                                        return handleEditModalSave(payload);
-                                    }}
-                                    isSaving={editModal.id ? savingIds.has(editModal.id) : false}
-                                    keyAreas={dfKeyAreas}
-                                    availableLists={availableDfLists}
-                                    parentListNames={dfListNames}
-                                    users={users}
-                                    goals={goals}
-                                    modalTitle={massEditingMode ? `Mass editing ${selectedIds.size} tasks` : "Edit Don't forget task"}
-                                    isDontForgetMode={true}
-                                />
+                                        <EditTaskModal
+                                            isOpen={Boolean(editModal.open)}
+                                            initialData={_mapEditInitial()}
+                                            onCancel={() => {
+                                                setEditModal({ open: false, id: null, form: null });
+                                                setMassEditingMode(false);
+                                            }}
+                                            onSave={(payload) => {
+                                                if (massEditingMode) return handleMassEditSave(payload);
+                                                return handleEditModalSave(payload);
+                                            }}
+                                            isSaving={editModal.id ? savingIds.has(editModal.id) : false}
+                                            keyAreas={dfKeyAreas}
+                                            availableLists={availableDfLists}
+                                            parentListNames={dfListNames}
+                                            users={users}
+                                            goals={goals}
+                                            modalTitle={massEditingMode ? `Mass editing ${selectedIds.size} tasks` : "Edit Don't forget task"}
+                                            isDontForgetMode={true}
+                                        />
 
-                                {/* Activity composer removed from DontForget */}
+                                        {/* Activity composer removed from DontForget */}
 
-                                <EditTaskModal
-                                    isOpen={Boolean(assignModal.open)}
-                                    initialData={_mapAssignInitial()}
-                                    onCancel={() => setAssignModal({ open: false, task: null, kaId: "", listIndex: 1 })}
-                                    onSave={(payload) => handleAssignSave({ key_area_id: payload.key_area_id || payload.keyAreaId || assignModal.kaId })}
-                                    isSaving={false}
-                                    keyAreas={dfKeyAreas}
-                                    availableLists={availableDfLists}
-                                    parentListNames={dfListNames}
-                                    users={users}
-                                    goals={goals}
-                                    isDontForgetMode={true}
-                                />
+                                        <EditTaskModal
+                                            isOpen={Boolean(assignModal.open)}
+                                            initialData={_mapAssignInitial()}
+                                            onCancel={() => setAssignModal({ open: false, task: null, kaId: "", listIndex: 1 })}
+                                            onSave={(payload) => handleAssignSave({ key_area_id: payload.key_area_id || payload.keyAreaId || assignModal.kaId })}
+                                            isSaving={false}
+                                            keyAreas={dfKeyAreas}
+                                            availableLists={availableDfLists}
+                                            parentListNames={dfListNames}
+                                            users={users}
+                                            goals={goals}
+                                            isDontForgetMode={true}
+                                        />
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                    </div>
-                ) : (
+                        ) : (
                             <div className="p-2 text-gray-500">Select a view.</div>
                         )}
                     </div>
