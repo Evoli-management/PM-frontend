@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Section, Field, Toggle, LoadingButton } from './UIComponents';
 import calendarService from '../../services/calendarService';
-import { syncService } from '../../services/syncService';
 
 export const Integrations = ({ showToast }) => {
         // Connect integration handler
@@ -13,15 +12,17 @@ export const Integrations = ({ showToast }) => {
                     case 'googleCalendar':
                         result = await calendarService.syncGoogleCalendar();
                         if (result && result.success) {
-                            showToast && showToast('Google Calendar connected and sync initiated!');
+                            showToast && showToast('Google Calendar connected! Syncing events...');
                             await loadIntegrations();
+                            calendarService.triggerSync().catch(e => console.warn('Initial sync failed:', e));
                         }
                         break;
                     case 'outlookCalendar':
                         result = await calendarService.syncMicrosoftCalendar();
                         if (result && result.success) {
-                            showToast && showToast('Outlook Calendar connected and sync initiated!');
+                            showToast && showToast('Outlook Calendar connected! Syncing events...');
                             await loadIntegrations();
+                            calendarService.triggerSync().catch(e => console.warn('Initial sync failed:', e));
                         }
                         break;
                     case 'googleTasks':
@@ -30,6 +31,7 @@ export const Integrations = ({ showToast }) => {
                             if (res && res.success) {
                                 showToast && showToast('Google Tasks connected and sync initiated!');
                                 await loadIntegrations();
+                                calendarService.triggerSync().catch(e => console.warn('Initial sync failed:', e));
                             }
                         } catch (error) {
                             throw error;
@@ -266,22 +268,16 @@ export const Integrations = ({ showToast }) => {
     // State for manual sync
     const [syncingType, setSyncingType] = useState('');
 
-    // Manual sync handler stub
+    // Manual sync handler
     const handleManualSync = async (type) => {
         setSyncingType(type);
         try {
-            showToast(`Manual sync for ${type} started`);
-            // Map type to provider for backend
-            let provider;
-            if (type === 'googleTasks') provider = 'google';
-            else if (type === 'microsoftToDo') provider = 'microsoft';
-            else throw new Error('Unknown provider');
-
-            await syncService.triggerManualSync(provider);
-            showToast(`Manual sync for ${type} completed`);
+            showToast(`Sync started`);
+            await calendarService.triggerSync();
+            showToast(`Sync completed successfully`);
             await loadIntegrations();
         } catch (err) {
-            showToast(`Manual sync for ${type} failed`, 'error');
+            showToast(`Sync failed`, 'error');
         } finally {
             setSyncingType('');
         }

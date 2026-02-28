@@ -480,6 +480,11 @@ const calendarService = {
         return res.data;
     },
 
+    async triggerSync() {
+        const res = await apiClient.post(`${base}/sync/trigger`);
+        return res.data;
+    },
+
     async disconnectCalendar(provider) {
         if (!provider) throw new Error("Missing provider");
         
