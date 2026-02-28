@@ -396,27 +396,30 @@ export default function DontForget() {
         return `${days}d`;
     };
 
-    // UI state
-    const [selectedIds, setSelectedIds] = useState(new Set());
-    // Legacy-style imported filter: show only imported tasks if true, else all
-    const [showImportedOnly, setShowImportedOnly] = useState(false);
-    // For backward compatibility, keep showImported as always true (for now)
-    const [showImported, setShowImported] = useState(true);
-    // Expose setter for Navbar tab group (both old global fn approach and new event approach)
+    // Unified Don't Forget filter: 'all' | 'active' | 'completed' | 'imported'
+    // Driven by the Navbar tab group via pm-dontforget-filter event
+    const [dfFilter, setDfFilter] = useState('all');
+    // Expose setter for backward compatibility
     useEffect(() => {
-        window.setDontForgetShowImported = setShowImportedOnly;
-        // Also listen for the custom event dispatched by the Navbar tabs
+        window.setDontForgetShowImported = (val) => setDfFilter(val ? 'imported' : 'all');
         const handler = (e) => {
-            const val = e?.detail?.value;
-            if (typeof val === 'boolean') setShowImportedOnly(val);
+            const val = e?.detail?.filter;
+            if (val) setDfFilter(val);
+            // Legacy compat: pm-dontforget-toggle-imported
+            if (typeof e?.detail?.value === 'boolean') setDfFilter(e.detail.value ? 'imported' : 'all');
         };
+        window.addEventListener('pm-dontforget-filter', handler);
         window.addEventListener('pm-dontforget-toggle-imported', handler);
         return () => {
             delete window.setDontForgetShowImported;
+            window.removeEventListener('pm-dontforget-filter', handler);
             window.removeEventListener('pm-dontforget-toggle-imported', handler);
         };
     }, []);
+    // Checkbox selection state for mass edit
+    const [selectedIds, setSelectedIds] = useState(new Set());
     const [savingIds, setSavingIds] = useState(new Set());
+
     const [dfName, setDfName] = useState("");
     const [showComposer, setShowComposer] = useState(false);
     // Full task view state (TaskFullView integration)
@@ -688,17 +691,32 @@ export default function DontForget() {
         return { ...t, listIndex: resolved };
     });
 
-    // Which DF tasks are visible in the list (filtered by selected DF list)
+    // Which DF tasks are visible in the list (filtered by dfFilter tab)
     const dontForgetTasks = useMemo(
         () => {
             let arr = (tasks || []).filter((t) => {
                 if (t.keyArea) return false;
-                // Imported tab: show only imported tasks, skip listIndex filter
-                if (showImportedOnly) return !!t.imported;
-                // Regular lists: hide imported tasks from the normal lists (they belong to Imported tab)
-                if (t.imported) return false;
-                if (!(showCompleted || !t.completed)) return false;
-                // Only include tasks that belong to the selected DF list
+                switch (dfFilter) {
+                    case 'imported':
+                        // Show only imported tasks, skip listIndex filter
+                        return !!t.imported;
+                    case 'active':
+                        // Active: non-completed, non-imported tasks in selected list
+                        if (t.imported) return false;
+                        if (t.completed) return false;
+                        break;
+                    case 'completed':
+                        // Completed: completed, non-imported tasks in selected list
+                        if (t.imported) return false;
+                        if (!t.completed) return false;
+                        break;
+                    case 'all':
+                    default:
+                        // All: hide imported (they live in imported tab)
+                        if (t.imported) return false;
+                        break;
+                }
+                // Only include tasks that belong to the selected DF list (for non-imported tabs)
                 const idx = Number(t.listIndex ?? t.list_index ?? 1);
                 if (selectedDfList && Number(selectedDfList) !== Number(idx)) return false;
                 return true;

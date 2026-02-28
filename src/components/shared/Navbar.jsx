@@ -84,17 +84,17 @@ export default function Navbar() {
     // Global inline reminder modal state (listens for events)
     const [globalReminderOpen, setGlobalReminderOpen] = useState(false);
     const [globalReminderObj, setGlobalReminderObj] = useState(null);
-    // Reactive state for Don't Forget imported tab active state
-    // (window.pmDontForgetShowImported can't trigger re-renders, so use state)
-    const [dfImportedActive, setDfImportedActive] = useState(false);
+    // Unified Don't Forget filter tab state: 'all' | 'active' | 'completed' | 'imported'
+    const [dfFilter, setDfFilter] = useState('all');
     useEffect(() => {
         const handler = (e) => {
-            const val = e?.detail?.value;
-            if (typeof val === 'boolean') setDfImportedActive(val);
+            const val = e?.detail?.filter;
+            if (val) setDfFilter(val);
         };
-        window.addEventListener('pm-dontforget-toggle-imported', handler);
-        return () => window.removeEventListener('pm-dontforget-toggle-imported', handler);
+        window.addEventListener('pm-dontforget-filter', handler);
+        return () => window.removeEventListener('pm-dontforget-filter', handler);
     }, []);
+
 
     // Handle global search functionality across entire system
     const handleSearch = async (searchTerm) => {
@@ -770,29 +770,51 @@ export default function Navbar() {
                         </div>
                     </div>
                 )}
-                {/* Imported Tasks tab group: only on Don't Forget page */}
+                {/* Don't Forget Tab Group: Active Tasks | All Tasks | Completed | Imported Tasks */}
                 {location.search.includes('dontforget=1') && location.pathname.startsWith('/tasks') && (
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-4 text-xs font-semibold overflow-x-auto whitespace-nowrap navbar-keyarea-tabs">
+                            {/* ACTIVE TASKS */}
                             <button
                                 type="button"
                                 onClick={() => {
-                                    window.pmDontForgetShowImported = false;
-                                    window.dispatchEvent(new CustomEvent('pm-dontforget-toggle-imported', { detail: { value: false } }));
-                                    if (typeof window.setDontForgetShowImported === 'function') window.setDontForgetShowImported(false);
+                                    setDfFilter('active');
+                                    window.dispatchEvent(new CustomEvent('pm-dontforget-filter', { detail: { filter: 'active' } }));
                                 }}
-                                className={`px-2 py-2 rounded transition ${!dfImportedActive ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-600 hover:text-slate-900'}`}
+                                className={`px-2 py-2 rounded transition ${dfFilter === 'active' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-600 hover:text-slate-900'}`}
+                            >
+                                ACTIVE TASKS
+                            </button>
+                            {/* ALL TASKS */}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setDfFilter('all');
+                                    window.dispatchEvent(new CustomEvent('pm-dontforget-filter', { detail: { filter: 'all' } }));
+                                }}
+                                className={`px-2 py-2 rounded transition ${dfFilter === 'all' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-600 hover:text-slate-900'}`}
                             >
                                 ALL TASKS
                             </button>
+                            {/* COMPLETED */}
                             <button
                                 type="button"
                                 onClick={() => {
-                                    window.pmDontForgetShowImported = true;
-                                    window.dispatchEvent(new CustomEvent('pm-dontforget-toggle-imported', { detail: { value: true } }));
-                                    if (typeof window.setDontForgetShowImported === 'function') window.setDontForgetShowImported(true);
+                                    setDfFilter('completed');
+                                    window.dispatchEvent(new CustomEvent('pm-dontforget-filter', { detail: { filter: 'completed' } }));
                                 }}
-                                className={`px-2 py-2 rounded transition ${dfImportedActive ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-600 hover:text-slate-900'}`}
+                                className={`px-2 py-2 rounded transition ${dfFilter === 'completed' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-600 hover:text-slate-900'}`}
+                            >
+                                COMPLETED
+                            </button>
+                            {/* IMPORTED TASKS */}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setDfFilter('imported');
+                                    window.dispatchEvent(new CustomEvent('pm-dontforget-filter', { detail: { filter: 'imported' } }));
+                                }}
+                                className={`px-2 py-2 rounded transition ${dfFilter === 'imported' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-600 hover:text-slate-900'}`}
                             >
                                 IMPORTED TASKS
                             </button>
