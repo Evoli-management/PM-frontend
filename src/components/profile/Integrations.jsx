@@ -12,24 +12,14 @@ export const Integrations = ({ showToast }) => {
                 switch (type) {
                     case 'googleCalendar':
                         result = await calendarService.syncGoogleCalendar();
-                        if (result && result.success && result.accessToken) {
-                            await calendarService.syncGoogleCalendarData(result.accessToken);
-                            setIntegrations(prev => ({
-                                ...prev,
-                                googleCalendar: { ...prev.googleCalendar, connected: true }
-                            }));
+                        if (result && result.success) {
                             showToast && showToast('Google Calendar connected and sync initiated!');
                             await loadIntegrations();
                         }
                         break;
                     case 'outlookCalendar':
                         result = await calendarService.syncMicrosoftCalendar();
-                        if (result && result.success && result.accessToken) {
-                            await calendarService.syncMicrosoftCalendarData(result.accessToken);
-                            setIntegrations(prev => ({
-                                ...prev,
-                                outlookCalendar: { ...prev.outlookCalendar, connected: true }
-                            }));
+                        if (result && result.success) {
                             showToast && showToast('Outlook Calendar connected and sync initiated!');
                             await loadIntegrations();
                         }
@@ -37,12 +27,7 @@ export const Integrations = ({ showToast }) => {
                     case 'googleTasks':
                         try {
                             const res = await calendarService.syncGoogleTasks();
-                            if (res && res.success && res.accessToken) {
-                                await calendarService.syncGoogleTasksData(res.accessToken);
-                                setIntegrations(prev => ({
-                                    ...prev,
-                                    googleTasks: { ...prev.googleTasks, connected: true }
-                                }));
+                            if (res && res.success) {
                                 showToast && showToast('Google Tasks connected and sync initiated!');
                                 await loadIntegrations();
                             }
@@ -137,7 +122,13 @@ export const Integrations = ({ showToast }) => {
         try {
             // Get sync status from API
             const syncStatus = await calendarService.getSyncStatus();
-            const updates = { ...integrations };
+            const updates = {
+                googleCalendar: { connected: false, email: '', syncEnabled: true },
+                outlookCalendar: { connected: false, email: '', syncEnabled: true },
+                googleTasks: { connected: false, syncEnabled: true },
+                microsoftToDo: { connected: false, syncEnabled: true },
+                teams: { connected: false, tenant: '', notificationsEnabled: true }
+            };
             if (syncStatus.google) {
                 updates.googleCalendar = {
                     connected: syncStatus.google.connected,
@@ -145,13 +136,20 @@ export const Integrations = ({ showToast }) => {
                     syncEnabled: true
                 };
             }
-            // ...existing code...
+            if (syncStatus.microsoft) {
+                updates.outlookCalendar = {
+                    connected: syncStatus.microsoft.connected,
+                    email: syncStatus.microsoft.email || '',
+                    syncEnabled: true
+                };
+            }
+            setIntegrations(updates);
+        } catch (err) {
+            console.error('Failed to load integration status:', err);
         } finally {
             setLoading(false);
         }
     };
-
-    // ...existing code...
     
     const disconnectIntegration = async (type) => {
         try {
