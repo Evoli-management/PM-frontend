@@ -253,7 +253,7 @@ export default function DontForget() {
         let cancelled = false;
         (async () => {
             try {
-                const data = await (await getTaskService()).list({ unassigned: true });
+                const data = await (await getTaskService()).list({ includeImported: true });
                 if (!cancelled) {
                     // Map API fields to this view’s expected shape
                     const mapped = data.map((t) => ({

@@ -47,13 +47,14 @@ const mapPriorityFromApi = (p) => {
 const base = "/tasks";
 
 const taskService = {
-    async list({ keyAreaId, unassigned, delegatedTo, withoutGoal } = {}) {
+    async list({ keyAreaId, unassigned, delegatedTo, withoutGoal, includeImported } = {}) {
         // In dev, bypass browser cache to avoid 304/Not Modified confusion after updates
         const params = {};
         if (keyAreaId) params.keyAreaId = keyAreaId;
         if (unassigned) params.unassigned = true;
         if (delegatedTo) params.delegatedTo = true;
         if (withoutGoal) params.withoutGoal = true;
+        if (includeImported) params.includeImported = true;
         if (import.meta.env?.DEV) params._ts = Date.now();
         // Note: Do NOT send custom Cache-Control request header; it triggers CORS preflight and may be disallowed by server.
         // We use a cache-busting query param instead.
@@ -104,7 +105,8 @@ const taskService = {
                 gid = rawGoal;
             }
         }
-        return { ...t, status: mapStatusFromApi(t.status), priority: mapPriorityFromApi(t.priority), goal_id: gid || null,
+        return {
+            ...t, status: mapStatusFromApi(t.status), priority: mapPriorityFromApi(t.priority), goal_id: gid || null,
             list_index: typeof t.listIndex !== 'undefined' ? t.listIndex : (typeof t.list_index !== 'undefined' ? t.list_index : null),
             listIndex: typeof t.listIndex !== 'undefined' ? t.listIndex : (typeof t.list_index !== 'undefined' ? t.list_index : null),
         };
@@ -131,7 +133,8 @@ const taskService = {
                 gid = rawGoal;
             }
         }
-        return { ...t, status: mapStatusFromApi(t.status), priority: mapPriorityFromApi(t.priority), goal_id: gid || null,
+        return {
+            ...t, status: mapStatusFromApi(t.status), priority: mapPriorityFromApi(t.priority), goal_id: gid || null,
             list_index: typeof t.listIndex !== 'undefined' ? t.listIndex : (typeof t.list_index !== 'undefined' ? t.list_index : null),
             listIndex: typeof t.listIndex !== 'undefined' ? t.listIndex : (typeof t.list_index !== 'undefined' ? t.list_index : null),
         };
@@ -155,7 +158,8 @@ const taskService = {
                 gid = rawGoal;
             }
         }
-        return { ...t, status: mapStatusFromApi(t.status), priority: mapPriorityFromApi(t.priority), goal_id: gid || null,
+        return {
+            ...t, status: mapStatusFromApi(t.status), priority: mapPriorityFromApi(t.priority), goal_id: gid || null,
             list_index: typeof t.listIndex !== 'undefined' ? t.listIndex : (typeof t.list_index !== 'undefined' ? t.list_index : null),
             listIndex: typeof t.listIndex !== 'undefined' ? t.listIndex : (typeof t.list_index !== 'undefined' ? t.list_index : null),
         };
