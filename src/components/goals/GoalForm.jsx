@@ -24,18 +24,23 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
     keyAreaId: goal?.keyAreaId || "",
     status: goal?.status || "active",
     visibility: goal?.visibility || "public",
+    parentGoalId: goal?.parentGoalId || null,
   });
+  const [availableGoals, setAvailableGoals] = useState([]);
+  const [parentGoalSearch, setParentGoalSearch] = useState('');
+  const [showParentGoalDropdown, setShowParentGoalDropdown] = useState(false);
+  const parentGoalPickerRef = useRef(null);
 
   const [milestones, setMilestones] = useState(
     goal?.milestones?.length > 0
       ? goal.milestones.map((m) => ({
-          id: m.id,
-          title: m.title,
-          weight: m.weight || 1.0,
-          // Normalize incoming dates to YYYY-MM-DD for <input type="date" />
-          startDate: m.startDate ? new Date(m.startDate).toISOString().split("T")[0] : "",
-          dueDate: m.dueDate ? new Date(m.dueDate).toISOString().split("T")[0] : "",
-        }))
+        id: m.id,
+        title: m.title,
+        weight: m.weight || 1.0,
+        // Normalize incoming dates to YYYY-MM-DD for <input type="date" />
+        startDate: m.startDate ? new Date(m.startDate).toISOString().split("T")[0] : "",
+        dueDate: m.dueDate ? new Date(m.dueDate).toISOString().split("T")[0] : "",
+      }))
       : [{ title: "", weight: 1.0, startDate: defaultDate, dueDate: defaultDate }]
   );
 
@@ -43,6 +48,34 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
   // edit mode after lazy-loading this component) make sure our local form
   // state reflects that incoming goal. This ensures inputs populate correctly
   // when the form mounts or when the prop changes.
+  // Load available goals for parent picker
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const mod = await import('../../services/goalService');
+        const svc = mod.default || mod;
+        const fn = svc.getGoals || svc.list;
+        if (typeof fn === 'function') {
+          const list = await fn({ status: 'active' });
+          if (mounted) setAvailableGoals(Array.isArray(list) ? list : []);
+        }
+      } catch (e) { /* goals list is optional */ }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  // Close parent goal dropdown on outside click
+  useEffect(() => {
+    if (!showParentGoalDropdown) return;
+    const onDown = (e) => {
+      if (parentGoalPickerRef.current && !parentGoalPickerRef.current.contains(e.target))
+        setShowParentGoalDropdown(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [showParentGoalDropdown]);
+
   useEffect(() => {
     if (!goal) return;
     setFormData({
@@ -59,17 +92,18 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
       keyAreaId: goal?.keyAreaId || "",
       status: goal?.status || "active",
       visibility: goal?.visibility || "public",
+      parentGoalId: goal?.parentGoalId || null,
     });
 
     setMilestones(
       goal?.milestones?.length > 0
         ? goal.milestones.map((m) => ({
-            id: m.id,
-            title: m.title,
-            weight: m.weight || 1.0,
-            startDate: m.startDate ? new Date(m.startDate).toISOString().split("T")[0] : "",
-            dueDate: m.dueDate ? new Date(m.dueDate).toISOString().split("T")[0] : "",
-          }))
+          id: m.id,
+          title: m.title,
+          weight: m.weight || 1.0,
+          startDate: m.startDate ? new Date(m.startDate).toISOString().split("T")[0] : "",
+          dueDate: m.dueDate ? new Date(m.dueDate).toISOString().split("T")[0] : "",
+        }))
         : [{ title: "", weight: 1.0, startDate: defaultDate, dueDate: defaultDate }]
     );
     // reset milestone index when loading a new goal
@@ -97,7 +131,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
   const { position, isDragging, handleMouseDown, handleMouseMove, handleMouseUp, resetPosition } = useDraggable();
   const { size, isDraggingResize, handleResizeMouseDown } = useResizable(600, 560);
   const milestoneDueRef = useRef(null);
-  
+
   useEffect(() => {
     if (isDragging) {
       document.addEventListener('mousemove', handleMouseMove);
@@ -108,7 +142,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
       };
     }
   }, [isDragging, handleMouseMove, handleMouseUp]);
-  
+
   useEffect(() => {
     if (onClose) resetPosition();
   }, [resetPosition]);
@@ -261,6 +295,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
       keyAreaId: formData.keyAreaId || null,
       visibility: formData.visibility,
       status: formData.status,
+      parentGoalId: formData.parentGoalId || null,
       milestones: milestones
         .filter((m) => m.title.trim())
         .map((m) => ({
@@ -349,9 +384,9 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
           minHeight: '200px'
         }}
       >
-        
+
         {/* Header */}
-        <div 
+        <div
           className="relative flex items-center justify-between px-6 py-4 border-b border-gray-200 cursor-grab active:cursor-grabbing select-none flex-shrink-0"
           onMouseDown={handleMouseDown}
         >
@@ -399,11 +434,10 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
               <label className="block text-sm font-medium text-slate-700">
                 Goal name <span className="text-red-500">*</span>
               </label>
-              <span className={`text-xs font-medium ${
-                formData.title.length > 150 ? 'text-red-600' :
-                formData.title.length > 100 ? 'text-yellow-600' :
-                'text-gray-400'
-              }`}>
+              <span className={`text-xs font-medium ${formData.title.length > 150 ? 'text-red-600' :
+                  formData.title.length > 100 ? 'text-yellow-600' :
+                    'text-gray-400'
+                }`}>
                 {formData.title.length}/200
               </span>
             </div>
@@ -412,9 +446,8 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
               maxLength="200"
               value={formData.title}
               onChange={(e) => handleInputChange("title", e.target.value)}
-              className={`w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 mt-0.5 ${
-                errors.title ? "border-red-300 bg-red-50" : ""
-              }`}
+              className={`w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 mt-0.5 ${errors.title ? "border-red-300 bg-red-50" : ""
+                }`}
               placeholder="Enter goal name (max 200 characters)"
             />
             {formData.title.length > 150 && !errors.title && (
@@ -458,7 +491,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
                     type="button"
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600"
                     aria-label="Open date picker"
-                    onClick={() => { try { startRef.current?.showPicker?.(); startRef.current?.focus(); } catch (__) {} }}
+                    onClick={() => { try { startRef.current?.showPicker?.(); startRef.current?.focus(); } catch (__) { } }}
                   >📅</button>
                 </div>
               </div>
@@ -475,16 +508,15 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
                     type="date"
                     value={formData.dueDate}
                     onChange={(e) => handleInputChange("dueDate", e.target.value)}
-                    className={`w-full rounded-lg border px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar ${
-                      errors.dueDate ? "border-red-300 bg-red-50" : "border-slate-300 bg-white"
-                    }`}
+                    className={`w-full rounded-lg border px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar ${errors.dueDate ? "border-red-300 bg-red-50" : "border-slate-300 bg-white"
+                      }`}
                     min={new Date().toISOString().split("T")[0]}
                   />
                   <button
                     type="button"
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600"
                     aria-label="Open date picker"
-                    onClick={() => { try { dueRef.current?.showPicker?.(); dueRef.current?.focus(); } catch (__) {} }}
+                    onClick={() => { try { dueRef.current?.showPicker?.(); dueRef.current?.focus(); } catch (__) { } }}
                   >📅</button>
                 </div>
                 {errors.dueDate && (
@@ -555,6 +587,57 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
                   className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 mt-0"
                   placeholder="e.g., important, urgent"
                 />
+              </div>
+
+              {/* Parent Goal Picker */}
+              <div ref={parentGoalPickerRef} className="relative">
+                <label className="block text-sm font-medium text-slate-700">
+                  Link to parent goal <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                {formData.parentGoalId ? (
+                  <div className="flex items-center gap-2 mt-0.5 px-3 py-2 rounded-lg border border-purple-300 bg-purple-50">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-purple-600 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M12.293 3.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 9H7a3 3 0 000 6h1a1 1 0 110 2H7A5 5 0 017 7h7.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+                    <span className="flex-1 text-sm text-purple-800 truncate">
+                      {availableGoals.find(g => g.id === formData.parentGoalId)?.title || 'Parent goal selected'}
+                    </span>
+                    <button type="button" onClick={() => handleInputChange('parentGoalId', null)} className="text-purple-500 hover:text-purple-700 ml-1" aria-label="Remove parent goal">✕</button>
+                  </div>
+                ) : (
+                  <div className="mt-0.5">
+                    <input
+                      type="text"
+                      placeholder="Search goals to link as parent..."
+                      value={parentGoalSearch}
+                      onChange={(e) => { setParentGoalSearch(e.target.value); setShowParentGoalDropdown(true); }}
+                      onFocus={() => setShowParentGoalDropdown(true)}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50"
+                    />
+                    {showParentGoalDropdown && availableGoals.length > 0 && (
+                      <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                        {availableGoals
+                          .filter(g => g.id !== goal?.id && g.title?.toLowerCase().includes(parentGoalSearch.toLowerCase()))
+                          .slice(0, 8)
+                          .map(g => (
+                            <button
+                              key={g.id}
+                              type="button"
+                              className="w-full text-left px-3 py-2 text-sm text-slate-800 hover:bg-purple-50 hover:text-purple-800 truncate"
+                              onClick={() => {
+                                handleInputChange('parentGoalId', g.id);
+                                setParentGoalSearch('');
+                                setShowParentGoalDropdown(false);
+                              }}
+                            >
+                              {g.title}
+                            </button>
+                          ))}
+                        {availableGoals.filter(g => g.id !== goal?.id && g.title?.toLowerCase().includes(parentGoalSearch.toLowerCase())).length === 0 && (
+                          <div className="px-3 py-2 text-sm text-slate-400">No matching goals</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -630,7 +713,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
                     type="button"
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600"
                     aria-label="Open date picker"
-                    onClick={() => { try { rightStartRef.current?.showPicker?.(); rightStartRef.current?.focus(); } catch (__) {} }}
+                    onClick={() => { try { rightStartRef.current?.showPicker?.(); rightStartRef.current?.focus(); } catch (__) { } }}
                   >📅</button>
                 </div>
               </div>
@@ -653,7 +736,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
                     type="button"
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600"
                     aria-label="Open date picker"
-                    onClick={() => { try { milestoneDueRef.current?.showPicker?.(); milestoneDueRef.current?.focus(); } catch (__) {} }}
+                    onClick={() => { try { milestoneDueRef.current?.showPicker?.(); milestoneDueRef.current?.focus(); } catch (__) { } }}
                   >📅</button>
                 </div>
               </div>
