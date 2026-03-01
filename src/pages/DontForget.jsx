@@ -795,7 +795,7 @@ export default function DontForget() {
 
             return arr;
         },
-        [tasks, showImported, showCompleted, selectedDfList, dfSortField, dfSortDirection],
+        [tasks, dfFilter, selectedDfList, dfSortField, dfSortDirection],
     );
 
     const addDontForgetTask = async (payload) => {
@@ -2066,7 +2066,7 @@ export default function DontForget() {
                                                     {dontForgetTasks.length === 0 && (
                                                         <tr>
                                                             <td className="px-6 py-8 text-gray-500" colSpan={12}>
-                                                                {showImportedOnly
+                                                                {dfFilter === 'imported'
                                                                     ? "No Imported tasks currently..."
                                                                     : `This list has no tasks yet. Click "Add Task" to create one for ${getDfListName(selectedDfList)}.`}
                                                             </td>
