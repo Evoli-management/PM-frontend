@@ -109,6 +109,14 @@ const CalendarContainer = () => {
     const [appointmentInitialAllDay, setAppointmentInitialAllDay] = useState(false);
     const [filterType, setFilterType] = useState("all");
     const [showViewMenu, setShowViewMenu] = useState(false);
+    const [slotSizeMinutes, setSlotSizeMinutes] = useState(() => {
+        try {
+            const saved = Number(localStorage.getItem("calendar:slotSizeMinutes"));
+            return saved === 30 ? 30 : 15;
+        } catch {
+            return 15;
+        }
+    });
     const viewMenuRef = React.useRef(null);
     const deletePopoverRef = React.useRef(null);
     const simpleConfirmRef = React.useRef(null);
@@ -237,6 +245,12 @@ const CalendarContainer = () => {
             try { localStorage.setItem('calendar:workWeek', workWeek ? 'true' : 'false'); } catch (_) {}
         } catch {}
     }, [view, currentDate, prefsLoaded]);
+
+    useEffect(() => {
+        try {
+            localStorage.setItem("calendar:slotSizeMinutes", String(slotSizeMinutes));
+        } catch {}
+    }, [slotSizeMinutes]);
     // Check if external sync is enabled to start auto-refresh
     useEffect(() => {
         let ignore = false;
@@ -1711,6 +1725,8 @@ const CalendarContainer = () => {
                         onQuickCreate={handleQuickCreate}
                         onEventClick={(ev, action) => (ev?.taskId ? openEditTask(ev.taskId) : openModal(ev, action))}
                         onTaskClick={openEditTask}
+                        slotSizeMinutes={slotSizeMinutes}
+                        onToggleSlotSize={() => setSlotSizeMinutes((prev) => (prev === 15 ? 30 : 15))}
                     />
                     </div>
                 )}
@@ -1731,6 +1747,8 @@ const CalendarContainer = () => {
                         onTaskDrop={handleTaskDrop}
                         onQuickCreate={handleQuickCreate}
                         enableQuickCreate={true}
+                        slotSizeMinutes={slotSizeMinutes}
+                        onToggleSlotSize={() => setSlotSizeMinutes((prev) => (prev === 15 ? 30 : 15))}
                     />
                     </div>
                 )}
@@ -1765,12 +1783,16 @@ const CalendarContainer = () => {
                         onActivityEdit={openEditActivity}
                         onActivityDelete={handleActivityDelete}
                         activities={weekActivities}
+                        slotSizeMinutes={slotSizeMinutes}
+                        onToggleSlotSize={() => setSlotSizeMinutes((prev) => (prev === 15 ? 30 : 15))}
                     />
                     </div>
                 )}
                 {view === "day" && (
                     <div className="flex-1 overflow-hidden">
                     <DayView
+                        slotMinutes={slotSizeMinutes}
+                        hourHeight={slotSizeMinutes === 15 ? 96 : 64}
                         currentDate={currentDate}
                         onShiftDate={shiftDate}
                         onSetDate={setCurrentDate}
@@ -1800,6 +1822,8 @@ const CalendarContainer = () => {
                         onActivityEdit={openEditActivity}
                         onActivityDelete={handleActivityDelete}
                         onPlanTomorrow={() => {}}
+                        slotSizeMinutes={slotSizeMinutes}
+                        onToggleSlotSize={() => setSlotSizeMinutes((prev) => (prev === 15 ? 30 : 15))}
                     />
                     </div>
                 )}

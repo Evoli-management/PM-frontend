@@ -8,6 +8,7 @@ import {
     FaGripVertical,
 } from "react-icons/fa";
 import { isFeatureEnabled } from "../../utils/flags.js";
+import { formatKeyAreaLabel } from "../../utils/keyAreaDisplay.js";
 
 // Lazy load keyAreaService for reordering
 let _keyAreaService = null;
@@ -337,8 +338,8 @@ export default function Sidebar({
             className={`bg-white ${collapsed ? "w-20" : "w-64"} shadow-sm border border-gray-200 border-t-0 flex flex-col justify-between px-2 transition-transform duration-300 rounded-none overflow-hidden ${mobileTranslate} fixed top-16 left-0 z-40 md:fixed md:top-16 md:left-0 md:translate-x-0 layout-panel-gap-right h-[calc(100vh-64px)]`}
             aria-label="Sidebar"
         >
-            <div className="flex-1 overflow-hidden pb-2">
-                <div className="mb-6 flex items-center gap-2 px-2">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden pb-2">
+                <div className="mb-6 flex items-center gap-2 px-2 pt-1">
                     <div className="ml-auto flex items-center gap-2">
                         {mobileOpen && (
                             <button
@@ -362,15 +363,16 @@ export default function Sidebar({
                         )}
 
                         <button
-                            className="text-blue-700 hover:text-blue-900 focus:outline-none"
+                            className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-green-200 text-green-800 shadow-sm transition hover:bg-green-300 hover:text-green-900 focus:outline-none focus:ring-2 focus:ring-green-400"
                             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+                            title={collapsed ? "Show menu" : "Hide menu"}
                             onClick={() => {
                                 if (typeof onCollapseToggle === "function") onCollapseToggle();
                                 else setInternalCollapsed((c) => !c);
                             }}
                         >
                             <svg
-                                className={`w-4 h-4 transform ${collapsed ? "rotate-90" : "rotate-0"}`}
+                                className={`w-4 h-4 transform ${collapsed ? "rotate-180" : "rotate-0"}`}
                                 viewBox="0 0 24 24"
                                 fill="none"
                                 stroke="currentColor"
@@ -378,7 +380,7 @@ export default function Sidebar({
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
                             >
-                                <path d="M6 9l6 6 6-6" />
+                                <path d="M15 6l-6 6 6 6" />
                             </svg>
                         </button>
                     </div>
@@ -446,7 +448,7 @@ export default function Sidebar({
                                                 </button>
 
                                                 {!collapsed && keyAreasOpen && (
-                                                    <div className="ml-6 mt-2 space-y-1 max-h-48 overflow-y-auto pr-1">
+                                                    <div className="ml-6 mt-2 space-y-1 pr-1">
                                                         {displayKeyAreas &&
                                                             displayKeyAreas.length > 0 &&
                                                             displayKeyAreas.map((ka, index) => {
@@ -461,7 +463,7 @@ export default function Sidebar({
                                                                 
                                                                 const itemClasses = `${baseClasses} ${isActive ? activeClasses : inactiveClasses} ${dragOverClasses}`;
                                                                 const isLocked = !!ka.is_default;
-                                                                const isIdeas = /idea/i.test(ka.title || "");
+                                                                const keyAreaLabel = formatKeyAreaLabel(ka, index);
                                                                 const isDraggable = !isLocked; // Only allow dragging non-default items
                                                                 
                                                                 return (
@@ -515,18 +517,10 @@ export default function Sidebar({
                                                                                 className="text-sm flex items-center gap-2 flex-1"
                                                                                 style={{ color: ka.color || '#374151' }}
                                                                             >
-                                                                                {ka.title}
+                                                                                {keyAreaLabel}
                                                                                 {isLocked && (
                                                                                     <span className="ml-2 inline-flex items-center">
-                                                                                        {isIdeas ? (
-                                                                                            <img
-                                                                                                src={`${import.meta.env.BASE_URL}ideas.png`}
-                                                                                                alt="Ideas"
-                                                                                                className="w-4 h-4 object-contain"
-                                                                                            />
-                                                                                        ) : (
-                                                                                            <FaLock className="text-slate-500 text-xs" />
-                                                                                        )}
+                                                                                        <FaLock className="text-slate-500 text-xs" />
                                                                                     </span>
                                                                                 )}
                                                                             </span>

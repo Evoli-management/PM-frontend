@@ -3,6 +3,7 @@ import Sidebar from '../components/shared/Sidebar';
 import { FaAlignJustify } from 'react-icons/fa';
 import taskService from '../services/taskService';
 import { computeEisenhowerQuadrant, toDateOnly, getQuadrantColorClass } from '../utils/keyareasHelpers';
+import { formatKeyAreaLabel } from '../utils/keyAreaDisplay';
 
 export default function MyFocus() {
     const [loading, setLoading] = useState(true);
@@ -190,7 +191,7 @@ export default function MyFocus() {
                                             >
                                                 <option value="">Key Area</option>
                                                 {keyAreaOptions.map((ka) => (
-                                                    <option key={ka.id} value={ka.id}>{ka.title || ka.name}</option>
+                                                    <option key={ka.id} value={ka.id}>{formatKeyAreaLabel(ka)}</option>
                                                 ))}
                                             </select>
                                             <select

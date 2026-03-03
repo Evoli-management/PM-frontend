@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { FaSpinner, FaCheckCircle, FaRegCircle, FaAlignJustify, FaTag, FaTrash, FaEdit, FaAngleDoubleRight, FaChevronUp, FaChevronDown, FaEllipsisV } from 'react-icons/fa';
-import { toDateOnly, getPriorityLabel, mapUiStatusToServer, getStatusColorClass, getPriorityColorClass, resolveAssignee, selectedUserIdToPersistValue } from '../../utils/keyareasHelpers';
+import { toDateOnly, getPriorityLabel, mapUiStatusToServer, getStatusColorClass, getPriorityColorClass, resolveAssignee } from '../../utils/keyareasHelpers';
 
 const ActivityRow = ({
   a,
@@ -145,10 +145,16 @@ const ActivityRow = ({
           <div className="ml-2 flex items-center gap-2 text-slate-600">
             {(() => {
               if (lvl === 2) return null;
-              const cls = lvl === 3 ? 'text-red-600' : 'text-emerald-600';
+              if (lvl === 3) {
+                return (
+                  <span className="inline-block text-xs font-bold leading-none text-red-600" title="Priority: High">
+                    !
+                  </span>
+                );
+              }
               return (
-                <span className={`inline-block text-sm font-bold ${cls}`} title={`Priority: ${lvl === 3 ? 'high' : 'low'}`}>
-                  !
+                <span className="inline-block text-xs font-bold leading-none text-slate-500" title="Priority: Low">
+                  ↓
                 </span>
               );
             })()}
@@ -176,8 +182,8 @@ const ActivityRow = ({
                 value={(() => resolveAssignee({ activity: a, taskAssignee, users, currentUserId }).selectValue)()}
                 onChange={async (e) => {
                   const sel = e.target.value;
-                  const valueToSave = selectedUserIdToPersistValue(sel, users, currentUserId);
-                  try { await updateField && updateField(a.id, 'assignee', valueToSave); } catch (err) {}
+                  // For activities, persist responsible as user id via delegatedToUserId.
+                  try { await updateField && updateField(a.id, 'assignee', sel || null); } catch (err) {}
                   setEditingKey(null);
                 }}
                 onBlur={() => setEditingKey(null)}
@@ -236,9 +242,9 @@ const ActivityRow = ({
                 try { await updateField && updateField(a.id, 'priority', v); } catch (err) {}
               }}
             >
-              <option value="low">Low</option>
+              <option value="high" >❗️ High</option>
               <option value="normal">Normal</option>
-              <option value="high">High</option>
+              <option value="low" style={{ color: "#6b7280" }}>↓ Low</option>
             </select>
           ) : (
             (() => {

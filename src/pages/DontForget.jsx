@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useRef, useState, Suspense } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "../components/shared/Sidebar.jsx";
 import { getPriorityLevel } from "../utils/keyareasHelpers";
+import { parseDurationToMinutes } from "../utils/duration";
 import { useToast } from "../components/shared/ToastProvider.jsx";
 import { FiAlertTriangle, FiClock } from "react-icons/fi";
 import { FaCheck, FaExclamation, FaLongArrowAltDown, FaTimes, FaTrash, FaBars, FaCog, FaSearch } from "react-icons/fa";
@@ -759,14 +760,8 @@ export default function DontForget() {
                             bVal = b.deadline || b.due_date || b.dueDate || '';
                             break;
                         case 'duration':
-                            const getDuration = (t) => {
-                                const start = t.start_date || t.startDate;
-                                const end = t.end_date || t.endDate;
-                                if (!start || !end) return 0;
-                                return new Date(end).getTime() - new Date(start).getTime();
-                            };
-                            aVal = getDuration(a);
-                            bVal = getDuration(b);
+                            aVal = parseDurationToMinutes(a.duration ?? a.duration_minutes) ?? 0;
+                            bVal = parseDurationToMinutes(b.duration ?? b.duration_minutes) ?? 0;
                             break;
                         case 'completed':
                             aVal = a.completionDate || a.completion_date || '';

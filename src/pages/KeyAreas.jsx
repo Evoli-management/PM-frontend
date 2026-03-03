@@ -38,8 +38,8 @@ import {
     mapServerStatusToUi,
     normalizeActivity,
     resolveAssignee,
-    selectedUserIdToPersistValue,
 } from '../utils/keyareasHelpers';
+import { parseDurationToMinutes } from '../utils/duration';
 
 // Lazy getters for services to allow code-splitting and avoid circular imports
 let _taskService = null;
@@ -152,8 +152,10 @@ const api = {
         }
     },
     async createTask(task) {
+        const durationRaw = task.duration ?? task.duration_minutes;
         const payload = {
             keyAreaId: task.key_area_id || task.keyAreaId || task.key_area || task.keyArea,
+            goalId: task.goal_id || task.goalId || task.goal || null,
             title: task.title,
             description: nullableString(task.description),
             assignee: nullableString(task.assignee),
@@ -175,6 +177,12 @@ const api = {
                 return "medium";
             })(),
             delegatedToUserId: task.delegatedToUserId ?? null,
+            duration:
+                durationRaw === undefined
+                    ? undefined
+                    : durationRaw === null
+                        ? null
+                        : String(durationRaw).trim() || null,
             // Accept client-provided list index when creating so server persists list membership
             listIndex: typeof task.list_index !== 'undefined' ? task.list_index : (typeof task.listIndex !== 'undefined' ? task.listIndex : undefined),
         };
@@ -190,12 +198,14 @@ const api = {
             assignee: created.assignee ?? payload.assignee ?? null,
             duration: created.duration ?? null,
             key_area_id: created.keyAreaId || payload.keyAreaId,
+            goal_id: created.goalId ?? created.goal_id ?? payload.goalId ?? null,
             // expose list index to UI under both conventions
             list_index: typeof created.listIndex !== 'undefined' ? created.listIndex : (typeof created.list_index !== 'undefined' ? created.list_index : 1),
             listIndex: typeof created.listIndex !== 'undefined' ? created.listIndex : (typeof created.list_index !== 'undefined' ? created.list_index : 1),
         };
     },
     async updateTask(id, task) {
+        const durationRaw = task.duration ?? task.duration_minutes;
         const payload = {
             keyAreaId: task.key_area_id || task.keyAreaId || task.key_area || task.keyArea,
             goalId: task.goal_id || task.goalId || task.goal || null,
@@ -205,6 +215,12 @@ const api = {
             startDate: (toDateOnly(task.start_date ?? task.startDate) || undefined),
             dueDate: (toDateOnly(task.deadline ?? task.due_date ?? task.dueDate) || undefined),
             endDate: (toDateOnly(task.end_date ?? task.endDate) || undefined),
+            duration:
+                durationRaw === undefined
+                    ? undefined
+                    : durationRaw === null
+                        ? null
+                        : String(durationRaw).trim() || null,
             // Ensure client-side list membership is sent to the backend when present
             listIndex: typeof task.list_index !== 'undefined' ? task.list_index : (typeof task.listIndex !== 'undefined' ? task.listIndex : undefined),
             status: (() => {
@@ -343,11 +359,16 @@ const KanbanView = ({ tasks = [], onSelect, selectedIds = new Set(), toggleSelec
     const priorityBadge = (p) => {
         const lvl = getPriorityLevel(p);
         if (lvl === 2) return null;
-        const cls = lvl === 3 ? "text-red-600" : "text-emerald-600";
-        const label = lvl === 3 ? "High" : "Low";
+        if (lvl === 3) {
+            return (
+                <span className="inline-block text-xs font-bold leading-none text-red-600" title="Priority: High" aria-hidden>
+                    !
+                </span>
+            );
+        }
         return (
-            <span className={`inline-block text-xs font-bold ${cls}`} title={`Priority: ${label}`} aria-hidden>
-                !
+            <span className="inline-block text-xs font-bold leading-none text-slate-500" title="Priority: Low" aria-hidden>
+                ↓
             </span>
         );
     };
@@ -725,18 +746,14 @@ export default function KeyAreas() {
 
         try {
             if (key === 'assignee') {
-                const ts = await getTaskService();
-                let valueToSend = value;
-                try {
-                    valueToSend = selectedUserIdToPersistValue(value, users, currentUserId);
-                } catch (err) {}
-
-                const updatedTask = await ts.update(taskId, { assignee: valueToSend });
-                setSelectedTaskInPanel((prev) => (prev && String(prev.id) === String(updatedTask.id) ? { ...prev, ...updatedTask } : prev));
-                setAllTasks((prev) => (Array.isArray(prev) ? prev.map((t) => (String(t.id) === String(updatedTask.id) ? { ...t, ...updatedTask } : t)) : prev));
+                const svc = await getActivityService();
+                const updated = await svc.update(activity.id, {
+                    delegatedToUserId: value || null,
+                });
+                const norm = normalizeActivity(updated || {});
                 setActivitiesByTask((prev) => ({
                     ...prev,
-                    [tid]: (prev[tid] || []).map((a) => (a.id === activity.id ? { ...a, assignee: valueToSend } : a)),
+                    [tid]: (prev[tid] || []).map((a) => (a.id === activity.id ? { ...a, ...norm } : a)),
                 }));
                 addToast && addToast({ title: 'Saved', variant: 'success' });
             } else {
@@ -2734,14 +2751,8 @@ export default function KeyAreas() {
                         bVal = b.deadline || b.due_date || b.dueDate || '';
                         break;
                     case 'duration':
-                        const getDuration = (t) => {
-                            const start = t.start_date || t.startDate;
-                            const end = t.end_date || t.endDate;
-                            if (!start || !end) return 0;
-                            return new Date(end).getTime() - new Date(start).getTime();
-                        };
-                        aVal = getDuration(a);
-                        bVal = getDuration(b);
+                        aVal = parseDurationToMinutes(a.duration ?? a.duration_minutes) ?? 0;
+                        bVal = parseDurationToMinutes(b.duration ?? b.duration_minutes) ?? 0;
                         break;
                     case 'completed':
                         aVal = a.completionDate || a.completion_date || '';
@@ -3165,6 +3176,13 @@ export default function KeyAreas() {
             if (payload.startDate || payload.start_date || payload.date_start) body.startDate = toDateOnly(payload.startDate || payload.start_date || payload.date_start);
             if (payload.endDate || payload.end_date || payload.date_end) body.endDate = toDateOnly(payload.endDate || payload.end_date || payload.date_end);
             if (payload.deadline || payload.dueDate || payload.due_date) body.deadline = toDateOnly(payload.deadline || payload.dueDate || payload.due_date);
+            if (typeof payload.duration !== 'undefined') {
+                const durationRaw = payload.duration;
+                body.duration =
+                    durationRaw === null
+                        ? null
+                        : String(durationRaw).trim() || null;
+            }
             if (typeof payload.priority !== 'undefined') body.priority = mapPriorityToApi(payload.priority);
             if (payload.goalId || payload.goal || payload.goal_id) body.goalId = payload.goalId || payload.goal || payload.goal_id;
             if (payload.completionDate) body.completionDate = payload.completionDate;
@@ -3358,8 +3376,8 @@ export default function KeyAreas() {
                         />
                     </div>
                     
-                    <div className="flex-1 h-full min-h-0 max-w-full overflow-x-hidden pb-0 flex flex-col">
-                        <div className="px-1 md:px-2">
+                    <div className="flex-1 h-full min-h-0 max-w-full overflow-hidden px-1 md:px-2 pb-1 flex flex-col">
+                        <div>
                             {/* Header / Search / New KA */}
                             <div
                                 className="flex items-center justify-between gap-3 mb-4"
@@ -3593,13 +3611,13 @@ export default function KeyAreas() {
                             </div>
                         )}
                         {(selectedKA || viewTab === 'delegated' || viewTab === 'todo') && (viewTab !== 'delegated' && viewTab !== 'todo' && viewTab !== 'activity-trap') && (
-                            <div className="flex-1 h-[calc(100vh-200px)] min-h-[600px]">
+                            <div className="flex-1 min-h-0 overflow-hidden">
                                 <ResizablePanels
                                     taskPanel={
                                     <div className="flex flex-col h-full bg-white">
                                         {/* Task Panel Content */}
-                                        <div className="flex-1 min-h-0 overflow-hidden px-3 py-3">
-                                            <div className="space-y-6 flex flex-col h-full min-h-0">
+                                        <div className="flex-1 min-h-0 overflow-hidden px-3 pt-3 pb-0">
+                                            <div className="space-y-6 flex flex-col min-h-0">
                                 <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 space-y-6">
                                         {/* Header Row: Task Lists Label + Mass Edit Control */}
                                         <div className="flex items-center justify-between border-b pb-2">
@@ -3839,7 +3857,7 @@ export default function KeyAreas() {
                                                         hint="Use the 'Add Task' button below to create your first task."
                                                     />
                                                 ) : (
-                                                    <div className="flex-1 min-h-0 overflow-x-auto">
+                                                    <div className="min-h-0 max-h-[calc(100vh-520px)] overflow-x-auto overflow-y-auto hover-scrollbar-y">
                                                         <table className="min-w-[1400px] w-full text-sm table-fixed">
                                                             <thead className="bg-slate-50 border border-slate-200 text-slate-700 block">
                                                                 <tr className="table w-full table-fixed">
@@ -3936,7 +3954,7 @@ export default function KeyAreas() {
                                                                     {/* Actions column removed — actions available via row menu */}
                                                                 </tr>
                                                             </thead>
-                                                            <tbody className="bg-white block max-h-[calc(100vh-520px)] overflow-y-auto overflow-x-hidden hover-scrollbar">
+                                                            <tbody className="bg-white block">
                                                                 {sortedTasks.map((t) => {
                                                                     const q = computeEisenhowerQuadrant({
                                                                         deadline: t.deadline,
@@ -4092,16 +4110,33 @@ export default function KeyAreas() {
                                     </div>
                                         
                                     {/* Add Task Footer */}
-                                    <div className="flex justify-end pr-10 pt-2 pb-2 bg-white border-t border-slate-100">
+                                    <div className="shrink-0 flex justify-end pr-10 pt-2 pb-2 bg-white border-t border-slate-100">
                                             <button
                                                 type="button"
                                                 onClick={() => {
-                                                    setTaskForm((s) => ({
-                                                        ...s,
-                                                        list_index: taskTab,
-                                                        // Prefill key area with the currently selected Key Area when creating a new task
-                                                        key_area_id: selectedKA?.id || s.key_area_id || s.keyAreaId || null,
-                                                    }));
+                                                    setTaskForm({
+                                                        title: "",
+                                                        description: "",
+                                                        list_index: taskTab || 1,
+                                                        category: "Key Areas",
+                                                        goal_id: "",
+                                                        start_date: "",
+                                                        deadline: "",
+                                                        end_date: "",
+                                                        status: "open",
+                                                        priority: "normal",
+                                                        tags: "",
+                                                        recurrence: "",
+                                                        attachments: "",
+                                                        attachmentsFiles: [],
+                                                        assignee: "",
+                                                        duration: "",
+                                                        // Prefill key area with the currently selected Key Area for new task creation.
+                                                        key_area_id: selectedKA?.id || null,
+                                                        list: "",
+                                                        finish_date: "",
+                                                        _endAuto: true,
+                                                    });
                                                     setShowTaskComposer(true);
                                                 }}
                                                 className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -4123,14 +4158,16 @@ export default function KeyAreas() {
                                                     {(() => {
                                                         const lvl = getPriorityLevel ? getPriorityLevel(selectedTaskInPanel?.priority) : 2;
                                                         if (lvl === 2) return null;
-                                                        const cls = lvl === 3 ? "text-red-600" : "text-emerald-600";
-                                                        const label = lvl === 3 ? "High" : "Low";
+                                                        if (lvl === 3) {
+                                                            return (
+                                                                <span className="inline-block text-xs font-bold leading-none text-red-600" title="Priority: High">
+                                                                    !
+                                                                </span>
+                                                            );
+                                                        }
                                                         return (
-                                                            <span
-                                                                className={`inline-block text-sm font-bold ${cls}`}
-                                                                title={`Priority: ${label}`}
-                                                            >
-                                                                !
+                                                            <span className="inline-block text-xs font-bold leading-none text-slate-500" title="Priority: Low">
+                                                                ↓
                                                             </span>
                                                         );
                                                     })()}
@@ -4204,14 +4241,8 @@ export default function KeyAreas() {
                                                                             bVal = b.deadline || '';
                                                                             break;
                                                                         case 'duration':
-                                                                            const getDuration = (act) => {
-                                                                                const start = act.start_date || act.startDate;
-                                                                                const end = act.end_date || act.endDate;
-                                                                                if (!start || !end) return 0;
-                                                                                return new Date(end).getTime() - new Date(start).getTime();
-                                                                            };
-                                                                            aVal = getDuration(a);
-                                                                            bVal = getDuration(b);
+                                                                            aVal = parseDurationToMinutes(a.duration ?? a.duration_minutes) ?? 0;
+                                                                            bVal = parseDurationToMinutes(b.duration ?? b.duration_minutes) ?? 0;
                                                                             break;
                                                                         case 'completed':
                                                                             aVal = a.completionDate || a.completion_date || '';
@@ -4408,9 +4439,9 @@ export default function KeyAreas() {
                                                                                                 onChange={(e) => updateActivityField(a, selectedTaskInPanel?.id, 'priority', e.target.value)}
                                                                                                 disabled={savingActivityIds.has(a.id)}
                                                                                             >
-                                                                                                <option value="low">Low</option>
+                                                                                                <option value="high" >❗️ High</option>
                                                                                                 <option value="normal">Normal</option>
-                                                                                                <option value="high">High</option>
+                                                                                                <option value="low" style={{ color: "#6b7280" }}>↓ Low</option>
                                                                                             </select>
                                                                                         </td>
                                                                                     )}
@@ -4915,7 +4946,7 @@ export default function KeyAreas() {
                         )}
                         {/* DETAIL: Tabs */}
                         {selectedKA && (
-                            <div className="mt-4 space-y-4">
+                            <div className="space-y-4">
                                 {/* Composer — rendered from left card; show form only when requested */}
                                 {showTaskComposer && (
                                     <>

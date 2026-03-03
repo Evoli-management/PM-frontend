@@ -3,9 +3,10 @@ import { useDraggable } from "../../hooks/useDraggable";
 import { useResizable } from "../../hooks/useResizable";
 import calendarService from "../../services/calendarService";
 import { useToast } from "../shared/ToastProvider.jsx";
-import { FaTrash } from "react-icons/fa";
+import { FaSave, FaTrash } from "react-icons/fa";
 import TimePicker from "../ui/TimePicker.jsx";
 import useCalendarPreferences from "../../hooks/useCalendarPreferences";
+import { formatKeyAreaLabel } from "../../utils/keyAreaDisplay";
 
 /* ----------------------------- Helper functions ---------------------------- */
 
@@ -470,7 +471,7 @@ const buildRecurringPattern = ({
     const recurrenceUntilRef = useRef(null);
 
     const { position, isDragging, handleMouseDown, handleMouseMove, handleMouseUp, resetPosition } = useDraggable();
-    const { size, isDraggingResize, handleResizeMouseDown } = useResizable(600, 560);
+    const { size, isDraggingResize, handleResizeMouseDown } = useResizable(600, 520);
     
     useEffect(() => {
         if (isDragging) {
@@ -928,6 +929,38 @@ const buildRecurringPattern = ({
         }
     };
 
+    const handleHeaderDelete = async () => {
+        if (!isEdit) return;
+        try {
+            const recurring = Boolean(event?.recurringPattern || event?.recurrence || event?.seriesId);
+            if (recurring) {
+                setShowDeleteConfirm(true);
+                setDeleteScopeChoice('occurrence');
+                return;
+            }
+
+            if (!window.confirm(`Delete this ${modalEntityLabel.toLowerCase()}?`)) return;
+
+            if (typeof onDelete === "function") {
+                await onDelete();
+                return;
+            }
+
+            if (event?.kind === "appointment") {
+                await calendarService.deleteAppointment(event.id);
+            } else {
+                await calendarService.deleteEvent(event.id);
+            }
+
+            if (typeof onDeleted === "function") {
+                onDeleted({ id: event?.id, scope: "occurrence", seriesId: event?.seriesId || null, occurrenceStart: event?.start || null });
+            }
+            onClose && onClose();
+        } catch (err) {
+            try { console.error('Delete failed', err); } catch (_) {}
+        }
+    };
+
     
 
     /* --------------------------------- JSX ---------------------------------- */
@@ -1017,12 +1050,34 @@ const buildRecurringPattern = ({
                             ? `Edit ${modalEntityLabel}`
                             : `Create ${modalEntityLabel}`}
                     </h3>
-                    <div className="flex items-center justify-end">
+                    <div className="flex items-center justify-end gap-2">
+                        <button
+                            type="submit"
+                            form="appointment-modal-form"
+                            disabled={saving}
+                            className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+                            onMouseDown={(e) => e.stopPropagation()}
+                        >
+                            <FaSave className="text-xs" />
+                            {saving ? "Saving..." : "Save"}
+                        </button>
+                        {isEdit ? (
+                            <button
+                                type="button"
+                                className="p-2 rounded-md text-red-600 hover:bg-red-50"
+                                aria-label="Delete"
+                                onClick={handleHeaderDelete}
+                                onMouseDown={(e) => e.stopPropagation()}
+                            >
+                                <FaTrash className="text-sm" />
+                            </button>
+                        ) : null}
                         <button
                             type="button"
                             className="rounded-full p-2 text-slate-600 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-600"
                             aria-label="Close"
                             onClick={onClose}
+                            onMouseDown={(e) => e.stopPropagation()}
                         >
                             ✕
                         </button>
@@ -1031,14 +1086,15 @@ const buildRecurringPattern = ({
 
                 {/* Body */}
                 <form
-                    className="space-y-2 px-4 pb-4 pt-2 overflow-y-auto flex-1"
+                    id="appointment-modal-form"
+                    className="pm-notched-form space-y-2 px-4 pb-2 pt-2 overflow-y-auto flex-1"
                     onSubmit={(e) => {
                         e.preventDefault();
                         if (!saving) handleSave();
                     }}
                 >
                     {/* Title */}
-                    <div>
+                    <div className="mb-4">
                         <label
                             className="text-sm font-medium text-slate-700"
                             htmlFor="appointment-title"
@@ -1048,7 +1104,7 @@ const buildRecurringPattern = ({
                         <input
                             id="appointment-title"
                             required
-                            className="left-focus mt-0 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50"
+                            className="left-focus mt-0.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50"
                             placeholder={`${modalEntityLabel} title`}
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
@@ -1060,7 +1116,7 @@ const buildRecurringPattern = ({
                     <div className="grid grid-cols-1 gap-y-4 md:grid-cols-[1fr_auto_1fr] md:gap-x-6">
                         {/* Left column: start date, end date, start time, end time */}
                         <div className="grid grid-rows-4 gap-0 md:col-span-1">
-                            <div>
+                            <div className="min-h-16">
                                 <label className="text-sm font-medium text-slate-700">
                                     Start date
                                 </label>
@@ -1092,7 +1148,7 @@ const buildRecurringPattern = ({
                                 </div>
                             </div>
 
-                            <div>
+                            <div className="min-h-16">
                                 <label className="text-sm font-medium text-slate-700">
                                     End date
                                 </label>
@@ -1125,7 +1181,7 @@ const buildRecurringPattern = ({
                             </div>
 
                             <>
-                                <div>
+                                <div className="min-h-16">
                                     <label className="text-sm font-medium text-slate-700">Start time</label>
                                     <TimePicker
                                         value={startTimeStr}
@@ -1137,7 +1193,7 @@ const buildRecurringPattern = ({
                                     />
                                 </div>
 
-                                <div>
+                                <div className="min-h-16">
                                     <label className="text-sm font-medium text-slate-700">End time</label>
                                     <TimePicker
                                         value={endTimeStr}
@@ -1159,7 +1215,7 @@ const buildRecurringPattern = ({
 
                         {/* Right column: description, key area, assignee, goal */}
                         <div className="grid grid-rows-4 gap-0 md:col-span-1">
-                            <div>
+                            <div className="min-h-16">
                                 <label className="text-sm font-medium text-slate-700">
                                     Description
                                 </label>
@@ -1172,7 +1228,7 @@ const buildRecurringPattern = ({
                                 />
                             </div>
 
-                            <div>
+                            <div className="min-h-16">
                                 <label className="text-sm font-medium text-slate-700">
                                     Key area
                                 </label>
@@ -1184,9 +1240,9 @@ const buildRecurringPattern = ({
                                         onChange={(e) => setKeyAreaId(e.target.value)}
                                     >
                                         <option value="">— No key area —</option>
-                                        {Array.isArray(keyAreas) && keyAreas.map((k) => (
+                                        {Array.isArray(keyAreas) && keyAreas.map((k, idx) => (
                                             <option key={k.id || k.keyAreaId || k._id} value={k.id || k.keyAreaId || k._id}>
-                                                {k.title || k.name || String(k.id)}
+                                                {formatKeyAreaLabel(k, idx)}
                                             </option>
                                         ))}
                                     </select>
@@ -1203,7 +1259,7 @@ const buildRecurringPattern = ({
                                 </div>
                             </div>
 
-                            <div>
+                            <div className="min-h-16">
                                 <label className="text-sm font-medium text-slate-700">
                                     Assignee
                                 </label>
@@ -1238,7 +1294,7 @@ const buildRecurringPattern = ({
                                 </div>
                             </div>
 
-                            <div>
+                            <div className="min-h-16">
                                 <label className="text-sm font-medium text-slate-700">
                                     Link goal
                                 </label>
@@ -1585,56 +1641,9 @@ const buildRecurringPattern = ({
                     
 
                     {/* Footer */}
-                    <div className="flex w-full items-center justify-end gap-2">
-                        <div className="flex items-center gap-2">
-                            <button
-                                type="submit"
-                                disabled={saving}
-                                className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
-                            >
-                                <svg
-                                    stroke="currentColor"
-                                    fill="currentColor"
-                                    strokeWidth="0"
-                                    viewBox="0 0 448 512"
-                                    height="1em"
-                                    width="1em"
-                                    xmlns="http://www.w3.org/2000/svg"
-                                >
-                                    <path d="M433.941 129.941l-83.882-83.882A48 48 0 0 0 316.118 32H48C21.49 32 0 53.49 0 80v352c0 26.51 21.49 48 48 48h352c26.51 0 48-21.49 48-48V163.882a48 48 0 0 0-14.059-33.941zM224 416c-35.346 0-64-28.654-64-64 0-35.346 28.654-64 64-64s64 28.654 64 64c0 35.346-28.654 64-64 64zm96-304.52V212c0 6.627-5.373 12-12 12H76c-6.627 0-12-5.373-12-12V108c0-6.627 5.373-12 12-12h228.52c3.183 0 6.235 1.264 8.485 3.515l3.48 3.48A11.996 11.996 0 0 1 320 111.48z" />
-                                </svg>
-                                {saving ? "Saving..." : "Save"}
-                            </button>
-                            {/* Delete is handled from the appointment bar delete icon; show modal Delete button only when opened from Month view */}
-                            {isEdit && showDelete ? (
-                                <div className="flex items-center gap-2">
-                                    {!showDeleteConfirm ? (
-                                        <button
-                                            type="button"
-                                            aria-label="Delete appointment"
-                                            title="Delete"
-                                            className="rounded-md border border-red-300 px-3 py-2 text-sm text-red-700 hover:bg-red-50 flex items-center justify-center"
-                                            onClick={() => {
-                                                try {
-                                                    // If this appears to be a recurring appointment,
-                                                    // show inline scoped delete options. Otherwise
-                                                    // delegate to parent handler (which may show
-                                                    // a global popover).
-                                                    const isRecurring = Boolean(event?.recurringPattern || event?.recurrence || event?.seriesId);
-                                                    if (isRecurring) {
-                                                        setShowDeleteConfirm(true);
-                                                        setDeleteScopeChoice('occurrence');
-                                                    } else {
-                                                        if (typeof onDelete === 'function') onDelete();
-                                                    }
-                                                } catch (e) {}
-                                            }}
-                                        >
-                                            <FaTrash aria-hidden />
-                                        </button>
-                                    ) : null}
-
-                                    {showDeleteConfirm ? (
+                    {showDeleteConfirm ? (
+                        <div className="flex w-full items-center justify-end gap-2">
+                            <div className="flex items-center gap-2">
                                         <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
                                             <div className="font-semibold text-sm mb-2">Delete recurring appointment</div>
                                             <div className="flex flex-col gap-2 text-sm">
@@ -1726,19 +1735,9 @@ const buildRecurringPattern = ({
                                                 </div>
                                             </div>
                                         </div>
-                                    ) : null}
-                                </div>
-                            ) : null}
-
-                            <button
-                                type="button"
-                                className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                                onClick={onClose}
-                            >
-                                Cancel
-                            </button>
+                            </div>
                         </div>
-                    </div>
+                    ) : null}
                 </form>
                 {/* Right resize handle */}
                 <div

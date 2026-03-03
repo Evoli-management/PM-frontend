@@ -75,9 +75,9 @@ const TaskFormModal = ({ isOpen, initialData = {}, onSave, onCancel, isSaving = 
             <div>
               <label className="block text-sm font-medium text-slate-700">Priority</label>
               <select className="w-full mt-1 rounded border border-slate-300 p-2" value={priority} onChange={(e) => setPriority(e.target.value)}>
-                <option value="low">Low</option>
+                <option value="high" >❗️ High</option>
                 <option value="med">Normal</option>
-                <option value="high">High</option>
+                <option value="low" style={{ color: "#6b7280" }}>↓ Low</option>
               </select>
             </div>
           </div>

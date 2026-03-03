@@ -153,14 +153,16 @@ const TaskRow = ({
           {(() => {
             const lvl = getPriorityLevel ? getPriorityLevel(t.priority) : 2;
             if (lvl === 2) return null;
-            const cls = lvl === 3 ? "text-red-600" : "text-emerald-600";
-            const label = lvl === 3 ? "High" : "Low";
+            if (lvl === 3) {
+              return (
+                <span className="mt-0.5 inline-block shrink-0 text-sm font-bold leading-none text-red-600" title="Priority: High">
+                  !
+                </span>
+              );
+            }
             return (
-              <span
-                className={`mt-0.5 inline-block text-sm font-bold ${cls}`}
-                title={`Priority: ${label}`}
-              >
-                !
+              <span className="mt-0.5 inline-block shrink-0 text-sm font-bold leading-none text-slate-500" title="Priority: Low">
+                ↓
               </span>
             );
           })()}
@@ -276,9 +278,9 @@ const TaskRow = ({
                 try { await updateField && updateField(t.id, 'priority', v); } catch (err) {}
               }}
             >
-              <option value="low">Low</option>
+              <option value="high" >❗️ High</option>
               <option value="normal">Normal</option>
-              <option value="high">High</option>
+              <option value="low" style={{ color: "#6b7280" }}>↓ Low</option>
             </select>
           ) : (
             (() => {
@@ -442,7 +444,13 @@ const TaskRow = ({
         </td>
       )}
       {vc.duration && (
-        <td className="px-3 py-2 align-top text-slate-800 w-[90px]">{formatDuration(t.start_date || t.deadline, t.end_date)}</td>
+        <td className="px-3 py-2 align-top text-slate-800 w-[90px]">
+          {(() => {
+            const raw = t.duration ?? t.duration_minutes ?? '';
+            const val = String(raw).trim();
+            return val || '—';
+          })()}
+        </td>
       )}
       {vc.completed && (
         <td className="px-3 py-2 align-top text-slate-800 w-[120px]">

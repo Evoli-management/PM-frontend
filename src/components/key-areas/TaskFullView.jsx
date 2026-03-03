@@ -604,7 +604,7 @@ export default function TaskFullView({
                                 {/* show high-priority marker before the title when applicable */}
                                 {(() => {
                                     const isHigh = getPriorityLevel(task.priority) === 3;
-                                    if (isHigh) return (<span className="mt-0.5 inline-block text-sm font-bold text-red-600 mr-2" title={`Priority: High`}>!</span>);
+                                    if (isHigh) return (<span className="inline-block text-xs font-bold leading-none text-red-600" title="Priority: High">!</span>);
                                     return null;
                                 })()}
                                 <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" className="absolute left-0 top-1/2 -translate-y-1/2 pointer-events-none text-[20px]" aria-hidden="true" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg" style={{ color: kaColor }}><path d="M400 32H48C21.5 32 0 53.5 0 80v352c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48V80c0-26.5-21.5-48-48-48z"></path></svg>

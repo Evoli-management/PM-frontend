@@ -226,6 +226,8 @@ export default function MonthView({
   onQuickCreate,
   enableQuickCreate = true,
   onTaskDrop,
+  slotSizeMinutes = 15,
+  onToggleSlotSize,
 }) {
   const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -235,7 +237,7 @@ export default function MonthView({
     formatTime,
     loading: prefsLoading,
     isWorkingTime,
-  } = useCalendarPreferences(30);
+  } = useCalendarPreferences(slotSizeMinutes);
 
   const NON_WORK_BG = "#f8fafc";
   const NON_WORK_OPACITY = 0.75;
@@ -1364,6 +1366,16 @@ export default function MonthView({
               </div>
             )}
           </div>
+          <button
+            type="button"
+            onClick={() => onToggleSlotSize && onToggleSlotSize()}
+            className="px-2 py-1 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+            style={{ minWidth: 48, minHeight: 28 }}
+            aria-label={`Toggle time labels to ${slotSizeMinutes === 15 ? "30 minutes" : "15 minutes"}`}
+            title={`Time labels: ${slotSizeMinutes}m (click to switch)`}
+          >
+            {slotSizeMinutes}m
+          </button>
         </div>
 
         <h2 className="text-xl font-bold flex items-center gap-2">

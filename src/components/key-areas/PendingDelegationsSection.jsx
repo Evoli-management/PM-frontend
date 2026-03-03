@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Select from 'react-select';
 import taskDelegationService from '../../services/taskDelegationService';
 import activityDelegationService from '../../services/activityDelegationService';
+import { formatKeyAreaLabel } from '../../utils/keyAreaDisplay';
 
 export default function PendingDelegationsSection({
   pendingTasks = [],
@@ -34,7 +35,8 @@ export default function PendingDelegationsSection({
   const [listError, setListError] = useState('');
 
   const normalizeKeyAreaTitle = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-  const getKeyAreaLabel = (area) => area?.name || area?.title || 'Untitled';
+  const getRawKeyAreaLabel = (area) => area?.name || area?.title || 'Untitled';
+  const getKeyAreaLabel = (area, index = null) => formatKeyAreaLabel(area, index);
 
   // Format date as dd.mm.yyyy
   const formatDate = (date) => {
@@ -207,16 +209,16 @@ export default function PendingDelegationsSection({
   }
 
   const normalizedTitles = new Set(
-    keyAreas.map((area) => normalizeKeyAreaTitle(getKeyAreaLabel(area)))
+    keyAreas.map((area) => normalizeKeyAreaTitle(getRawKeyAreaLabel(area)))
   );
-  const keyAreaOptions = keyAreas.map((ka) => ({
+  const keyAreaOptions = keyAreas.map((ka, idx) => ({
     value: ka.id,
-    label: getKeyAreaLabel(ka),
+    label: getKeyAreaLabel(ka, idx),
   }));
   if (!normalizedTitles.has('ideas')) {
     keyAreaOptions.push({
       value: '__missing_ideas',
-      label: 'Ideas (unavailable)',
+      label: '💡 Ideas (unavailable)',
       isDisabled: true,
     });
   }

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Plus, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import { useDraggable } from "../../hooks/useDraggable";
 import { useResizable } from "../../hooks/useResizable";
+import { formatKeyAreaLabel } from "../../utils/keyAreaDisplay";
 
 const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = false }) => {
   // default new-goal dates to today. The validation allows deadline to be
@@ -536,9 +537,9 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
                   className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-10 mt-0"
                 >
                   <option value="">Select key area</option>
-                  {keyAreas.map((area) => (
+                  {keyAreas.map((area, idx) => (
                     <option key={area.id} value={area.id}>
-                      {area.name}
+                      {formatKeyAreaLabel(area, idx)}
                     </option>
                   ))}
                 </select>
@@ -567,9 +568,9 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
                   onChange={(e) => handleInputChange("priority", e.target.value)}
                   className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-10 mt-0"
                 >
-                  <option value="low">Low</option>
+                  <option value="low" style={{ color: "#6b7280" }}>↓ Low</option>
                   <option value="medium">Medium</option>
-                  <option value="high">High</option>
+                  <option value="high" >❗️ High</option>
                 </select>
               </div>
 

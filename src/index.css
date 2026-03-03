@@ -100,22 +100,30 @@ body {
 
 /* Vertical-only hover scrollbar (keeps horizontal scroll behavior unchanged) */
 .hover-scrollbar-y {
-    scrollbar-width: thin; /* Firefox */
+    scrollbar-width: none; /* Firefox: hide by default */
+    scrollbar-color: transparent transparent;
+    scrollbar-gutter: stable;
 }
-.hover-scrollbar-y::-webkit-scrollbar:vertical {
-    width: 4px;
+.hover-scrollbar-y::-webkit-scrollbar {
+    width: 0;
+    height: 0;
 }
-.hover-scrollbar-y:hover::-webkit-scrollbar:vertical {
-    width: 4px;
+.hover-scrollbar-y:hover {
+    scrollbar-width: thin; /* Firefox: show on hover */
+    scrollbar-color: #b9c0cd transparent;
 }
-.hover-scrollbar-y:hover::-webkit-scrollbar-track:vertical {
+.hover-scrollbar-y:hover::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+.hover-scrollbar-y::-webkit-scrollbar-track {
     background: transparent;
 }
-.hover-scrollbar-y::-webkit-scrollbar-thumb:vertical {
+.hover-scrollbar-y::-webkit-scrollbar-thumb {
     background: transparent;
     border-radius: 999px;
 }
-.hover-scrollbar-y:hover::-webkit-scrollbar-thumb:vertical {
+.hover-scrollbar-y:hover::-webkit-scrollbar-thumb {
     background: #b9c0cd;
     border-radius: 999px;
 }
@@ -338,4 +346,25 @@ input[type="date"].hide-native-date-icon {
 
 .ta-legacy .ta-priority {
     color: var(--ta-accent);
+}
+
+/* Notched label fields for task/activity modals */
+.pm-notched-form :is(div):has(> label + :is(input, select, textarea, .relative)) {
+    position: relative;
+}
+
+.pm-notched-form :is(div):has(> label + :is(input, select, textarea, .relative)) > label {
+    position: absolute;
+    top: 0;
+    transform: translateY(-50%);
+    left: 10px;
+    margin: 0;
+    padding: 0 6px;
+    background: #fff;
+    color: #334155;
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.1;
+    z-index: 2;
+    pointer-events: none;
 }

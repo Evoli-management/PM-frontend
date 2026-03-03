@@ -14,6 +14,14 @@ function getWeekNumber(date) {
 
 const defaultSlotSize = 30;
 const MIN_BOTTOM_PANEL_HEIGHT = 104;
+const DEFAULT_HOUR_HEIGHT_PX = 76;
+const DENSE_HOUR_HEIGHT_PX_15MIN = 96;
+
+const getSlotPixelHeight = (slotSizeMinutes) => {
+  const safeMinutes = Math.max(1, Number(slotSizeMinutes) || defaultSlotSize);
+  const hourHeight = safeMinutes === 15 ? DENSE_HOUR_HEIGHT_PX_15MIN : DEFAULT_HOUR_HEIGHT_PX;
+  return Math.round((hourHeight * safeMinutes) / 60);
+};
 
 const WeekView = ({
   currentDate,
@@ -45,8 +53,10 @@ const WeekView = ({
   onActivityDelete = null,
   // ✅ was referenced but not provided in your snippet; keep safe
   onDeleteRequest = null,
+  slotSizeMinutes = 30,
+  onToggleSlotSize = null,
 }) => {
-  const [slotSize, setSlotSize] = useState(defaultSlotSize);
+  const [slotSize, setSlotSize] = useState(slotSizeMinutes || defaultSlotSize);
   const {
     timeSlots,
     formattedTimeSlots,
@@ -94,9 +104,19 @@ const WeekView = ({
   // Track current time as ms
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [measuredSlotPx, setMeasuredSlotPx] = useState(() =>
-    Math.round((slotSize / 30) * 38)
+    getSlotPixelHeight(slotSize)
   );
   const [listScrollTop, setListScrollTop] = useState(0);
+
+  useEffect(() => {
+    if (slotSizeMinutes && slotSizeMinutes !== slotSize) {
+      setSlotSize(slotSizeMinutes);
+    }
+  }, [slotSizeMinutes, slotSize]);
+
+  useEffect(() => {
+    setMeasuredSlotPx(getSlotPixelHeight(slotSize));
+  }, [slotSize]);
 
   // keep "now" updated
   useEffect(() => {
@@ -123,7 +143,7 @@ const WeekView = ({
     const calculateHeight = () => {
       const slotsPerHour = Math.max(1, Math.round(60 / Math.max(1, slotSize)));
       const desiredSlots = slotsPerHour * 3;
-      const defaultSlotPx = Math.round((slotSize / 30) * 38);
+      const defaultSlotPx = getSlotPixelHeight(slotSize);
       const slotPx = measuredSlotPx || defaultSlotPx;
       const desiredHeight = Math.max(1, Math.round(desiredSlots * slotPx));
 
@@ -254,7 +274,7 @@ const WeekView = ({
   const slots = timeSlots.length > 0 ? timeSlots : generateTimeSlots("00:00", "24:00", slotSize);
 
   // Visual row height based on configured slotSize (minutes).
-  const ITEM_SIZE = Math.round((slotSize / 30) * 38);
+  const ITEM_SIZE = getSlotPixelHeight(slotSize);
   const weekNum = getWeekNumber(weekStart);
 
   // Update time slots when slot size changes
@@ -618,6 +638,16 @@ const WeekView = ({
                 </div>
               )}
             </div>
+            <button
+              type="button"
+              onClick={() => onToggleSlotSize && onToggleSlotSize()}
+              className="px-2 py-1 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+              style={{ minWidth: 48, minHeight: 28 }}
+              aria-label={`Toggle time labels to ${slotSize === 15 ? "30 minutes" : "15 minutes"}`}
+              title={`Time labels: ${slotSize}m (click to switch)`}
+            >
+              {slotSize}m
+            </button>
           </div>
 
           <h2 className="text-xl font-bold flex items-center gap-2">
@@ -1443,17 +1473,18 @@ const WeekView = ({
                               if (nowMinutesFloat < startMinutes || nowMinutesFloat > endMinutes) return null;
 
                               const nowTop = (nowMinutesFloat - startMinutes) * pxPerMinute;
+                              const nowTimeValue = `${String(nowDate.getHours()).padStart(2, "0")}:${String(nowDate.getMinutes()).padStart(2, "0")}`;
+                              const nowTimeLabel = formatTime ? formatTime(nowTimeValue) : nowTimeValue;
 
                               return (
-                                <div className="absolute flex items-center pointer-events-none" style={{ left: TIME_COL_PX + "px", right: 0, top: nowTop + "px" }}>
-                                  <span className="ml-[-32px] bg-red-500 text-white text-[10px] px-1 rounded-full">
-                                    {formatTime
-                                      ? formatTime(
-                                          `${String(nowDate.getHours()).padStart(2, "0")}:${String(nowDate.getMinutes()).padStart(2, "0")}`
-                                        )
-                                      : `${String(nowDate.getHours()).padStart(2, "0")}:${String(nowDate.getMinutes()).padStart(2, "0")}`}
+                                <div
+                                  className="absolute pointer-events-none z-30"
+                                  style={{ left: TIME_COL_PX + "px", right: 0, top: nowTop + "px" }}
+                                >
+                                  <div className="absolute left-0 right-0 border-t border-red-400" />
+                                  <span className="absolute top-0 left-1 -translate-y-1/2 bg-red-500 text-white text-[10px] leading-none px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                                    {nowTimeLabel}
                                   </span>
-                                  <div className="flex-1 border-t border-red-400" />
                                 </div>
                               );
                             } catch {
@@ -1845,6 +1876,7 @@ const WeekView = ({
                     const isHourBoundary = slotMinute === 0;
                     const isHalfHourBoundary = slotMinute === 30;
                     const isQuarterHourBoundary = slotMinute % 15 === 0 && slotMinute % 30 !== 0;
+                    const shouldShowSlotLabel = slotSize === 15 ? slotMinute % 15 === 0 : slotMinute % 30 === 0;
 
                     const rowBorderClass = isHourBoundary
                       ? "border-t border-slate-300"
@@ -1879,7 +1911,7 @@ const WeekView = ({
                             borderRightColor: "rgba(148, 163, 184, 0.3)",
                           }}
                         >
-                          <span className="pl-2">{isHourBoundary ? formatTime(slot) : ""}</span>
+                          <span className="pl-2">{shouldShowSlotLabel ? (formatTime ? formatTime(slot) : slot) : ""}</span>
                         </div>
 
                         {/* RIGHT: grid cells */}

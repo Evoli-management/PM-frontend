@@ -3,6 +3,9 @@ import Modal from "../shared/Modal";
 import { useToast } from "../shared/ToastProvider.jsx";
 import { useDraggable } from "../../hooks/useDraggable";
 import { useResizable } from "../../hooks/useResizable";
+import { FaSave, FaTrash } from "react-icons/fa";
+import { formatKeyAreaLabel } from "../../utils/keyAreaDisplay";
+import { durationToTimeInputValue } from "../../utils/duration";
 // Load services on demand to allow them to be code-split from the main bundle
 let _keyAreaService = null;
 const getKeyAreaService = async () => {
@@ -24,6 +27,7 @@ export default function CreateTaskModal({
     isOpen, 
     onClose, 
     onSave,
+    onDelete,
     initialData = {},
     preselectedKeyArea = null,
     renderInline = false,
@@ -67,7 +71,7 @@ export default function CreateTaskModal({
         priority: initialData.priority || "medium",
         assignee: initialData.assignee || "",
         status: initialData.status || "todo",
-        duration: initialData.duration || "",
+        duration: durationToTimeInputValue(initialData.duration || ""),
         goal: initialData.goal || "",
     });
 
@@ -220,6 +224,7 @@ export default function CreateTaskModal({
                 list_index: form.list_index || 1,
                 status: form.status,
                 priority: form.priority,
+                duration: form.duration ? String(form.duration).trim() : null,
             };
 
             let result;
@@ -253,6 +258,24 @@ export default function CreateTaskModal({
         }
     };
 
+    const handleDelete = async () => {
+        if (!isEditMode || !taskId) return;
+        if (!window.confirm("Delete this task?")) return;
+        try {
+            if (typeof onDelete === "function") {
+                await onDelete(taskId);
+            } else {
+                const svc = await getTaskService();
+                await svc.remove(taskId);
+            }
+            addToast({ title: "Task deleted", variant: "success" });
+            onClose();
+        } catch (error) {
+            console.error("Failed to delete task:", error);
+            addToast({ title: "Failed to delete task", variant: "error" });
+        }
+    };
+
     if (!isOpen) return null;
 
     return (
@@ -272,11 +295,36 @@ export default function CreateTaskModal({
                     className="bg-white text-slate-900 border-b border-slate-200 py-3 px-4 text-center font-semibold cursor-grab active:cursor-grabbing select-none flex-shrink-0"
                     onMouseDown={handleMouseDown}
                 >
-                    {isEditMode ? "Edit Task" : "Add Task"}
+                    <div className="relative">
+                        <span>{isEditMode ? "Edit Task" : "Add Task"}</span>
+                        <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                            <button
+                                type="submit"
+                                form="create-task-legacy-form"
+                                className="rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold px-3 py-1.5 text-sm inline-flex items-center gap-1.5"
+                            >
+                                <FaSave className="text-xs" />
+                                Save
+                            </button>
+                            {isEditMode && (
+                                <button
+                                    type="button"
+                                    className="p-2 rounded-md text-red-600 hover:bg-red-50"
+                                    aria-label="Delete"
+                                    onClick={handleDelete}
+                                >
+                                    <FaTrash className="text-sm" />
+                                </button>
+                            )}
+                            <button type="button" className="p-2 rounded-md text-slate-600 hover:text-slate-800 hover:bg-slate-100" aria-label="Close" onClick={onClose}>
+                                ✕
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <form className="p-4 md:p-6 overflow-y-auto flex-1" onSubmit={handleSubmit}>
+                <form id="create-task-legacy-form" className="pm-notched-form p-4 md:p-6 overflow-y-auto flex-1" onSubmit={handleSubmit}>
                     <div className="mb-4">
-                        <label className="sr-only" htmlFor="ka-task-title">Task name</label>
+                        <label className="text-sm font-medium text-slate-700" htmlFor="ka-task-title">Task name</label>
                         <input autoFocus id="ka-task-title" required className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50" placeholder="Task name" value={form.title} name="title" onChange={handleInputChange} />
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
@@ -305,13 +353,13 @@ export default function CreateTaskModal({
                                     <input ref={dueDateRef} className="h-9 w-full rounded-lg border border-slate-300 pr-10 pl-3 text-sm shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 hide-native-date-icon" type="date" value={form.dueDate} name="dueDate" onChange={handleInputChange} />
                                     <span role="button" tabIndex={0} aria-label="Open date picker" className="absolute inset-y-0 right-2 grid place-items-center text-base cursor-pointer select-none" onClick={() => openPicker(dueDateRef)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openPicker(dueDateRef); }}>📅</span>
                                 </div>
-                                <p className="mt-1 text-[11px] text-slate-500">No later than</p>
+                                <p className="mt-1 text-[11px] text-slate-500" aria-hidden="true">&nbsp;</p>
                             </div>
                             <div className="flex flex-col">
                                 <label className="text-sm font-medium text-slate-700">Duration</label>
                                 <div className="relative mt-0">
-                                    <input className="h-9 w-full rounded-lg border border-slate-300 pr-10 pl-3 text-sm shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50" placeholder="e.g., 1h, 1d" value={form.duration || ""} name="duration" onChange={handleInputChange} />
-                                    <span className="absolute inset-y-0 right-2 grid place-items-center text-base">📅</span>
+                                    <input className="h-9 w-full rounded-lg border border-slate-300 pr-10 pl-3 text-sm shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50" type="time" step="60" value={form.duration || ""} name="duration" onChange={handleInputChange} />
+                                    <span className="absolute inset-y-0 right-2 grid place-items-center text-base">🕒</span>
                                 </div>
                             </div>
                         </div>
@@ -320,8 +368,8 @@ export default function CreateTaskModal({
                                 <label className="text-sm font-medium text-slate-700">Key Area</label>
                                 <select name="keyAreaId" className="mt-0 h-10 rounded-lg border border-slate-300 px-3 text-sm bg-white shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50" value={form.keyAreaId} onChange={handleInputChange}>
                                     <option value="">— Select key area —</option>
-                                    {keyAreas.map(area => (
-                                        <option key={area.id} value={area.id}>{area.title}</option>
+                                    {keyAreas.map((area, idx) => (
+                                        <option key={area.id} value={area.id}>{formatKeyAreaLabel(area, idx)}</option>
                                     ))}
                                 </select>
                             </div>
@@ -351,9 +399,9 @@ export default function CreateTaskModal({
                             <div className="flex flex-col">
                                 <label className="text-sm font-medium text-slate-700">Priority</label>
                                 <select name="priority" className="mt-0 h-10 rounded-lg border border-slate-300 px-3 text-sm bg-white shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50" value={form.priority} onChange={handleInputChange}>
-                                    <option value="high">High</option>
+                                    <option value="high" >❗️ High</option>
                                     <option value="normal">Normal</option>
-                                    <option value="low">Low</option>
+                                    <option value="low" style={{ color: "#6b7280" }}>↓ Low</option>
                                 </select>
                             </div>
                             <div className="flex flex-col">
@@ -374,18 +422,7 @@ export default function CreateTaskModal({
                             </div>
                         </div>
                     </div>
-                    <div className="mt-6 flex items-center justify-end">
-                        <div className="flex items-center gap-2">
-                            <button type="submit" className="rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-4 py-2 text-sm">
-                                OK
-                            </button>
-                            <button type="button" className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50" onClick={onClose}>Cancel</button>
-                        </div>
-                    </div>
                 </form>
-                <button type="button" className="absolute top-2 right-2 p-2 rounded-md text-slate-600 hover:text-slate-800 hover:bg-slate-100" aria-label="Close" onClick={onClose}>
-                    ✕
-                </button>
                 {/* Right resize handle */}
                 <div
                   onMouseDown={(e) => handleResizeMouseDown(e, 'right')}

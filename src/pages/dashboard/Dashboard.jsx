@@ -197,7 +197,10 @@ function EChart({ data = [], labels = [] }) {
 }
 
 // SortableWidget wrapper component for drag functionality
-function SortableWidget({ id, children, onClose }) {
+const BASE_WIDGET_WIDTH = 320;
+const MAX_WIDGET_WIDTH = BASE_WIDGET_WIDTH * 2;
+
+function SortableWidget({ id, children, onClose, widthScale = 1, onResizeWidth = null }) {
     const {
         attributes,
         listeners,
@@ -211,16 +214,68 @@ function SortableWidget({ id, children, onClose }) {
         transform: CSS.Transform.toString(transform),
         transition,
         opacity: isDragging ? 0.5 : 1,
+        width: `${Math.round(BASE_WIDGET_WIDTH * widthScale)}px`,
+        minWidth: `${BASE_WIDGET_WIDTH}px`,
+        maxWidth: `${MAX_WIDGET_WIDTH}px`,
+    };
+
+    const widgetRef = useRef(null);
+    const setRefs = (node) => {
+        widgetRef.current = node;
+        setNodeRef(node);
+    };
+
+    const resizeStartRef = useRef(null);
+    const handleResizeMove = (event) => {
+        const state = resizeStartRef.current;
+        if (!state || !onResizeWidth) return;
+        const delta = event.clientX - state.startX;
+        const nextWidth = Math.max(BASE_WIDGET_WIDTH, Math.min(MAX_WIDGET_WIDTH, state.startWidth + delta));
+        const nextScale = Math.max(1, Math.min(2, nextWidth / BASE_WIDGET_WIDTH));
+        if (Math.abs(nextScale - state.lastSent) > 0.01) {
+            resizeStartRef.current = { ...state, lastSent: nextScale };
+            onResizeWidth(nextScale);
+        }
+    };
+    const handleResizeEnd = () => {
+        window.removeEventListener("pointermove", handleResizeMove);
+        window.removeEventListener("pointerup", handleResizeEnd);
+        resizeStartRef.current = null;
+    };
+    const handleResizeStart = (event) => {
+        if (!onResizeWidth) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const measuredWidth = widgetRef.current?.getBoundingClientRect?.().width || BASE_WIDGET_WIDTH;
+        const startWidth = Math.max(BASE_WIDGET_WIDTH, Math.min(MAX_WIDGET_WIDTH, measuredWidth));
+        resizeStartRef.current = {
+            startX: event.clientX,
+            startWidth,
+            lastSent: widthScale,
+        };
+        window.addEventListener("pointermove", handleResizeMove);
+        window.addEventListener("pointerup", handleResizeEnd);
     };
 
     return (
-        <div ref={setNodeRef} style={style} className="group relative">
+        <div ref={setRefs} style={style} className="group relative w-full md:w-auto shrink-0">
             {/* Drag handle - Full width title area */}
             <div 
                 {...attributes} 
                 {...listeners}
                 className="absolute top-0 left-0 right-0 h-12 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 cursor-grab active:cursor-grabbing"
             />
+            {/* Stretch handle: drag horizontally to resize between 1x and 2x */}
+            {onResizeWidth && (
+                <div
+                    role="separator"
+                    aria-orientation="vertical"
+                    aria-label="Resize widget width"
+                    title="Drag to resize width"
+                    onPointerDown={handleResizeStart}
+                    className="absolute top-0 right-0 w-1 h-full cursor-e-resize hover:bg-blue-500/20 transition-colors z-20 touch-none"
+                />
+            )}
             {/* Close button */}
             {onClose && (
                 <button
@@ -292,6 +347,14 @@ export default function Dashboard() {
             calendarPreview: true,
             activity: true,
         },
+        widgetSizes: {
+            myDay: 1,
+            goals: 1,
+            keyAreas: 1,
+            enps: 1,
+            calendarPreview: 1,
+            activity: 1,
+        },
         // explicit order for all widgets — will be kept in localStorage (quickAdd removed to avoid duplication with navbar)
         widgetOrder: ["myDay", "goals", "keyAreas", "enps", "calendarPreview", "activity"],
         theme: "light", // or 'dark'
@@ -304,6 +367,7 @@ export default function Dashboard() {
 
             // merge widgets
             const widgets = { ...defaultPrefs.widgets, ...(stored.widgets || {}) };
+            const widgetSizes = { ...defaultPrefs.widgetSizes, ...(stored.widgetSizes || {}) };
 
             // normalize widgetOrder: prefer stored.widgetOrder; else use stored.lastSelected ordering; else fall back to defaults
             const knownKeys = Object.keys(defaultPrefs.widgets);
@@ -323,11 +387,17 @@ export default function Dashboard() {
             const presentKeys = widgetOrder.filter((k, i, arr) => knownKeys.includes(k) && arr.indexOf(k) === i);
             const missingKeys = knownKeys.filter(k => !presentKeys.includes(k));
             widgetOrder = [...presentKeys, ...missingKeys];
+            const normalizedSizes = knownKeys.reduce((acc, key) => {
+                const rawSize = Number(widgetSizes[key]);
+                acc[key] = Math.max(1, Math.min(2, Number.isFinite(rawSize) ? rawSize : 1));
+                return acc;
+            }, {});
 
             return {
                 ...defaultPrefs,
                 ...stored,
                 widgets,
+                widgetSizes: normalizedSizes,
                 widgetOrder,
                 // Force light mode regardless of stored value
                 theme: "light",
@@ -353,6 +423,11 @@ export default function Dashboard() {
         setPrefs((p) => {
             const enabled = !p.widgets[key];
             const widgets = { ...p.widgets, [key]: enabled };
+            const currentSize = Number(p.widgetSizes?.[key]);
+            const widgetSizes = {
+                ...(p.widgetSizes || {}),
+                [key]: Math.max(1, Math.min(2, Number.isFinite(currentSize) ? currentSize : 1)),
+            };
             let widgetOrder = Array.isArray(p.widgetOrder) ? p.widgetOrder.slice() : [];
 
             const lastSelected = { ...(p.lastSelected || {}) };
@@ -366,7 +441,7 @@ export default function Dashboard() {
                 delete lastSelected[key];
             }
 
-            const newPrefs = { ...p, widgets, widgetOrder, lastSelected };
+            const newPrefs = { ...p, widgets, widgetSizes, widgetOrder, lastSelected };
             
             // Dispatch event so Navbar updates its widget menu immediately
             setTimeout(() => {
@@ -770,12 +845,22 @@ export default function Dashboard() {
         // Make all widgets the same size with proper content accommodation
         // Flexible height to fit content but maintain consistency
         const widgetClass = 'w-full h-96 min-h-96';
+        const widthScale = Math.max(1, Math.min(2, Number(prefs.widgetSizes?.[key]) || 1));
+        const setWidgetWidthScale = (scale) => {
+            setPrefs((p) => ({
+                ...p,
+                widgetSizes: {
+                    ...(p.widgetSizes || {}),
+                    [key]: Math.max(1, Math.min(2, Number(scale) || 1)),
+                },
+            }));
+        };
 
 
 
         if (key === "myDay") {
             return (
-                <SortableWidget key={key} id={key} onClose={() => toggleWidget(key)}>
+                <SortableWidget key={key} id={key} widthScale={widthScale} onResizeWidth={setWidgetWidthScale} onClose={() => toggleWidget(key)}>
                     <div className={widgetClass}>
                         <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
                             <div className="flex items-start justify-between mb-3">
@@ -798,7 +883,7 @@ export default function Dashboard() {
 
         if (key === "goals") {
             return (
-                <SortableWidget key={key} id={key} onClose={() => toggleWidget(key)}>
+                <SortableWidget key={key} id={key} widthScale={widthScale} onResizeWidth={setWidgetWidthScale} onClose={() => toggleWidget(key)}>
                     <div className={widgetClass}>
                     <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
                         <h3 className="font-semibold text-blue-700 mb-3">Your active goals</h3>
@@ -876,7 +961,7 @@ export default function Dashboard() {
 
         if (key === "keyAreas") {
             return (
-                <SortableWidget key={key} id={key} onClose={() => toggleWidget(key)}>
+                <SortableWidget key={key} id={key} widthScale={widthScale} onResizeWidth={setWidgetWidthScale} onClose={() => toggleWidget(key)}>
                     <div className={widgetClass}>
                         <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
                             <h3 className="font-semibold text-blue-700 mb-3">Key Areas Summary</h3>
@@ -893,7 +978,7 @@ export default function Dashboard() {
 
         if (key === "enps") {
             return (
-                <SortableWidget key={key} id={key} onClose={() => toggleWidget(key)}>
+                <SortableWidget key={key} id={key} widthScale={widthScale} onResizeWidth={setWidgetWidthScale} onClose={() => toggleWidget(key)}>
                     <div className={widgetClass}>
                     <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
                         <h3 className="font-semibold text-blue-700 mb-3">eNPS Snapshot</h3>
@@ -919,7 +1004,7 @@ export default function Dashboard() {
 
         if (key === "calendarPreview") {
             return (
-                <SortableWidget key={key} id={key} onClose={() => toggleWidget(key)}>
+                <SortableWidget key={key} id={key} widthScale={widthScale} onResizeWidth={setWidgetWidthScale} onClose={() => toggleWidget(key)}>
                     <div className={widgetClass}>
                     <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
                         <h3 className="font-semibold text-blue-700 mb-3">Calendar Preview (Today)</h3>
@@ -961,7 +1046,7 @@ export default function Dashboard() {
 
         if (key === "activity") {
             return (
-                <SortableWidget key={key} id={key} onClose={() => toggleWidget(key)}>
+                <SortableWidget key={key} id={key} widthScale={widthScale} onResizeWidth={setWidgetWidthScale} onClose={() => toggleWidget(key)}>
                     <div className={widgetClass}>
                     <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
                         <h3 className="font-semibold text-blue-700 mb-3">What's New</h3>
@@ -1097,7 +1182,7 @@ export default function Dashboard() {
                                             items={visibleWidgetKeys} 
                                             strategy={rectSortingStrategy}
                                         >
-                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-1 md:gap-2">
+                                            <div className="flex flex-wrap items-stretch gap-1 md:gap-2">
                                                 {visibleWidgetKeys.map((key, index) => renderWidget(key, index))}
                                             </div>
                                         </SortableContext>
