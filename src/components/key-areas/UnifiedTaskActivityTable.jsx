@@ -5,6 +5,7 @@ import { toDateOnly } from '../../utils/keyareasHelpers';
 import taskDelegationService from '../../services/taskDelegationService';
 import activityDelegationService from '../../services/activityDelegationService';
 import keyAreaService from '../../services/keyAreaService';
+import { formatKeyAreaLabel } from '../../utils/keyAreaDisplay';
 
 /**
  * UnifiedTaskActivityTable - Displays tasks AND activities in a single table
@@ -782,7 +783,7 @@ export default function UnifiedTaskActivityTable({
                         <option value="">Key Area</option>
                         {keyAreas.map((ka, idx) => (
                             <option key={ka.id} value={ka.id}>
-                                {idx + 1}. {ka.name || ka.title}
+                                {formatKeyAreaLabel(ka, idx)}
                             </option>
                         ))}
                     </select>
@@ -1126,7 +1127,7 @@ export default function UnifiedTaskActivityTable({
                                                     <option value="">Key Area</option>
                                                     {keyAreas.map((ka, idx) => (
                                                         <option key={ka.id} value={ka.id}>
-                                                            {idx + 1}. {ka.name || ka.title}
+                                                            {formatKeyAreaLabel(ka, idx)}
                                                         </option>
                                                     ))}
                                                 </select>
@@ -1173,9 +1174,9 @@ export default function UnifiedTaskActivityTable({
                                                 onChange={(e) => saveEdit(item, 'priority', e.target.value)}
                                                 onClick={(e) => e.stopPropagation()}
                                             >
-                                                <option value="low">Low</option>
+                                                <option value="high" >❗️ High</option>
                                                 <option value="normal">Normal</option>
-                                                <option value="high">High</option>
+                                                <option value="low" style={{ color: "#6b7280" }}>↓ Low</option>
                                             </select>
                                         </td>
                                     )}
@@ -1352,9 +1353,9 @@ export default function UnifiedTaskActivityTable({
                                              focus:border-transparent"
                                 >
                                     <option value="">-- Select a Key Area --</option>
-                                    {userKeyAreas.map((area) => (
+                                    {userKeyAreas.map((area, idx) => (
                                         <option key={area.id} value={area.id}>
-                                            {area.title || area.name}
+                                            {formatKeyAreaLabel(area, idx)}
                                         </option>
                                     ))}
                                 </select>

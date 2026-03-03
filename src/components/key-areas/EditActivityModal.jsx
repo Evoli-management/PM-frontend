@@ -5,6 +5,10 @@ import { getPriorityLevel } from '../../utils/keyareasHelpers';
 import usersService from '../../services/usersService';
 import { useDraggable } from '../../hooks/useDraggable';
 import { useResizable } from '../../hooks/useResizable';
+import { FaSave, FaTrash } from 'react-icons/fa';
+import activityService from '../../services/activityService';
+import { formatKeyAreaLabel } from '../../utils/keyAreaDisplay';
+import { durationToTimeInputValue } from '../../utils/duration';
 
 // ---- helpers (JS only) ----
 const safeDate = (v) => {
@@ -49,6 +53,7 @@ export default function EditActivityModal({
   isOpen,
   initialData = {},
   onSave,
+  onDelete,
   onCancel,
   isSaving = false,
   keyAreas = [],
@@ -72,7 +77,7 @@ export default function EditActivityModal({
   const [keyAreaError, setKeyAreaError] = useState('');
   const [listError, setListError] = useState('');
   const [deadline, setDeadline] = useState(safeDate(initialData.deadline || initialData.dueDate));
-  const [duration, setDuration] = useState(initialData.duration || '');
+  const [duration, setDuration] = useState(durationToTimeInputValue(initialData.duration || ''));
   const [keyAreaId, setKeyAreaId] = useState(
     initialData.key_area_id || initialData.keyAreaId || initialData.keyArea || initialData.key_area || ''
   );
@@ -128,7 +133,7 @@ export default function EditActivityModal({
     setEndDate(nextEnd);
     setEndAuto(!Boolean(initialData.endDate || initialData.date_end));
     setDeadline(safeDate(initialData.deadline ?? initialData.dueDate ?? initialData.due_date ?? initialData.deadline));
-    setDuration(initialData.duration || '');
+    setDuration(durationToTimeInputValue(initialData.duration || ''));
     setKeyAreaId(initialData.key_area_id || initialData.keyAreaId || initialData.keyArea || initialData.key_area || '');
     setListIndex(initialData.list || initialData.list_index || '');
     setTaskId(initialData.taskId || initialData.task_id || initialData.task || initialData.task_id || '');
@@ -324,6 +329,22 @@ export default function EditActivityModal({
     handleSave();
   };
 
+  const handleDelete = async () => {
+    const id = initialData.id || initialData.activityId || initialData._id;
+    if (!id) return;
+    if (!window.confirm('Delete this activity?')) return;
+    try {
+      if (typeof onDelete === 'function') {
+        await onDelete(id, initialData);
+      } else {
+        await activityService.remove(id);
+      }
+      onCancel && onCancel();
+    } catch (e) {
+      console.error('Failed to delete activity', e);
+    }
+  };
+
   return (
     <Modal open={isOpen} onClose={onCancel}>
       <div
@@ -347,14 +368,37 @@ export default function EditActivityModal({
         `}</style>
 
         <div
-          className="relative px-5 py-2 border-b border-slate-200 text-center font-semibold text-slate-900 cursor-grab active:cursor-grabbing select-none flex-shrink-0"
+          className="relative px-5 py-2 border-b border-slate-200 cursor-grab active:cursor-grabbing select-none flex-shrink-0"
           onMouseDown={handleMouseDown}
         >
-          Edit Activity
+          <h3 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xl font-semibold text-slate-900">
+            Edit Activity
+          </h3>
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="submit"
+              form="edit-activity-form"
+              className="rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold px-3 py-1.5 text-sm inline-flex items-center gap-1.5"
+            >
+              <FaSave className="text-xs" />
+              Save
+            </button>
+            <button
+              type="button"
+              className="p-2 rounded-md text-red-600 hover:bg-red-50"
+              aria-label="Delete"
+              onClick={handleDelete}
+            >
+              <FaTrash className="text-sm" />
+            </button>
+            <button type="button" className="p-2 rounded-md text-slate-600 hover:text-slate-800 hover:bg-slate-100" aria-label="Close" onClick={onCancel}>
+              <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 352 512" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M242.72 256l100.07-100.07c12.28-12.28 12.28-32.19 0-44.48l-22.24-22.24c-12.28-12.28-32.19-12.28-44.48 0L176 189.28 75.93 89.21c-12.28-12.28-32.19-12.28-44.48 0L9.21 111.45c-12.28 12.28-12.28 32.19 0 44.48L109.28 256 9.21 356.07c-12.28 12.28-12.28 32.19 0 44.48l22.24 22.24c12.28 12.28 32.2 12.28 44.48 0L176 322.72l100.07 100.07c12.28 12.28 32.2 12.28 44.48 0l22.24-22.24c12.28-12.28 12.28-32.19 0-44.48L242.72 256z"></path></svg>
+            </button>
+          </div>
         </div>
 
-        <form className="px-4 pb-4 pt-2 space-y-2 overflow-y-auto flex-1" onSubmit={onSubmit}>
-          <div>
+        <form id="edit-activity-form" className="pm-notched-form px-4 pb-4 pt-2 space-y-2 overflow-y-auto flex-1" onSubmit={onSubmit}>
+          <div className="mb-4">
             <label className="text-sm font-medium text-slate-700" htmlFor="ka-activity-title">Activity name</label>
             <input
               id="ka-activity-title"
@@ -436,7 +480,7 @@ export default function EditActivityModal({
                     📅
                   </button>
                 </div>
-                <p className="mt-0 text-xs text-slate-500">No later than</p>
+                <p className="mt-0 text-xs text-slate-500" aria-hidden="true">&nbsp;</p>
               </div>
 
               <div>
@@ -444,7 +488,8 @@ export default function EditActivityModal({
                 <input
                   name="duration"
                   className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 mt-0"
-                  placeholder="e.g., 1h, 1d"
+                  type="time"
+                  step="60"
                   value={duration}
                   onChange={(e) => setDuration(e.target.value)}
                 />
@@ -461,7 +506,7 @@ export default function EditActivityModal({
                 <div className="relative mt-0">
                   <select name="key_area_id" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" value={keyAreaId} onChange={(e) => { setKeyAreaId(e.target.value); setKeyAreaError(''); }} required>
                     <option value="">— Select Key Area —</option>
-                    {(localKeyAreas && localKeyAreas.length ? localKeyAreas : keyAreas).map((ka) => (<option key={ka.id} value={ka.id}>{ka.title || ka.name}</option>))}
+                    {(localKeyAreas && localKeyAreas.length ? localKeyAreas : keyAreas).map((ka, idx) => (<option key={ka.id} value={ka.id}>{formatKeyAreaLabel(ka, idx)}</option>))}
                   </select>
                   <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 </div>
@@ -516,9 +561,9 @@ export default function EditActivityModal({
                 <label className="text-sm font-medium text-slate-700">Priority</label>
                 <div className="relative mt-0">
                   <select name="priority" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" value={priority} onChange={(e) => setPriority(e.target.value)}>
-                    <option value="high">High</option>
+                    <option value="high" >❗️ High</option>
                     <option value="normal">Normal</option>
-                    <option value="low">Low</option>
+                    <option value="low" style={{ color: "#6b7280" }}>↓ Low</option>
                   </select>
                   <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 </div>
@@ -539,13 +584,6 @@ export default function EditActivityModal({
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-2 w-full mt-2">
-            <button type="submit" className="rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-4 py-2 text-sm">
-              <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M433.941 129.941l-83.882-83.882A48 48 0 0 0 316.118 32H48C21.49 32 0 53.49 0 80v352c0 26.51 21.49 48 48 48h352c26.51 0 48-21.49 48-48V163.882a48 48 0 0 0-14.059-33.941zM224 416c-35.346 0-64-28.654-64-64 0-35.346 28.654-64 64-64s64 28.654 64 64c0 35.346-28.654 64-64 64zm96-304.52V212c0 6.627-5.373 12-12 12H76c-6.627 0-12-5.373-12-12V108c0-6.627 5.373-12 12-12h228.52c3.183 0 6.235 1.264 8.485 3.515l3.48 3.48A11.996 11.996 0 0 1 320 111.48z"></path></svg>
-              OK
-            </button>
-            <button type="button" className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50" onClick={onCancel}>Cancel</button>
-          </div>
         </form>
 
         <div
@@ -565,9 +603,6 @@ export default function EditActivityModal({
           title="Drag to resize"
         />
 
-        <button type="button" className="absolute top-2 right-2 p-2 rounded-md text-slate-600 hover:text-slate-800 hover:bg-slate-100" aria-label="Close" onClick={onCancel}>
-          <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 352 512" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M242.72 256l100.07-100.07c12.28-12.28 12.28-32.19 0-44.48l-22.24-22.24c-12.28-12.28-32.19-12.28-44.48 0L176 189.28 75.93 89.21c-12.28-12.28-32.19-12.28-44.48 0L9.21 111.45c-12.28 12.28-12.28 32.19 0 44.48L109.28 256 9.21 356.07c-12.28 12.28-12.28 32.19 0 44.48l22.24 22.24c12.28 12.28 32.2 12.28 44.48 0L176 322.72l100.07 100.07c12.28 12.28 32.2 12.28 44.48 0l22.24-22.24c12.28-12.28 12.28-32.19 0-44.48L242.72 256z"></path></svg>
-        </button>
       </div>
     </Modal>
   );

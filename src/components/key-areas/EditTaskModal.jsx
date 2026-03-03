@@ -1,10 +1,13 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { FaSave } from 'react-icons/fa';
+import { FaSave, FaTrash } from 'react-icons/fa';
 import Modal from '../shared/Modal';
 import usersService from '../../services/usersService';
+import taskService from '../../services/taskService';
 import { useFormattedDate } from '../../hooks/useFormattedDate';
 import { useDraggable } from '../../hooks/useDraggable';
 import { useResizable } from '../../hooks/useResizable';
+import { formatKeyAreaLabel } from '../../utils/keyAreaDisplay';
+import { durationToTimeInputValue } from '../../utils/duration';
 
 // ---- helpers (JS only) ----
 const safeDate = (v) => {
@@ -42,6 +45,7 @@ export default function EditTaskModal({
   isOpen,
   initialData = {},
   onSave,
+  onDelete,
   onCancel,
   isSaving = false,
   keyAreas = [],
@@ -131,7 +135,7 @@ export default function EditTaskModal({
   const [keyAreaError, setKeyAreaError] = useState('');
   const [listError, setListError] = useState('');
   const [deadline, setDeadline] = useState(safeDate(initialData.deadline || initialData.dueDate));
-  const [duration, setDuration] = useState(initialData.duration || initialData.duration_minutes || '');
+  const [duration, setDuration] = useState(durationToTimeInputValue(initialData.duration || initialData.duration_minutes || ''));
   const [priority, setPriority] = useState(initialData.priority ?? initialData.priority_level ?? 2);
   const [status, setStatus] = useState(initialData.status || initialData.state || 'open');
   const [keyAreaId, setKeyAreaId] = useState(
@@ -202,7 +206,7 @@ export default function EditTaskModal({
   if (endDate !== nextEnd) setEndDate(nextEnd);
     const nextDeadline = safeDate(initialData.deadline || initialData.dueDate);
     if (deadline !== nextDeadline) setDeadline(nextDeadline);
-    const nextDuration = initialData.duration || initialData.duration_minutes || '';
+    const nextDuration = durationToTimeInputValue(initialData.duration || initialData.duration_minutes || '');
     if (duration !== nextDuration) setDuration(nextDuration);
     const nextPriority = initialData.priority ?? initialData.priority_level ?? 2;
     if (priority !== nextPriority) setPriority(nextPriority);
@@ -479,6 +483,22 @@ export default function EditTaskModal({
     handleSave();
   };
 
+  const handleDelete = async () => {
+    const id = initialData.id || initialData.taskId || initialData.task_id || initialData._id;
+    if (!id) return;
+    if (!window.confirm('Delete this task?')) return;
+    try {
+      if (typeof onDelete === 'function') {
+        await onDelete(id, initialData);
+      } else {
+        await taskService.remove(id);
+      }
+      onCancel && onCancel();
+    } catch (e) {
+      console.error('Failed to delete task', e);
+    }
+  };
+
   // shared styles to match existing UI
   const inputCls =
     'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50';
@@ -510,7 +530,23 @@ export default function EditTaskModal({
           <h3 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xl font-semibold text-slate-900">
             {modalTitle || 'Edit Task'}
           </h3>
-          <div className="flex items-center justify-end">
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="submit"
+              form="edit-task-form"
+              className="rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold px-3 py-1.5 text-sm inline-flex items-center gap-1.5"
+            >
+              <FaSave className="text-xs" />
+              Save
+            </button>
+            <button
+              type="button"
+              className="p-2 rounded-md text-red-600 hover:bg-red-50"
+              aria-label="Delete"
+              onClick={handleDelete}
+            >
+              <FaTrash className="text-sm" />
+            </button>
             <button 
               type="button" 
               className="p-2 rounded-full text-slate-600 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-600" 
@@ -521,42 +557,42 @@ export default function EditTaskModal({
             </button>
           </div>
         </div>
-        <form className="px-4 pb-4 pt-2 space-y-2 overflow-y-auto flex-1" onSubmit={onSubmit}>
-          <div>
+        <form id="edit-task-form" className="pm-notched-form px-4 pb-4 pt-2 space-y-2 overflow-y-auto flex-1" onSubmit={onSubmit}>
+          <div className="mb-4">
             <label className="text-sm font-medium text-slate-700" htmlFor="edit-task-title">Task name</label>
             <input autoFocus id="edit-task-title" required className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 mt-0.5" placeholder="Task name" value={title} onChange={(e) => setTitle(e.target.value)} />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-y-4 md:gap-x-6">
             <div className="grid grid-rows-5 gap-0 md:col-span-1">
-              <div style={{ minHeight: '83.7639px' }}>
+              <div style={{ minHeight: '64px' }}>
                 <label className="text-sm font-medium text-slate-700">Description</label>
                 <input className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 mt-0" placeholder="Brief description" value={description} onChange={(e) => setDescription(e.target.value)} />
               </div>
-              <div style={{ minHeight: '83.7639px' }}>
+              <div style={{ minHeight: '64px' }}>
                 <label className="text-sm font-medium text-slate-700">Start date</label>
                 <div className="relative mt-0">
                   <input ref={startRef} className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
                   <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600" aria-label="Open date picker">📅</button>
                 </div>
               </div>
-              <div style={{ minHeight: '83.7639px' }}>
+              <div style={{ minHeight: '64px' }}>
                 <label className="text-sm font-medium text-slate-700">End date</label>
                 <div className="relative mt-0">
                   <input ref={endRef} className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
                   <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600" aria-label="Open date picker">📅</button>
                 </div>
               </div>
-              <div style={{ minHeight: '83.7639px' }}>
+              <div style={{ minHeight: '64px' }}>
                 <label className="text-sm font-medium text-slate-700">Deadline</label>
                 <div className="relative mt-0.5">
                   <input ref={deadlineRef} className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar" type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
                   <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600" aria-label="Open date picker">📅</button>
                 </div>
-                <p className="mt-0 text-xs text-slate-500">No later than</p>
+                <p className="mt-0 text-xs text-slate-500" aria-hidden="true">&nbsp;</p>
               </div>
-              <div style={{ minHeight: '83.7639px' }}>
+              <div style={{ minHeight: '64px' }}>
                 <label className="text-sm font-medium text-slate-700">Duration</label>
-                <input className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 mt-0" placeholder="e.g., 1h, 1d" value={duration || ""} onChange={(e) => setDuration(e.target.value)} />
+                <input className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 mt-0" type="time" step="60" value={duration || ""} onChange={(e) => setDuration(e.target.value)} />
               </div>
             </div>
 
@@ -565,19 +601,19 @@ export default function EditTaskModal({
             </div>
 
             <div className="grid grid-rows-5 gap-0 md:col-span-1">
-              <div style={{ minHeight: '83.7639px' }}>
+              <div style={{ minHeight: '64px' }}>
                 <label className="text-sm font-medium text-slate-700">Key Area</label>
                 <div className="relative mt-0">
                   <select name="key_area_id" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" required="" value={keyAreaId} onChange={(e) => setKeyAreaId(e.target.value)}>
                     <option value="">— Select Key Area —</option>
-                    {(localKeyAreas && localKeyAreas.length ? localKeyAreas : keyAreas).map(area => (
-                      <option key={area.id} value={area.id}>{area.title}</option>
+                    {(localKeyAreas && localKeyAreas.length ? localKeyAreas : keyAreas).map((area, idx) => (
+                      <option key={area.id} value={area.id}>{formatKeyAreaLabel(area, idx)}</option>
                     ))}
                   </select>
                   <svg viewBox="0 0 24 24" aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"><path fill="currentColor" d="M6.7 8.7a1 1 0 0 1 1.4 0L12 12.6l3.9-3.9a1 1 0 1 1 1.4 1.4l-4.6 4.6a1 1 0 0 1-1.4 0L6.7 10.1a1 1 0 0 1 0-1.4Z"></path></svg>
                 </div>
               </div>
-              <div style={{ minHeight: '83.7639px' }}>
+              <div style={{ minHeight: '64px' }}>
                 <label className="text-sm font-medium text-slate-700">List</label>
                 <div className="relative mt-0">
                   <select name="list_index" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" required="" value={listIndex} onChange={(e) => setListIndex(Number(e.target.value))} disabled={!keyAreaId}>
@@ -599,7 +635,7 @@ export default function EditTaskModal({
                   <svg viewBox="0 0 24 24" aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"><path fill="currentColor" d="M6.7 8.7a1 1 0 0 1 1.4 0L12 12.6l3.9-3.9a1 1 0 1 1 1.4 1.4l-4.6 4.6a1 1 0 0 1-1.4 0L6.7 10.1a1 1 0 0 1 0-1.4Z"></path></svg>
                 </div>
               </div>
-              <div style={{ minHeight: '83.7639px' }}>
+              <div style={{ minHeight: '64px' }}>
                 <label className="text-sm font-medium text-slate-700">Responsible</label>
                 <div className="relative mt-0">
                   <select name="assignee" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10 mt-0 h-9" value={assignee} onChange={(e) => setAssignee(e.target.value)}>
@@ -611,18 +647,18 @@ export default function EditTaskModal({
                   <svg viewBox="0 0 24 24" aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"><path fill="currentColor" d="M6.7 8.7a1 1 0 0 1 1.4 0L12 12.6l3.9-3.9a1 1 0 1 1 1.4 1.4l-4.6 4.6a1 1 0 0 1-1.4 0L6.7 10.1a1 1 0 0 1 0-1.4Z"></path></svg>
                 </div>
               </div>
-              <div style={{ minHeight: '83.7639px' }}>
+              <div style={{ minHeight: '64px' }}>
                 <label className="text-sm font-medium text-slate-700">Priority</label>
                 <div className="relative mt-0">
                   <select name="priority" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" value={priority} onChange={(e) => setPriority(Number(e.target.value))}>
-                    <option value="1">Low</option>
+                    <option value="3" >❗️ High</option>
                     <option value="2">Normal</option>
-                    <option value="3">High</option>
+                    <option value="1" style={{ color: "#6b7280" }}>↓ Low</option>
                   </select>
                   <svg viewBox="0 0 24 24" aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"><path fill="currentColor" d="M6.7 8.7a1 1 0 0 1 1.4 0L12 12.6l3.9-3.9a1 1 0 1 1 1.4 1.4l-4.6 4.6a1 1 0 0 1-1.4 0L6.7 10.1a1 1 0 0 1 0-1.4Z"></path></svg>
                 </div>
               </div>
-              <div style={{ minHeight: '83.7639px' }}>
+              <div style={{ minHeight: '64px' }}>
                 <label className="text-sm font-medium text-slate-700">Goal</label>
                 <div className="relative mt-0">
                   <select name="goal" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" value={goal || ""} onChange={(e) => setGoal(e.target.value)}>
@@ -637,10 +673,6 @@ export default function EditTaskModal({
                 </div>
               </div>
             </div>
-          </div>
-          <div className="flex items-center justify-end gap-2 w-full">
-            <button type="submit" className="rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-4 py-2 text-sm"><svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M433.941 129.941l-83.882-83.882A48 48 0 0 0 316.118 32H48C21.49 32 0 53.49 0 80v352c0 26.51 21.49 48 48 48h352c26.51 0 48-21.49 48-48V163.882a48 48 0 0 0-14.059-33.941zM224 416c-35.346 0-64-28.654-64-64 0-35.346 28.654-64 64-64s64 28.654 64 64c0 35.346-28.654 64-64 64zm96-304.52V212c0 6.627-5.373 12-12 12H76c-6.627 0-12-5.373-12-12V108c0-6.627 5.373-12 12-12h228.52c3.183 0 6.235 1.264 8.485 3.515l3.48 3.48A11.996 11.996 0 0 1 320 111.48z"></path></svg>Save</button>
-            <button type="button" className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50" onClick={onCancel}>Cancel</button>
           </div>
         </form>
         <div className="absolute top-0 right-0 w-1 h-full cursor-e-resize hover:bg-blue-500/20 transition-colors" style={{ zIndex: 40 }} onMouseDown={(e) => handleResizeMouseDown(e, 'right')} />

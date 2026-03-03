@@ -85,6 +85,8 @@ export default function DayView({
   onActivityEdit,
   onActivityDelete,
   onDeleteRequest,
+  slotSizeMinutes = 15,
+  onToggleSlotSize,
 }) {
 
   // Always render the full 24-hour grid; non-working slots will be greyed
@@ -106,11 +108,18 @@ export default function DayView({
     return hour >= start && hour < end;
   });
 
-  const HOUR_HEIGHT = hourHeight;
+  const HOUR_HEIGHT = slotMinutes === 15 ? Math.max(hourHeight, 96) : hourHeight;
 
-  // current time position
-  const now = new Date();
-  const nowMinutes = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  // current time position (live)
+  const now = new Date(nowMs);
+  const nowMinutes =
+    now.getHours() * 60 +
+    now.getMinutes() +
+    now.getSeconds() / 60 +
+    now.getMilliseconds() / 60000;
+  const nowTimeValue = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  const nowTimeLabel = formatTime ? formatTime(nowTimeValue) : nowTimeValue;
   // For full-day display, start at 00:00 and show 24 hours
   const startMinutes = 0;
   const totalMinutes = 24 * 60;
@@ -141,6 +150,24 @@ export default function DayView({
   const [allDayOverflowOpen, setAllDayOverflowOpen] = useState(false);
   const [allDayOverflowItems, setAllDayOverflowItems] = useState([]);
   const allDayPopupRef = useRef(null);
+  const autoScrolledDayKeyRef = useRef(null);
+
+  // Keep the "now" line in sync with wall clock time.
+  useEffect(() => {
+    const tick = () => setNowMs(Date.now());
+    tick();
+
+    let intervalId = null;
+    const timeoutId = setTimeout(() => {
+      tick();
+      intervalId = setInterval(tick, 1000);
+    }, 1000 - (Date.now() % 1000));
+
+    return () => {
+      clearTimeout(timeoutId);
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, []);
 
   const isToday = (() => {
     const d = currentDate || new Date();
@@ -199,10 +226,9 @@ export default function DayView({
     }
   }, [propView]);
 
-  // Auto-scroll to current time when viewing today's date
+  // Auto-scroll to current time when opening a specific day (once per day key).
   useEffect(() => {
     if (!scrollContainerRef.current) return;
-    // Only auto-scroll if we're viewing today
     const d = currentDate || new Date();
     const t = new Date();
     const isCurrentDay = (
@@ -210,13 +236,20 @@ export default function DayView({
       d.getMonth() === t.getMonth() &&
       d.getDate() === t.getDate()
     );
-    
-    if (isCurrentDay) {
-      // Scroll to current time with a small offset to keep it visible in the middle
-      const scrollOffset = Math.max(0, nowTop - HOUR_HEIGHT * 2); // Center time in the middle of view
-      scrollContainerRef.current.scrollTop = scrollOffset;
-    }
-  }, [currentDate, HOUR_HEIGHT, nowTop]);
+
+    const dayKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    if (!isCurrentDay || autoScrolledDayKeyRef.current === dayKey) return;
+
+    const nowLocal = new Date();
+    const nowMinutesLocal =
+      nowLocal.getHours() * 60 +
+      nowLocal.getMinutes() +
+      nowLocal.getSeconds() / 60;
+    const nowTopLocal = (Math.max(0, Math.min(nowMinutesLocal, totalMinutes)) / 60) * HOUR_HEIGHT;
+    const scrollOffset = Math.max(0, nowTopLocal - HOUR_HEIGHT * 2);
+    scrollContainerRef.current.scrollTop = scrollOffset;
+    autoScrolledDayKeyRef.current = dayKey;
+  }, [currentDate, HOUR_HEIGHT, totalMinutes]);
 
   // Pointer-based resize helper (top/bottom handles) — mirrors WeekView behavior in a simpler form.
   const startResize = (ev, apptObj, side) => {
@@ -330,6 +363,27 @@ export default function DayView({
     const d = new Date();
     onSetDate?.(d);
     setCurrentDate(d);
+    // Clicking Today should always re-focus current time once.
+    try {
+      if (scrollContainerRef.current) {
+        const nowLocal = new Date();
+        const nowMinutesLocal =
+          nowLocal.getHours() * 60 +
+          nowLocal.getMinutes() +
+          nowLocal.getSeconds() / 60;
+        const nowTopLocal = (Math.max(0, Math.min(nowMinutesLocal, totalMinutes)) / 60) * HOUR_HEIGHT;
+        const scrollOffset = Math.max(0, nowTopLocal - HOUR_HEIGHT * 2);
+        scrollContainerRef.current.scrollTop = scrollOffset;
+      }
+      autoScrolledDayKeyRef.current = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    } catch (_) {}
+  };
+
+  const handleCreateAllDayEvent = () => {
+    if (typeof onQuickCreate !== "function") return;
+    const base = currentDate || new Date();
+    const dt = new Date(base.getFullYear(), base.getMonth(), base.getDate(), 0, 0, 0, 0);
+    onQuickCreate(dt, { allDay: true });
   };
 
   // headerWeekday should be the weekday name only (e.g. 'Wed')
@@ -830,6 +884,16 @@ export default function DayView({
                     </div>
                   )}
                 </div>
+                <button
+                  type="button"
+                  onClick={() => onToggleSlotSize && onToggleSlotSize()}
+                  className="px-2 py-1 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+                  aria-label={`Toggle time labels to ${slotSizeMinutes === 15 ? "30 minutes" : "15 minutes"}`}
+                  title={`Time labels: ${slotSizeMinutes}m (click to switch)`}
+                  style={{ minWidth: 48, minHeight: 28 }}
+                >
+                  {slotSizeMinutes}m
+                </button>
               </div>
 
               <h2 className="text-xl font-bold flex items-center gap-2">
@@ -876,12 +940,13 @@ export default function DayView({
             <div className="w-full bg-white flex flex-col text-sm text-gray-700" style={{ height: "100%" }}>
               {/* all-day strip: show tasks that span multiple days with continuation indicators */}
               <div
-                className="flex relative z-20"
+                className="flex relative z-20 cursor-pointer transition-colors hover:bg-blue-100"
                 style={{
                   borderBottomWidth: "2px",
                   borderBottomStyle: "solid",
                   borderBottomColor: "rgba(100, 116, 139, 0.65)",
                 }}
+                onClick={handleCreateAllDayEvent}
               >
                 <div className="w-16 bg-white text-xs text-gray-500 flex border-r border-gray-200">
                   <div
@@ -894,32 +959,7 @@ export default function DayView({
                 </div>
                 <div className="flex-1">
                   {/* make all-day area able to stack full-width bars for multi-day tasks */}
-                  <div
-                    className="px-2 py-1 cursor-pointer hover:bg-gray-50 transition-colors"
-                    role="button"
-                    tabIndex={0}
-                    aria-label="Click to create all-day event"
-                    title="Click to create all-day event"
-                    onClick={(e) => {
-                      try { e.stopPropagation(); } catch (_) {}
-                      if (typeof onQuickCreate === "function") {
-                        const base = currentDate || new Date();
-                        const dt = new Date(base.getFullYear(), base.getMonth(), base.getDate(), 0, 0, 0, 0);
-                        onQuickCreate(dt, { allDay: true });
-                      }
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        try { e.stopPropagation(); } catch (_) {}
-                        if (typeof onQuickCreate === "function") {
-                          const base = currentDate || new Date();
-                          const dt = new Date(base.getFullYear(), base.getMonth(), base.getDate(), 0, 0, 0, 0);
-                          onQuickCreate(dt, { allDay: true });
-                        }
-                      }
-                    }}
-                  >
+                  <div className="px-2 py-1">
                     <div className="flex flex-col gap-1 overflow-visible">
                       {(() => {
                         try {
@@ -1153,22 +1193,46 @@ export default function DayView({
                     className="relative border-r border-gray-200"
                     style={{ height: HOUR_HEIGHT * hours.length }}
                   >
-                    {hours.map((h) => {
-                      const hourIso = `${String(h).padStart(2,'0')}:00`;
-                      const hourLabel = formatTime ? formatTime(hourIso) : hourIso;
-                      const hourIsWorking = isWorkingTime ? isWorkingTime(hourIso) : (h >= sH && h < eH);
-                      return (
-                        <div
-                          key={h}
-                          className="relative flex items-start border-b border-gray-100"
-                          style={{ height: HOUR_HEIGHT, backgroundColor: hourIsWorking ? undefined : '#f8fafc' }}
-                        >
-                          <span className={`absolute top-1 right-1 text-[11px] ${hourIsWorking ? 'text-gray-500' : 'text-gray-400'}`}>
-                            {hourLabel}
-                          </span>
-                        </div>
-                      );
-                    })}
+                    {(() => {
+                      const segmentsPerHour = Math.max(1, Math.floor(60 / Math.max(1, slotMinutes)));
+                      const segmentHeight = (HOUR_HEIGHT * slotMinutes) / 60;
+                      const rows = [];
+
+                      hours.forEach((h) => {
+                        for (let i = 0; i < segmentsPerHour; i++) {
+                          const minute = i * slotMinutes;
+                          const slotIso = `${String(h).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+                          const slotIsWorking = isWorkingTime ? isWorkingTime(slotIso) : (h >= sH && h < eH);
+                          const isHourMark = minute === 0;
+                          const isHalfHour = minute === 30;
+                          const isQuarter = !isHourMark && !isHalfHour && minute % 15 === 0;
+                          const borderClasses = isHourMark
+                            ? "border-t border-slate-400"
+                            : isHalfHour
+                            ? "border-t border-slate-300"
+                            : isQuarter
+                            ? "border-t border-dotted border-slate-200"
+                            : "";
+                          const labelClass = isHourMark
+                            ? (slotIsWorking ? "text-[12px] font-semibold text-slate-700" : "text-[12px] font-semibold text-slate-500")
+                            : (slotIsWorking ? "text-[11px] text-gray-500" : "text-[11px] text-gray-400");
+
+                          rows.push(
+                            <div
+                              key={`${h}-${minute}`}
+                              className={`relative flex items-center justify-end pr-1 ${borderClasses}`}
+                              style={{ height: segmentHeight, backgroundColor: slotIsWorking ? undefined : "#f8fafc" }}
+                            >
+                              <span className={labelClass}>
+                                {formatTime ? formatTime(slotIso) : slotIso}
+                              </span>
+                            </div>
+                          );
+                        }
+                      });
+
+                      return rows;
+                    })()}
                   </div>
                 </div>
 
@@ -1189,15 +1253,17 @@ export default function DayView({
                       hours.forEach((h) => {
                         for (let i = 0; i < segmentsPerHour; i++) {
                           const minute = i * slotMinutes;
-                          // solid at 0 and 30 minutes, dotted at 15 and 45 (when slotMinutes is 15)
-                          const isSolid = minute % 30 === 0;
-                          const isDotted = !isSolid && minute % 15 === 0;
+                          const isHourMark = minute === 0;
+                          const isHalfHour = minute === 30;
+                          const isQuarter = !isHourMark && !isHalfHour && minute % 15 === 0;
 
                           let borderClasses = "";
-                          if (isSolid) {
-                            borderClasses = "border-t border-slate-300"; // solid at 0 and 30
-                          } else if (isDotted) {
-                            borderClasses = "border-t border-dotted border-slate-200"; // dotted at 15 and 45
+                          if (isHourMark) {
+                            borderClasses = "border-t border-slate-400";
+                          } else if (isHalfHour) {
+                            borderClasses = "border-t border-slate-300";
+                          } else if (isQuarter) {
+                            borderClasses = "border-t border-dotted border-slate-200";
                           }
 
                           const slotTimeStr = `${String(h).padStart(2,'0')}:${String(minute).padStart(2,'0')}`;
@@ -1582,14 +1648,13 @@ export default function DayView({
                       {/* current time line */}
                     {isToday && (
                       <div
-                        className="absolute left-0 right-0 flex items-center pointer-events-none"
+                        className="absolute left-0 right-0 pointer-events-none z-30"
                         style={{ top: nowTop }}
                       >
-                        <span className="ml-[-32px] bg-red-500 text-white text-[10px] px-1 rounded-full">
-                          {formatTime ? formatTime(`${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`) : `${String(now.getHours()).padStart(2, "0")}:
-                          ${String(now.getMinutes()).padStart(2, "0")}`}
+                        <div className="absolute left-0 right-0 border-t border-red-400" />
+                        <span className="absolute top-0 left-1 -translate-y-1/2 bg-red-500 text-white text-[10px] leading-none px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                          {nowTimeLabel}
                         </span>
-                        <div className="flex-1 border-t border-red-400" />
                       </div>
                     )}
                   </div>

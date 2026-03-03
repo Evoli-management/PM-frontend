@@ -3,6 +3,8 @@ import { FaSave } from 'react-icons/fa';
 import usersService from '../../services/usersService';
 import { useDraggable } from '../../hooks/useDraggable';
 import { useResizable } from '../../hooks/useResizable';
+import { formatKeyAreaLabel } from '../../utils/keyAreaDisplay';
+import { durationToTimeInputValue, isDurationInputValid } from '../../utils/duration';
 
 // ---- helpers (JS only) ----
 const safeDate = (v) => {
@@ -32,15 +34,14 @@ const validateDateRange = (startDate, endDate) => {
   return { valid: true };
 };
 
-// Validate duration format: must be like 2h, 30m, 2h30m, etc
+// Validate duration format: allow user-friendly formats like 1h30m / 1h 30m / 1hr 30min.
 const validateDuration = (value) => {
   if (!value) return { valid: true }; // Optional field
   if (typeof value !== 'string') return { valid: true };
   const trimmed = value.trim();
   if (!trimmed) return { valid: true }; // Empty after trim
-  const durationRegex = /^(\d+[hm])+$/i; // Matches: 2h, 30m, 2h30m, etc
-  if (durationRegex.test(trimmed)) return { valid: true };
-  return { valid: false, error: 'Duration must be in format like 2h, 30m, or 2h30m' };
+  if (isDurationInputValid(trimmed)) return { valid: true };
+  return { valid: false, error: 'Duration format invalid. Examples: 01:30, 1h30m, 1h 30m, 1hr 30min, 45m.' };
 };
 
 const now = new Date();
@@ -123,7 +124,7 @@ export default function CreateTaskModal({
   // When creating, we keep end date in-sync with start date until the user edits end date.
   const [endAuto, setEndAuto] = useState(!(initialData.end_date || initialData.endDate));
   const [deadline, setDeadline] = useState(safeDate(initialData.deadline || initialData.dueDate));
-  const [duration, setDuration] = useState(initialData.duration || initialData.duration_minutes || '');
+  const [duration, setDuration] = useState(durationToTimeInputValue(initialData.duration || initialData.duration_minutes || ''));
   const [priority, setPriority] = useState(initialData.priority ?? initialData.priority_level ?? 2);
   const [status, setStatus] = useState(initialData.status || initialData.state || 'open');
   const [keyAreaId, setKeyAreaId] = useState(
@@ -139,6 +140,7 @@ export default function CreateTaskModal({
   const [listNames, setListNames] = useState({});
   const [localGoals, setLocalGoals] = useState(goals || []);
   const [resolvedCurrentUserId, setResolvedCurrentUserId] = useState(currentUserId || null);
+  const rowMinHeight = firstRowHeight ? `${Math.min(firstRowHeight, 64)}px` : undefined;
 
   const startRef = useRef(null);
   const endRef = useRef(null);
@@ -147,7 +149,7 @@ export default function CreateTaskModal({
   const currentUserIdRef = useRef(false);
 
   const { position, isDragging, handleMouseDown, handleMouseMove, handleMouseUp, resetPosition } = useDraggable();
-  const { size, isDraggingResize, handleResizeMouseDown } = useResizable(550, 510);
+  const { size, isDraggingResize, handleResizeMouseDown } = useResizable(550, 470);
   
   useEffect(() => {
     if (isDragging) {
@@ -185,7 +187,7 @@ export default function CreateTaskModal({
   if (endAuto !== nextEndAuto) setEndAuto(nextEndAuto);
     const nextDeadline = safeDate(initialData.deadline || initialData.dueDate);
     if (deadline !== nextDeadline) setDeadline(nextDeadline);
-    const nextDuration = initialData.duration || initialData.duration_minutes || '';
+    const nextDuration = durationToTimeInputValue(initialData.duration || initialData.duration_minutes || '');
     if (duration !== nextDuration) setDuration(nextDuration);
     const nextPriority = initialData.priority ?? initialData.priority_level ?? 2;
     if (priority !== nextPriority) setPriority(nextPriority);
@@ -524,7 +526,15 @@ export default function CreateTaskModal({
           <h3 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xl font-semibold text-slate-900">
             {finalIsDontForget ? "Create Don't forget task" : 'Create Task'}
           </h3>
-          <div className="flex items-center justify-end">
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="submit"
+              form="create-task-form"
+              className="rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold px-3 py-1.5 text-sm inline-flex items-center gap-1.5"
+            >
+              <FaSave className="text-xs" />
+              Save
+            </button>
             <button
               type="button"
               className="p-2 rounded-full text-slate-600 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-600"
@@ -536,8 +546,8 @@ export default function CreateTaskModal({
           </div>
         </div>
 
-  <form onSubmit={onSubmit} className="px-4 pb-4 pt-2 space-y-2 overflow-y-auto flex-1">
-          <div>
+  <form id="create-task-form" onSubmit={onSubmit} className="pm-notched-form px-4 pb-4 pt-2 space-y-2 overflow-y-auto flex-1">
+          <div className="mb-4">
             <label className="text-sm font-medium text-slate-700" htmlFor="ka-task-title">Task name</label>
             <input
               id="ka-task-title"
@@ -552,7 +562,7 @@ export default function CreateTaskModal({
 
           <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-y-4 md:gap-x-6">
             <div className="grid grid-rows-5 gap-0 md:col-span-1">
-              <div ref={firstRowRef} style={firstRowHeight ? { minHeight: `${firstRowHeight}px` } : undefined}>
+              <div ref={firstRowRef} style={rowMinHeight ? { minHeight: rowMinHeight } : undefined}>
                 <label className="text-sm font-medium text-slate-700">Description</label>
                 <input
                   name="description"
@@ -563,7 +573,7 @@ export default function CreateTaskModal({
                 />
               </div>
 
-              <div style={firstRowHeight ? { minHeight: `${firstRowHeight}px` } : undefined}>
+              <div style={rowMinHeight ? { minHeight: rowMinHeight } : undefined}>
                 <label className="text-sm font-medium text-slate-700">Start date</label>
                 <div className="relative mt-0">
                   <input
@@ -585,7 +595,7 @@ export default function CreateTaskModal({
                 </div>
               </div>
 
-              <div style={firstRowHeight ? { minHeight: `${firstRowHeight}px` } : undefined}>
+              <div style={rowMinHeight ? { minHeight: rowMinHeight } : undefined}>
                 <label className="text-sm font-medium text-slate-700">End date</label>
                 <div className="relative mt-0">
                   <input
@@ -603,7 +613,7 @@ export default function CreateTaskModal({
                 </div>
               </div>
 
-              <div style={firstRowHeight ? { minHeight: `${firstRowHeight}px` } : undefined}>
+              <div style={rowMinHeight ? { minHeight: rowMinHeight } : undefined}>
                 <label className="text-sm font-medium text-slate-700">Deadline</label>
                 <div className="relative mt-0.5">
                   <input
@@ -618,15 +628,16 @@ export default function CreateTaskModal({
                     📅
                   </button>
                 </div>
-                <p className="mt-0 text-xs text-slate-500">No later than</p>
+                <p className="mt-0 text-xs text-slate-500" aria-hidden="true">&nbsp;</p>
               </div>
 
-              <div style={firstRowHeight ? { minHeight: `${firstRowHeight}px` } : undefined}>
+              <div style={rowMinHeight ? { minHeight: rowMinHeight } : undefined}>
                 <label className="text-sm font-medium text-slate-700">Duration</label>
                 <input
                   name="duration"
+                  type="time"
+                  step="60"
                   className={`${inputCls} mt-0`}
-                  placeholder="e.g., 1h, 1d"
                   value={duration}
                   onChange={(e) => setDuration(e.target.value)}
                 />
@@ -638,7 +649,7 @@ export default function CreateTaskModal({
               <div className="w-px bg-slate-200 my-2" />
             </div>
             <div className="grid grid-rows-5 gap-0 md:col-span-1">
-              <div style={firstRowHeight ? { minHeight: `${firstRowHeight}px` } : undefined}>
+              <div style={rowMinHeight ? { minHeight: rowMinHeight } : undefined}>
                 <label className="text-sm font-medium text-slate-700">Key Area</label>
                 <div className="relative mt-0">
                   <select
@@ -649,15 +660,15 @@ export default function CreateTaskModal({
                     required={!finalIsDontForget}
                   >
                     <option value="">— Select Key Area —</option>
-                    {(localKeyAreas && localKeyAreas.length ? localKeyAreas : keyAreas).map((ka) => (
-                      <option key={ka.id} value={ka.id}>{ka.title || ka.name}</option>
+                    {(localKeyAreas && localKeyAreas.length ? localKeyAreas : keyAreas).map((ka, idx) => (
+                      <option key={ka.id} value={ka.id}>{formatKeyAreaLabel(ka, idx)}</option>
                     ))}
                   </select>
                   <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 </div>
               </div>
 
-              <div style={firstRowHeight ? { minHeight: `${firstRowHeight}px` } : undefined}>
+              <div style={rowMinHeight ? { minHeight: rowMinHeight } : undefined}>
                 <label className="text-sm font-medium text-slate-700">List</label>
                 <div className="relative mt-0">
                   <select
@@ -688,7 +699,7 @@ export default function CreateTaskModal({
                 </div>
               </div>
 
-              <div style={firstRowHeight ? { minHeight: `${firstRowHeight}px` } : undefined}>
+              <div style={rowMinHeight ? { minHeight: rowMinHeight } : undefined}>
                 <label className="text-sm font-medium text-slate-700">Responsible</label>
                 <div className="relative mt-0">
                   <select name="assignee" className={`${selectCls} mt-0 h-9`} value={assignee} onChange={(e) => setAssignee(e.target.value)}>
@@ -699,19 +710,19 @@ export default function CreateTaskModal({
                 </div>
               </div>
 
-              <div style={firstRowHeight ? { minHeight: `${firstRowHeight}px` } : undefined}>
+              <div style={rowMinHeight ? { minHeight: rowMinHeight } : undefined}>
                 <label className="text-sm font-medium text-slate-700">Priority</label>
                 <div className="relative mt-0">
                   <select name="priority" className={selectCls} value={String(priority)} onChange={(e) => setPriority(Number(e.target.value))}>
-                    <option value={1}>Low</option>
+                    <option value={3} >❗️ High</option>
                     <option value={2}>Normal</option>
-                    <option value={3}>High</option>
+                    <option value={1} style={{ color: "#6b7280" }}>↓ Low</option>
                   </select>
                   <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 </div>
               </div>
 
-              <div style={firstRowHeight ? { minHeight: `${firstRowHeight}px` } : undefined}>
+              <div style={rowMinHeight ? { minHeight: rowMinHeight } : undefined}>
                 <label className="text-sm font-medium text-slate-700">Goal</label>
                 <div className="relative mt-0">
                   <select name="goal" className={selectCls} value={goal} onChange={(e) => setGoal(e.target.value)}>
@@ -722,13 +733,6 @@ export default function CreateTaskModal({
                 </div>
               </div>
             </div>
-          </div>
-          <div className="flex items-center justify-end gap-2 w-full">
-            <button type="submit" className="rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-4 py-2 text-sm">
-              <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M433.941 129.941l-83.882-83.882A48 48 0 0 0 316.118 32H48C21.49 32 0 53.49 0 80v352c0 26.51 21.49 48 48 48h352c26.51 0 48-21.49 48-48V163.882a48 48 0 0 0-14.059-33.941zM224 416c-35.346 0-64-28.654-64-64 0-35.346 28.654-64 64-64s64 28.654 64 64c0 35.346-28.654 64-64 64zm96-304.52V212c0 6.627-5.373 12-12 12H76c-6.627 0-12-5.373-12-12V108c0-6.627 5.373-12 12-12h228.52c3.183 0 6.235 1.264 8.485 3.515l3.48 3.48A11.996 11.996 0 0 1 320 111.48z"></path></svg>
-              Save
-            </button>
-            <button type="button" onClick={onCancel} className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Cancel</button>
           </div>
         </form>
         {/* Right resize handle */}

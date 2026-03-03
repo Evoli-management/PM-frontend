@@ -2,6 +2,7 @@ export { default } from "./DontForget.jsx";
 import { useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "../components/shared/Sidebar.jsx";
 import { toDateOnly } from "../utils/keyareasHelpers";
+import { formatKeyAreaLabel } from "../utils/keyAreaDisplay";
 import { useToast } from "../components/shared/ToastProvider.jsx";
 import { FiAlertTriangle, FiClock } from "react-icons/fi";
 import { FaCheck, FaExclamation, FaLongArrowAltDown, FaTimes, FaTrash, FaBars } from "react-icons/fa";
@@ -127,16 +128,6 @@ export default function Tasks() {
         if (isNaN(d.getTime())) return "";
         return d.toISOString().slice(0, 10);
     };
-    const formatDurationDays = (start, end) => {
-        const s = toDateOnly(start);
-        const e = toDateOnly(end);
-        if (!s || !e) return "";
-        const ms = new Date(e + "T00:00:00Z").getTime() - new Date(s + "T00:00:00Z").getTime();
-        if (!isFinite(ms)) return "";
-        const days = Math.max(0, Math.round(ms / (1000 * 60 * 60 * 24)));
-        return `${days}d`;
-    };
-
     // UI state
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [showImported, setShowImported] = useState(true);
@@ -914,9 +905,9 @@ export default function Tasks() {
                                                     className="w-full border rounded px-2 py-1 focus:outline-none focus:ring-0 focus:border-gray-300"
                                                 >
                                                     <option value="">(leave as is)</option>
-                                                    <option value="high">High</option>
+                                                    <option value="high" >❗️ High</option>
                                                     <option value="normal">Normal</option>
-                                                    <option value="low">Low</option>
+                                                    <option value="low" style={{ color: "#6b7280" }}>↓ Low</option>
                                                 </select>
                                             </div>
                                             <div>
@@ -1148,11 +1139,7 @@ export default function Tasks() {
                                                             {task.dueDate || ""}
                                                         </td>
                                                         <td className="px-2 sm:px-3 py-2 align-top text-slate-800 text-xs sm:text-sm hidden xl:table-cell">
-                                                            {task.duration ||
-                                                                formatDurationDays(
-                                                                    task.start_date || task.dueDate,
-                                                                    task.end_date,
-                                                                )}
+                                                            {String(task.duration ?? task.duration_minutes ?? "").trim() || "—"}
                                                         </td>
                                                         <td className="px-2 sm:px-3 py-2 align-top text-slate-800 text-xs sm:text-sm hidden xl:table-cell">
                                                             {toDateOnly(task.completionDate || task.completion_date) || "—"}
@@ -1350,9 +1337,9 @@ export default function Tasks() {
                                                             }
                                                             className="mt-0.5 w-full rounded-md border-0 bg-transparent px-1.5 py-1 text-xs h-8"
                                                         >
-                                                            <option value="high">High</option>
+                                                            <option value="high" >❗️ High</option>
                                                             <option value="normal">Normal</option>
-                                                            <option value="low">Low</option>
+                                                            <option value="low" style={{ color: "#6b7280" }}>↓ Low</option>
                                                         </select>
                                                     </div>
                                                     <div className="bg-slate-50 border border-slate-200 rounded-md p-1.5">
@@ -1388,9 +1375,9 @@ export default function Tasks() {
                                                             className="mt-0.5 w-full rounded-md border-0 bg-transparent px-1.5 py-1 text-xs h-8"
                                                         >
                                                             <option value="">— Keep in Don’t Forget —</option>
-                                                            {dfKeyAreas.map((ka) => (
+                                                            {dfKeyAreas.map((ka, idx) => (
                                                                 <option key={ka.id} value={ka.id}>
-                                                                    {ka.title}
+                                                                    {formatKeyAreaLabel(ka, idx)}
                                                                 </option>
                                                             ))}
                                                         </select>
@@ -1574,9 +1561,9 @@ export default function Tasks() {
                                                         {dfKeyAreas.length === 0 && (
                                                             <option value="">No key areas found</option>
                                                         )}
-                                                        {dfKeyAreas.map((ka) => (
+                                                        {dfKeyAreas.map((ka, idx) => (
                                                             <option key={ka.id} value={ka.id}>
-                                                                {ka.title}
+                                                                {formatKeyAreaLabel(ka, idx)}
                                                             </option>
                                                         ))}
                                                     </select>

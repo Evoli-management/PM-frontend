@@ -3,6 +3,7 @@ import calendarService from "../../services/calendarService";
 import { useToast } from "../shared/ToastProvider.jsx";
 import { useCalendarPreferences } from "../../hooks/useCalendarPreferences";
 import TimePicker from "../ui/TimePicker.jsx";
+import { formatKeyAreaLabel } from "../../utils/keyAreaDisplay";
 // Load keyAreaService on demand so it can be code-split
 let _keyAreaService = null;
 const getKeyAreaService = async () => {
@@ -292,9 +293,9 @@ const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEv
                                     onChange={(e) => setKeyAreaId(e.target.value)}
                                 >
                                     <option value="">None</option>
-                                    {keyAreas.map((ka) => (
+                                    {keyAreas.map((ka, idx) => (
                                         <option key={ka.id} value={ka.id}>
-                                            {ka.title}
+                                            {formatKeyAreaLabel(ka, idx)}
                                         </option>
                                     ))}
                                 </select>

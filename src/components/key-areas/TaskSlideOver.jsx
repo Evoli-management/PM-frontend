@@ -347,9 +347,9 @@ export default function TaskSlideOver({
                                                 <div>
                                                     <div className="text-[11px] text-slate-600">Priority</div>
                                                     <select className="mt-1 w-full rounded-md border border-slate-300 bg-white p-1.5 text-sm" value={form.priority || "med"} onChange={(e) => setForm((s) => ({ ...s, priority: e.target.value }))} disabled={readOnly}>
-                                                        <option value="low">Low</option>
+                                                        <option value="high" >❗️ High</option>
                                                         <option value="med">Medium</option>
-                                                        <option value="high">High</option>
+                                                        <option value="low" style={{ color: "#6b7280" }}>↓ Low</option>
                                                     </select>
                                                 </div>
                                             </div>

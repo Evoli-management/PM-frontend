@@ -284,7 +284,7 @@ export default function DontForgetComposer({ open, onClose, onAdd, defaultList =
                                         📅
                                     </span>
                                 </div>
-                                <p className="mt-1 text-[11px] text-slate-500">No later than</p>
+                                <p className="mt-1 text-[11px] text-slate-500" aria-hidden="true">&nbsp;</p>
                             </div>
 
                             {/* Date (finish) */}
@@ -369,9 +369,9 @@ export default function DontForgetComposer({ open, onClose, onAdd, defaultList =
                                     onChange={(e) => setPriority(e.target.value)}
                                     className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 >
-                                    <option value="high">High</option>
+                                    <option value="high" >❗️ High</option>
                                     <option value="normal">Normal</option>
-                                    <option value="low">Low</option>
+                                    <option value="low" style={{ color: "#6b7280" }}>↓ Low</option>
                                 </select>
                             </div>
 

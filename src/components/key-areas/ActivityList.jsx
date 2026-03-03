@@ -12,15 +12,6 @@ const getActivityService = async () => {
     return _activityService;
 };
 
-let _taskService = null;
-const getTaskService = async () => {
-    if (_taskService) return _taskService;
-    const mod = await import('../../services/taskService');
-    _taskService = mod.default || mod;
-    return _taskService;
-};
-
-
 export default function ActivityList({
     task,
     activitiesByTask = {},
@@ -55,30 +46,17 @@ export default function ActivityList({
         setSavingActivityIds((s) => new Set([...s, id]));
 
         try {
-            // The backend's update DTO for activities does not accept an `assignee` field.
-            // When editing the Responsible dropdown from within a task context, update
-            // the parent task's assignee instead.
             if (key === 'assignee') {
                 try {
-                    const ts = await getTaskService();
-                    // Map selected value (may be id) to name/'Me' when possible
-                    // use helper to map selected user id to persisted value
-                    let valueToSend = value;
-                    try {
-                        const { selectedUserIdToPersistValue } = await import('../../utils/keyareasHelpers');
-                        valueToSend = selectedUserIdToPersistValue(value, users, currentUserId);
-                    } catch (err) {}
-                    // eslint-disable-next-line no-console
-                    console.debug('[ActivityList] updating task assignee', task.id, { assignee: valueToSend });
-                    const updated = await ts.update(task.id, { assignee: valueToSend });
-                    // eslint-disable-next-line no-console
-                    console.debug('[ActivityList] task update response', updated);
-                    // apply change locally on the activity row
-                    setList((prev) => prev.map((a) => (a.id === id ? { ...a, assignee: value } : a)));
+                    const svc = await getActivityService();
+                    const updated = await svc.update(id, {
+                        delegatedToUserId: value || null,
+                    });
+                    const norm = normalizeActivity(updated || {});
+                    setList((prev) => prev.map((a) => (a.id === id ? { ...a, ...norm } : a)));
                     addToast && addToast({ title: 'Saved', variant: 'success' });
-                    try { window.dispatchEvent(new CustomEvent('ka-task-updated', { detail: { task: updated } })); } catch (e) {}
                 } catch (err) {
-                    console.error('Failed to update task assignee from activity list', err);
+                    console.error('Failed to update activity assignee', err);
                     setList(prevList);
                     addToast && addToast({ title: 'Failed to update assignee', variant: 'error' });
                 }

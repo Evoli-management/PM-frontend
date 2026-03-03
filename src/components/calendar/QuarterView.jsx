@@ -78,6 +78,8 @@ export default function QuarterView({
     onChangeView,
     filterType,
     onChangeFilter,
+    slotSizeMinutes = 15,
+    onToggleSlotSize,
 }) {
     const { formatDate } = useCalendarPreferences();
     const [keyAreaMap, setKeyAreaMap] = useState({});
@@ -515,6 +517,16 @@ export default function QuarterView({
                                 </div>
                             )}
                         </div>
+                        <button
+                            type="button"
+                            onClick={() => onToggleSlotSize && onToggleSlotSize()}
+                            className="px-2 py-1 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+                            style={{ minWidth: 48, minHeight: 28 }}
+                            aria-label={`Toggle time labels to ${slotSizeMinutes === 15 ? "30 minutes" : "15 minutes"}`}
+                            title={`Time labels: ${slotSizeMinutes}m (click to switch)`}
+                        >
+                            {slotSizeMinutes}m
+                        </button>
                     </div>
                     <span className="text-lg font-semibold text-blue-700">{quarterLabel}</span>
                     <div className="flex items-center gap-2">

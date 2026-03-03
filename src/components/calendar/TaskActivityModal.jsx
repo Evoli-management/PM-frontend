@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useToast } from "../shared/ToastProvider.jsx";
+import { formatKeyAreaLabel } from "../../utils/keyAreaDisplay";
 // Load keyAreaService and taskService on demand so they can be code-split
 let _keyAreaService = null;
 const getKeyAreaService = async () => {
@@ -246,9 +247,9 @@ export default function TaskActivityModal({ item, onClose, onSave, onDelete }) {
                                         className="w-full px-3 py-2 border rounded"
                                     >
                                         <option value="">— Select key area —</option>
-                                        {keyAreas.map((ka) => (
+                                        {keyAreas.map((ka, idx) => (
                                             <option key={ka.id} value={ka.id}>
-                                                {ka.title}
+                                                {formatKeyAreaLabel(ka, idx)}
                                             </option>
                                         ))}
                                     </select>
@@ -299,9 +300,9 @@ export default function TaskActivityModal({ item, onClose, onSave, onDelete }) {
                                         onChange={handleTaskChange}
                                         className="w-full px-3 py-2 border rounded"
                                     >
-                                        <option value="low">Low</option>
+                                        <option value="high" >❗️ High</option>
                                         <option value="medium">Medium</option>
-                                        <option value="high">High</option>
+                                        <option value="low" style={{ color: "#6b7280" }}>↓ Low</option>
                                     </select>
                                 </div>
                             </div>
@@ -331,9 +332,9 @@ export default function TaskActivityModal({ item, onClose, onSave, onDelete }) {
                                         className="w-full px-3 py-2 border rounded"
                                     >
                                         <option value="">— None —</option>
-                                        {keyAreas.map((ka) => (
+                                        {keyAreas.map((ka, idx) => (
                                             <option key={ka.id} value={ka.id}>
-                                                {ka.title}
+                                                {formatKeyAreaLabel(ka, idx)}
                                             </option>
                                         ))}
                                     </select>

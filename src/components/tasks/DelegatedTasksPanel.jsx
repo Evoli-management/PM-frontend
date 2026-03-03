@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { FaUserCheck, FaTimes, FaHistory, FaCheck, FaBan } from 'react-icons/fa';
 import taskDelegationService from '../../services/taskDelegationService';
 import { useToast } from '../shared/ToastProvider.jsx';
+import { formatKeyAreaLabel } from '../../utils/keyAreaDisplay';
 
 export default function DelegatedTasksPanel({ onTaskClick }) {
     const [delegatedTasks, setDelegatedTasks] = useState([]);
@@ -452,9 +453,9 @@ export default function DelegatedTasksPanel({ onTaskClick }) {
                                              focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 >
                                     <option value="">-- Select a Key Area --</option>
-                                    {keyAreas.map((area) => (
+                                    {keyAreas.map((area, idx) => (
                                         <option key={area.id} value={area.id}>
-                                            {area.name}
+                                            {formatKeyAreaLabel(area, idx)}
                                         </option>
                                     ))}
                                 </select>
