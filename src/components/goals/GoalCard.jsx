@@ -74,7 +74,7 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onUna
             // small debounce so quick mouse passes don't trigger many requests
             hoverTimer.current = setTimeout(() => {
                 try {
-                    prefetchGoal(goal.id).catch(() => {});
+                    prefetchGoal(goal.id).catch(() => { });
                 } catch (e) {
                     // swallow
                 }
@@ -344,19 +344,29 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onUna
                 </h3>
 
                 {goal.description && (
-                    <p className="text-gray-600 text-sm line-clamp-2 leading-relaxed mb-4">
+                    <p className="text-gray-600 text-sm line-clamp-2 leading-relaxed mb-2">
                         {goal.description}
                     </p>
+                )}
+
+                {/* Sub-goal badge: shown when this goal is linked to a parent */}
+                {goal.parentGoalId && (
+                    <div className="inline-flex items-center gap-1 mb-3 px-2 py-0.5 rounded-full bg-purple-50 border border-purple-200 text-xs text-purple-700 font-medium">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fillRule="evenodd" d="M12.293 3.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 9H7a3 3 0 000 6h1a1 1 0 110 2H7A5 5 0 017 7h7.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                        Sub-goal{goal.parentGoalTitle ? `: ${goal.parentGoalTitle}` : ''}
+                    </div>
                 )}
 
                 {/* Progress Section */}
                 <div className="mb-4">
                     <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium text-gray-700">
-                                    {displayCompletedMilestones}/{displayTotalMilestones} milestones completed
-                                </span>
-                            </div>
+                            <span className="text-sm font-medium text-gray-700">
+                                {displayCompletedMilestones}/{displayTotalMilestones} milestones completed
+                            </span>
+                        </div>
                         <span className="text-sm font-semibold text-gray-900">{progressPercent}%</span>
                     </div>
 

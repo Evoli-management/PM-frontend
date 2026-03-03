@@ -1,371 +1,218 @@
-import React, { useState, useEffect } from 'react';
-import { Section, Field, Toggle, LoadingButton } from './UIComponents';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Section, LoadingButton } from './UIComponents';
 import calendarService from '../../services/calendarService';
-import { syncService } from '../../services/syncService';
+
+/**
+ * Integrations page — 2 provider cards: Google and Microsoft.
+ *
+ * Google  → Google Calendar + Google Tasks (one OAuth token)
+ * Microsoft → Outlook Calendar + Microsoft To Do (one OAuth token)
+ */
+
+function timeAgo(dateStr) {
+    if (!dateStr) return null;
+    const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return `${Math.floor(diff / 86400)}d ago`;
+}
 
 export const Integrations = ({ showToast }) => {
-        // Connect integration handler
-        const connectIntegration = async (type) => {
-            setConnecting(type);
-            try {
-                let result;
-                switch (type) {
-                    case 'googleCalendar':
-                        result = await calendarService.syncGoogleCalendar();
-                        if (result && result.success && result.accessToken) {
-                            await calendarService.syncGoogleCalendarData(result.accessToken);
-                            setIntegrations(prev => ({
-                                ...prev,
-                                googleCalendar: { ...prev.googleCalendar, connected: true }
-                            }));
-                            showToast && showToast('Google Calendar connected and sync initiated!');
-                            await loadIntegrations();
-                        }
-                        break;
-                    case 'outlookCalendar':
-                        result = await calendarService.syncMicrosoftCalendar();
-                        if (result && result.success && result.accessToken) {
-                            await calendarService.syncMicrosoftCalendarData(result.accessToken);
-                            setIntegrations(prev => ({
-                                ...prev,
-                                outlookCalendar: { ...prev.outlookCalendar, connected: true }
-                            }));
-                            showToast && showToast('Outlook Calendar connected and sync initiated!');
-                            await loadIntegrations();
-                        }
-                        break;
-                    case 'googleTasks':
-                        try {
-                            const res = await calendarService.syncGoogleTasks();
-                            if (res && res.success && res.accessToken) {
-                                await calendarService.syncGoogleTasksData(res.accessToken);
-                                setIntegrations(prev => ({
-                                    ...prev,
-                                    googleTasks: { ...prev.googleTasks, connected: true }
-                                }));
-                                showToast && showToast('Google Tasks connected and sync initiated!');
-                                await loadIntegrations();
-                            }
-                        } catch (error) {
-                            throw error;
-                        }
-                        break;
-                    case 'microsoftToDo':
-                        try {
-                            const res = await calendarService.syncMicrosoftToDo();
-                            if (res && res.success) {
-                                setIntegrations(prev => ({
-                                    ...prev,
-                                    microsoftToDo: { ...prev.microsoftToDo, connected: true }
-                                }));
-                                showToast && showToast('Microsoft To Do connected and sync initiated!');
-                            }
-                        } catch (error) {
-                            throw error;
-                        }
-                        break;
-                    case 'teams':
-                        await new Promise(resolve => setTimeout(resolve, 1000));
-                        setIntegrations(prev => ({
-                            ...prev,
-                            teams: { connected: true, tenant: 'My Organization', notificationsEnabled: true }
-                        }));
-                        showToast && showToast('Microsoft Teams connected!');
-                        break;
-                    default:
-                        showToast && showToast('Unknown integration type', 'error');
-                }
-                await loadIntegrations();
-            } catch (error) {
-                console.error('Connection error:', error);
-                const errMsg = error?.response?.data?.error || error?.message || '';
-                if (
-                    error?.response?.status === 400 ||
-                    /invalid(_grant|_token)/i.test(errMsg) ||
-                    /token.*expired/i.test(errMsg)
-                ) {
-                    showToast && showToast('Your connection has expired. Please reconnect your account.', 'error');
-                    const apiBase = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? '/api' : 'https://practicalmanager-4241d0bfc5ed.herokuapp.com/api');
-                    if (type === 'googleCalendar' || type === 'googleTasks') {
-                        window.location.href = `${apiBase}/auth/google`;
-                    } else if (type === 'outlookCalendar' || type === 'microsoftToDo') {
-                        window.location.href = `${apiBase}/auth/microsoft`;
-                    }
-                } else if (error.message === 'OAuth cancelled by user') {
-                    showToast && showToast('Connection cancelled', 'info');
-                } else {
-                    showToast && showToast(`Failed to connect ${type}`, 'error');
-                }
-            } finally {
-                setConnecting('');
-            }
-        };
-    const [integrations, setIntegrations] = useState({
-        // Calendar Integrations
-        googleCalendar: { connected: false, email: '', syncEnabled: true },
-        outlookCalendar: { connected: false, email: '', syncEnabled: true },
-        // Task Integrations
-        googleTasks: { connected: false, syncEnabled: true },
-        microsoftToDo: { connected: false, syncEnabled: true },
-        // Communication
-        teams: { connected: false, tenant: '', notificationsEnabled: true }
+    const [providers, setProviders] = useState({
+        google: { connected: false, email: '', lastSyncAt: null, lastError: null, syncStatus: null },
+        microsoft: { connected: false, email: '', lastSyncAt: null, lastError: null, syncStatus: null },
     });
 
-    // Add saveIntegrations function to handle saving integration settings
-    const saveIntegrations = async () => {
+    const [loading, setLoading] = useState(false);
+    const [connecting, setConnecting] = useState('');
+    const [syncing, setSyncing] = useState('');
+
+    const loadStatus = useCallback(async () => {
+        setLoading(true);
         try {
-            setLoading(true);
-            // TODO: Replace with actual API call to save integrations
-            // await api.saveIntegrations(integrations);
-            showToast && showToast('Integration settings saved!', 'success');
+            const status = await calendarService.getSyncStatus();
+            setProviders({
+                google: {
+                    connected: !!status.google?.connected,
+                    email: status.google?.email || '',
+                    lastSyncAt: status.google?.lastSyncAt || null,
+                    lastError: status.google?.lastError || null,
+                    syncStatus: status.google?.syncStatus || null,
+                },
+                microsoft: {
+                    connected: !!status.microsoft?.connected,
+                    email: status.microsoft?.email || '',
+                    lastSyncAt: status.microsoft?.lastSyncAt || null,
+                    lastError: status.microsoft?.lastError || null,
+                    syncStatus: status.microsoft?.syncStatus || null,
+                },
+            });
         } catch (err) {
-            showToast && showToast('Failed to save integration settings', 'error');
+            console.error('Failed to load integration status:', err);
         } finally {
             setLoading(false);
         }
-    };
-    
-    const [loading, setLoading] = useState(false);
-    const [connecting, setConnecting] = useState('');
-    
-    useEffect(() => {
-        loadIntegrations();
     }, []);
-    
-    const loadIntegrations = async () => {
-        setLoading(true);
+
+    useEffect(() => { loadStatus(); }, [loadStatus]);
+
+    const connect = async (provider) => {
+        setConnecting(provider);
         try {
-            // Get sync status from API
-            const syncStatus = await calendarService.getSyncStatus();
-            const updates = { ...integrations };
-            if (syncStatus.google) {
-                updates.googleCalendar = {
-                    connected: syncStatus.google.connected,
-                    email: syncStatus.google.email || '',
-                    syncEnabled: true
-                };
+            const result = provider === 'google'
+                ? await calendarService.syncGoogleCalendar()
+                : await calendarService.syncMicrosoftCalendar();
+
+            if (result?.success) {
+                showToast && showToast(`${provider === 'google' ? 'Google' : 'Microsoft'} connected! Syncing now…`);
+                await loadStatus();
+                calendarService.triggerSync().catch(e => console.warn('Initial sync failed:', e));
             }
-            // ...existing code...
+        } catch (error) {
+            const errMsg = error?.response?.data?.error || error?.message || '';
+            if (error?.response?.status === 400 || /invalid(_grant|_token)/i.test(errMsg) || /token.*expired/i.test(errMsg)) {
+                showToast && showToast('Your connection has expired. Please reconnect.', 'error');
+                const apiBase = import.meta.env.VITE_API_BASE_URL ||
+                    (import.meta.env.DEV ? '/api' : 'https://practicalmanager-4241d0bfc5ed.herokuapp.com/api');
+                window.location.href = `${apiBase}/auth/${provider === 'google' ? 'google' : 'microsoft'}`;
+            } else if (error.message === 'OAuth cancelled by user') {
+                showToast && showToast('Connection cancelled', 'info');
+            } else {
+                showToast && showToast(`Failed to connect ${provider}`, 'error');
+            }
         } finally {
-            setLoading(false);
+            setConnecting('');
         }
     };
 
-    // ...existing code...
-    
-    const disconnectIntegration = async (type) => {
+    const disconnect = async (provider) => {
         try {
-            switch (type) {
-                case 'googleCalendar':
-                    await calendarService.disconnectCalendar('google');
-                    break;
-                case 'outlookCalendar':
-                    await calendarService.disconnectCalendar('microsoft');
-                    break;
-                case 'teams':
-                    // For now, just update local state
-                    break;
-            }
-            
-            const updates = { ...integrations };
-            updates[type] = { ...updates[type], connected: false };
-            setIntegrations(updates);
-            showToast(`${type.charAt(0).toUpperCase() + type.slice(1)} disconnected`);
-            
-            // Reload to get updated status
-            await loadIntegrations();
-            
-        } catch (error) {
-            console.error('Disconnect error:', error);
-            showToast(`Failed to disconnect ${type}`, 'error');
+            await calendarService.disconnectCalendar(provider);
+            showToast && showToast(`${provider === 'google' ? 'Google' : 'Microsoft'} disconnected`);
+            await loadStatus();
+        } catch {
+            showToast && showToast('Failed to disconnect', 'error');
         }
     };
-    
-    const updateIntegrationSetting = (type, setting, value) => {
-        const updates = { ...integrations };
-        updates[type] = { ...updates[type], [setting]: value };
-        setIntegrations(updates);
+
+    const syncNow = async (provider) => {
+        setSyncing(provider);
+        try {
+            showToast && showToast('Sync started…');
+            await calendarService.triggerSync();
+            showToast && showToast('Sync completed!', 'success');
+            await loadStatus();
+        } catch {
+            showToast && showToast('Sync failed', 'error');
+        } finally {
+            setSyncing('');
+        }
     };
-    
-    const IntegrationCard = ({ 
-        name, 
-        type, 
-        icon, 
-        description, 
-        config, 
-        settings 
-    }) => (
-        <div className="bg-white rounded-lg p-6">
-            <div className="flex items-start justify-between">
-                <div className="flex-1">
-                    <div className="min-w-0">
+
+    const ProviderCard = ({ provider, name, icon, services, config }) => {
+        const lastSync = timeAgo(config.lastSyncAt);
+        const hasError = config.syncStatus === 'error' && config.lastError;
+
+        return (
+            <div className="bg-white rounded-lg p-6 space-y-3">
+                {/* Header row */}
+                <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                            <span className="w-6 h-6 flex items-center justify-center">{icon}</span>
+                            <span className="w-6 h-6 flex items-center justify-center flex-shrink-0">{icon}</span>
                             <span className="truncate">{name}</span>
                         </h3>
-                        <p className="text-sm text-gray-600 mt-1">{description}</p>
+                        <p className="text-sm text-gray-500 mt-0.5">{services.join(' · ')}</p>
                         {config.connected && config.email && (
                             <p className="text-xs text-blue-600 mt-1">{config.email}</p>
                         )}
-                        {config.connected && config.workspace && (
-                            <p className="text-xs text-blue-600 mt-1">{config.workspace}</p>
-                        )}
-                        {config.connected && config.username && (
-                            <p className="text-xs text-blue-600 mt-1">@{config.username}</p>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                        {config.connected ? (
+                            <>
+                                <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full whitespace-nowrap">
+                                    Connected
+                                </span>
+                                <button
+                                    onClick={() => disconnect(provider)}
+                                    className="text-sm text-red-600 hover:text-red-800 font-medium whitespace-nowrap"
+                                >
+                                    Disconnect
+                                </button>
+                                <button
+                                    onClick={() => syncNow(provider)}
+                                    disabled={syncing !== ''}
+                                    className="text-sm bg-blue-500 hover:bg-blue-700 disabled:opacity-50 text-white px-3 py-1 rounded-md whitespace-nowrap"
+                                >
+                                    {syncing === provider ? 'Syncing…' : 'Sync Now'}
+                                </button>
+                            </>
+                        ) : (
+                            <LoadingButton
+                                onClick={() => connect(provider)}
+                                loading={connecting === provider}
+                                className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md"
+                            >
+                                Connect
+                            </LoadingButton>
                         )}
                     </div>
                 </div>
-                
-                <div className="flex items-center space-x-2">
-                    {config.connected ? (
-                        <>
-                            <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
-                                Connected
+
+                {/* Last sync / error row */}
+                {config.connected && (
+                    <div className="flex items-center gap-3 text-xs">
+                        {lastSync ? (
+                            <span className="text-gray-400">
+                                🔄 Last synced: <span className="font-medium text-gray-600">{lastSync}</span>
                             </span>
-                            <button
-                                onClick={() => disconnectIntegration(type)}
-                                className="text-sm text-red-600 hover:text-red-800 font-medium"
-                            >
-                                Disconnect
-                            </button>
-                            {/* Sync Now button for all integrations */}
-                            <button
-                                onClick={() => handleManualSync(type)}
-                                className="ml-2 text-sm bg-blue-500 hover:bg-blue-700 text-white px-3 py-1 rounded-md"
-                                disabled={syncingType === type}
-                            >
-                                {syncingType === type ? 'Syncing...' : 'Sync Now'}
-                            </button>
-                        </>
-                    ) : (
-                        <LoadingButton
-                            onClick={() => connectIntegration(type)}
-                            loading={connecting === type}
-                            className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md"
-                        >
-                            Connect
-                        </LoadingButton>
-                    )}
-                </div>
+                        ) : (
+                            <span className="text-gray-400">Never synced — click Sync Now</span>
+                        )}
+                        {hasError && (
+                            <span className="text-red-500 bg-red-50 px-2 py-0.5 rounded" title={config.lastError}>
+                                ⚠ Sync error
+                            </span>
+                        )}
+                    </div>
+                )}
             </div>
-            
-            {config.connected && settings && (
-                <div className="mt-4 pt-4 space-y-3">
-                    {settings.map((setting, index) => (
-                        <Toggle
-                            key={index}
-                            label={setting.label}
-                            description={setting.description}
-                            checked={config[setting.key]}
-                            onChange={(checked) => updateIntegrationSetting(type, setting.key, checked)}
-                        />
-                    ))}
-                </div>
-            )}
-        </div>
-    );
-    
-    // State for manual sync
-    const [syncingType, setSyncingType] = useState('');
-
-    // Manual sync handler stub
-    const handleManualSync = async (type) => {
-        setSyncingType(type);
-        try {
-            showToast(`Manual sync for ${type} started`);
-            // Map type to provider for backend
-            let provider;
-            if (type === 'googleTasks') provider = 'google';
-            else if (type === 'microsoftToDo') provider = 'microsoft';
-            else throw new Error('Unknown provider');
-
-            await syncService.triggerManualSync(provider);
-            showToast(`Manual sync for ${type} completed`);
-            await loadIntegrations();
-        } catch (err) {
-            showToast(`Manual sync for ${type} failed`, 'error');
-        } finally {
-            setSyncingType('');
-        }
+        );
     };
 
     if (loading) {
         return (
             <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
             </div>
         );
     }
 
     return (
         <div className="space-y-6">
-            {/* Calendar Integrations */}
-            <Section 
-                title="Calendar Integrations" 
-                description="Sync your tasks and events with external calendars"
+            <Section
+                title="Connected Accounts"
+                description="Connect your Google or Microsoft account to sync your calendar events and tasks."
             >
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <IntegrationCard
-                        name="Google Calendar"
-                        type="googleCalendar"
+                    <ProviderCard
+                        provider="google"
+                        name="Google"
                         icon={<img src={`${import.meta.env.BASE_URL}google.svg`} alt="Google" className="w-6 h-6 object-contain" />}
-                        description="Sync tasks and deadlines with Google Calendar"
-                        config={integrations.googleCalendar}
-                        settings={[
-                            { key: 'syncEnabled', label: 'Sync Tasks', description: 'Automatically sync tasks to calendar' }
-                        ]}
+                        services={['Google Calendar', 'Google Tasks']}
+                        config={providers.google}
                     />
-                    <IntegrationCard
-                        name="Outlook Calendar"
-                        type="outlookCalendar"
+                    <ProviderCard
+                        provider="microsoft"
+                        name="Microsoft"
                         icon={<img src={`${import.meta.env.BASE_URL}microsoft.svg`} alt="Microsoft" className="w-6 h-6 object-contain" />}
-                        description="Sync with Microsoft Outlook Calendar"
-                        config={integrations.outlookCalendar}
-                        settings={[
-                            { key: 'syncEnabled', label: 'Sync Tasks', description: 'Automatically sync tasks to calendar' }
-                        ]}
+                        services={['Outlook Calendar', 'Microsoft To Do']}
+                        config={providers.microsoft}
                     />
                 </div>
             </Section>
-
-            {/* Task Integrations */}
-            <Section 
-                title="Task Integrations" 
-                description="Sync your tasks with Google Tasks or Microsoft To Do"
-            >
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <IntegrationCard
-                        name="Google Tasks"
-                        type="googleTasks"
-                        icon={<img src={`${import.meta.env.BASE_URL}google.svg`} alt="Google Tasks" className="w-6 h-6 object-contain" />}
-                        description="Sync tasks with Google Tasks"
-                        config={integrations.googleTasks}
-                        settings={[
-                            { key: 'syncEnabled', label: 'Sync Tasks', description: 'Automatically sync tasks with Google Tasks' }
-                        ]}
-                    />
-                    <IntegrationCard
-                        name="Microsoft To Do"
-                        type="microsoftToDo"
-                        icon={<img src={`${import.meta.env.BASE_URL}microsoft.svg`} alt="Microsoft To Do" className="w-6 h-6 object-contain" />}
-                        description="Sync tasks with Microsoft To Do"
-                        config={integrations.microsoftToDo}
-                        settings={[
-                            { key: 'syncEnabled', label: 'Sync Tasks', description: 'Automatically sync tasks with Microsoft To Do' }
-                        ]}
-                    />
-                </div>
-            </Section>
-
-            {/* Save Button */}
-            <div className="flex justify-end pt-6">
-                <LoadingButton
-                    onClick={saveIntegrations}
-                    className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors duration-200"
-                >
-                    Save Settings
-                </LoadingButton>
-            </div>
         </div>
     );
-}
+};

@@ -26,6 +26,12 @@ const GoalDetailModal = ({
     const [updatingMilestone, setUpdatingMilestone] = useState(null);
     const [dateInputValues, setDateInputValues] = useState({});
     const { formatDate, dateFormat } = useFormattedDate();
+    // Parent goal linking state
+    const [parentGoalSearch, setParentGoalSearch] = useState('');
+    const [showParentGoalDropdown, setShowParentGoalDropdown] = useState(false);
+    const [availableGoals, setAvailableGoals] = useState([]);
+    const [savingParentGoal, setSavingParentGoal] = useState(false);
+    const parentGoalPickerRef = useRef(null);
 
     const formatDateLabel = (value) => {
         if (!value) return `Format: ${dateFormat}`;
@@ -233,13 +239,13 @@ const GoalDetailModal = ({
             // Keep only activities that reference this goal when backend returned global list
             const filtered = Array.isArray(list)
                 ? list.filter(
-                      (a) =>
-                          (!a.taskId &&
-                              String(
-                                  a.goalId || a.parentGoalId || a.goal_id
-                              ) === String(goal.id)) ||
-                          (a.goalId && String(a.goalId) === String(goal.id))
-                  )
+                    (a) =>
+                        (!a.taskId &&
+                            String(
+                                a.goalId || a.parentGoalId || a.goal_id
+                            ) === String(goal.id)) ||
+                        (a.goalId && String(a.goalId) === String(goal.id))
+                )
                 : [];
             setActivities(filtered);
         } catch (err) {
@@ -256,8 +262,46 @@ const GoalDetailModal = ({
         if (!activeTab) setActiveTab("milestones");
         // fetch activities so Activities tab is ready
         fetchActivities();
+        // Load available goals for parent picker
+        (async () => {
+            try {
+                const mod = await import('../../services/goalService');
+                const svc = mod.default || mod;
+                const fn = svc.getGoals || svc.list;
+                if (typeof fn === 'function') {
+                    const list = await fn({ status: 'active' });
+                    setAvailableGoals(Array.isArray(list) ? list : []);
+                }
+            } catch (e) { /* optional */ }
+        })();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [goal?.id]);
+
+    // Close parent goal dropdown on outside click
+    useEffect(() => {
+        if (!showParentGoalDropdown) return;
+        const onDown = (e) => {
+            if (parentGoalPickerRef.current && !parentGoalPickerRef.current.contains(e.target))
+                setShowParentGoalDropdown(false);
+        };
+        document.addEventListener('mousedown', onDown);
+        return () => document.removeEventListener('mousedown', onDown);
+    }, [showParentGoalDropdown]);
+
+    const handleSetParentGoal = async (parentGoalId) => {
+        setSavingParentGoal(true);
+        try {
+            await onUpdate(goal.id, { parentGoalId: parentGoalId || null });
+            setLocalGoal(prev => ({ ...prev, parentGoalId: parentGoalId || null }));
+        } catch (e) {
+            console.error('Failed to set parent goal', e);
+            alert(e?.response?.data?.message || 'Failed to link goal. Check for circular links.');
+        } finally {
+            setSavingParentGoal(false);
+            setShowParentGoalDropdown(false);
+            setParentGoalSearch('');
+        }
+    };
 
     // Close milestone menu on outside click
     useEffect(() => {
@@ -455,15 +499,15 @@ const GoalDetailModal = ({
             // clear inputs after successful create
             try {
                 titleEl.value = "";
-            } catch (_) {}
+            } catch (_) { }
             try {
                 if (startEl) startEl.value = "";
                 clearDisplayOverride(`new-milestone-start-${goal.id}`);
-            } catch (_) {}
+            } catch (_) { }
             try {
                 if (dueEl) dueEl.value = "";
                 clearDisplayOverride(`new-milestone-due-${goal.id}`);
-            } catch (_) {}
+            } catch (_) { }
         } catch (err) {
             console.error("Failed to auto-create milestone:", err);
         } finally {
@@ -478,10 +522,10 @@ const GoalDetailModal = ({
             // showPicker is supported in some browsers
             try {
                 el.showPicker && el.showPicker();
-            } catch (e) {}
+            } catch (e) { }
             try {
                 el.focus();
-            } catch (e) {}
+            } catch (e) { }
         } catch (e) {
             // ignore
         }
@@ -679,7 +723,7 @@ const GoalDetailModal = ({
                         Delete
                     </button>
                 )}
-                
+
             </div>
         </div>
     );
@@ -913,11 +957,10 @@ const GoalDetailModal = ({
                                 <button
                                     id={`goal-${goal.id}-completed-icon`}
                                     onClick={handleToggleComplete}
-                                    className={`md:flex-none px-3 py-2 rounded-md flex items-center justify-center gap-2 text-sm ${
-                                        localGoal?.status === "completed"
+                                    className={`md:flex-none px-3 py-2 rounded-md flex items-center justify-center gap-2 text-sm ${localGoal?.status === "completed"
                                             ? "bg-emerald-600 text-white"
                                             : "border border-gray-300 text-gray-800 hover:bg-gray-100"
-                                    }`}
+                                        }`}
                                     title="Complete"
                                 >
                                     <FaCheckCircle className="w-4 h-4" />
@@ -925,6 +968,69 @@ const GoalDetailModal = ({
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            {/* PARENT GOAL LINK SECTION */}
+            <div className="px-6 pb-3 border-b border-gray-200 bg-white">
+                <div ref={parentGoalPickerRef} className="relative">
+                    <div className="flex items-center gap-2 mb-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-gray-500" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M12.293 3.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 9H7a3 3 0 000 6h1a1 1 0 110 2H7A5 5 0 017 7h7.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Parent Goal</span>
+                    </div>
+
+                    {localGoal?.parentGoalId ? (
+                        /* Linked state: show parent name + remove button */
+                        <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-purple-200 bg-purple-50">
+                            <span className="flex-1 text-sm text-purple-800 truncate">
+                                {availableGoals.find(g => g.id === localGoal.parentGoalId)?.title
+                                    || localGoal.parentGoalTitle
+                                    || 'Linked to parent goal'}
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => handleSetParentGoal(null)}
+                                disabled={savingParentGoal}
+                                className="text-xs text-purple-500 hover:text-red-600 font-medium disabled:opacity-50 flex-shrink-0"
+                                aria-label="Remove parent goal link"
+                            >
+                                {savingParentGoal ? 'Saving…' : '✕ Remove'}
+                            </button>
+                        </div>
+                    ) : (
+                        /* Unlinked state: show search picker */
+                        <div>
+                            <input
+                                type="text"
+                                placeholder="Search to link a parent goal…"
+                                value={parentGoalSearch}
+                                onChange={(e) => { setParentGoalSearch(e.target.value); setShowParentGoalDropdown(true); }}
+                                onFocus={() => setShowParentGoalDropdown(true)}
+                                className="w-full text-sm px-3 py-1.5 border border-slate-300 rounded-md bg-white placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50"
+                            />
+                            {showParentGoalDropdown && (
+                                <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-44 overflow-y-auto">
+                                    {availableGoals
+                                        .filter(g => g.id !== goal.id && g.title?.toLowerCase().includes(parentGoalSearch.toLowerCase()))
+                                        .slice(0, 8)
+                                        .map(g => (
+                                            <button
+                                                key={g.id}
+                                                type="button"
+                                                disabled={savingParentGoal}
+                                                className="w-full text-left px-3 py-2 text-sm text-slate-800 hover:bg-purple-50 hover:text-purple-800 truncate disabled:opacity-50"
+                                                onClick={() => handleSetParentGoal(g.id)}
+                                            >
+                                                {g.title}
+                                            </button>
+                                        ))}
+                                    {availableGoals.filter(g => g.id !== goal.id && g.title?.toLowerCase().includes(parentGoalSearch.toLowerCase())).length === 0 && (
+                                        <div className="px-3 py-2 text-sm text-slate-400">No matching goals</div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -1028,13 +1134,13 @@ const GoalDetailModal = ({
                                                                     ).map(
                                                                         (mm) =>
                                                                             mm.id ===
-                                                                            m.id
+                                                                                m.id
                                                                                 ? {
-                                                                                      ...mm,
-                                                                                      score:
-                                                                                          val /
-                                                                                          100,
-                                                                                  }
+                                                                                    ...mm,
+                                                                                    score:
+                                                                                        val /
+                                                                                        100,
+                                                                                }
                                                                                 : mm
                                                                     );
                                                                     return {
@@ -1076,7 +1182,7 @@ const GoalDetailModal = ({
                                                                                 prev
                                                                             ) =>
                                                                                 prev ===
-                                                                                m.id
+                                                                                    m.id
                                                                                     ? null
                                                                                     : m.id
                                                                         );
@@ -1094,52 +1200,52 @@ const GoalDetailModal = ({
 
                                                                 {openMilestoneMenuId ===
                                                                     m.id && (
-                                                                    <div
-                                                                        onMouseDown={(
-                                                                            e
-                                                                        ) =>
-                                                                            e.stopPropagation()
-                                                                        }
-                                                                        className="absolute left-full top-1/2 transform -translate-y-1/2 ml-2 w-36 bg-white border rounded shadow z-50"
-                                                                        role="menu"
-                                                                    >
-                                                                        <button
-                                                                            onClick={async (
+                                                                        <div
+                                                                            onMouseDown={(
                                                                                 e
-                                                                            ) => {
-                                                                                e.stopPropagation();
-                                                                                setOpenMilestoneMenuId(
-                                                                                    null
-                                                                                );
-                                                                                await handleDeleteMilestone(
-                                                                                    m.id
-                                                                                );
-                                                                            }}
-                                                                            className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                                                                            role="menuitem"
+                                                                            ) =>
+                                                                                e.stopPropagation()
+                                                                            }
+                                                                            className="absolute left-full top-1/2 transform -translate-y-1/2 ml-2 w-36 bg-white border rounded shadow z-50"
+                                                                            role="menu"
                                                                         >
-                                                                            <svg
-                                                                                stroke="currentColor"
-                                                                                fill="currentColor"
-                                                                                strokeWidth="0"
-                                                                                viewBox="0 0 448 512"
-                                                                                className="w-4 h-4 inline-block mr-2 align-middle"
-                                                                                height="1em"
-                                                                                width="1em"
-                                                                                xmlns="http://www.w3.org/2000/svg"
+                                                                            <button
+                                                                                onClick={async (
+                                                                                    e
+                                                                                ) => {
+                                                                                    e.stopPropagation();
+                                                                                    setOpenMilestoneMenuId(
+                                                                                        null
+                                                                                    );
+                                                                                    await handleDeleteMilestone(
+                                                                                        m.id
+                                                                                    );
+                                                                                }}
+                                                                                className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                                                                                role="menuitem"
                                                                             >
-                                                                                <path d="M432 32H312l-9.4-18.7A24 24 0 0 0 281.1 0H166.8a23.72 23.72 0 0 0-21.4 13.3L136 32H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16zM53.2 467a48 48 0 0 0 47.9 45h245.8a48 48 0 0 0 47.9-45L416 128H32z"></path>
-                                                                            </svg>
-                                                                            Delete
-                                                                        </button>
-                                                                    </div>
-                                                                )}
+                                                                                <svg
+                                                                                    stroke="currentColor"
+                                                                                    fill="currentColor"
+                                                                                    strokeWidth="0"
+                                                                                    viewBox="0 0 448 512"
+                                                                                    className="w-4 h-4 inline-block mr-2 align-middle"
+                                                                                    height="1em"
+                                                                                    width="1em"
+                                                                                    xmlns="http://www.w3.org/2000/svg"
+                                                                                >
+                                                                                    <path d="M432 32H312l-9.4-18.7A24 24 0 0 0 281.1 0H166.8a23.72 23.72 0 0 0-21.4 13.3L136 32H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16zM53.2 467a48 48 0 0 0 47.9 45h245.8a48 48 0 0 0 47.9-45L416 128H32z"></path>
+                                                                                </svg>
+                                                                                Delete
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
                                                             </div>
 
                                                             <div className="flex-1">
                                                                 {/* Click title to edit inline. Save on blur or Enter, Esc cancels. */}
                                                                 {editingMilestoneId ===
-                                                                m.id ? (
+                                                                    m.id ? (
                                                                     <input
                                                                         autoFocus
                                                                         value={
@@ -1184,18 +1290,17 @@ const GoalDetailModal = ({
                                                                     />
                                                                 ) : (
                                                                     <div
-                                                                        className={`text-sm font-semibold ${
-                                                                            m.done
+                                                                        className={`text-sm font-semibold ${m.done
                                                                                 ? "line-through text-gray-500"
                                                                                 : "text-gray-900"
-                                                                        }`}
+                                                                            }`}
                                                                         onClick={() => {
                                                                             setEditingMilestoneId(
                                                                                 m.id
                                                                             );
                                                                             setEditingMilestoneTitle(
                                                                                 m.title ||
-                                                                                    ""
+                                                                                ""
                                                                             );
                                                                         }}
                                                                         role="button"
@@ -1214,7 +1319,7 @@ const GoalDetailModal = ({
                                                                                 );
                                                                                 setEditingMilestoneTitle(
                                                                                     m.title ||
-                                                                                        ""
+                                                                                    ""
                                                                                 );
                                                                             }
                                                                         }}
@@ -1467,8 +1572,8 @@ const GoalDetailModal = ({
                                                                 `new-milestone-start-${goal.id}`,
                                                                 next
                                                                     ? formatDate(
-                                                                          next
-                                                                      )
+                                                                        next
+                                                                    )
                                                                     : ""
                                                             );
                                                         }}
@@ -1538,8 +1643,8 @@ const GoalDetailModal = ({
                                                                 `new-milestone-due-${goal.id}`,
                                                                 next
                                                                     ? formatDate(
-                                                                          next
-                                                                      )
+                                                                        next
+                                                                    )
                                                                     : ""
                                                             );
                                                         }}
@@ -1630,11 +1735,10 @@ const GoalDetailModal = ({
                                                     )}
                                                 />
                                                 <div
-                                                    className={`text-sm ${
-                                                        a.completed
+                                                    className={`text-sm ${a.completed
                                                             ? "line-through text-gray-500"
                                                             : "text-gray-900"
-                                                    }`}
+                                                        }`}
                                                 >
                                                     {a.text ||
                                                         a.title ||
@@ -1662,22 +1766,22 @@ const GoalDetailModal = ({
         </div>
     );
 
-// If opened as a full page (via route), render the content inline. Otherwise render inside an overlay.
-if (typeof isPage !== "undefined" && isPage) {
-    return (
-        // Pull the whole goal page block up a bit so it lines up with the sidebar menu
-        <div className="h-full flex flex-col -mt-4">
-            <div className="px-0 mb-4">
-                <div className="flex items-center justify-between gap-3 -mt-2">
-                    <div className="flex items-center gap-2 w-full">
-                        {headerBar}
+    // If opened as a full page (via route), render the content inline. Otherwise render inside an overlay.
+    if (typeof isPage !== "undefined" && isPage) {
+        return (
+            // Pull the whole goal page block up a bit so it lines up with the sidebar menu
+            <div className="h-full flex flex-col -mt-4">
+                <div className="px-0 mb-4">
+                    <div className="flex items-center justify-between gap-3 -mt-2">
+                        <div className="flex items-center gap-2 w-full">
+                            {headerBar}
+                        </div>
                     </div>
                 </div>
+                {innerContent}
             </div>
-            {innerContent}
-        </div>
-    );
-}
+        );
+    }
 
 
     return (

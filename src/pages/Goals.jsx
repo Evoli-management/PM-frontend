@@ -1,12 +1,14 @@
 // src/pages/Goals.jsx
 import React, { useState, useEffect, useCallback, Suspense } from "react";
 import * as goalService from "../services/goalService";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import Sidebar from "../components/shared/Sidebar";
 import Toast from "../components/shared/Toast";
 // goalService is dynamically imported where needed to allow code-splitting
 import GoalsHeader from "../components/goals/GoalsHeader";
 import GoalList from "../components/goals/GoalList";
+import QuickGoalsPanel from "../components/goals/QuickGoalsPanel";
+import GoalReport from "../components/goals/GoalReport";
 const GoalForm = React.lazy(() => import("../components/goals/GoalForm"));
 import KanbanView from "../components/goals/views/KanbanView";
 import ListView from "../components/goals/views/ListView";
@@ -48,8 +50,11 @@ const Goals = () => {
     const [currentView, setCurrentView] = useState("grid");
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const [selectedGoals, setSelectedGoals] = useState(new Set());
+    const [quickPanelOpen, setQuickPanelOpen] = useState(false);
     const navigate = useNavigate();
-    // route params handled by dedicated GoalDetail page; this list page only navigates to it
+    const location = useLocation();
+    // Detect active goals tab from URL
+    const goalsTab = new URLSearchParams(location.search || '').get('tab') || 'goals';
 
     // Persist filter settings to localStorage
     useEffect(() => {
@@ -122,6 +127,15 @@ const Goals = () => {
             window.removeEventListener("milestone:updated", onMilestoneUpdated);
         };
     }, [fetchGoals, statusFilter]);
+
+    // Listen for Quick Goals event from Navbar
+    useEffect(() => {
+        const handler = (e) => {
+            if (e?.detail?.open) setQuickPanelOpen(true);
+        };
+        window.addEventListener('pm-goals-quick-panel', handler);
+        return () => window.removeEventListener('pm-goals-quick-panel', handler);
+    }, []);
 
     // Note: when user navigates to /goals/:goalId we rely on the dedicated GoalDetail page
 
@@ -211,32 +225,32 @@ const Goals = () => {
             try {
                 console.log("Goals.jsx - Attempting to delete goal:", goalId);
                 const mod = await import("../services/goalService");
-                        try {
-                            console.log("Attempting permanent delete for goal:", goalId);
-                            // Prefer explicit hard delete when user requested permanent deletion
-                            if (typeof goalService.deleteGoalHard === "function") {
-                                await goalService.deleteGoalHard(goalId);
-                            } else {
-                                // Fallback to existing deleteGoal which may try archive first
-                                await goalService.deleteGoal(goalId);
-                            }
+                try {
+                    console.log("Attempting permanent delete for goal:", goalId);
+                    // Prefer explicit hard delete when user requested permanent deletion
+                    if (typeof goalService.deleteGoalHard === "function") {
+                        await goalService.deleteGoalHard(goalId);
+                    } else {
+                        // Fallback to existing deleteGoal which may try archive first
+                        await goalService.deleteGoal(goalId);
+                    }
 
-                            // Use functional updates to avoid stale-closure issues
-                            setGoals((prev) => prev.filter((g) => g.id !== goalId));
-                            setFilteredGoals((prev) => prev.filter((g) => g.id !== goalId));
-                            showToast("success", "Goal has been permanently deleted.");
-                        } catch (err) {
-                            console.error("Failed to permanently delete goal, attempting archive fallback:", err);
-                            try {
-                                await goalService.archiveGoal(goalId);
-                                setGoals((prev) => prev.filter((g) => g.id !== goalId));
-                                setFilteredGoals((prev) => prev.filter((g) => g.id !== goalId));
-                                showToast("success", "Goal has been archived.");
-                            } catch (archiveError) {
-                                console.error("Archive fallback also failed:", archiveError);
-                                showToast("error", `Failed to delete goal: ${archiveError?.message || err?.message || 'Unknown error'}`);
-                            }
-                        }
+                    // Use functional updates to avoid stale-closure issues
+                    setGoals((prev) => prev.filter((g) => g.id !== goalId));
+                    setFilteredGoals((prev) => prev.filter((g) => g.id !== goalId));
+                    showToast("success", "Goal has been permanently deleted.");
+                } catch (err) {
+                    console.error("Failed to permanently delete goal, attempting archive fallback:", err);
+                    try {
+                        await goalService.archiveGoal(goalId);
+                        setGoals((prev) => prev.filter((g) => g.id !== goalId));
+                        setFilteredGoals((prev) => prev.filter((g) => g.id !== goalId));
+                        showToast("success", "Goal has been archived.");
+                    } catch (archiveError) {
+                        console.error("Archive fallback also failed:", archiveError);
+                        showToast("error", `Failed to delete goal: ${archiveError?.message || err?.message || 'Unknown error'}`);
+                    }
+                }
             } catch (error) {
                 console.error("Failed to delete goal:", error);
                 showToast("error", `Failed to delete goal: ${error.message}`);
@@ -428,7 +442,7 @@ const Goals = () => {
             // can render instantly and avoid an extra network round-trip.
             try {
                 if (typeof goalService.prefetchGoal === "function") {
-                    goalService.prefetchGoal(goal.id).catch(() => {});
+                    goalService.prefetchGoal(goal.id).catch(() => { });
                 }
             } catch (e) {
                 // ignore
@@ -474,143 +488,143 @@ const Goals = () => {
 
                         <div className="px-1 md:px-2">
                             <div className="mb-4">
-                                    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-                                        <div>
-                                            <h1 className="text-2xl font-bold text-slate-900">Goals</h1>
-                                            <p className="text-sm text-slate-600">Track and achieve your objectives</p>
-                                        </div>
-
-                                        <div className="flex items-center gap-2">
-                                            <div className="flex items-center bg-white border border-slate-200 rounded-lg p-0.5 shadow-sm">
-                                                <button
-                                                    onClick={() => setCurrentView("grid")}
-                                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all ${currentView === "grid" ? "bg-blue-500 text-white shadow-sm" : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"}`}
-                                                    title="Grid"
-                                                >
-                                                    <span className="hidden sm:inline text-xs font-medium">Grid</span>
-                                                </button>
-                                                <button
-                                                    onClick={() => setCurrentView("list")}
-                                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all ${currentView === "list" ? "bg-blue-500 text-white shadow-sm" : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"}`}
-                                                    title="List"
-                                                >
-                                                    <span className="hidden sm:inline text-xs font-medium">List</span>
-                                                </button>
-                                                <button
-                                                    onClick={() => setCurrentView("kanban")}
-                                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all ${currentView === "kanban" ? "bg-blue-500 text-white shadow-sm" : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"}`}
-                                                    title="Kanban"
-                                                >
-                                                    <span className="hidden sm:inline text-xs font-medium">Kanban</span>
-                                                </button>
-                                            </div>
-
-                                            <button
-                                                onClick={() => setIsModalOpen(true)}
-                                                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-sm hover:shadow-md"
-                                            >
-                                                <span className="text-sm font-semibold">New Goal</span>
-                                            </button>
-                                        </div>
+                                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                                    <div>
+                                        <h1 className="text-2xl font-bold text-slate-900">Goals</h1>
+                                        <p className="text-sm text-slate-600">Track and achieve your objectives</p>
                                     </div>
 
-                                    {/* Combined Stats and Filters in Single Row */}
-                                    {/* Show stats & filters even when there are no goals for the selected filter
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex items-center bg-white border border-slate-200 rounded-lg p-0.5 shadow-sm">
+                                            <button
+                                                onClick={() => setCurrentView("grid")}
+                                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all ${currentView === "grid" ? "bg-blue-500 text-white shadow-sm" : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"}`}
+                                                title="Grid"
+                                            >
+                                                <span className="hidden sm:inline text-xs font-medium">Grid</span>
+                                            </button>
+                                            <button
+                                                onClick={() => setCurrentView("list")}
+                                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all ${currentView === "list" ? "bg-blue-500 text-white shadow-sm" : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"}`}
+                                                title="List"
+                                            >
+                                                <span className="hidden sm:inline text-xs font-medium">List</span>
+                                            </button>
+                                            <button
+                                                onClick={() => setCurrentView("kanban")}
+                                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all ${currentView === "kanban" ? "bg-blue-500 text-white shadow-sm" : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"}`}
+                                                title="Kanban"
+                                            >
+                                                <span className="hidden sm:inline text-xs font-medium">Kanban</span>
+                                            </button>
+                                        </div>
+
+                                        <button
+                                            onClick={() => setIsModalOpen(true)}
+                                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-sm hover:shadow-md"
+                                        >
+                                            <span className="text-sm font-semibold">New Goal</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Combined Stats and Filters in Single Row */}
+                                {/* Show stats & filters even when there are no goals for the selected filter
                                         so the user can change filters or create a new goal. */}
-                                    {!isLoading && (
-                                        <div className="mt-4 bg-white rounded-xl border border-slate-200 shadow-sm p-3">
-                                            <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center">
-                                                {/* Compact Stats */}
-                                                <div className="flex gap-3">
-                                                    <div className="flex items-center gap-1.5 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
-                                                        {/* Use provided goals image for Total stat */}
-                                                        <img
-                                                            alt="Goals"
-                                                            src={`${import.meta.env.BASE_URL}goals.png`}
-                                                            className="w-6 h-6 object-contain block w-6 h-6 min-w-[24px] min-h-[24px]"
-                                                        />
-                                                        <div className="flex items-baseline gap-1">
-                                                            <span className="text-sm font-bold text-gray-900">{stats.total}</span>
-                                                            <span className="text-xs text-gray-500">Total</span>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 rounded-lg border border-blue-200">
-                                                        <FaClock className="w-3.5 h-3.5 text-blue-600" />
-                                                        <div className="flex items-baseline gap-1">
-                                                            <span className="text-sm font-bold text-blue-600">{stats.active}</span>
-                                                            <span className="text-xs text-gray-500">Active</span>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-1.5 px-3 py-2 bg-green-50 rounded-lg border border-green-200">
-                                                        <FaCheckCircle className="w-3.5 h-3.5 text-green-600" />
-                                                        <div className="flex items-baseline gap-1">
-                                                            <span className="text-sm font-bold text-green-600">{stats.completed}</span>
-                                                            <span className="text-xs text-gray-500">Done</span>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-1.5 px-3 py-2 bg-red-50 rounded-lg border border-red-200">
-                                                        <FaClock className="w-3.5 h-3.5 text-red-600" />
-                                                        <div className="flex items-baseline gap-1">
-                                                            <span className="text-sm font-bold text-red-600">{stats.overdue}</span>
-                                                            <span className="text-xs text-gray-500">Overdue</span>
-                                                        </div>
+                                {!isLoading && (
+                                    <div className="mt-4 bg-white rounded-xl border border-slate-200 shadow-sm p-3">
+                                        <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center">
+                                            {/* Compact Stats */}
+                                            <div className="flex gap-3">
+                                                <div className="flex items-center gap-1.5 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
+                                                    {/* Use provided goals image for Total stat */}
+                                                    <img
+                                                        alt="Goals"
+                                                        src={`${import.meta.env.BASE_URL}goals.png`}
+                                                        className="w-6 h-6 object-contain block w-6 h-6 min-w-[24px] min-h-[24px]"
+                                                    />
+                                                    <div className="flex items-baseline gap-1">
+                                                        <span className="text-sm font-bold text-gray-900">{stats.total}</span>
+                                                        <span className="text-xs text-gray-500">Total</span>
                                                     </div>
                                                 </div>
-
-                                                {/* Filters */}
-                                                <div className="flex flex-1 gap-2">
-                                                    <div className="flex-1 relative">
-                                                        <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm" />
-                                                        <input
-                                                            type="text"
-                                                            placeholder="Search goals..."
-                                                            value={searchTerm}
-                                                            onChange={(e) => setSearchTerm(e.target.value)}
-                                                            className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-slate-50 focus:bg-white transition-colors"
-                                                        />
+                                                <div className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 rounded-lg border border-blue-200">
+                                                    <FaClock className="w-3.5 h-3.5 text-blue-600" />
+                                                    <div className="flex items-baseline gap-1">
+                                                        <span className="text-sm font-bold text-blue-600">{stats.active}</span>
+                                                        <span className="text-xs text-gray-500">Active</span>
                                                     </div>
-
-                                                    <div className="relative">
-                                                        <FaFilter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm" />
-                                                        <select
-                                                            value={statusFilter}
-                                                            onChange={(e) => setStatusFilter(e.target.value)}
-                                                            className="pl-9 pr-8 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-slate-50 focus:bg-white transition-colors min-w-[120px]"
-                                                        >
-                                                            <option value="all">All Status</option>
-                                                            <option value="active">Active</option>
-                                                            <option value="completed">Completed</option>
-                                                            <option value="archived">Archived</option>
-                                                        </select>
+                                                </div>
+                                                <div className="flex items-center gap-1.5 px-3 py-2 bg-green-50 rounded-lg border border-green-200">
+                                                    <FaCheckCircle className="w-3.5 h-3.5 text-green-600" />
+                                                    <div className="flex items-baseline gap-1">
+                                                        <span className="text-sm font-bold text-green-600">{stats.completed}</span>
+                                                        <span className="text-xs text-gray-500">Done</span>
                                                     </div>
-
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Filter by tag..."
-                                                        value={tagFilter}
-                                                        onChange={(e) => setTagFilter(e.target.value)}
-                                                        className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-slate-50 focus:bg-white transition-colors min-w-[120px]"
-                                                    />
-
-                                                    <div className="relative">
-                                                        <FaSortAmountDown className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm" />
-                                                        <select
-                                                            value={sortBy}
-                                                            onChange={(e) => setSortBy(e.target.value)}
-                                                            className="pl-9 pr-8 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-slate-50 focus:bg-white transition-colors min-w-[140px]"
-                                                        >
-                                                            <option value="dueDate">Due Date</option>
-                                                            <option value="priority">Priority</option>
-                                                            <option value="progress">Progress</option>
-                                                            <option value="title">Title</option>
-                                                            <option value="created">Recently Created</option>
-                                                        </select>
+                                                </div>
+                                                <div className="flex items-center gap-1.5 px-3 py-2 bg-red-50 rounded-lg border border-red-200">
+                                                    <FaClock className="w-3.5 h-3.5 text-red-600" />
+                                                    <div className="flex items-baseline gap-1">
+                                                        <span className="text-sm font-bold text-red-600">{stats.overdue}</span>
+                                                        <span className="text-xs text-gray-500">Overdue</span>
                                                     </div>
                                                 </div>
                                             </div>
+
+                                            {/* Filters */}
+                                            <div className="flex flex-1 gap-2">
+                                                <div className="flex-1 relative">
+                                                    <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm" />
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Search goals..."
+                                                        value={searchTerm}
+                                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                                        className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-slate-50 focus:bg-white transition-colors"
+                                                    />
+                                                </div>
+
+                                                <div className="relative">
+                                                    <FaFilter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm" />
+                                                    <select
+                                                        value={statusFilter}
+                                                        onChange={(e) => setStatusFilter(e.target.value)}
+                                                        className="pl-9 pr-8 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-slate-50 focus:bg-white transition-colors min-w-[120px]"
+                                                    >
+                                                        <option value="all">All Status</option>
+                                                        <option value="active">Active</option>
+                                                        <option value="completed">Completed</option>
+                                                        <option value="archived">Archived</option>
+                                                    </select>
+                                                </div>
+
+                                                <input
+                                                    type="text"
+                                                    placeholder="Filter by tag..."
+                                                    value={tagFilter}
+                                                    onChange={(e) => setTagFilter(e.target.value)}
+                                                    className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-slate-50 focus:bg-white transition-colors min-w-[120px]"
+                                                />
+
+                                                <div className="relative">
+                                                    <FaSortAmountDown className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm" />
+                                                    <select
+                                                        value={sortBy}
+                                                        onChange={(e) => setSortBy(e.target.value)}
+                                                        className="pl-9 pr-8 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-slate-50 focus:bg-white transition-colors min-w-[140px]"
+                                                    >
+                                                        <option value="dueDate">Due Date</option>
+                                                        <option value="priority">Priority</option>
+                                                        <option value="progress">Progress</option>
+                                                        <option value="title">Title</option>
+                                                        <option value="created">Recently Created</option>
+                                                    </select>
+                                                </div>
+                                            </div>
                                         </div>
-                                    )}
-                                </div>
+                                    </div>
+                                )}
+                            </div>
 
                             {/* Main Content */}
                             {/* Bulk Action Bar */}
@@ -661,7 +675,12 @@ const Goals = () => {
                                 </div>
                             )}
 
-                            <div className="goals-content">{renderContent()}</div>
+                            {/* Main content area: switch between Goals list and Report tab */}
+                            {goalsTab === 'report' ? (
+                                <GoalReport />
+                            ) : (
+                                <div className="goals-content">{renderContent()}</div>
+                            )}
 
                             {/* Modal */}
                             {isModalOpen && (
@@ -686,6 +705,14 @@ const Goals = () => {
                             )}
 
                             {/* Goal detail is a separate page at /goals/:goalId; it is not rendered inline in this list view. */}
+
+                            {/* Quick Goals hierarchy panel — opened by Navbar QUICK GOALS tab */}
+                            {quickPanelOpen && (
+                                <QuickGoalsPanel
+                                    goals={goals}
+                                    onClose={() => setQuickPanelOpen(false)}
+                                />
+                            )}
 
                             {/* Toast Notifications */}
                             {toast && <Toast type={toast.type} message={toast.message} onClose={() => setToast(null)} />}
