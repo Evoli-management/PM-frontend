@@ -5,6 +5,7 @@ import { useCalendarPreferences } from "../../hooks/useCalendarPreferences";
 import { generateTimeSlots } from "../../utils/timeUtils";
 import { FaEdit, FaTrash, FaCheck } from "react-icons/fa";
 import { FaChevronLeft, FaChevronRight, FaChevronDown, FaBars } from "react-icons/fa";
+import CalendarViewTopSection from "./CalendarViewTopSection";
 
 function getWeekNumber(date) {
   const firstJan = new Date(date.getFullYear(), 0, 1);
@@ -638,6 +639,7 @@ const WeekView = ({
 
       <div className="p-0 flex flex-col h-full min-h-0" style={{ overflow: "hidden", position: "relative" }}>
         {/* Header */}
+        <CalendarViewTopSection elephantTaskRow={elephantTaskRow} elephantTopGapClass="mt-1" showElephantSeparator={false}>
         <div className="day-header-controls flex items-center justify-between min-h-[34px]">
           <div className="flex items-center gap-2">
             <button
@@ -663,111 +665,6 @@ const WeekView = ({
             >
               <FaChevronRight />
             </button>
-            <div className="relative" ref={slotMenuRef}>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowSlotMenu((s) => !s);
-                  setShowViewMenu(false);
-                }}
-                className="day-header-btn px-2 py-0.5 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center gap-2"
-                style={{ minWidth: 48, minHeight: 34 }}
-                aria-haspopup="menu"
-                aria-expanded={showSlotMenu ? "true" : "false"}
-                aria-label="Time label interval"
-                title={`Time labels: ${slotSize}m`}
-              >
-                <span>Time</span>
-                <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
-                  {slotSize}m
-                </span>
-                <FaChevronDown className={`${showSlotMenu ? "rotate-180" : "rotate-0"} transition-transform`} />
-              </button>
-              {showSlotMenu && (
-                <div role="menu" className="absolute left-0 z-50 mt-2 w-28 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden">
-                  {[15, 30].map((size) => (
-                    <button
-                      key={size}
-                      role="menuitemradio"
-                      aria-checked={slotSize === size}
-                      className={`w-full text-left px-3 py-2 text-sm ${
-                        slotSize === size ? "bg-blue-50 text-blue-700 font-semibold" : "text-slate-700 hover:bg-slate-50"
-                      }`}
-                      onClick={() => {
-                        if (slotSize !== size && typeof onToggleSlotSize === "function") {
-                          onToggleSlotSize();
-                        }
-                        setShowSlotMenu(false);
-                      }}
-                    >
-                      {size}m
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <h2 className="text-xl font-bold flex items-center gap-2">
-            {weekLabel}
-            {(loading || prefsLoading) && (
-              <span className="text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-0.5">
-                Loading
-              </span>
-            )}
-          </h2>
-
-          <div className="flex items-center gap-2">
-            <div
-              role="group"
-              aria-label="Week length"
-              tabIndex={0}
-              className="inline-flex items-center rounded bg-white border border-slate-200 shadow-sm mr-2"
-              onKeyDown={(e) => {
-                try {
-                  if (e.key === "ArrowLeft" || e.key === "ArrowDown") {
-                    e.preventDefault();
-                    setWorkWeek(true);
-                  } else if (e.key === "ArrowRight" || e.key === "ArrowUp") {
-                    e.preventDefault();
-                    setWorkWeek(false);
-                  } else if (e.key === "Home") {
-                    e.preventDefault();
-                    setWorkWeek(true);
-                  } else if (e.key === "End") {
-                    e.preventDefault();
-                    setWorkWeek(false);
-                  }
-                } catch {}
-              }}
-            >
-              <button
-                type="button"
-                aria-pressed={workWeek}
-                onClick={() => setWorkWeek(true)}
-                className={`px-2 py-1 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  workWeek ? "text-white bg-blue-600" : "text-slate-700 hover:bg-slate-50"
-                }`}
-                title="5 day week (Mon-Fri)"
-              >
-                <span className="sr-only">Show 5 day week</span>
-                <span aria-hidden>5d</span>
-              </button>
-
-              <button
-                type="button"
-                aria-pressed={!workWeek}
-                onClick={() => setWorkWeek(false)}
-                className={`px-2 py-1 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  !workWeek ? "text-white bg-blue-600" : "text-slate-700 hover:bg-slate-50"
-                }`}
-                title="7 day week (Mon-Sun)"
-              >
-                <span className="sr-only">Show 7 day week</span>
-                <span aria-hidden>7d</span>
-              </button>
-            </div>
-
             <button
               className="day-header-btn px-2 py-0.5 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
               style={{ minWidth: 34, minHeight: 34 }}
@@ -839,7 +736,112 @@ const WeekView = ({
             >
               Today
             </button>
+          </div>
 
+          <h2 className="text-xl font-bold flex items-center gap-2">
+            {weekLabel}
+            {(loading || prefsLoading) && (
+              <span className="text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-0.5">
+                Loading
+              </span>
+            )}
+          </h2>
+
+          <div className="flex items-center gap-2">
+            <div
+              role="group"
+              aria-label="Week length"
+              tabIndex={0}
+              className="inline-flex items-center rounded bg-white border border-slate-200 shadow-sm mr-2"
+              onKeyDown={(e) => {
+                try {
+                  if (e.key === "ArrowLeft" || e.key === "ArrowDown") {
+                    e.preventDefault();
+                    setWorkWeek(true);
+                  } else if (e.key === "ArrowRight" || e.key === "ArrowUp") {
+                    e.preventDefault();
+                    setWorkWeek(false);
+                  } else if (e.key === "Home") {
+                    e.preventDefault();
+                    setWorkWeek(true);
+                  } else if (e.key === "End") {
+                    e.preventDefault();
+                    setWorkWeek(false);
+                  }
+                } catch {}
+              }}
+            >
+              <button
+                type="button"
+                aria-pressed={workWeek}
+                onClick={() => setWorkWeek(true)}
+                className={`px-2 py-1 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  workWeek ? "text-white bg-blue-600" : "text-slate-700 hover:bg-slate-50"
+                }`}
+                title="5 day week (Mon-Fri)"
+              >
+                <span className="sr-only">Show 5 day week</span>
+                <span aria-hidden>5d</span>
+              </button>
+
+              <button
+                type="button"
+                aria-pressed={!workWeek}
+                onClick={() => setWorkWeek(false)}
+                className={`px-2 py-1 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  !workWeek ? "text-white bg-blue-600" : "text-slate-700 hover:bg-slate-50"
+                }`}
+                title="7 day week (Mon-Sun)"
+              >
+                <span className="sr-only">Show 7 day week</span>
+                <span aria-hidden>7d</span>
+              </button>
+            </div>
+
+            <div className="relative" ref={slotMenuRef}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSlotMenu((s) => !s);
+                  setShowViewMenu(false);
+                }}
+                className="day-header-btn px-2 py-0.5 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center gap-2"
+                style={{ minWidth: 48, minHeight: 34 }}
+                aria-haspopup="menu"
+                aria-expanded={showSlotMenu ? "true" : "false"}
+                aria-label="Time label interval"
+                title={`Time labels: ${slotSize}m`}
+              >
+                <span>Time</span>
+                <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
+                  {slotSize}m
+                </span>
+                <FaChevronDown className={`${showSlotMenu ? "rotate-180" : "rotate-0"} transition-transform`} />
+              </button>
+              {showSlotMenu && (
+                <div role="menu" className="absolute left-0 z-50 mt-2 w-28 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden">
+                  {[15, 30].map((size) => (
+                    <button
+                      key={size}
+                      role="menuitemradio"
+                      aria-checked={slotSize === size}
+                      className={`w-full text-left px-3 py-2 text-sm ${
+                        slotSize === size ? "bg-blue-50 text-blue-700 font-semibold" : "text-slate-700 hover:bg-slate-50"
+                      }`}
+                      onClick={() => {
+                        if (slotSize !== size && typeof onToggleSlotSize === "function") {
+                          onToggleSlotSize();
+                        }
+                        setShowSlotMenu(false);
+                      }}
+                    >
+                      {size}m
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            
             <div className="relative" ref={viewMenuRef}>
               <button
                 className="day-header-btn px-2 py-0.5 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center gap-2"
@@ -881,18 +883,12 @@ const WeekView = ({
             </div>
           </div>
         </div>
-
-        {elephantTaskRow ? (
-          <>
-            <div className="w-full border-t border-slate-300" />
-            <div>{elephantTaskRow}</div>
-          </>
-        ) : null}
+        </CalendarViewTopSection>
 
         {/* Calendar grid */}
         <div
           ref={containerRef}
-          className="no-scrollbar flex-1 min-h-0 flex flex-col"
+          className="no-scrollbar flex-1 min-h-0 flex flex-col mt-1"
           style={{ overflow: "hidden" }}
         >
             {/* Header + all-day row */}

@@ -61,7 +61,7 @@ export default function ResizablePanels({
         >
             {/* Left Panel - Tasks */}
             <div
-                className={`${leftPanelScrollable ? 'overflow-auto' : 'overflow-hidden'} bg-white h-full min-h-0`}
+                className={`${leftPanelScrollable ? 'overflow-y-auto overflow-x-hidden' : 'overflow-hidden'} bg-white h-full min-h-0`}
                 style={{
                     width: `${taskWidth}%`,
                     transition: isDragging ? 'none' : 'width 0.2s ease',
@@ -72,7 +72,7 @@ export default function ResizablePanels({
 
             {/* Divider */}
             <div
-                className="relative w-0 flex-shrink-0"
+                className="relative w-0 flex-shrink-0 mx-px"
                 aria-label="Resize divider"
                 role="separator"
                 style={{
@@ -97,7 +97,7 @@ export default function ResizablePanels({
 
             {/* Right Panel - Activities */}
             <div
-                className={`${rightPanelScrollable ? 'overflow-auto' : 'overflow-hidden'} bg-slate-50 h-full min-h-0`}
+                className={`${rightPanelScrollable ? 'overflow-y-auto overflow-x-hidden' : 'overflow-hidden'} bg-slate-50 h-full min-h-0`}
                 style={{
                     width: `${activityWidth}%`,
                     transition: isDragging ? 'none' : 'width 0.2s ease',

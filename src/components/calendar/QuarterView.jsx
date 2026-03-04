@@ -1,6 +1,7 @@
 import React, { useState, useRef, useLayoutEffect, useEffect, useMemo } from "react";
 import { FaChevronLeft, FaChevronRight, FaChevronDown, FaEdit, FaTrash } from "react-icons/fa";
 import { useCalendarPreferences } from "../../hooks/useCalendarPreferences";
+import CalendarViewTopSection from "./CalendarViewTopSection";
 
 function getWeekNumber(date) {
     // ISO week number (weeks start on Monday)
@@ -510,6 +511,7 @@ export default function QuarterView({
             `}</style>
             <div className="h-full min-h-0 flex flex-col">
                 {/* Quarter navigation inside view */}
+                <CalendarViewTopSection elephantTaskRow={elephantTaskRow} elephantTopGapClass="mt-1" showElephantSeparator={false}>
                 <div className="day-header-controls flex items-center justify-between bg-white flex-shrink-0 min-h-[34px]">
                     <div className="flex items-center gap-2">
                         {/* Back first, then View dropdown */}
@@ -529,6 +531,22 @@ export default function QuarterView({
                         >
                             <FaChevronRight />
                         </button>
+                        <button
+                            className="day-header-btn px-2 py-0.5 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+                            style={{ minWidth: 34, minHeight: 34 }}
+                            aria-label="Today"
+                            onClick={() => {
+                                try {
+                                    if (typeof onSetDate === 'function') onSetDate(new Date());
+                                } catch (_) {}
+                                setTimeout(() => scrollToDate(new Date()), 80);
+                            }}
+                        >
+                            Today
+                        </button>
+                    </div>
+                    <span className="text-lg font-semibold text-blue-700">{quarterLabel}</span>
+                    <div className="flex items-center gap-2">
                         <div className="relative" ref={slotMenuRef}>
                             <button
                                 type="button"
@@ -573,23 +591,6 @@ export default function QuarterView({
                                 </div>
                             )}
                         </div>
-                    </div>
-                    <span className="text-lg font-semibold text-blue-700">{quarterLabel}</span>
-                    <div className="flex items-center gap-2">
-                        <button
-                            className="day-header-btn px-2 py-0.5 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
-                            style={{ minWidth: 34, minHeight: 34 }}
-                            aria-label="Today"
-                            onClick={() => {
-                                try {
-                                    if (typeof onSetDate === 'function') onSetDate(new Date());
-                                } catch (_) {}
-                                // scroll to and highlight today's cell after render
-                                setTimeout(() => scrollToDate(new Date()), 80);
-                            }}
-                        >
-                            Today
-                        </button>
                         <div className="relative" ref={viewMenuRef}>
                             <button
                                 className="day-header-btn px-2 py-0.5 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center gap-2"
@@ -633,13 +634,8 @@ export default function QuarterView({
                         </div>
                     </div>
                 </div>
-                {elephantTaskRow ? (
-                    <>
-                        <div className="w-full border-t border-slate-300" />
-                        <div>{elephantTaskRow}</div>
-                    </>
-                ) : null}
-                <div className="relative grid grid-cols-3 gap-6 flex-shrink-0 bg-white border-b border-blue-100">
+                </CalendarViewTopSection>
+                <div className="relative grid grid-cols-3 gap-6 flex-shrink-0 bg-white border-b border-blue-100 mt-1">
                     {monthLongNames.map((monthName, idx) => (
                         <div key={`month-header-${idx}`} className="text-left px-2 py-2 text-blue-500 text-base font-semibold bg-white min-w-0">
                             {monthName}
