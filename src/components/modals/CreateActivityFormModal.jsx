@@ -66,6 +66,7 @@ export default function CreateActivityFormModal({
   const [startDate, setStartDate] = useState(safeDate(initialData.startDate || initialData.date_start) || defaultDate)
   const [endDate, setEndDate] = useState(safeDate(initialData.endDate || initialData.date_end) || defaultDate)
   const [endAuto, setEndAuto] = useState(!(initialData.endDate || initialData.date_end))
+  const [deadlineAuto, setDeadlineAuto] = useState(true)
   const [deadline, setDeadline] = useState(safeDate(initialData.deadline || initialData.dueDate))
   const [priority, setPriority] = useState(initialData.priority ?? initialData.priority_level ?? 'normal')
   const [goalId, setGoalId] = useState(initialData.goalId || initialData.goal || '')
@@ -122,6 +123,7 @@ export default function CreateActivityFormModal({
     setEndDate(nextEnd)
     // If initial data provides an explicit end date, disable auto-sync; otherwise keep auto-sync enabled
     setEndAuto(!Boolean(initialData?.endDate || initialData?.date_end))
+    setDeadlineAuto(true)
     setDeadline(safeDate(initialData?.deadline || initialData?.dueDate))
     setPriority(initialData?.priority ?? initialData?.priority_level ?? 'normal')
     setGoalId(initialData?.goalId || initialData?.goal || '')
@@ -178,6 +180,13 @@ export default function CreateActivityFormModal({
       }
     })()
   }, [isOpen])
+
+  useEffect(() => {
+    if (!isOpen) return
+    if (!deadlineAuto) return
+    if (!endDate) return
+    if (deadline !== endDate) setDeadline(endDate)
+  }, [isOpen, endDate, deadline, deadlineAuto])
 
   useEffect(() => {
     if (!isOpen) return
@@ -450,7 +459,9 @@ export default function CreateActivityFormModal({
                   className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar"
                   value={endDate}
                   onChange={(e) => {
-                    setEndDate(e.target.value)
+                    const v = e.target.value
+                    setEndDate(v)
+                    if (deadlineAuto) setDeadline(v)
                     try { setEndAuto(false) } catch (__) {}
                   }}
                   ref={endRef}
@@ -469,7 +480,10 @@ export default function CreateActivityFormModal({
                   type="date"
                   className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar"
                   value={deadline}
-                  onChange={(e) => setDeadline(e.target.value)}
+                  onChange={(e) => {
+                    setDeadline(e.target.value)
+                    setDeadlineAuto(false)
+                  }}
                   ref={deadlineRef}
                 />
                 <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600" aria-label="Open date picker" onClick={() => { try { deadlineRef.current?.showPicker?.(); deadlineRef.current?.focus(); } catch (__) {} }}>

@@ -902,9 +902,18 @@ export default function DayView({
           box-shadow: none !important;
           ring: 0 !important;
         }
-        .day-timeslots-scroll { scrollbar-width: none; }
+        .day-timeslots-scroll {
+          scrollbar-width: none;
+          overflow-y: overlay;
+          overflow-x: hidden;
+          width: 100%;
+        }
         .day-timeslots-scroll::-webkit-scrollbar { width: 0; height: 0; }
-        .day-timeslots-wrap:hover .day-timeslots-scroll { scrollbar-width: thin; }
+        .day-timeslots-wrap:hover .day-timeslots-scroll {
+          scrollbar-width: thin;
+          width: calc(100% + 8px);
+          margin-right: -8px;
+        }
         .day-timeslots-wrap:hover .day-timeslots-scroll::-webkit-scrollbar { width: 8px; }
         .day-timeslots-wrap:hover .day-timeslots-scroll::-webkit-scrollbar-thumb {
           background: rgba(100, 116, 139, 0.45);
@@ -1038,8 +1047,22 @@ export default function DayView({
         <div className="flex-shrink-0 h-full min-h-0 flex flex-col">
               {/* CALENDAR CARD */}
               <div
-            className="day-timeslots-wrap bg-white border border-blue-50 rounded-lg shadow-sm p-0 overflow-visible flex-1 min-h-0"
+            className="day-timeslots-wrap relative bg-white border-l border-y border-blue-50 shadow-sm p-0 overflow-hidden flex-1 min-h-0"
           >
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 z-[40]"
+              style={{
+                borderTop: "1px solid rgb(148, 163, 184)",
+                borderLeft: "1px solid rgb(148, 163, 184)",
+                borderBottom: "1px solid rgb(148, 163, 184)",
+              }}
+            />
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute top-0 bottom-0 left-0 z-[45]"
+              style={{ borderLeft: "1px solid rgb(148, 163, 184)" }}
+            />
             <div className="w-full bg-white flex flex-col text-sm text-gray-700" style={{ height: "100%" }}>
               <div className="w-full flex h-10 border-y border-slate-300 bg-slate-100/80">
                 <div className="w-16 h-full border-l border-slate-300" />
@@ -1294,7 +1317,7 @@ export default function DayView({
               <div
                 ref={scrollContainerRef}
                 className="day-timeslots-scroll flex-1 flex min-h-0 relative z-0 pr-0"
-                style={{ overflowX: "hidden", overflowY: "auto", scrollbarGutter: "stable" }}
+                style={{ overflowX: "hidden", overflowY: "auto" }}
               >
                 {/* LEFT TIME COLUMN – clearer hourly rows */}
                 <div className="w-16 bg-white text-xs text-gray-500 min-h-0">
@@ -1590,6 +1613,31 @@ export default function DayView({
                           ka = keyAreaMap[String(appt.keyAreaId || appt.key_area_id)];
                         }
                         const kaColor = ka && ka.color ? ka.color : null;
+                        const isActivityCopy =
+                          Boolean(appt.activityId || appt.activity_id || appt.sourceActivityId || appt.source_activity_id) ||
+                          String(appt?.sourceType || '').toLowerCase() === 'activity';
+                        const isTaskCopy =
+                          !isActivityCopy &&
+                          (Boolean(appt.taskId || appt.task_id || appt.sourceTaskId || appt.source_task_id) ||
+                            String(appt?.sourceType || '').toLowerCase() === 'task');
+                        const copyIconColor = (() => {
+                          if (!isTaskCopy && !isActivityCopy) return null;
+                          let iconKa = ka;
+                          if (!iconKa) {
+                            const linkedTaskId = appt.taskId || appt.task_id || appt.sourceTaskId || appt.source_task_id;
+                            if (linkedTaskId) {
+                              const parent = (Array.isArray(todos) ? todos : []).find(
+                                (t) => String(t.id) === String(linkedTaskId)
+                              );
+                              if (parent) iconKa = keyAreaMap[String(parent.keyAreaId || parent.key_area_id)];
+                            }
+                          }
+                          const linkedKeyAreaId = appt.keyAreaId || appt.key_area_id || appt.sourceKeyAreaId || appt.source_key_area_id;
+                          if (!iconKa && linkedKeyAreaId) {
+                            iconKa = keyAreaMap[String(linkedKeyAreaId)];
+                          }
+                          return iconKa?.color || '#4DC3D8';
+                        })();
                         const DEFAULT_BAR_COLOR = '#4DC3D8';
                         const finalBg = bgClass ? null : (kaColor || DEFAULT_BAR_COLOR);
                         const textColor = finalBg ? getContrastTextColor(finalBg) : '#ffffff';
@@ -1692,7 +1740,23 @@ export default function DayView({
                             title={title}
                           >
                             <div className="relative h-full flex items-center gap-1 w-full min-w-0 pr-10">
-                              <span className="shrink-0">{categories[appt.kind]?.icon || ""}</span>
+                              <span className="shrink-0">
+                                {isActivityCopy ? (
+                                  <FaBars className="w-3 h-3" style={{ color: copyIconColor || undefined }} />
+                                ) : isTaskCopy ? (
+                                  <span
+                                    className="inline-block w-3 h-3 rounded-[3px]"
+                                    style={{ backgroundColor: copyIconColor || '#22c55e' }}
+                                  />
+                                ) : (
+                                  <span
+                                    className="inline-block w-3 h-3 rounded-[3px]"
+                                    style={{
+                                      backgroundColor: copyIconColor || kaColor || finalBg || '#4DC3D8',
+                                    }}
+                                  />
+                                )}
+                              </span>
                               <span className="truncate whitespace-nowrap text-[11px] min-w-0 flex-1 leading-4 font-medium cursor-grab active:cursor-grabbing" tabIndex={0} aria-label={title}>{title}</span>
 
                               <div className="flex items-center gap-1 shrink-0 absolute right-1 top-1/2 -translate-y-1/2">

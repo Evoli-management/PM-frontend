@@ -508,6 +508,25 @@ export default function QuarterView({
                     box-shadow: none !important;
                     ring: 0 !important;
                 }
+
+                .qv-vscroll {
+                    scrollbar-width: none;
+                    overflow-y: overlay;
+                    overflow-x: hidden;
+                    width: 100%;
+                }
+                .qv-vscroll::-webkit-scrollbar { width: 0; height: 0; }
+                .qv-scroll-wrap:hover .qv-vscroll {
+                    scrollbar-width: thin;
+                    width: calc(100% + 8px);
+                    margin-right: -8px;
+                }
+                .qv-scroll-wrap:hover .qv-vscroll::-webkit-scrollbar { width: 8px; }
+                .qv-scroll-wrap:hover .qv-vscroll::-webkit-scrollbar-thumb {
+                    background: rgba(100, 116, 139, 0.45);
+                    border-radius: 8px;
+                }
+                .qv-scroll-wrap:hover .qv-vscroll::-webkit-scrollbar-track { background: transparent; }
             `}</style>
             <div className="h-full min-h-0 flex flex-col">
                 {/* Quarter navigation inside view */}
@@ -644,9 +663,13 @@ export default function QuarterView({
                 </div>
                 {/* Calendar grid: three independent month columns */}
                 <div
+                    className="qv-scroll-wrap relative flex-1 min-h-0"
+                    style={{ maxWidth: "100%", maxHeight: "100%", overflow: "hidden" }}
+                >
+                <div
                     ref={gridRef}
-                    className="relative flex-1 min-h-0 overflow-auto"
-                    style={{ maxWidth: "100%", maxHeight: "100%" }}
+                    className="qv-vscroll relative h-full min-h-0"
+                    style={{ maxHeight: "100%" }}
                 >
                 <div className="relative grid grid-cols-3 gap-6 min-w-full pb-6">
                     {weekSeparators.length > 0 && (
@@ -970,6 +993,7 @@ export default function QuarterView({
                             </div>
                         );
                     })}
+                </div>
                 </div>
                 </div>
             </div>

@@ -73,7 +73,8 @@ export default function EditActivityModal({
   const [description, setDescription] = useState(initialData.notes || initialData.description || '');
   const [startDate, setStartDate] = useState(safeDate(initialData.date_start || initialData.startDate) || defaultDate);
   const [endDate, setEndDate] = useState(safeDate(initialData.date_end || initialData.endDate) || defaultDate);
-  const [endAuto, setEndAuto] = useState(!(initialData.endDate || initialData.date_end));
+  const [endAuto, setEndAuto] = useState(true);
+  const [deadlineAuto, setDeadlineAuto] = useState(true);
   const [keyAreaError, setKeyAreaError] = useState('');
   const [listError, setListError] = useState('');
   const [deadline, setDeadline] = useState(safeDate(initialData.deadline || initialData.dueDate));
@@ -131,7 +132,10 @@ export default function EditActivityModal({
     setStartDate(safeDate(initialData.date_start ?? initialData.dateStart ?? initialData.startDate ?? initialData.start_date ?? initialData.date) || defaultDate);
     const nextEnd = safeDate(initialData.date_end ?? initialData.endDate ?? initialData.end_date ?? initialData.date_end) || defaultDate;
     setEndDate(nextEnd);
-    setEndAuto(!Boolean(initialData.endDate || initialData.date_end));
+    // Keep auto-sync enabled on open so changing Start date auto-fills End date,
+    // matching behavior in other composer/edit modals until user edits End date manually.
+    setEndAuto(true);
+    setDeadlineAuto(true);
     setDeadline(safeDate(initialData.deadline ?? initialData.dueDate ?? initialData.due_date ?? initialData.deadline));
     setDuration(durationToTimeInputValue(initialData.duration || ''));
     setKeyAreaId(initialData.key_area_id || initialData.keyAreaId || initialData.keyArea || initialData.key_area || '');
@@ -273,6 +277,13 @@ export default function EditActivityModal({
       }
     })();
   }, [isOpen, users]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!deadlineAuto) return;
+    if (!endDate) return;
+    if (deadline !== endDate) setDeadline(endDate);
+  }, [isOpen, endDate, deadline, deadlineAuto]);
 
   if (!isOpen) return null;
 
@@ -454,7 +465,9 @@ export default function EditActivityModal({
                     className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar"
                     value={endDate}
                     onChange={(e) => {
-                      setEndDate(e.target.value);
+                      const v = e.target.value;
+                      setEndDate(v);
+                      if (deadlineAuto) setDeadline(v);
                       try { setEndAuto(false); } catch (__) {}
                     }}
                     ref={endRef}
@@ -473,7 +486,10 @@ export default function EditActivityModal({
                     type="date"
                     className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar"
                     value={deadline}
-                    onChange={(e) => setDeadline(e.target.value)}
+                    onChange={(e) => {
+                      setDeadline(e.target.value);
+                      setDeadlineAuto(false);
+                    }}
                     ref={deadlineRef}
                   />
                   <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600" aria-label="Open date picker" onClick={() => { try { deadlineRef.current?.showPicker?.(); deadlineRef.current?.focus(); } catch (__) {} }}>

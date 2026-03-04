@@ -3,7 +3,7 @@ import { FixedSizeList } from "react-window";
 import AvailabilityBlock from "./AvailabilityBlock";
 import { useCalendarPreferences } from "../../hooks/useCalendarPreferences";
 import { generateTimeSlots } from "../../utils/timeUtils";
-import { FaEdit, FaTrash, FaCheck } from "react-icons/fa";
+import { FaEdit, FaTrash, FaCheck, FaEllipsisV } from "react-icons/fa";
 import { FaChevronLeft, FaChevronRight, FaChevronDown, FaBars } from "react-icons/fa";
 import CalendarViewTopSection from "./CalendarViewTopSection";
 
@@ -15,7 +15,7 @@ function getWeekNumber(date) {
 
 const defaultSlotSize = 30;
 const MIN_BOTTOM_PANEL_HEIGHT = 104;
-const DEFAULT_HOUR_HEIGHT_PX = 76;
+const DEFAULT_HOUR_HEIGHT_PX = 60;
 const DENSE_HOUR_HEIGHT_PX_15MIN = 96;
 
 const getSlotPixelHeight = (slotSizeMinutes) => {
@@ -23,6 +23,15 @@ const getSlotPixelHeight = (slotSizeMinutes) => {
   const hourHeight = safeMinutes === 15 ? DENSE_HOUR_HEIGHT_PX_15MIN : DEFAULT_HOUR_HEIGHT_PX;
   return Math.round((hourHeight * safeMinutes) / 60);
 };
+
+function toDisplayIndex(value) {
+  if (value === null || typeof value === "undefined" || value === "") return 0;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  const i = Math.trunc(n);
+  if (i === 0) return 1;
+  return i > 0 ? i : 0;
+}
 
 const WeekView = ({
   currentDate,
@@ -92,13 +101,20 @@ const WeekView = ({
   const [showTasksRightCue, setShowTasksRightCue] = useState(false);
   const weekScrollRef = useRef(null);
   const listOuterRef = useRef(null);
+  const menuOpenTimerRef = useRef(null);
   const allDayPopupRef = useRef(null);
   const viewMenuRef = useRef(null);
   const slotMenuRef = useRef(null);
+  const quickAddMenuRef = useRef(null);
+  const LEFT_QUICK_ADD_MENU_KEY = "__left_quick_add__";
   const [columnWidth, setColumnWidth] = useState(null);
   const [keyAreaMap, setKeyAreaMap] = useState({});
+  const [keyAreaOrderMap, setKeyAreaOrderMap] = useState({});
+  const [taskMetaMap, setTaskMetaMap] = useState({});
   const [calculatedListHeight, setCalculatedListHeight] = useState(400);
   const hasAutoScrolledRef = useRef(null);
+  const [hoveredQuickAddDayKey, setHoveredQuickAddDayKey] = useState(null);
+  const [quickAddMenu, setQuickAddMenu] = useState({ open: false, x: 0, y: 0, dayKey: null, date: null });
 
   // ✅ bottom panel resize state
   const [bottomPanelHeight, setBottomPanelHeight] = useState(MIN_BOTTOM_PANEL_HEIGHT);
@@ -111,7 +127,6 @@ const WeekView = ({
   const [measuredSlotPx, setMeasuredSlotPx] = useState(() =>
     getSlotPixelHeight(slotSize)
   );
-  const [listScrollTop, setListScrollTop] = useState(0);
 
   useEffect(() => {
     if (slotSizeMinutes && slotSizeMinutes !== slotSize) {
@@ -142,6 +157,88 @@ const WeekView = ({
       }
     };
   }, []);
+
+  const handleRowMenuSummaryClick = (event) => {
+    try {
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (menuOpenTimerRef.current) {
+        window.clearTimeout(menuOpenTimerRef.current);
+        menuOpenTimerRef.current = null;
+      }
+
+      const summaryEl = event.currentTarget;
+      const detailsEl = summaryEl?.closest?.("details");
+      const rowEl = event.currentTarget?.closest?.('[data-week-item-row="true"]');
+      const scrollEl = event.currentTarget?.closest?.('.week-bottom-list-scroll');
+      if (!rowEl || !scrollEl || !detailsEl) return;
+
+      // Second click on the same dots closes the popup.
+      if (detailsEl.hasAttribute("open")) {
+        detailsEl.removeAttribute("open");
+        return;
+      }
+
+      // Close other open menus in the same scroll area.
+      try {
+        const openMenus = scrollEl.querySelectorAll("details[open]");
+        openMenus.forEach((menu) => {
+          if (menu !== detailsEl) menu.removeAttribute("open");
+        });
+      } catch (_) {}
+
+      const targetTop = Math.max(0, rowEl.offsetTop - 6);
+      scrollEl.scrollTo({ top: targetTop, behavior: "smooth" });
+
+      const openAndFocus = () => {
+        try {
+          detailsEl.setAttribute("open", "");
+          const firstAction = detailsEl.querySelector("button");
+          if (firstAction) firstAction.focus();
+        } catch (_) {}
+      };
+
+      // Give smooth scrolling a moment so the row lands at the top first.
+      menuOpenTimerRef.current = window.setTimeout(() => {
+        openAndFocus();
+        menuOpenTimerRef.current = null;
+      }, 220);
+    } catch (_) {}
+  };
+
+  useEffect(() => {
+    const handleDocMouseDown = (event) => {
+      try {
+        const insideMenu = event.target?.closest?.('details[data-week-actions-menu="true"]');
+        if (insideMenu) return;
+        const openMenus = document.querySelectorAll('details[data-week-actions-menu="true"][open]');
+        openMenus.forEach((menu) => menu.removeAttribute("open"));
+      } catch (_) {}
+    };
+
+    document.addEventListener("mousedown", handleDocMouseDown);
+    return () => {
+      document.removeEventListener("mousedown", handleDocMouseDown);
+      if (menuOpenTimerRef.current) {
+        window.clearTimeout(menuOpenTimerRef.current);
+        menuOpenTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const onDocMouseDown = (event) => {
+      try {
+        if (!quickAddMenu.open) return;
+        const insideQuickAdd = event.target?.closest?.('[data-week-quick-add-menu="true"]');
+        if (insideQuickAdd) return;
+        setQuickAddMenu({ open: false, x: 0, y: 0, dayKey: null, date: null });
+      } catch (_) {}
+    };
+    document.addEventListener("mousedown", onDocMouseDown);
+    return () => document.removeEventListener("mousedown", onDocMouseDown);
+  }, [quickAddMenu.open]);
 
   // Keep the time grid sized to the remaining space after header + splitter + bottom panel.
   useEffect(() => {
@@ -189,13 +286,10 @@ const WeekView = ({
     };
   }, [slotSize, measuredSlotPx, bottomPanelHeight]);
 
-  // Track FixedSizeList outer scroll so the now-line can be positioned relative to visible scroll
+  // Measure FixedSizeList slot height for precise overlay alignment
   useEffect(() => {
     const el = listOuterRef.current;
     if (!el) return;
-    const onScroll = () => setListScrollTop(el.scrollTop || 0);
-    el.addEventListener("scroll", onScroll, { passive: true });
-    setListScrollTop(el.scrollTop || 0);
 
     const measure = () => {
       try {
@@ -211,7 +305,6 @@ const WeekView = ({
     ro.observe(el);
     window.addEventListener("resize", measure);
     return () => {
-      el.removeEventListener("scroll", onScroll);
       ro.disconnect();
       window.removeEventListener("resize", measure);
     };
@@ -226,14 +319,50 @@ const WeekView = ({
         const svc = mod?.default || mod;
         const areas = await svc.list().catch(() => []);
         const map = {};
-        (areas || []).forEach((a) => {
-          if (a && a.id) map[String(a.id)] = a;
+        const orderMap = {};
+        (areas || []).forEach((a, idx) => {
+          if (a && a.id) {
+            map[String(a.id)] = a;
+            orderMap[String(a.id)] = idx + 1;
+          }
         });
-        if (!ignore) setKeyAreaMap(map);
+        if (!ignore) {
+          setKeyAreaMap(map);
+          setKeyAreaOrderMap(orderMap);
+        }
       } catch (e) {
-        if (!ignore) setKeyAreaMap({});
+        if (!ignore) {
+          setKeyAreaMap({});
+          setKeyAreaOrderMap({});
+        }
       }
     })();
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let ignore = false;
+    (async () => {
+      try {
+        const tMod = await import("../../services/taskService");
+        const taskSvc = tMod?.default || tMod;
+        const allTasks = await taskSvc.list().catch(() => []);
+        const map = {};
+        (allTasks || []).forEach((task) => {
+          if (!task || !task.id) return;
+          map[String(task.id)] = {
+            keyAreaId: task.keyAreaId ?? task.key_area_id ?? null,
+            listIndex: task.listIndex ?? task.list_index ?? task.list ?? null,
+          };
+        });
+        if (!ignore) setTaskMetaMap(map);
+      } catch (_) {
+        if (!ignore) setTaskMetaMap({});
+      }
+    })();
+
     return () => {
       ignore = true;
     };
@@ -274,6 +403,16 @@ const WeekView = ({
       weekStart.getDate() + i
     );
   });
+  const todayStart = (() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+  })();
+  const isTodayColumn = (date) =>
+    date.getFullYear() === todayStart.getFullYear() &&
+    date.getMonth() === todayStart.getMonth() &&
+    date.getDate() === todayStart.getDate();
+  const todayColumnIndex = days.findIndex((d) => isTodayColumn(d));
+  const todayGridColWidth = Math.max(0, columnWidth || 0);
 
   // Use dynamic time slots from preferences; fallback to full-day slots if not available
   const slots = timeSlots.length > 0 ? timeSlots : generateTimeSlots("00:00", "24:00", slotSize);
@@ -398,13 +537,33 @@ const WeekView = ({
   }, []);
 
   // Drag-and-drop handler
+  const resolveDropDateForDay = (targetDay, sourceIso) => {
+    const nextDate = new Date(
+      targetDay.getFullYear(),
+      targetDay.getMonth(),
+      targetDay.getDate(),
+      0,
+      0,
+      0,
+      0
+    );
+    try {
+      if (sourceIso) {
+        const sourceDate = new Date(sourceIso);
+        if (!Number.isNaN(sourceDate.getTime())) {
+          nextDate.setHours(sourceDate.getHours(), sourceDate.getMinutes(), 0, 0);
+        }
+      }
+    } catch (_) {}
+    return nextDate;
+  };
+
   const handleDrop = (e, day, slot) => {
     try {
       e.preventDefault();
       e.stopPropagation();
       const [h, m] = slot.split(":");
       const date = new Date(day.getFullYear(), day.getMonth(), day.getDate(), Number(h), Number(m));
-      const dragEffect = e.dataTransfer.getData("dragEffect");
       const eventId = e.dataTransfer.getData("eventId");
       if (eventId) {
         const dur = parseInt(e.dataTransfer.getData("durationMs") || "0", 10);
@@ -414,27 +573,53 @@ const WeekView = ({
       }
       const taskId = e.dataTransfer.getData("taskId");
       if (taskId) {
+        const taskText = e.dataTransfer.getData("taskText") || e.dataTransfer.getData("text/plain");
+        onTaskDrop && onTaskDrop(taskId, date, "copy", taskText);
+        return;
+      }
+      const activityId = e.dataTransfer.getData("activityId");
+      if (activityId) {
+        const activityText = e.dataTransfer.getData("activityText") || e.dataTransfer.getData("text/plain");
+        onActivityDrop && onActivityDrop(activityId, date, "copy", activityText);
+      }
+    } catch (err) {
+      console.warn("Drop failed", err);
+    }
+  };
+
+  const handleBottomColumnDrop = (e, day) => {
+    try {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const dragEffect = e.dataTransfer.getData("dragEffect");
+      const sourceIso = e.dataTransfer.getData("dragSourceStart") || null;
+      const date = resolveDropDateForDay(day, sourceIso);
+
+      const taskId = e.dataTransfer.getData("taskId");
+      if (taskId) {
         const dropEffect = (dragEffect && dragEffect !== "none")
           ? dragEffect
           : (e.dataTransfer.dropEffect && e.dataTransfer.dropEffect !== "none")
             ? e.dataTransfer.dropEffect
-          : (e.dataTransfer.effectAllowed || "copy");
+          : (e.dataTransfer.effectAllowed || "move");
         const taskText = e.dataTransfer.getData("taskText") || e.dataTransfer.getData("text/plain");
         onTaskDrop && onTaskDrop(taskId, date, dropEffect, taskText);
         return;
       }
+
       const activityId = e.dataTransfer.getData("activityId");
       if (activityId) {
         const dropEffect = (dragEffect && dragEffect !== "none")
           ? dragEffect
           : (e.dataTransfer.dropEffect && e.dataTransfer.dropEffect !== "none")
             ? e.dataTransfer.dropEffect
-          : (e.dataTransfer.effectAllowed || "copy");
+          : (e.dataTransfer.effectAllowed || "move");
         const activityText = e.dataTransfer.getData("activityText") || e.dataTransfer.getData("text/plain");
         onActivityDrop && onActivityDrop(activityId, date, dropEffect, activityText);
       }
     } catch (err) {
-      console.warn("Drop failed", err);
+      console.warn("Bottom-column drop failed", err);
     }
   };
 
@@ -605,19 +790,37 @@ const WeekView = ({
         }
         .today-row-overlay { animation: blinkRow 0.45s linear 4; background-clip: padding-box; border-radius: 4px; }
 
-        .week-time-grid-scroll { scrollbar-width: none; }
+        .week-time-grid-scroll {
+          scrollbar-width: none;
+          overflow-y: overlay;
+          overflow-x: hidden;
+          width: 100%;
+        }
         .week-time-grid-scroll::-webkit-scrollbar { width: 0; height: 0; }
 
-        .week-time-grid-wrap:hover .week-time-grid-scroll { scrollbar-width: thin; }
+        .week-time-grid-wrap:hover .week-time-grid-scroll {
+          scrollbar-width: thin;
+          width: calc(100% + 8px);
+          margin-right: -8px;
+        }
         .week-time-grid-wrap:hover .week-time-grid-scroll::-webkit-scrollbar { width: 8px; }
         .week-time-grid-wrap:hover .week-time-grid-scroll::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.45); border-radius: 8px; }
         .week-time-grid-wrap:hover .week-time-grid-scroll::-webkit-scrollbar-track { background: transparent; }
 
         .week-bottom-list-scroll {
-          scrollbar-width: thin;
+          scrollbar-width: none;
           scrollbar-color: rgba(100, 116, 139, 0.45) transparent;
+          overflow-y: overlay;
+          overflow-x: hidden;
+          width: 100%;
         }
-        .week-bottom-list-scroll::-webkit-scrollbar { width: 5px; }
+        .week-bottom-list-cell:hover .week-bottom-list-scroll {
+          scrollbar-width: thin;
+          width: calc(100% + 8px);
+          margin-right: -8px;
+        }
+        .week-bottom-list-scroll::-webkit-scrollbar { width: 0; }
+        .week-bottom-list-cell:hover .week-bottom-list-scroll::-webkit-scrollbar { width: 8px; }
         .week-bottom-list-scroll::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.45); border-radius: 8px; }
         .week-bottom-list-scroll::-webkit-scrollbar-track { background: transparent; }
 
@@ -886,11 +1089,41 @@ const WeekView = ({
         </CalendarViewTopSection>
 
         {/* Calendar grid */}
+        <div className="overflow-hidden bg-white flex-1 min-h-0 mt-1 ml-2">
         <div
           ref={containerRef}
-          className="no-scrollbar flex-1 min-h-0 flex flex-col mt-1"
+          className="day-timeslots-wrap relative bg-white border border-blue-50 rounded-lg shadow-sm p-0 overflow-visible h-full min-h-0 flex flex-col"
           style={{ overflow: "hidden" }}
         >
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 rounded-lg z-20"
+              style={{
+                borderTop: "1px solid rgb(148, 163, 184)",
+                borderLeft: "1px solid rgb(148, 163, 184)",
+                borderRight: "1px solid rgb(148, 163, 184)",
+                borderBottom: "1px solid rgb(148, 163, 184)",
+              }}
+            />
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute top-0 bottom-0 z-20"
+              style={{
+                left: `${TIME_COL_PX}px`,
+                borderLeft: "1px solid rgb(203, 213, 225)",
+              }}
+            />
+            {Array.from({ length: Math.max(0, daysCount - 1) }).map((_, idx) => (
+              <div
+                key={`week-col-sep-${idx}`}
+                aria-hidden="true"
+                className="pointer-events-none absolute top-0 bottom-0 z-20"
+                style={{
+                  left: `calc(${TIME_COL_PX}px + ((100% - ${TIME_COL_PX}px) * ${((idx + 1) / daysCount).toFixed(6)}))`,
+                  borderLeft: "1px solid rgb(203, 213, 225)",
+                }}
+              />
+            ))}
             {/* Header + all-day row */}
             <div ref={headerBlockRef} className="flex-shrink-0">
               <table
@@ -901,8 +1134,13 @@ const WeekView = ({
                 <thead>
                   <tr className="bg-blue-50">
                     <th
-                      className="text-left px-2 py-2 text-blue-500 text-base font-semibold rounded-tl-lg"
-                      style={{ width: TIME_COL_PX + "px" }}
+                      className="text-left px-2 py-1 text-xs text-blue-500 font-semibold rounded-tl-lg"
+                      style={{
+                        width: TIME_COL_PX + "px",
+                        borderBottomWidth: "1px",
+                        borderBottomStyle: "solid",
+                        borderBottomColor: "rgb(203, 213, 225)",
+                      }}
                     >
                       <span className="sr-only">all day</span>
                     </th>
@@ -910,11 +1148,20 @@ const WeekView = ({
                     {days.map((date, dIdx) => (
                       <th
                         key={dIdx}
-                        className={`text-center px-2 py-2 text-blue-500 text-base font-semibold ${
+                        className={`text-center px-2 py-1 text-xs text-blue-500 font-semibold ${
                           dIdx === days.length - 1 ? "rounded-tr-lg" : ""
                         }`}
+                        style={{
+                          backgroundColor: isTodayColumn(date) ? "rgba(59,130,246,0.14)" : undefined,
+                          borderBottomWidth: "1px",
+                          borderBottomStyle: "solid",
+                          borderBottomColor: "rgb(203, 213, 225)",
+                        }}
                       >
-                        {formatDate(date, { includeWeekday: true, shortWeekday: true })}
+                        {`${date
+                          .toLocaleDateString(undefined, { weekday: "short" })
+                          .replace(".", "")
+                        } ${String(date.getDate()).padStart(2, "0")}`}
                       </th>
                     ))}
                   </tr>
@@ -923,13 +1170,10 @@ const WeekView = ({
                 <tbody>
                   <tr>
                     <td
-                      className="px-2 py-2 text-xs text-gray-500"
+                      className="px-2 py-1 text-xs text-gray-500 text-center"
                       style={{
                         width: TIME_COL_PX + "px",
-                        borderRightWidth: "2px",
-                        borderRightStyle: "dashed",
-                        borderRightColor: "rgba(148, 163, 184, 0.3)",
-                        borderBottomWidth: "2px",
+                        borderBottomWidth: "1px",
                         borderBottomStyle: "solid",
                         borderBottomColor: "rgba(100, 116, 139, 0.65)",
                       }}
@@ -940,25 +1184,37 @@ const WeekView = ({
                     </td>
 
                     <td
-                      className="px-2 py-2 align-top"
+                      className="px-2 py-1 align-top"
                       style={{
-                        borderRightWidth: "2px",
-                        borderRightStyle: "dashed",
-                        borderRightColor: "rgba(148, 163, 184, 0.3)",
-                        borderBottomWidth: "2px",
+                        borderBottomWidth: "1px",
                         borderBottomStyle: "solid",
                         borderBottomColor: "rgba(100, 116, 139, 0.65)",
                       }}
                       colSpan={daysCount}
                     >
                       {/* keep as you had (multi-day bars renderer) */}
-                      <div style={{ position: "relative", minHeight: 40 }}>
+                      <div style={{ position: "relative", minHeight: 32 }}>
+                        {todayColumnIndex >= 0 ? (
+                          <div
+                            aria-hidden="true"
+                            style={{
+                              position: "absolute",
+                              top: 0,
+                              bottom: 0,
+                              left: `${(todayColumnIndex / Math.max(1, daysCount)) * 100}%`,
+                              width: `${100 / Math.max(1, daysCount)}%`,
+                              backgroundColor: "rgba(59,130,246,0.10)",
+                              pointerEvents: "none",
+                              zIndex: 0,
+                            }}
+                          />
+                        ) : null}
                         {(() => {
                           try {
                             const dayMs = 24 * 60 * 60 * 1000;
-                            const BAR_TOP = 8;
-                            const BAR_HEIGHT = 26;
-                            const BAR_GAP = 6;
+                            const BAR_TOP = 4;
+                            const BAR_HEIGHT = 24;
+                            const BAR_GAP = 4;
                             const toUtcDaySerial = (d) =>
                               Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / dayMs;
                             const dayDiff = (a, b) => toUtcDaySerial(a) - toUtcDaySerial(b);
@@ -1621,11 +1877,24 @@ const WeekView = ({
                                   const dayDiff = Math.floor((endDay.getTime() - startDay.getTime()) / (24 * 60 * 60 * 1000));
                                   if (dayDiff >= 1) return null;
 
+                                  const kindLower = String(ev?.kind || "").toLowerCase();
+                                  const sourceTypeLower = String(ev?.sourceType || ev?.source_type || "").toLowerCase();
+                                  const hasTaskLink = Boolean(ev?.taskId || ev?.task_id || ev?.sourceTaskId || ev?.source_task_id);
+                                  const hasActivityLink = Boolean(
+                                    ev?.activityId || ev?.activity_id || ev?.sourceActivityId || ev?.source_activity_id
+                                  );
+                                  const isAppointmentLike =
+                                    kindLower === "appointment" ||
+                                    kindLower === "appointment_exception" ||
+                                    sourceTypeLower === "task" ||
+                                    sourceTypeLower === "activity" ||
+                                    hasActivityLink;
+
                                   if (
                                     evStart.getFullYear() !== date.getFullYear() ||
                                     evStart.getMonth() !== date.getMonth() ||
                                     evStart.getDate() !== date.getDate() ||
-                                    ev.taskId
+                                    (hasTaskLink && !isAppointmentLike)
                                   ) {
                                     return null;
                                   }
@@ -1682,6 +1951,10 @@ const WeekView = ({
                                     : Math.max(24, colWidth - 4);
 
                                   const kindColor = (() => {
+                                    const kindLower = String(ev?.kind || "").toLowerCase();
+                                    if (kindLower === "appointment") {
+                                      return categories?.appointment?.color || categories?.[ev.kind]?.color || "#3b82f6";
+                                    }
                                     let ka = null;
                                     if (ev.taskId || ev.task_id) {
                                       const parent = (Array.isArray(todos) ? todos : []).find(
@@ -1693,6 +1966,29 @@ const WeekView = ({
                                       ka = keyAreaMap[String(ev.keyAreaId || ev.key_area_id)];
                                     }
                                     return ka?.color || categories?.[ev.kind]?.color || "#4DC3D8";
+                                  })();
+                                  const sourceTypeLower = String(ev?.sourceType || ev?.source_type || "").toLowerCase();
+                                  const isActivityCopy =
+                                    Boolean(ev.activityId || ev.activity_id || ev.sourceActivityId || ev.source_activity_id) ||
+                                    sourceTypeLower === "activity";
+                                  const isTaskCopy =
+                                    !isActivityCopy &&
+                                    (Boolean(ev.taskId || ev.task_id || ev.sourceTaskId || ev.source_task_id) || sourceTypeLower === "task");
+                                  const copyIconColor = (() => {
+                                    if (!isTaskCopy && !isActivityCopy) return null;
+                                    let ka = null;
+                                    const linkedTaskId = ev.taskId || ev.task_id || ev.sourceTaskId || ev.source_task_id;
+                                    if (linkedTaskId) {
+                                      const parent = (Array.isArray(todos) ? todos : []).find(
+                                        (t) => String(t.id) === String(linkedTaskId)
+                                      );
+                                      if (parent) ka = keyAreaMap[String(parent.keyAreaId || parent.key_area_id)];
+                                    }
+                                    const linkedKeyAreaId = ev.keyAreaId || ev.key_area_id || ev.sourceKeyAreaId || ev.source_key_area_id;
+                                    if (!ka && linkedKeyAreaId) {
+                                      ka = keyAreaMap[String(linkedKeyAreaId)];
+                                    }
+                                    return ka?.color || "#4DC3D8";
                                   })();
                                   const isKindTailwind =
                                     typeof kindColor === "string" && kindColor.startsWith("bg-");
@@ -1745,7 +2041,6 @@ const WeekView = ({
                                             e.preventDefault();
                                             e.stopPropagation();
                                             e.dataTransfer.dropEffect = "copy";
-                                            console.log("[WeekView] Appointment bar drag-over detected");
                                           } catch (err) {
                                             console.error("[WeekView] Drag-over error", err);
                                           }
@@ -1760,15 +2055,6 @@ const WeekView = ({
                                             const activityId = data.getData("activityId");
                                             const durationMs = parseInt(data.getData("durationMs") || "0", 10);
                                             
-                                            console.log("[WeekView] Drop on appointment bar detected", {
-                                              eventId,
-                                              taskId,
-                                              activityId,
-                                              dropEffect: e.dataTransfer.dropEffect,
-                                              dragEffect: data.getData("dragEffect"),
-                                              effectAllowed: data.effectAllowed,
-                                            });
-                                            
                                             const dt = new Date(
                                               date.getFullYear(),
                                               date.getMonth(),
@@ -1780,35 +2066,18 @@ const WeekView = ({
                                             );
 
                                             if (eventId && typeof onEventMove === "function") {
-                                              console.log("[WeekView] Moving appointment to", dt);
                                               const newEnd = durationMs > 0 ? new Date(dt.getTime() + durationMs) : null;
                                               onEventMove(eventId, dt, newEnd);
                                               return;
                                             }
                                             if (taskId && typeof onTaskDrop === "function") {
                                               const taskText = data.getData("taskText");
-                                              const rawEffect = data.getData("dragEffect") || data.dropEffect || data.effectAllowed || "copy";
-                                              const dropEffect = rawEffect && rawEffect !== "none" ? rawEffect : "copy";
-                                              console.log("[WeekView] Creating appointment from task drop", {
-                                                taskId,
-                                                taskText,
-                                                dropEffect,
-                                                dt,
-                                              });
-                                              onTaskDrop(taskId, dt, dropEffect, taskText);
+                                              onTaskDrop(taskId, dt, "copy", taskText);
                                               return;
                                             }
                                             if (activityId && typeof onActivityDrop === "function") {
                                               const activityText = data.getData("activityText");
-                                              const rawEffect = data.getData("dragEffect") || data.dropEffect || data.effectAllowed || "copy";
-                                              const dropEffect = rawEffect && rawEffect !== "none" ? rawEffect : "copy";
-                                              console.log("[WeekView] Creating appointment from activity drop", {
-                                                activityId,
-                                                activityText,
-                                                dropEffect,
-                                                dt,
-                                              });
-                                              onActivityDrop(activityId, dt, dropEffect, activityText);
+                                              onActivityDrop(activityId, dt, "copy", activityText);
                                             }
                                           } catch (err) {
                                             console.error("[WeekView] Drop handler error", err);
@@ -1819,7 +2088,27 @@ const WeekView = ({
                                           // Concurrent small bar: truncated text with icons below
                                           <div className="h-full flex flex-col items-start justify-between gap-0.5 w-full">
                                             <div className="flex items-start gap-1 min-w-0 w-full">
-                                              <span className="shrink-0 text-[9px]">{categories[ev.kind]?.icon || "📌"}</span>
+                                              <span className="shrink-0 text-[9px]">
+                                                {isActivityCopy ? (
+                                                  <FaBars className="w-2.5 h-2.5" style={{ color: copyIconColor || undefined }} />
+                                                ) : isTaskCopy ? (
+                                                  <span
+                                                    className="inline-block w-2.5 h-2.5 rounded-[3px]"
+                                                    style={{ backgroundColor: copyIconColor || "#22c55e" }}
+                                                  />
+                                                ) : (
+                                                  <span
+                                                    className="inline-block w-2.5 h-2.5 rounded-[3px]"
+                                                    style={{
+                                                      backgroundColor:
+                                                        copyIconColor ||
+                                                        (typeof kindColor === "string" && !kindColor.startsWith("bg-")
+                                                          ? kindColor
+                                                          : "#4DC3D8"),
+                                                    }}
+                                                  />
+                                                )}
+                                              </span>
                                               <span className="text-[9px] font-medium leading-tight truncate" tabIndex={0} aria-label={ev.title}>
                                                 {ev.title}
                                               </span>
@@ -1857,7 +2146,27 @@ const WeekView = ({
                                         ) : (
                                           // Non-concurrent or larger bar: inline icons
                                           <div className="h-full flex items-center gap-1 w-full min-w-0">
-                                            <span className="shrink-0">{categories[ev.kind]?.icon || "📌"}</span>
+                                            <span className="shrink-0">
+                                              {isActivityCopy ? (
+                                                <FaBars className="w-3 h-3" style={{ color: copyIconColor || undefined }} />
+                                              ) : isTaskCopy ? (
+                                                <span
+                                                  className="inline-block w-3 h-3 rounded-[3px]"
+                                                  style={{ backgroundColor: copyIconColor || "#22c55e" }}
+                                                />
+                                              ) : (
+                                                <span
+                                                  className="inline-block w-3 h-3 rounded-[3px]"
+                                                  style={{
+                                                    backgroundColor:
+                                                      copyIconColor ||
+                                                      (typeof kindColor === "string" && !kindColor.startsWith("bg-")
+                                                        ? kindColor
+                                                        : "#4DC3D8"),
+                                                  }}
+                                                />
+                                              )}
+                                            </span>
                                             <span className="truncate whitespace-nowrap text-[11px] min-w-0 flex-1 leading-4 font-medium" tabIndex={0} aria-label={ev.title}>
                                               {ev.title}
                                             </span>
@@ -1974,27 +2283,34 @@ const WeekView = ({
                     const isQuarterHourBoundary = slotMinute % 15 === 0 && slotMinute % 30 !== 0;
                     const shouldShowSlotLabel = slotSize === 15 ? slotMinute % 15 === 0 : slotMinute % 30 === 0;
 
-                    const rowBorderClass = isHourBoundary
-                      ? "border-t border-slate-300"
-                      : isHalfHourBoundary
-                      ? ""
-                      : "border-t border-slate-100";
+                    const rowBorderClass = isHourBoundary ? "border-t border-slate-300" : "";
 
                     const slotIsWorking = isWorkingTime ? isWorkingTime(slot) : true;
-
-                    const cellTopBorderStyle = isHalfHourBoundary
-                      ? { borderTopStyle: "solid", borderTopWidth: "1px", borderTopColor: "rgba(148,163,184,0.15)" }
-                      : isQuarterHourBoundary
-                      ? { borderTopStyle: "dotted", borderTopWidth: "1px", borderTopColor: "rgba(148,163,184,0.15)" }
-                      : {};
 
                     return (
                       <div
                         key={index}
                         data-slot-index={index}
                         style={{ ...style, overflow: "visible", boxSizing: "border-box" }}
-                        className={`flex w-full bg-white ${rowBorderClass}`}
+                        className={`relative flex w-full bg-white ${rowBorderClass}`}
                       >
+                        {!isHourBoundary && (isHalfHourBoundary || isQuarterHourBoundary) && (
+                          <div
+                            aria-hidden="true"
+                            style={{
+                              position: "absolute",
+                              left: 0,
+                              right: 0,
+                              top: 0,
+                              height: 0,
+                              borderTopStyle: isHalfHourBoundary ? "solid" : "dotted",
+                              borderTopWidth: "1px",
+                              borderTopColor: "rgba(148,163,184,0.3)",
+                              pointerEvents: "none",
+                              zIndex: 0,
+                            }}
+                          />
+                        )}
                         {/* LEFT: hour labels */}
                         <div
                           className="px-2 text-xs text-gray-500 flex-shrink-0 flex items-center justify-center relative"
@@ -2002,9 +2318,6 @@ const WeekView = ({
                             width: TIME_COL_PX + "px",
                             height: ITEM_SIZE,
                             backgroundColor: slotIsWorking ? undefined : NON_WORK_BG,
-                            borderRightWidth: "2px",
-                            borderRightStyle: "dashed",
-                            borderRightColor: "rgba(148, 163, 184, 0.3)",
                           }}
                         >
                           <span className="pl-2">{shouldShowSlotLabel ? (formatTime ? formatTime(slot) : slot) : ""}</span>
@@ -2031,10 +2344,6 @@ const WeekView = ({
                                 cursor: "pointer",
                                 backgroundColor: isHoverPreview ? "rgba(191, 219, 254, 0.65)" : (slotIsWorking ? undefined : NON_WORK_BG),
                                 opacity: slotIsWorking ? 1 : NON_WORK_OPACITY,
-                                borderRightWidth: "2px",
-                                borderRightStyle: "dashed",
-                                borderRightColor: "rgba(148, 163, 184, 0.3)",
-                                ...cellTopBorderStyle,
                               }}
                               onDragOver={(e) => {
                                 e.preventDefault();
@@ -2057,23 +2366,6 @@ const WeekView = ({
                                 );
                               }}
                             >
-                              {slotSize === 30 && (
-                                <div
-                                  aria-hidden="true"
-                                  style={{
-                                    position: "absolute",
-                                    left: 2,
-                                    right: 2,
-                                    top: (measuredSlotPx || ITEM_SIZE) / 2 + "px",
-                                    height: 1,
-                                    borderTopStyle: "dotted",
-                                    borderTopWidth: "1px",
-                                    borderTopColor: "rgba(148,163,184,0.15)",
-                                    pointerEvents: "none",
-                                    zIndex: 1,
-                                  }}
-                                />
-                              )}
                             </div>
                           );
                         })}
@@ -2081,6 +2373,22 @@ const WeekView = ({
                     );
                 }}
               </FixedSizeList>
+
+              {/* Persistent today column highlight (continuous, independent of row scrolling) */}
+              {todayColumnIndex >= 0 && todayGridColWidth > 0 && (
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute"
+                  style={{
+                    left: `${TIME_COL_PX + todayColumnIndex * todayGridColWidth}px`,
+                    width: `${Math.max(0, todayGridColWidth)}px`,
+                    top: 0,
+                    bottom: 0,
+                    backgroundColor: "rgba(59,130,246,0.10)",
+                    zIndex: 1,
+                  }}
+                />
+              )}
 
               {/* Column overlay for Today blink */}
               {colOverlay && colOverlay.visible && (
@@ -2123,7 +2431,7 @@ const WeekView = ({
                   left: 0,
                   right: 0,
                   top: "50%",
-                  height: 2,
+                  height: 1,
                   transform: "translateY(-50%)",
                   background: isBottomPanelResizing ? "rgba(37,99,235,0.75)" : "rgba(51,65,85,0.92)",
                 }}
@@ -2142,7 +2450,7 @@ const WeekView = ({
 
             {/* Bottom panel (separate table with no header) */}
             <div
-              className="border border-gray-100 rounded-b-lg overflow-hidden flex-shrink-0"
+              className="border-x border-b border-gray-100 rounded-b-lg overflow-hidden flex-shrink-0"
               style={{
                 height: bottomPanelHeight,
                 minHeight: MIN_BOTTOM_PANEL_HEIGHT,
@@ -2157,15 +2465,12 @@ const WeekView = ({
                 <tbody>
                   <tr style={{ height: "100%" }}>
                     <td
-                      className="align-top"
+                      className="relative align-top"
                       style={{
                         width: TIME_COL_PX + "px",
                         minWidth: TIME_COL_PX + "px",
                         maxWidth: TIME_COL_PX + "px",
                         padding: "8px 8px 8px 4px",
-                        borderRightWidth: "2px",
-                        borderRightStyle: "dashed",
-                        borderRightColor: "rgba(148, 163, 184, 0.3)",
                         backgroundColor: "white",
                         verticalAlign: "top",
                       }}
@@ -2173,29 +2478,80 @@ const WeekView = ({
                       <div className="flex flex-col items-start">
                         <button
                           type="button"
-                          className="inline-flex items-center justify-center px-2 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm whitespace-nowrap mb-2"
-                          style={{ minHeight: 36, width: TIME_COL_PX + "px", alignSelf: "flex-start" }}
-                          onClick={() =>
-                            onAddTaskOrActivity && onAddTaskOrActivity(currentDate || new Date(), { defaultTab: "task" })
-                          }
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-lg font-semibold shadow-sm"
+                          aria-label="Create task or activity"
+                          title="Create task or activity"
+                          onClick={(e) => {
+                            if (!onAddTaskOrActivity) return;
+                            try {
+                              const cell = e.currentTarget?.closest?.("td");
+                              const cellRect = cell?.getBoundingClientRect?.();
+                              const btnRect = e.currentTarget?.getBoundingClientRect?.();
+                              const menuHeight = 82;
+                              const baseX = cellRect && btnRect ? (btnRect.right - cellRect.left + 10) : 44;
+                              const baseY = cellRect && btnRect
+                                ? (btnRect.top - cellRect.top + Math.max(0, (btnRect.height - menuHeight) / 2))
+                                : 8;
+                              const x = Math.max(6, baseX);
+                              const y = cellRect
+                                ? Math.max(6, Math.min(baseY, cellRect.height - menuHeight - 6))
+                                : Math.max(6, baseY);
+                              setQuickAddMenu({
+                                open: true,
+                                x,
+                                y,
+                                dayKey: LEFT_QUICK_ADD_MENU_KEY,
+                                date: currentDate || new Date(),
+                              });
+                            } catch (_) {
+                              setQuickAddMenu({
+                                open: true,
+                                x: 40,
+                                y: 8,
+                                dayKey: LEFT_QUICK_ADD_MENU_KEY,
+                                date: currentDate || new Date(),
+                              });
+                            }
+                          }}
                         >
-                          <span>Add task</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          className="inline-flex items-center justify-center px-2 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm whitespace-nowrap"
-                          style={{ minHeight: 36, width: TIME_COL_PX + "px", alignSelf: "flex-start" }}
-                          onClick={() =>
-                            onAddTaskOrActivity && onAddTaskOrActivity(currentDate || new Date(), { defaultTab: "activity" })
-                          }
-                        >
-                          <span>Add activity</span>
+                          +
                         </button>
                       </div>
+                      {quickAddMenu.open && quickAddMenu.dayKey === LEFT_QUICK_ADD_MENU_KEY ? (
+                        <div
+                          ref={quickAddMenuRef}
+                          data-week-quick-add-menu="true"
+                          className="absolute z-20 w-36 rounded-md border border-slate-200 bg-white shadow-lg p-1"
+                          style={{ left: quickAddMenu.x, top: quickAddMenu.y }}
+                        >
+                          <button
+                            type="button"
+                            className="w-full rounded px-2 py-1 text-left text-[11px] text-slate-700 hover:bg-slate-50"
+                            onClick={(ev) => {
+                              ev.stopPropagation();
+                              onAddTaskOrActivity && onAddTaskOrActivity(quickAddMenu.date || (currentDate || new Date()), { defaultTab: "task" });
+                              setQuickAddMenu({ open: false, x: 0, y: 0, dayKey: null, date: null });
+                            }}
+                          >
+                            Create task
+                          </button>
+                          <button
+                            type="button"
+                            className="w-full rounded px-2 py-1 text-left text-[11px] text-slate-700 hover:bg-slate-50"
+                            onClick={(ev) => {
+                              ev.stopPropagation();
+                              onAddTaskOrActivity && onAddTaskOrActivity(quickAddMenu.date || (currentDate || new Date()), { defaultTab: "activity" });
+                              setQuickAddMenu({ open: false, x: 0, y: 0, dayKey: null, date: null });
+                            }}
+                          >
+                            Create activity
+                          </button>
+                        </div>
+                      ) : null}
                     </td>
 
                     {days.map((date, dIdx) => {
+                  const isTodayCol = isTodayColumn(date);
                   const startDay = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
                   const endDay = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
 
@@ -2207,11 +2563,6 @@ const WeekView = ({
                         const sDt = s ? new Date(s) : null;
                         const eDt = e ? new Date(e) : null;
                         if (!sDt || !eDt) return false;
-
-                        const sStartDay = new Date(sDt.getFullYear(), sDt.getMonth(), sDt.getDate(), 0, 0, 0, 0);
-                        const eStartDay = new Date(eDt.getFullYear(), eDt.getMonth(), eDt.getDate(), 0, 0, 0, 0);
-
-                        if (eStartDay.getTime() > sStartDay.getTime()) return false;
                         return sDt <= endDay && eDt >= startDay;
                       } catch {
                         return false;
@@ -2271,90 +2622,187 @@ const WeekView = ({
                   return (
                     <td
                       key={`col-${dIdx}`}
-                      className="align-top p-2 h-full overflow-hidden"
+                      className="week-bottom-list-cell relative align-top p-2 h-full overflow-visible cursor-pointer"
+                      title="Double-click to create task or activity"
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        try { e.dataTransfer.dropEffect = "move"; } catch {}
+                      }}
+                      onDrop={(e) => handleBottomColumnDrop(e, date)}
+                      onMouseMove={(e) => {
+                        const dayKey = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+                        try {
+                          const inRow = e.target?.closest?.('[data-week-item-row="true"]');
+                          const inActions = e.target?.closest?.('details[data-week-actions-menu="true"]');
+                          const inQuickAdd = e.target?.closest?.('[data-week-quick-add-menu="true"]');
+                          if (inRow || inActions || inQuickAdd) {
+                            setHoveredQuickAddDayKey((prev) => (prev === dayKey ? null : prev));
+                            return;
+                          }
+                        } catch (_) {}
+                        setHoveredQuickAddDayKey(dayKey);
+                      }}
+                      onMouseLeave={() => setHoveredQuickAddDayKey((prev) => (prev === `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}` ? null : prev))}
+                      onDoubleClick={(e) => {
+                        if (!onAddTaskOrActivity) return;
+                        try {
+                          const inRow = e.target?.closest?.('[data-week-item-row="true"]');
+                          const inActions = e.target?.closest?.('details[data-week-actions-menu="true"]');
+                          if (inRow || inActions) return;
+                        } catch (_) {}
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const menuWidth = 148;
+                        const menuHeight = 82;
+                        const nextX = Math.max(6, Math.min((e.clientX - rect.left) + 6, rect.width - menuWidth - 6));
+                        const nextY = Math.max(6, Math.min((e.clientY - rect.top) + 6, rect.height - menuHeight - 6));
+                        setQuickAddMenu({
+                          open: true,
+                          x: nextX,
+                          y: nextY,
+                          dayKey: `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`,
+                          date: new Date(date),
+                        });
+                      }}
                       style={{
-                        borderRightWidth: "2px",
-                        borderRightStyle: "dashed",
-                        borderRightColor: "rgba(148, 163, 184, 0.3)",
+                        backgroundColor:
+                          hoveredQuickAddDayKey === `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
+                            ? "rgba(239, 246, 255, 0.45)"
+                            : (isTodayCol ? "rgba(59,130,246,0.10)" : undefined),
                         verticalAlign: "top",
                       }}
                     >
-                      <div className="week-bottom-list-scroll h-full min-h-0 flex flex-col gap-0 overflow-y-auto overflow-x-hidden" style={{ paddingRight: "3px" }}>
+                      <div className="week-bottom-list-scroll relative h-full min-h-0 flex flex-col gap-0 overflow-y-auto overflow-x-hidden">
                         {combined.map((item) => {
                           if (item.__type === "task") {
                             const t = item;
+                            const taskMeta = t?.id ? taskMetaMap[String(t.id)] : null;
+                            const taskKeyAreaId =
+                              t?.keyAreaId ??
+                              t?.key_area_id ??
+                              t?.keyArea?.id ??
+                              t?.key_area?.id ??
+                              taskMeta?.keyAreaId ??
+                              null;
                             const ka =
-                              t.keyAreaId || t.key_area_id ? keyAreaMap[String(t.keyAreaId || t.key_area_id)] : null;
+                              taskKeyAreaId ? keyAreaMap[String(taskKeyAreaId)] : null;
                             const DEFAULT_ACCENT_COLOR = "#4DC3D8";
                             const kaColor = ka && ka.color ? ka.color : null;
                             const accentColor = kaColor || DEFAULT_ACCENT_COLOR;
+                            const isIdeasKeyArea = String(ka?.title || "")
+                              .trim()
+                              .toLowerCase() === "ideas";
+                            const keyAreaNumber = toDisplayIndex(
+                              isIdeasKeyArea
+                                ? 10
+                                : (
+                                  keyAreaOrderMap[String(taskKeyAreaId)] ??
+                                  ka?.position ??
+                                  t?.keyAreaPosition ??
+                                  t?.keyArea?.position ??
+                                  t?.key_area?.position ??
+                                  null
+                                )
+                            );
+                            const listNumber = toDisplayIndex(
+                              t?.list_index ?? t?.listIndex ?? t?.list ?? taskMeta?.listIndex
+                            );
+                            const keyAreaListLabel =
+                              keyAreaNumber > 0 && listNumber > 0
+                                ? `${keyAreaNumber}.${listNumber}`
+                                : null;
 
                             return (
                               <div
                                 key={`task-${t.id}`}
+                                data-week-item-row="true"
                                 draggable
                                 onDragStart={(e) => {
                                   try {
+                                    const taskStart =
+                                      t.startDate ||
+                                      t.start_date ||
+                                      t.date ||
+                                      t.dueDate ||
+                                      t.due_date ||
+                                      null;
                                     e.dataTransfer.setData("taskId", String(t.id));
                                     e.dataTransfer.setData("text/plain", String(t.title || t.name || "Task"));
                                     e.dataTransfer.setData("taskText", String(t.title || t.name || "Task"));
-                                    e.dataTransfer.setData("dragEffect", "copy");
-                                    e.dataTransfer.effectAllowed = "copy";
-                                    console.log("[WeekView] Task drag started", {
-                                      taskId: t.id,
-                                      taskTitle: t.title || t.name,
-                                    });
+                                    if (taskStart) e.dataTransfer.setData("dragSourceStart", String(taskStart));
+                                    e.dataTransfer.setData("dragEffect", "move");
+                                    e.dataTransfer.effectAllowed = "copyMove";
                                   } catch (err) {
                                     console.error("[WeekView] Task drag start error", err);
                                   }
                                 }}
-                                className="group px-1.5 py-1 text-xs cursor-grab active:cursor-grabbing min-w-0 flex items-center gap-2 border-b border-sky-200 transition-colors hover:bg-sky-50 shrink-0 min-h-[28px]"
+                                className="group px-1.5 py-1 text-xs cursor-grab active:cursor-grabbing min-w-0 flex items-center gap-0.5 border-b border-sky-200 transition-colors hover:bg-sky-50 shrink-0 min-h-[28px]"
                                 title={t.title || t.name}
                               >
                                 <span
-                                  className="w-4 h-4 rounded-[3px] shrink-0"
+                                  className="w-3 h-3 rounded-[3px] shrink-0"
                                   style={{ backgroundColor: accentColor }}
                                   aria-hidden="true"
                                 />
                                 <div className="truncate flex-1 text-[15px] text-[#4DC3D8]">{t.title || t.name}</div>
-                                <div className="flex items-center gap-1 shrink-0">
-                                  {onTaskComplete && (
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        onTaskComplete(t);
-                                      }}
-                                      className="p-1 hover:bg-green-100 rounded transition-colors"
-                                      title="Mark complete"
-                                    >
-                                      <FaCheck className="w-3 h-3 text-green-600" />
-                                    </button>
-                                  )}
-                                  {onTaskEdit && (
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        onTaskEdit(t);
-                                      }}
-                                      className="p-1 hover:bg-slate-100 rounded transition-colors"
-                                      title="Edit"
-                                    >
-                                      <FaEdit className="w-3 h-3 text-slate-600" />
-                                    </button>
-                                  )}
-                                  {onTaskDelete && (
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        onTaskDelete(t);
-                                      }}
-                                      className="p-1 hover:bg-red-100 rounded transition-colors"
-                                      title="Delete"
-                                    >
-                                      <FaTrash className="w-3 h-3 text-red-600" />
-                                    </button>
-                                  )}
-                                </div>
+                                {keyAreaListLabel ? (
+                                  <span className="shrink-0 text-[11px] font-semibold text-[#4DC3D8] mr-0.5">
+                                    {keyAreaListLabel}
+                                  </span>
+                                ) : null}
+                                <details data-week-actions-menu="true" className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
+                                  <summary
+                                    onClick={handleRowMenuSummaryClick}
+                                    className="list-none p-0.5 rounded hover:bg-slate-100 transition-colors cursor-pointer"
+                                    title="Task actions"
+                                  >
+                                    <FaEllipsisV className="w-3 h-3 text-slate-600" />
+                                  </summary>
+                                  <div className="absolute right-0 top-6 z-20 w-28 rounded-md border border-slate-200 bg-white shadow-lg py-0.5">
+                                    {onTaskComplete && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          onTaskComplete(t);
+                                          const detailsEl = e.currentTarget.closest("details");
+                                          if (detailsEl) detailsEl.removeAttribute("open");
+                                        }}
+                                        className="w-full px-2 py-1 text-left text-[11px] text-slate-700 hover:bg-green-50 inline-flex items-center gap-1.5 whitespace-nowrap"
+                                      >
+                                        <FaCheck className="w-2.5 h-2.5 text-green-600" />
+                                        <span>Mark complete</span>
+                                      </button>
+                                    )}
+                                    {onTaskEdit && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          onTaskEdit(t);
+                                          const detailsEl = e.currentTarget.closest("details");
+                                          if (detailsEl) detailsEl.removeAttribute("open");
+                                        }}
+                                        className="w-full px-2 py-1 text-left text-[11px] text-slate-700 hover:bg-slate-50 inline-flex items-center gap-1.5 whitespace-nowrap"
+                                      >
+                                        <FaEdit className="w-2.5 h-2.5 text-slate-600" />
+                                        <span>Edit</span>
+                                      </button>
+                                    )}
+                                    {onTaskDelete && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          onTaskDelete(t);
+                                          const detailsEl = e.currentTarget.closest("details");
+                                          if (detailsEl) detailsEl.removeAttribute("open");
+                                        }}
+                                        className="w-full px-2 py-1 text-left text-[11px] text-red-700 hover:bg-red-50 inline-flex items-center gap-1.5 whitespace-nowrap"
+                                      >
+                                        <FaTrash className="w-2.5 h-2.5 text-red-600" />
+                                        <span>Delete</span>
+                                      </button>
+                                    )}
+                                  </div>
+                                </details>
                               </div>
                             );
                           }
@@ -2379,69 +2827,122 @@ const WeekView = ({
                           return (
                             <div
                               key={`act-${a.id}`}
+                              data-week-item-row="true"
                               draggable
                               onDragStart={(e) => {
                                 try {
+                                  const activityStart =
+                                    a.date ||
+                                    a.startDate ||
+                                    a.start_date ||
+                                    a.dueDate ||
+                                    a.due_date ||
+                                    a.createdAt ||
+                                    a.created_at ||
+                                    null;
                                   e.dataTransfer.setData("activityId", String(a.id || ""));
                                   e.dataTransfer.setData("activityText", String(a.text || a.title || "Activity"));
                                   e.dataTransfer.setData("text/plain", String(a.text || a.title || "Activity"));
-                                  e.dataTransfer.setData("dragEffect", "copy");
-                                  e.dataTransfer.effectAllowed = "copy";
-                                  console.log("[WeekView] Activity drag started", {
-                                    activityId: a.id,
-                                    activityText: a.text || a.title,
-                                  });
+                                  if (activityStart) e.dataTransfer.setData("dragSourceStart", String(activityStart));
+                                  e.dataTransfer.setData("dragEffect", "move");
+                                  e.dataTransfer.effectAllowed = "copyMove";
                                 } catch (err) {
                                   console.error("[WeekView] Activity drag start error", err);
                                 }
                               }}
-                              className="group px-1.5 py-1 text-xs truncate w-full flex items-center gap-2 border-b border-sky-200 transition-colors hover:bg-sky-50 shrink-0 min-h-[28px]"
+                              className="group px-1.5 py-1 text-xs w-full flex items-center gap-2 border-b border-sky-200 transition-colors hover:bg-sky-50 shrink-0 min-h-[28px]"
                               title={a.text || a.title}
                             >
-                              <FaBars className="w-4 h-4 shrink-0" style={{ color: accentColor }} aria-hidden="true" />
+                              <FaBars className="w-3 h-3 shrink-0" style={{ color: accentColor }} aria-hidden="true" />
                               <div className="truncate flex-1 text-[15px] text-[#4DC3D8]">{a.text || a.title}</div>
-                              <div className="flex items-center gap-1 shrink-0">
-                                {onActivityComplete && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      onActivityComplete(a);
-                                    }}
-                                    className="p-1 hover:bg-green-100 rounded transition-colors"
-                                    title="Mark complete"
-                                  >
-                                    <FaCheck className="w-3 h-3 text-green-600" />
-                                  </button>
-                                )}
-                                {onActivityEdit && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      onActivityEdit(a);
-                                    }}
-                                    className="p-1 hover:bg-slate-100 rounded transition-colors"
-                                    title="Edit"
-                                  >
-                                    <FaEdit className="w-3 h-3 text-slate-600" />
-                                  </button>
-                                )}
-                                {onActivityDelete && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      onActivityDelete(a);
-                                    }}
-                                    className="p-1 hover:bg-red-100 rounded transition-colors"
-                                    title="Delete"
-                                  >
-                                    <FaTrash className="w-3 h-3 text-red-600" />
-                                  </button>
-                                )}
-                              </div>
+                              <details data-week-actions-menu="true" className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
+                                <summary
+                                  onClick={handleRowMenuSummaryClick}
+                                  className="list-none p-0.5 rounded hover:bg-slate-100 transition-colors cursor-pointer"
+                                  title="Activity actions"
+                                >
+                                  <FaEllipsisV className="w-3 h-3 text-slate-600" />
+                                </summary>
+                                <div className="absolute right-0 top-6 z-20 w-28 rounded-md border border-slate-200 bg-white shadow-lg py-0.5">
+                                  {onActivityComplete && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        onActivityComplete(a);
+                                        const detailsEl = e.currentTarget.closest("details");
+                                        if (detailsEl) detailsEl.removeAttribute("open");
+                                      }}
+                                      className="w-full px-2 py-1 text-left text-[11px] text-slate-700 hover:bg-green-50 inline-flex items-center gap-1.5 whitespace-nowrap"
+                                    >
+                                      <FaCheck className="w-2.5 h-2.5 text-green-600" />
+                                      <span>Mark complete</span>
+                                    </button>
+                                  )}
+                                  {onActivityEdit && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        onActivityEdit(a);
+                                        const detailsEl = e.currentTarget.closest("details");
+                                        if (detailsEl) detailsEl.removeAttribute("open");
+                                      }}
+                                      className="w-full px-2 py-1 text-left text-[11px] text-slate-700 hover:bg-slate-50 inline-flex items-center gap-1.5 whitespace-nowrap"
+                                    >
+                                      <FaEdit className="w-2.5 h-2.5 text-slate-600" />
+                                      <span>Edit</span>
+                                    </button>
+                                  )}
+                                  {onActivityDelete && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        onActivityDelete(a);
+                                        const detailsEl = e.currentTarget.closest("details");
+                                        if (detailsEl) detailsEl.removeAttribute("open");
+                                      }}
+                                      className="w-full px-2 py-1 text-left text-[11px] text-red-700 hover:bg-red-50 inline-flex items-center gap-1.5 whitespace-nowrap"
+                                    >
+                                      <FaTrash className="w-2.5 h-2.5 text-red-600" />
+                                      <span>Delete</span>
+                                    </button>
+                                  )}
+                                </div>
+                              </details>
                             </div>
                           );
                         })}
                       </div>
+                      {quickAddMenu.open && quickAddMenu.dayKey === `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}` ? (
+                        <div
+                          ref={quickAddMenuRef}
+                          data-week-quick-add-menu="true"
+                          className="absolute z-20 w-36 rounded-md border border-slate-200 bg-white shadow-lg p-1"
+                          style={{ left: quickAddMenu.x, top: quickAddMenu.y }}
+                        >
+                          <button
+                            type="button"
+                            className="w-full rounded px-2 py-1 text-left text-[11px] text-slate-700 hover:bg-slate-50"
+                            onClick={(ev) => {
+                              ev.stopPropagation();
+                              onAddTaskOrActivity && onAddTaskOrActivity(quickAddMenu.date || date, { defaultTab: "task" });
+                              setQuickAddMenu({ open: false, x: 0, y: 0, dayKey: null, date: null });
+                            }}
+                          >
+                            Create task
+                          </button>
+                          <button
+                            type="button"
+                            className="w-full rounded px-2 py-1 text-left text-[11px] text-slate-700 hover:bg-slate-50"
+                            onClick={(ev) => {
+                              ev.stopPropagation();
+                              onAddTaskOrActivity && onAddTaskOrActivity(quickAddMenu.date || date, { defaultTab: "activity" });
+                              setQuickAddMenu({ open: false, x: 0, y: 0, dayKey: null, date: null });
+                            }}
+                          >
+                            Create activity
+                          </button>
+                        </div>
+                      ) : null}
                     </td>
                   );
                 })}
@@ -2449,6 +2950,7 @@ const WeekView = ({
                 </tbody>
               </table>
             </div>
+        </div>
         </div>
       </div>
     </>

@@ -124,6 +124,7 @@ export default function CreateTaskModal({
   // When creating, we keep end date in-sync with start date until the user edits end date.
   const [endAuto, setEndAuto] = useState(!(initialData.end_date || initialData.endDate));
   const [deadline, setDeadline] = useState(safeDate(initialData.deadline || initialData.dueDate));
+  const [deadlineAuto, setDeadlineAuto] = useState(true);
   const [duration, setDuration] = useState(durationToTimeInputValue(initialData.duration || initialData.duration_minutes || ''));
   const [priority, setPriority] = useState(initialData.priority ?? initialData.priority_level ?? 2);
   const [status, setStatus] = useState(initialData.status || initialData.state || 'open');
@@ -185,6 +186,7 @@ export default function CreateTaskModal({
   // If the initial data provides an explicit end date, disable auto-sync; otherwise keep auto-sync enabled
   const nextEndAuto = !Boolean(initialData.end_date || initialData.endDate);
   if (endAuto !== nextEndAuto) setEndAuto(nextEndAuto);
+  setDeadlineAuto(true);
     const nextDeadline = safeDate(initialData.deadline || initialData.dueDate);
     if (deadline !== nextDeadline) setDeadline(nextDeadline);
     const nextDuration = durationToTimeInputValue(initialData.duration || initialData.duration_minutes || '');
@@ -329,6 +331,13 @@ export default function CreateTaskModal({
       ignore = true;
     };
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!deadlineAuto) return;
+    if (!endDate) return;
+    if (deadline !== endDate) setDeadline(endDate);
+  }, [isOpen, endDate, deadline, deadlineAuto]);
 
   // When a specific Key Area is selected while creating a task, fetch tasks for that
   // key area so the List dropdown can include any list_index values already used by
@@ -621,7 +630,7 @@ export default function CreateTaskModal({
                     type="date"
                     className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar"
                     value={deadline}
-                    onChange={(e) => setDeadline(e.target.value)}
+                    onChange={(e) => { setDeadline(e.target.value); setDeadlineAuto(false); }}
                     ref={deadlineRef}
                   />
                   <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600" aria-label="Open date picker" onClick={() => { try { deadlineRef.current?.showPicker?.(); deadlineRef.current?.focus(); } catch (__) {} }}>
