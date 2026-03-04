@@ -33,7 +33,7 @@ import elephantTaskService from "../../services/elephantTaskService";
 import AvailabilityBlock from "./AvailabilityBlock";
 import calendarService from "../../services/calendarService";
 import { useToast } from "../shared/ToastProvider.jsx";
-import { normalizeActivity } from '../../utils/keyareasHelpers';
+import { normalizeActivity, toDateOnly } from '../../utils/keyareasHelpers';
 import AppointmentModal from "./AppointmentModal";
 import DebugEventModal from "./DebugEventModal";
 import useCalendarPreferences from '../../hooks/useCalendarPreferences';
@@ -351,11 +351,18 @@ const CalendarContainer = () => {
                     seenEvents.add(key);
                     return true;
                 });
+                const normalizedEvents = allEvents.map((ev) => ({
+                    ...ev,
+                    taskId: ev?.taskId ?? ev?.task_id ?? null,
+                    activityId: ev?.activityId ?? ev?.activity_id ?? null,
+                    keyAreaId: ev?.keyAreaId ?? ev?.key_area_id ?? null,
+                    sourceType: ev?.sourceType ?? ev?.source_type ?? null,
+                }));
                 // Attach human-friendly labels converted from UTC -> user's timezone
                 try {
                     // Use the synchronous wrapper; preloadTzLib is called at app startup so this will work.
                     const { formatUtcForUserSync } = await import('../../utils/time');
-                    const enriched = (allEvents || []).map((ev) => ({
+                    const enriched = (normalizedEvents || []).map((ev) => ({
                         ...ev,
                         formattedStart: ev.start ? formatUtcForUserSync(ev.start, timezone) : null,
                         formattedEnd: ev.end ? formatUtcForUserSync(ev.end, timezone) : null,
@@ -363,7 +370,7 @@ const CalendarContainer = () => {
                     setEvents(enriched);
                 } catch (e) {
                     // Fallback: store raw events if utils fail
-                    setEvents(allEvents);
+                    setEvents(normalizedEvents);
                 }
                 // Filter out completed tasks (status 'done' or 'completed')
                 const activeTodos = (Array.isArray(tds) ? tds : []).filter((t) => {
@@ -630,6 +637,10 @@ const CalendarContainer = () => {
             if (keyAreaId && String(keyAreaId).trim() !== '' && String(keyAreaId).match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
                 payload.keyAreaId = String(keyAreaId);
             }
+            if (taskId && String(taskId).trim() !== '') {
+                payload.taskId = String(taskId);
+                payload.sourceType = "task";
+            }
             if (import.meta.env.DEV) {
                 try { console.debug('Creating appointment payload', payload); } catch (_) {}
             }
@@ -642,7 +653,13 @@ const CalendarContainer = () => {
             // Attach client-side assignee info so the appointment modal can prefill
             // the Assignee select immediately after creation (this is client-only
             // metadata; backend does not currently persist assignee for appointments).
-            const createdWithMeta = { ...(created || {}), ...(assignee ? { assignee } : {}) };
+            const createdWithMeta = {
+                ...(created || {}),
+                ...(assignee ? { assignee } : {}),
+                sourceType: "task",
+                ...(taskId ? { sourceTaskId: String(taskId) } : {}),
+                ...(keyAreaId ? { sourceKeyAreaId: String(keyAreaId) } : {}),
+            };
             if (import.meta.env.DEV) {
                 try { console.debug('Appointment merged client-side meta', createdWithMeta); } catch (_) {}
             }
@@ -786,12 +803,26 @@ const CalendarContainer = () => {
             if (keyAreaId && String(keyAreaId).trim() !== '' && String(keyAreaId).match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
                 payload.keyAreaId = String(keyAreaId);
             }
+            if (activityId && String(activityId).trim() !== '') {
+                payload.activityId = String(activityId);
+                payload.sourceType = "activity";
+            }
+            const linkedTaskId = resolvedActivity?.taskId || resolvedActivity?.task_id || resolvedActivity?.task || null;
+            if (linkedTaskId && String(linkedTaskId).trim() !== '') {
+                payload.taskId = String(linkedTaskId);
+            }
             
             if (import.meta.env.DEV) {
                 try { console.debug('Creating appointment payload', payload); } catch (_) {}
             }
             const created = await calendarService.createAppointment(payload);
-            const createdWithMeta = { ...(created || {}), ...(assignee ? { assignee } : {}) };
+            const createdWithMeta = {
+                ...(created || {}),
+                ...(assignee ? { assignee } : {}),
+                sourceType: "activity",
+                ...(activityId ? { sourceActivityId: String(activityId) } : {}),
+                ...(keyAreaId ? { sourceKeyAreaId: String(keyAreaId) } : {}),
+            };
             setEvents((prev) => [...prev, createdWithMeta]);
             // Do not open the editor right away; let the user click the event to edit.
             addToast({ title: "Event created", description: `${title} at ${formatTime(`${String(start.getHours()).padStart(2,'0')}:${String(start.getMinutes()).padStart(2,'0')}`)} — click the event to edit`, variant: "success" });
@@ -1167,7 +1198,7 @@ const CalendarContainer = () => {
         }
 
         // Debug info to help trace prefill issues in the browser console
-        try { console.debug('Opening EditActivityModal with item', item, 'tasksList snapshot', tasksList); } catch (__) {}
+        try { console.debug('Opening EditTaskModal with item', item, 'tasksList snapshot', tasksList); } catch (__) {}
 
         setEditItem(item);
         setEditModalOpen(true);
@@ -2174,14 +2205,32 @@ const CalendarContainer = () => {
                             if (payload.assignee !== undefined) patch.assignee = payload.assignee;
                             if (payload.status !== undefined) patch.status = payload.status;
                             if (payload.priority !== undefined) patch.priority = payload.priority;
-                            if (payload.date !== undefined || payload.time !== undefined) {
+                            if (
+                                payload.date !== undefined ||
+                                payload.time !== undefined ||
+                                payload.start_date !== undefined ||
+                                payload.startDate !== undefined
+                            ) {
                                 try {
-                                    if (payload.date && payload.time) patch.startDate = new Date(`${payload.date}T${payload.time}`).toISOString();
-                                    else if (payload.date) patch.startDate = new Date(payload.date).toISOString();
+                                    if (payload.date && payload.time) {
+                                        patch.startDate = new Date(`${payload.date}T${payload.time}`).toISOString();
+                                    } else if (payload.start_date !== undefined) {
+                                        patch.startDate = payload.start_date ? new Date(payload.start_date).toISOString() : null;
+                                    } else if (payload.startDate !== undefined) {
+                                        patch.startDate = payload.startDate ? new Date(payload.startDate).toISOString() : null;
+                                    } else if (payload.date) {
+                                        patch.startDate = new Date(payload.date).toISOString();
+                                    }
                                 } catch (e) {}
                             }
-                            if (payload.endDate !== undefined || payload.end_date !== undefined) patch.endDate = payload.endDate ? new Date(payload.endDate).toISOString() : null;
-                            if (payload.dueDate !== undefined || payload.deadline !== undefined) patch.dueDate = payload.dueDate ? new Date(payload.dueDate).toISOString() : null;
+                            if (payload.endDate !== undefined || payload.end_date !== undefined) {
+                                const endValue = payload.end_date !== undefined ? payload.end_date : payload.endDate;
+                                patch.endDate = endValue ? new Date(endValue).toISOString() : null;
+                            }
+                            if (payload.dueDate !== undefined || payload.deadline !== undefined) {
+                                const dueValue = payload.deadline !== undefined ? payload.deadline : payload.dueDate;
+                                patch.dueDate = dueValue ? new Date(dueValue).toISOString() : null;
+                            }
                             if (payload.key_area_id || payload.keyAreaId) patch.keyAreaId = payload.key_area_id || payload.keyAreaId;
                             if (payload.list_index !== undefined || payload.listIndex !== undefined) patch.listIndex = payload.list_index ?? payload.listIndex;
 
@@ -2295,32 +2344,24 @@ const CalendarContainer = () => {
                             const svc = await getActivityService();
                             if (editItem.id) {
                                 // Map only allowed update fields to avoid ValidationPipe whitelist errors
-                                // helper: normalize date-only (YYYY-MM-DD) to ISO datetime string
+                                // Match KeyAreas behavior: persist date-only values for activity date fields.
                                 const normDate = (val) => {
                                     if (val === null) return null;
                                     if (typeof val === 'string' && val.trim() === '') return null;
                                     if (!val) return undefined;
-                                    const s = String(val);
-                                    // ISO date only (YYYY-MM-DD)
-                                    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
-                                        try {
-                                            return new Date(s + 'T00:00:00Z').toISOString();
-                                        } catch { return s; }
-                                    }
-                                    // otherwise try Date parse and toISOString
-                                    try {
-                                        const d = new Date(s);
-                                        if (!isNaN(d.getTime())) return d.toISOString();
-                                    } catch {}
-                                    return s;
+                                    return toDateOnly(val) || null;
                                 };
                                 const normPriority = (p) => {
-                                    if (p === null) return null;
-                                    if (p === undefined) return undefined;
-                                    if (typeof p === 'number') return p === 3 ? 'high' : p === 1 ? 'low' : 'normal';
+                                    if (p === undefined || p === null || p === '') return undefined;
+                                    const num = Number(p);
+                                    if (!Number.isNaN(num)) {
+                                        if (num <= 1) return 'low';
+                                        if (num >= 3) return 'high';
+                                        return 'normal';
+                                    }
                                     const ps = String(p).toLowerCase();
-                                    if (['1','2','3'].includes(ps)) return ps === '3' ? 'high' : ps === '1' ? 'low' : 'normal';
-                                    if (['high','normal','low'].includes(ps)) return ps;
+                                    if (ps === 'low' || ps === 'normal' || ps === 'high') return ps;
+                                    if (ps === 'medium' || ps === 'med') return 'normal';
                                     return undefined;
                                 };
 

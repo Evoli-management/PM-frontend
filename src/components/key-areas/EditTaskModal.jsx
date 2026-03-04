@@ -132,9 +132,11 @@ export default function EditTaskModal({
   const [assignee, setAssignee] = useState(getInitialAssigneeId());
   const [startDate, setStartDate] = useState(safeDate(initialData.start_date || initialData.startDate) || defaultDate);
   const [endDate, setEndDate] = useState(safeDate(initialData.end_date || initialData.endDate) || defaultDate);
+  const [endAuto, setEndAuto] = useState(!(initialData.end_date || initialData.endDate));
   const [keyAreaError, setKeyAreaError] = useState('');
   const [listError, setListError] = useState('');
   const [deadline, setDeadline] = useState(safeDate(initialData.deadline || initialData.dueDate));
+  const [deadlineAuto, setDeadlineAuto] = useState(true);
   const [duration, setDuration] = useState(durationToTimeInputValue(initialData.duration || initialData.duration_minutes || ''));
   const [priority, setPriority] = useState(initialData.priority ?? initialData.priority_level ?? 2);
   const [status, setStatus] = useState(initialData.status || initialData.state || 'open');
@@ -204,6 +206,8 @@ export default function EditTaskModal({
   if (startDate !== nextStart) setStartDate(nextStart);
   const nextEnd = safeDate(initialData.end_date || initialData.endDate) || defaultDate;
   if (endDate !== nextEnd) setEndDate(nextEnd);
+  setEndAuto(!Boolean(initialData.end_date || initialData.endDate));
+  setDeadlineAuto(true);
     const nextDeadline = safeDate(initialData.deadline || initialData.dueDate);
     if (deadline !== nextDeadline) setDeadline(nextDeadline);
     const nextDuration = durationToTimeInputValue(initialData.duration || initialData.duration_minutes || '');
@@ -267,6 +271,20 @@ export default function EditTaskModal({
       }
     })();
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!endAuto) return;
+    if (!startDate) return;
+    if (endDate !== startDate) setEndDate(startDate);
+  }, [isOpen, startDate, endDate, endAuto]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!deadlineAuto) return;
+    if (!endDate) return;
+    if (deadline !== endDate) setDeadline(endDate);
+  }, [isOpen, endDate, deadline, deadlineAuto]);
 
   // When fetched key areas load, if no keyAreaId is set, default to the first area.
   useEffect(() => {
@@ -590,7 +608,7 @@ export default function EditTaskModal({
               <div style={{ minHeight: '64px' }}>
                 <label className="text-sm font-medium text-slate-700">End date</label>
                 <div className="relative mt-0">
-                  <input ref={endRef} className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                  <input ref={endRef} className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar" type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setEndAuto(false); }} />
                   <button
                     type="button"
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600"
@@ -609,7 +627,7 @@ export default function EditTaskModal({
               <div style={{ minHeight: '64px' }}>
                 <label className="text-sm font-medium text-slate-700">Deadline</label>
                 <div className="relative mt-0.5">
-                  <input ref={deadlineRef} className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar" type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
+                  <input ref={deadlineRef} className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar" type="date" value={deadline} onChange={(e) => { setDeadline(e.target.value); setDeadlineAuto(false); }} />
                   <button
                     type="button"
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600"
