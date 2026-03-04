@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { FaSpinner, FaCheckCircle, FaRegCircle, FaAlignJustify, FaTag, FaTrash, FaEdit, FaAngleDoubleRight, FaChevronUp, FaChevronDown, FaEllipsisV } from 'react-icons/fa';
 import { toDateOnly, getPriorityLabel, mapUiStatusToServer, getStatusColorClass, getPriorityColorClass, resolveAssignee } from '../../utils/keyareasHelpers';
 
@@ -28,6 +29,7 @@ const ActivityRow = ({
   const [editingKey, setEditingKey] = useState(null);
   const [localValue, setLocalValue] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
   const menuRef = useRef(null);
   const menuBtnRef = useRef(null);
   useEffect(() => {
@@ -44,6 +46,33 @@ const ActivityRow = ({
     return () => {
       document.removeEventListener('mousedown', onDown);
       document.removeEventListener('keydown', onKey);
+    };
+  }, [menuOpen]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const updatePlacement = () => {
+      const btn = menuBtnRef.current;
+      if (!btn) return;
+      const menuHeight = menuRef.current?.offsetHeight || 140;
+      const menuWidth = menuRef.current?.offsetWidth || 176;
+      const rect = btn.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      const openUp = spaceBelow < menuHeight + 12 && spaceAbove > spaceBelow;
+      let left = rect.left;
+      const maxLeft = window.innerWidth - menuWidth - 8;
+      if (left > maxLeft) left = Math.max(8, maxLeft);
+      if (left < 8) left = 8;
+      const top = openUp ? Math.max(8, rect.top - menuHeight - 4) : Math.min(window.innerHeight - menuHeight - 8, rect.bottom + 4);
+      setMenuPos({ top, left });
+    };
+    updatePlacement();
+    window.addEventListener('resize', updatePlacement);
+    window.addEventListener('scroll', updatePlacement, true);
+    return () => {
+      window.removeEventListener('resize', updatePlacement);
+      window.removeEventListener('scroll', updatePlacement, true);
     };
   }, [menuOpen]);
   return (
@@ -80,10 +109,11 @@ const ActivityRow = ({
             >
               <FaEllipsisV />
             </button>
-            {menuOpen && (
+            {menuOpen && createPortal(
               <div
                 ref={menuRef}
-                className="absolute top-full left-0 mt-1 z-50 min-w-[176px] bg-white border border-slate-200 rounded shadow-lg"
+                style={{ position: 'fixed', top: menuPos.top, left: menuPos.left, zIndex: 1000, minWidth: 176 }}
+                className="bg-white border border-slate-200 rounded shadow-lg"
               >
                 <button type="button" className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm hover:bg-slate-50" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onEdit && onEdit(a); }}>
                   <FaEdit className="text-slate-600" />
@@ -97,7 +127,8 @@ const ActivityRow = ({
                   <FaAngleDoubleRight />
                   <span>Convert to task</span>
                 </button>
-              </div>
+              </div>,
+              document.body
             )}
           </div>
           <span className="inline-flex items-center justify-center w-9 h-8 border rounded mr-2 text-[#4DC3D8]" title="Drag handle">
@@ -229,23 +260,28 @@ const ActivityRow = ({
         <div className="flex items-center gap-2">
           <div className="text-xs text-slate-500">Priority</div>
           {typeof updateField === 'function' ? (
-            <select
-              className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-sm"
-              value={(() => {
+            (() => {
+              const priorityValue = (() => {
                 const raw = a.priority ?? a.priority_level ?? a.priorityLevel ?? eff;
                 if (raw === 1 || String(raw) === '1' || String(raw).toLowerCase() === 'low') return 'low';
                 if (raw === 3 || String(raw) === '3' || String(raw).toLowerCase() === 'high') return 'high';
                 return 'normal';
-              })()}
-              onChange={async (e) => {
-                const v = e.target.value;
-                try { await updateField && updateField(a.id, 'priority', v); } catch (err) {}
-              }}
-            >
-              <option value="high" >❗️ High</option>
-              <option value="normal">Normal</option>
-              <option value="low" style={{ color: "#6b7280" }}>↓ Low</option>
-            </select>
+              })();
+              return (
+                <select
+                  className="w-[96px] rounded-md border border-slate-300 bg-white py-0.5 text-sm px-2"
+                  value={priorityValue}
+                  onChange={async (e) => {
+                    const v = e.target.value;
+                    try { await updateField && updateField(a.id, 'priority', v); } catch (err) {}
+                  }}
+                >
+                  <option value="high">High</option>
+                  <option value="normal">Normal</option>
+                  <option value="low" style={{ color: "#6b7280" }}>Low</option>
+                </select>
+              );
+            })()
           ) : (
             (() => {
               const lvlLocal = getPriorityLevel ? getPriorityLevel(a.priority ?? a.priority_level ?? eff) : 2;

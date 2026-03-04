@@ -61,10 +61,9 @@ export default function ResizablePanels({
         >
             {/* Left Panel - Tasks */}
             <div
-                className={`${leftPanelScrollable ? 'overflow-auto' : 'overflow-hidden'} bg-white`}
+                className={`${leftPanelScrollable ? 'overflow-auto' : 'overflow-hidden'} bg-white h-full min-h-0`}
                 style={{
                     width: `${taskWidth}%`,
-                    borderRight: '1px solid #e2e8f0',
                     transition: isDragging ? 'none' : 'width 0.2s ease',
                 }}
             >
@@ -73,21 +72,32 @@ export default function ResizablePanels({
 
             {/* Divider */}
             <div
-                className={`w-1 bg-slate-200 hover:bg-blue-400 cursor-col-resize transition-colors ${
-                    isDragging ? 'bg-blue-500' : ''
-                }`}
-                onMouseDown={() => setIsDragging(true)}
+                className="relative w-0 flex-shrink-0"
                 aria-label="Resize divider"
                 role="separator"
                 style={{
                     userSelect: 'none',
                     WebkitUserSelect: 'none',
                 }}
-            />
+            >
+                <div
+                    className={`absolute left-0 top-0 h-full w-px transition-colors ${
+                        isDragging ? 'bg-blue-500' : 'bg-slate-300'
+                    }`}
+                    aria-hidden="true"
+                />
+                <div
+                    className={`absolute -left-1.5 top-0 h-full w-3 cursor-col-resize transition-colors ${
+                        isDragging ? 'bg-blue-200/40' : 'hover:bg-sky-100/50'
+                    }`}
+                    onMouseDown={() => setIsDragging(true)}
+                    aria-hidden="true"
+                />
+            </div>
 
             {/* Right Panel - Activities */}
             <div
-                className={`${rightPanelScrollable ? 'overflow-auto' : 'overflow-hidden'} bg-slate-50`}
+                className={`${rightPanelScrollable ? 'overflow-auto' : 'overflow-hidden'} bg-slate-50 h-full min-h-0`}
                 style={{
                     width: `${activityWidth}%`,
                     transition: isDragging ? 'none' : 'width 0.2s ease',

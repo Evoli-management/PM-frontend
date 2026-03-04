@@ -6,8 +6,11 @@ const reminderManager = {
   _interval: null,
   _permission: 'default',
   _pollMs: DEFAULT_POLL_MS,
+  _inFlight: false,
 
   async init({ pollMs } = {}) {
+    // Idempotent init: avoid stacking intervals across HMR/re-init calls.
+    this.stop();
     if (pollMs) this._pollMs = pollMs;
     try {
       this._permission = await (typeof Notification !== 'undefined' ? Notification.requestPermission() : Promise.resolve('denied'));
@@ -26,6 +29,8 @@ const reminderManager = {
   },
 
   async pollDue() {
+    if (this._inFlight) return;
+    this._inFlight = true;
     try {
       // Don't poll when user isn't authenticated to avoid 401 spam on the server.
       const token = localStorage.getItem('access_token');
@@ -53,6 +58,8 @@ const reminderManager = {
     } catch (err) {
       // ignore network/auth errors here
       // console.debug('reminderManager poll failed', err?.message || err);
+    } finally {
+      this._inFlight = false;
     }
   },
 

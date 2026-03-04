@@ -23,6 +23,15 @@ body {
     background-attachment: fixed;
 }
 
+/* Day-view elephant input: opt out of global input:focus green outline */
+#vpc-elephant-task-input:focus,
+#vpc-elephant-task-input:focus-visible {
+    outline: none !important;
+    outline-offset: 0 !important;
+    box-shadow: none !important;
+    border-color: transparent !important;
+}
+
 /* Provide a wrapper class to apply the global page background. Prefer using
    this wrapper (`.page-bg`) on the app root instead of forcing `main` with
    !important. */

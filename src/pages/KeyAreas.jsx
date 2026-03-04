@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useToast } from '../components/shared/ToastProvider.jsx';
 import { useFormattedDate } from '../hooks/useFormattedDate';
@@ -361,15 +362,11 @@ const KanbanView = ({ tasks = [], onSelect, selectedIds = new Set(), toggleSelec
         if (lvl === 2) return null;
         if (lvl === 3) {
             return (
-                <span className="inline-block text-xs font-bold leading-none text-red-600" title="Priority: High" aria-hidden>
-                    !
-                </span>
+                <img src="/high-priority.svg" alt="High priority" className="inline-block w-2 h-4" title="Priority: High" />
             );
         }
         return (
-            <span className="inline-block text-xs font-bold leading-none text-slate-500" title="Priority: Low" aria-hidden>
-                ↓
-            </span>
+            <img src="/low-priority-down.svg" alt="Low priority" className="inline-block w-2 h-4" title="Priority: Low" />
         );
     };
 
@@ -614,8 +611,30 @@ export default function KeyAreas() {
     const [activitiesMenuPos, setActivitiesMenuPos] = useState({ top: 0, left: 0 });
     const ActivityRowMenu = ({ activity, taskId }) => {
         const [open, setOpen] = useState(false);
+        const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
         const btnRef = useRef(null);
         const menuRef = useRef(null);
+
+        const updateMenuPos = () => {
+            const btn = btnRef.current;
+            if (!btn) return;
+            const menuWidth = menuRef.current?.offsetWidth || 176;
+            const rect = btn.getBoundingClientRect();
+            const scrollHost =
+                btn.closest('.overflow-x-auto') ||
+                btn.closest('.overflow-auto') ||
+                btn.closest('[class*="overflow"]');
+            const hostRect = scrollHost?.getBoundingClientRect?.() || null;
+            let left = rect.left;
+            const minLeft = hostRect ? hostRect.left + 8 : 8;
+            const maxLeft = hostRect
+                ? hostRect.right - menuWidth - 8
+                : window.innerWidth - menuWidth - 8;
+            if (left > maxLeft) left = Math.max(minLeft, maxLeft);
+            if (left < minLeft) left = minLeft;
+            const top = rect.bottom + 4;
+            setMenuPos({ top, left });
+        };
 
         useEffect(() => {
             if (!open) return;
@@ -625,11 +644,17 @@ export default function KeyAreas() {
                 setOpen(false);
             };
             const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+            const onReposition = () => updateMenuPos();
+            updateMenuPos();
             document.addEventListener('mousedown', onDown);
             document.addEventListener('keydown', onKey);
+            window.addEventListener('resize', onReposition);
+            window.addEventListener('scroll', onReposition, true);
             return () => {
                 document.removeEventListener('mousedown', onDown);
                 document.removeEventListener('keydown', onKey);
+                window.removeEventListener('resize', onReposition);
+                window.removeEventListener('scroll', onReposition, true);
             };
         }, [open]);
 
@@ -683,10 +708,11 @@ export default function KeyAreas() {
                 >
                     <FaEllipsisV />
                 </button>
-                {open && (
+                {open && createPortal(
                     <div
                         ref={menuRef}
-                        className="absolute top-full left-0 mt-1 z-50 min-w-[176px] bg-white border border-slate-200 rounded shadow"
+                        style={{ position: 'fixed', top: menuPos.top, left: menuPos.left, zIndex: 1000, minWidth: 176 }}
+                        className="bg-white border border-slate-200 rounded shadow"
                     >
                         <button type="button" className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm hover:bg-slate-50" onClick={handleEdit}>
                             <FaEdit className="text-slate-600" />
@@ -700,7 +726,8 @@ export default function KeyAreas() {
                             <FaAngleDoubleLeft />
                             <span>Convert to task</span>
                         </button>
-                    </div>
+                    </div>,
+                    document.body,
                 )}
             </div>
         );
@@ -3137,6 +3164,27 @@ export default function KeyAreas() {
         const originalTask = allTasks.find((t) => t.id === saved.id);
         const keyAreaChanged = originalTask && 
             String(originalTask.key_area_id || originalTask.keyAreaId) !== String(saved.key_area_id || saved.keyAreaId);
+        const listChanged = originalTask &&
+            String(originalTask.list_index || originalTask.list || originalTask.listIndex || "") !==
+            String(saved.list_index || saved.list || saved.listIndex || "");
+
+        if (keyAreaChanged || listChanged) {
+            const nextKeyAreaId = saved.key_area_id || saved.keyAreaId || null;
+            const nextListIndex = saved.list_index || saved.list || saved.listIndex || null;
+            setActivitiesByTask((prev) => {
+                const key = String(saved.id);
+                if (!Array.isArray(prev[key]) || prev[key].length === 0) return prev;
+                return {
+                    ...prev,
+                    [key]: prev[key].map((a) => ({
+                        ...a,
+                        keyAreaId: nextKeyAreaId,
+                        key_area_id: nextKeyAreaId,
+                        ...(nextListIndex !== null ? { list: nextListIndex, list_index: nextListIndex, listIndex: nextListIndex } : {}),
+                    })),
+                };
+            });
+        }
         
         if (keyAreaChanged) {
             // Task moved to different key area - clear selection and show success message
@@ -4160,15 +4208,11 @@ export default function KeyAreas() {
                                                         if (lvl === 2) return null;
                                                         if (lvl === 3) {
                                                             return (
-                                                                <span className="inline-block text-xs font-bold leading-none text-red-600" title="Priority: High">
-                                                                    !
-                                                                </span>
+                                                                <img src="/high-priority.svg" alt="High priority" className="inline-block w-2 h-4" title="Priority: High" />
                                                             );
                                                         }
                                                         return (
-                                                            <span className="inline-block text-xs font-bold leading-none text-slate-500" title="Priority: Low">
-                                                                ↓
-                                                            </span>
+                                                            <img src="/low-priority-down.svg" alt="Low priority" className="inline-block w-2 h-4" title="Priority: Low" />
                                                         );
                                                     })()}
                                                     <h3 className="text-sm font-semibold text-slate-900 truncate">{selectedTaskInPanel.title || 'Untitled Task'}</h3>
@@ -4428,21 +4472,26 @@ export default function KeyAreas() {
                                                                                     )}
                                                                                     {visibleColumns.priority && (
                                                                                         <td className="px-3 py-2 align-top">
-                                                                                            <select
-                                                                                                className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-sm"
-                                                                                                value={(function() {
-                                                                                                const raw = a.priority ?? selectedTaskInPanel.priority;
-                                                                                                if (raw === 1 || String(raw) === '1' || String(raw).toLowerCase() === 'low') return 'low';
-                                                                                                if (raw === 3 || String(raw) === '3' || String(raw).toLowerCase() === 'high') return 'high';
-                                                                                                return 'normal';
+                                                                                            {(() => {
+                                                                                                const priorityValue = (function() {
+                                                                                                    const raw = a.priority ?? selectedTaskInPanel.priority;
+                                                                                                    if (raw === 1 || String(raw) === '1' || String(raw).toLowerCase() === 'low') return 'low';
+                                                                                                    if (raw === 3 || String(raw) === '3' || String(raw).toLowerCase() === 'high') return 'high';
+                                                                                                    return 'normal';
+                                                                                                })();
+                                                                                                return (
+                                                                                                    <select
+                                                                                                        className="w-[96px] rounded-md border border-slate-300 bg-white py-0.5 text-sm px-2"
+                                                                                                        value={priorityValue}
+                                                                                                        onChange={(e) => updateActivityField(a, selectedTaskInPanel?.id, 'priority', e.target.value)}
+                                                                                                        disabled={savingActivityIds.has(a.id)}
+                                                                                                    >
+                                                                                                        <option value="high">High</option>
+                                                                                                        <option value="normal">Normal</option>
+                                                                                                        <option value="low" style={{ color: "#6b7280" }}>Low</option>
+                                                                                                    </select>
+                                                                                                );
                                                                                             })()}
-                                                                                                onChange={(e) => updateActivityField(a, selectedTaskInPanel?.id, 'priority', e.target.value)}
-                                                                                                disabled={savingActivityIds.has(a.id)}
-                                                                                            >
-                                                                                                <option value="high" >❗️ High</option>
-                                                                                                <option value="normal">Normal</option>
-                                                                                                <option value="low" style={{ color: "#6b7280" }}>↓ Low</option>
-                                                                                            </select>
                                                                                         </td>
                                                                                     )}
                                                                                     {visibleColumns.start_date && (

@@ -572,21 +572,57 @@ export default function EditTaskModal({
                 <label className="text-sm font-medium text-slate-700">Start date</label>
                 <div className="relative mt-0">
                   <input ref={startRef} className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-                  <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600" aria-label="Open date picker">📅</button>
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600"
+                    aria-label="Open date picker"
+                    onClick={() => {
+                      try {
+                        startRef.current?.showPicker?.();
+                        startRef.current?.focus();
+                      } catch (_) {}
+                    }}
+                  >
+                    📅
+                  </button>
                 </div>
               </div>
               <div style={{ minHeight: '64px' }}>
                 <label className="text-sm font-medium text-slate-700">End date</label>
                 <div className="relative mt-0">
                   <input ref={endRef} className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-                  <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600" aria-label="Open date picker">📅</button>
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600"
+                    aria-label="Open date picker"
+                    onClick={() => {
+                      try {
+                        endRef.current?.showPicker?.();
+                        endRef.current?.focus();
+                      } catch (_) {}
+                    }}
+                  >
+                    📅
+                  </button>
                 </div>
               </div>
               <div style={{ minHeight: '64px' }}>
                 <label className="text-sm font-medium text-slate-700">Deadline</label>
                 <div className="relative mt-0.5">
                   <input ref={deadlineRef} className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar" type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
-                  <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600" aria-label="Open date picker">📅</button>
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600"
+                    aria-label="Open date picker"
+                    onClick={() => {
+                      try {
+                        deadlineRef.current?.showPicker?.();
+                        deadlineRef.current?.focus();
+                      } catch (_) {}
+                    }}
+                  >
+                    📅
+                  </button>
                 </div>
                 <p className="mt-0 text-xs text-slate-500" aria-hidden="true">&nbsp;</p>
               </div>
@@ -650,10 +686,15 @@ export default function EditTaskModal({
               <div style={{ minHeight: '64px' }}>
                 <label className="text-sm font-medium text-slate-700">Priority</label>
                 <div className="relative mt-0">
-                  <select name="priority" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" value={priority} onChange={(e) => setPriority(Number(e.target.value))}>
-                    <option value="3" >❗️ High</option>
+                  <select
+                    name="priority"
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10"
+                    value={priority}
+                    onChange={(e) => setPriority(Number(e.target.value))}
+                  >
+                    <option value="3">High</option>
                     <option value="2">Normal</option>
-                    <option value="1" style={{ color: "#6b7280" }}>↓ Low</option>
+                    <option value="1" style={{ color: "#6b7280" }}>Low</option>
                   </select>
                   <svg viewBox="0 0 24 24" aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"><path fill="currentColor" d="M6.7 8.7a1 1 0 0 1 1.4 0L12 12.6l3.9-3.9a1 1 0 1 1 1.4 1.4l-4.6 4.6a1 1 0 0 1-1.4 0L6.7 10.1a1 1 0 0 1 0-1.4Z"></path></svg>
                 </div>

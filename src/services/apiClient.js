@@ -12,6 +12,16 @@ const apiClient = axios.create({
     withCredentials: true,
 });
 
+const isApiDebugEnabled = () => {
+    try {
+        if (!import.meta.env.DEV) return false;
+        if (import.meta.env.VITE_DEBUG_API === "1") return true;
+        return localStorage.getItem("debug_api") === "1";
+    } catch (_) {
+        return false;
+    }
+};
+
 // Add Authorization header if token exists in localStorage
 apiClient.interceptors.request.use(
     (config) => {
@@ -21,7 +31,7 @@ apiClient.interceptors.request.use(
         }
         
         // Debug logging only in development to avoid slowdowns from frequent logging
-        if (import.meta.env.DEV) {
+        if (isApiDebugEnabled()) {
             try {
                 console.debug("API Request:", {
                     method: config.method?.toUpperCase(),
@@ -43,7 +53,7 @@ apiClient.interceptors.request.use(
 // Response interceptor to handle errors
 apiClient.interceptors.response.use(
     (response) => {
-        if (import.meta.env.DEV) {
+        if (isApiDebugEnabled()) {
             try {
                 console.debug("API Response:", {
                     status: response.status,
@@ -71,7 +81,7 @@ apiClient.interceptors.response.use(
         }
         // Log a concise error; avoid expensive stringify operations on large response
         try {
-            if (import.meta.env.DEV) {
+            if (isApiDebugEnabled()) {
                 console.error("API Error:", {
                     status: error.response?.status,
                     url: error.config?.url,

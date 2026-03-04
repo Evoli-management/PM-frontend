@@ -300,9 +300,9 @@ export default function TaskActivityModal({ item, onClose, onSave, onDelete }) {
                                         onChange={handleTaskChange}
                                         className="w-full px-3 py-2 border rounded"
                                     >
-                                        <option value="high" >❗️ High</option>
+                                        <option value="high">High</option>
                                         <option value="medium">Medium</option>
-                                        <option value="low" style={{ color: "#6b7280" }}>↓ Low</option>
+                                        <option value="low" style={{ color: "#6b7280" }}>Low</option>
                                     </select>
                                 </div>
                             </div>

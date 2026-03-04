@@ -11,6 +11,36 @@ const ElephantTaskInput = ({ viewType, dateStart, dateEnd, onTaskChange }) => {
     const { addToast } = useToast();
 
     const contentRef = useRef(null);
+    const isDayView = String(viewType || "").toLowerCase() === "day";
+    const isWeekView = String(viewType || "").toLowerCase() === "week";
+    const isMonthView = String(viewType || "").toLowerCase() === "month";
+    const isQuarterView = String(viewType || "").toLowerCase() === "quarter";
+    const isUnifiedRowView = isDayView || isWeekView || isMonthView || isQuarterView;
+
+    const getDayMeta = (isoDate) => {
+        try {
+            const d = new Date(isoDate);
+            if (Number.isNaN(d.getTime())) return { weekday: "", weekNumber: null, dayOfYear: null };
+
+            const weekday = d.toLocaleDateString("en-US", { weekday: "long" });
+
+            const startOfYear = new Date(d.getFullYear(), 0, 1);
+            const dayOfYear = Math.floor((d - startOfYear) / 86400000) + 1;
+
+            // ISO week number
+            const utcDate = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+            const dayNum = utcDate.getUTCDay() || 7;
+            utcDate.setUTCDate(utcDate.getUTCDate() + 4 - dayNum);
+            const yearStart = new Date(Date.UTC(utcDate.getUTCFullYear(), 0, 1));
+            const weekNumber = Math.ceil((((utcDate - yearStart) / 86400000) + 1) / 7);
+
+            return { weekday, weekNumber, dayOfYear };
+        } catch (_) {
+            return { weekday: "", weekNumber: null, dayOfYear: null };
+        }
+    };
+
+    const dayMeta = getDayMeta(dateStart);
 
     // when entering edit mode focus and place caret at end
     useEffect(() => {
@@ -104,20 +134,73 @@ const ElephantTaskInput = ({ viewType, dateStart, dateEnd, onTaskChange }) => {
     };
 
     const handleKeyDown = (e) => {
-        if (e.key === "Enter" && e.ctrlKey) {
+        if (isDayView && e.key === "Enter") {
+            e.preventDefault();
+            handleSave();
+        } else if (e.key === "Enter" && e.ctrlKey) {
             handleSave();
         } else if (e.key === "Escape") {
             handleCancel();
         }
     };
 
-    if (isLoading) {
+    if (isLoading && !isUnifiedRowView) {
         return (
             <div className="w-full bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 px-3 py-2 rounded-lg">
                 <div className="flex items-center gap-2">
                     <span className="text-lg">🐘</span>
                     <span className="text-sm text-gray-500">Loading elephant task...</span>
                 </div>
+            </div>
+        );
+    }
+
+    if (isUnifiedRowView) {
+        return (
+            <div className="w-full border border-orange-200 bg-gradient-to-r from-orange-50 to-amber-50 flex items-center h-[48px] rounded-lg overflow-hidden">
+                <div className="w-[68px] self-stretch bg-orange-100/80 flex items-center justify-center text-orange-500 text-2xl select-none">
+                    🐘
+                </div>
+                <input
+                    id="vpc-elephant-task-input"
+                    type="text"
+                    className="vpc-elephant-task-input form-control flex-1 h-[34px] mx-2 px-3 bg-white border border-orange-200 rounded text-[14px] md:text-[15px] leading-tight text-[#7a8790] placeholder:text-gray-400 placeholder:italic outline-none cursor-text"
+                    placeholder="Enter your elephant task..."
+                    value={isEditing ? draft : (elephantTask || "")}
+                    disabled={isLoading}
+                    onFocus={() => {
+                        setDraft(elephantTask || "");
+                        setIsEditing(true);
+                    }}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleSave();
+                        } else if (e.key === "Escape") {
+                            e.preventDefault();
+                            handleCancel();
+                        }
+                    }}
+                    onBlur={() => {
+                        if (isEditing) handleSave();
+                    }}
+                />
+                {isDayView ? (
+                    <div className="w-[170px] sm:w-[220px] self-stretch px-3 py-0.5 text-right flex flex-col justify-center">
+                        <div className="text-[13px] md:text-[14px] leading-tight font-semibold text-[#1f2937]">{dayMeta.weekday || "Day"}</div>
+                        <div className="text-[12px] md:text-[13px] leading-tight text-[#111827]">
+                            Week: {dayMeta.weekNumber ?? "--"} / Day: {dayMeta.dayOfYear ?? "--"}
+                        </div>
+                    </div>
+                ) : null}
+                {isWeekView ? (
+                    <div className="w-[120px] sm:w-[160px] self-stretch px-3 py-0.5 text-right flex items-center justify-end">
+                        <div className="text-[13px] md:text-[14px] leading-tight font-semibold text-[#1f2937]">
+                            Week: {dayMeta.weekNumber ?? "--"}
+                        </div>
+                    </div>
+                ) : null}
             </div>
         );
     }

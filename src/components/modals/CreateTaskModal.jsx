@@ -398,10 +398,15 @@ export default function CreateTaskModal({
                             </div>
                             <div className="flex flex-col">
                                 <label className="text-sm font-medium text-slate-700">Priority</label>
-                                <select name="priority" className="mt-0 h-10 rounded-lg border border-slate-300 px-3 text-sm bg-white shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50" value={form.priority} onChange={handleInputChange}>
-                                    <option value="high" >❗️ High</option>
+                                <select
+                                    name="priority"
+                                    className="mt-0 h-10 rounded-lg border border-slate-300 px-3 text-sm bg-white shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50"
+                                    value={form.priority}
+                                    onChange={handleInputChange}
+                                >
+                                    <option value="high">High</option>
                                     <option value="normal">Normal</option>
-                                    <option value="low" style={{ color: "#6b7280" }}>↓ Low</option>
+                                    <option value="low" style={{ color: "#6b7280" }}>Low</option>
                                 </select>
                             </div>
                             <div className="flex flex-col">

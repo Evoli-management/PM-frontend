@@ -1691,22 +1691,6 @@ const CalendarContainer = () => {
                 {/* Controls moved into each view header per request */}
                 {/* Each view renders its own navigation header */}
 
-                {/* New Calendar Elephant Task Input */}
-                {(() => {
-                    const { dateStart, dateEnd } = getCurrentViewDateRange();
-                    return (
-                        <div className="mb-3 flex-shrink-0">
-                            <ElephantTaskInput
-                                viewType={view}
-                                dateStart={dateStart}
-                                dateEnd={dateEnd}
-                                onTaskChange={() => {
-                                    // Optionally refresh calendar data when elephant task changes
-                                }}
-                            />
-                        </div>
-                    );
-                })()}
                 {/* Active view content - flex-1 to fill available space */}
                 {view === "quarter" && (
                     <div className="flex-1 overflow-hidden">
@@ -1727,6 +1711,19 @@ const CalendarContainer = () => {
                         onTaskClick={openEditTask}
                         slotSizeMinutes={slotSizeMinutes}
                         onToggleSlotSize={() => setSlotSizeMinutes((prev) => (prev === 15 ? 30 : 15))}
+                        elephantTaskRow={(() => {
+                            const { dateStart, dateEnd } = getCurrentViewDateRange();
+                            return (
+                                <ElephantTaskInput
+                                    viewType="quarter"
+                                    dateStart={dateStart}
+                                    dateEnd={dateEnd}
+                                    onTaskChange={() => {
+                                        // Optionally refresh calendar data when elephant task changes
+                                    }}
+                                />
+                            );
+                        })()}
                     />
                     </div>
                 )}
@@ -1749,6 +1746,19 @@ const CalendarContainer = () => {
                         enableQuickCreate={true}
                         slotSizeMinutes={slotSizeMinutes}
                         onToggleSlotSize={() => setSlotSizeMinutes((prev) => (prev === 15 ? 30 : 15))}
+                        elephantTaskRow={(() => {
+                            const { dateStart, dateEnd } = getCurrentViewDateRange();
+                            return (
+                                <ElephantTaskInput
+                                    viewType="month"
+                                    dateStart={dateStart}
+                                    dateEnd={dateEnd}
+                                    onTaskChange={() => {
+                                        // Optionally refresh calendar data when elephant task changes
+                                    }}
+                                />
+                            );
+                        })()}
                     />
                     </div>
                 )}
@@ -1785,6 +1795,19 @@ const CalendarContainer = () => {
                         activities={weekActivities}
                         slotSizeMinutes={slotSizeMinutes}
                         onToggleSlotSize={() => setSlotSizeMinutes((prev) => (prev === 15 ? 30 : 15))}
+                        elephantTaskRow={(() => {
+                            const { dateStart, dateEnd } = getCurrentViewDateRange();
+                            return (
+                                <ElephantTaskInput
+                                    viewType="week"
+                                    dateStart={dateStart}
+                                    dateEnd={dateEnd}
+                                    onTaskChange={() => {
+                                        // Optionally refresh calendar data when elephant task changes
+                                    }}
+                                />
+                            );
+                        })()}
                     />
                     </div>
                 )}
@@ -1824,6 +1847,19 @@ const CalendarContainer = () => {
                         onPlanTomorrow={() => {}}
                         slotSizeMinutes={slotSizeMinutes}
                         onToggleSlotSize={() => setSlotSizeMinutes((prev) => (prev === 15 ? 30 : 15))}
+                        elephantTaskRow={(() => {
+                            const { dateStart, dateEnd } = getCurrentViewDateRange();
+                            return (
+                                <ElephantTaskInput
+                                    viewType="day"
+                                    dateStart={dateStart}
+                                    dateEnd={dateEnd}
+                                    onTaskChange={() => {
+                                        // Optionally refresh calendar data when elephant task changes
+                                    }}
+                                />
+                            );
+                        })()}
                     />
                     </div>
                 )}
@@ -2131,6 +2167,7 @@ const CalendarContainer = () => {
                         try {
                             const id = editItem.id;
                             if (!id) return;
+                            const taskIdStr = String(id);
                             const patch = {};
                             if (payload.title !== undefined) patch.title = payload.title;
                             if (payload.description !== undefined) patch.description = payload.description;
@@ -2148,9 +2185,47 @@ const CalendarContainer = () => {
                             if (payload.key_area_id || payload.keyAreaId) patch.keyAreaId = payload.key_area_id || payload.keyAreaId;
                             if (payload.list_index !== undefined || payload.listIndex !== undefined) patch.listIndex = payload.list_index ?? payload.listIndex;
 
+                            let updatedTask = null;
                             if (Object.keys(patch).length > 0) {
                                 const svc = await getTaskService();
-                                await svc.update(id, patch);
+                                updatedTask = await svc.update(id, patch);
+                            }
+
+                            if (updatedTask) {
+                                const nextKaId = updatedTask.keyAreaId || updatedTask.key_area_id || updatedTask.keyArea || null;
+                                const nextList = updatedTask.list_index || updatedTask.listIndex || updatedTask.list || null;
+                                // Keep task state in sync immediately.
+                                setTodos((prev) =>
+                                    (Array.isArray(prev) ? prev : []).map((t) =>
+                                        String(t.id) === taskIdStr ? { ...t, ...updatedTask } : t
+                                    )
+                                );
+                                // When task key area/list changes, activities should instantly inherit it.
+                                setActivitiesByTask((prev) => {
+                                    const current = prev?.[taskIdStr];
+                                    if (!Array.isArray(current) || current.length === 0) return prev;
+                                    return {
+                                        ...prev,
+                                        [taskIdStr]: current.map((a) => ({
+                                            ...a,
+                                            keyAreaId: nextKaId,
+                                            key_area_id: nextKaId,
+                                            ...(nextList !== null ? { list: nextList, list_index: nextList, listIndex: nextList } : {}),
+                                        })),
+                                    };
+                                });
+                                setWeekActivities((prev) =>
+                                    (Array.isArray(prev) ? prev : []).map((a) => {
+                                        const aTaskId = a?.taskId || a?.task_id || a?.task;
+                                        if (String(aTaskId || '') !== taskIdStr) return a;
+                                        return {
+                                            ...a,
+                                            keyAreaId: nextKaId,
+                                            key_area_id: nextKaId,
+                                            ...(nextList !== null ? { list: nextList, list_index: nextList, listIndex: nextList } : {}),
+                                        };
+                                    })
+                                );
                             }
                             await refreshTodosForRange();
                             setEditModalOpen(false);
