@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useCalendarPreferences } from "../../hooks/useCalendarPreferences";
 import calendarService from "../../services/calendarService";
 import ResizablePanels from "../key-areas/ResizablePanels";
+import CalendarViewTopSection from "./CalendarViewTopSection";
 
 // Load activityService on demand to keep it out of the main chunk
 let _activityService = null;
@@ -50,6 +51,22 @@ function adjustEndInclusive(ed) {
   } catch (e) {
     return ed;
   }
+}
+
+function toPositiveInt(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.trunc(n);
+}
+
+function toDisplayIndex(value) {
+  if (value === null || typeof value === 'undefined' || value === '') return 0;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  const i = Math.trunc(n);
+  // Support zero-based data from backend/storage while preserving one-based values.
+  if (i === 0) return 1;
+  return i > 0 ? i : 0;
 }
 import { FaChevronDown, FaEdit, FaTrash, FaCheck, FaBars, FaPlus } from "react-icons/fa";
 
@@ -142,6 +159,8 @@ export default function DayView({
   const [sideActivities, setSideActivities] = useState([]);
   const [loadingSidebar, setLoadingSidebar] = useState(false);
   const [keyAreaMap, setKeyAreaMap] = useState({});
+  const [keyAreaOrderMap, setKeyAreaOrderMap] = useState({});
+  const [taskMetaMap, setTaskMetaMap] = useState({});
 
   // transient resizing state for pointer-based resize (top/bottom handles)
   const [resizing, setResizing] = useState(null);
@@ -473,18 +492,49 @@ export default function DayView({
         setSideTodos(singleDayTodos);
         setSideAppointments(Array.isArray(apps) ? apps : []);
 
+        // Enrich sidebar todos with fields not returned by calendar/todos
+        // (notably listIndex used for key area list labels like 1.2).
+        try {
+          const tMod = await import("../../services/taskService");
+          const taskSvc = tMod?.default || tMod;
+          const allTasks = await taskSvc.list().catch(() => []);
+          const map = {};
+          (allTasks || []).forEach((task) => {
+            if (!task || !task.id) return;
+            map[String(task.id)] = {
+              keyAreaId: task.keyAreaId ?? task.key_area_id ?? null,
+              listIndex: task.listIndex ?? task.list_index ?? task.list ?? null,
+            };
+          });
+          if (!ignore) setTaskMetaMap(map);
+        } catch (_) {
+          if (!ignore) setTaskMetaMap({});
+        }
+
         // Load key areas to map colors for tasks when categories mapping is not present
         try {
           const kaMod = await import("../../services/keyAreaService");
           const kaSvc = kaMod?.default || kaMod;
           const areas = await kaSvc.list().catch(() => []);
           const map = {};
-          (areas || []).forEach((a) => {
-            if (a && a.id) map[String(a.id)] = a;
+          const orderMap = {};
+          (areas || []).forEach((a, idx) => {
+            if (a && a.id) {
+              map[String(a.id)] = a;
+              // Use ordinal order from the already-sorted key area list
+              // instead of raw `position` (e.g. Ideas may be stored as 10).
+              orderMap[String(a.id)] = idx + 1;
+            }
           });
-          if (!ignore) setKeyAreaMap(map);
+          if (!ignore) {
+            setKeyAreaMap(map);
+            setKeyAreaOrderMap(orderMap);
+          }
         } catch (__) {
-          if (!ignore) setKeyAreaMap({});
+          if (!ignore) {
+            setKeyAreaMap({});
+            setKeyAreaOrderMap({});
+          }
         }
 
         // Fetch activities for todos on this day AND unattached activities
@@ -570,6 +620,8 @@ export default function DayView({
           setSideTodos([]);
           setSideAppointments([]);
           setSideActivities([]);
+          setKeyAreaOrderMap({});
+          setTaskMetaMap({});
         }
       } finally {
         if (!ignore) setLoadingSidebar(false);
@@ -583,22 +635,24 @@ export default function DayView({
   // Sidebar subcomponents to simplify JSX and avoid nested ternary/fragment parsing issues
   const TasksBox = () => (
     <div className="flex flex-col h-full">
-      <div className="w-full inline-flex items-center justify-between gap-2 px-3 py-2 rounded-md border border-slate-300 bg-white text-slate-800 font-medium mb-1 md:mr-1">
-        <span className="inline-flex items-center gap-2">
-          <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" className="w-4 h-4 text-[#4DC3D8] shrink-0" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-            <path d="M400 32H48C21.5 32 0 53.5 0 80v352c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48V80c0-26.5-21.5-48-48-48z"></path>
-          </svg>
-          <span>Tasks</span>
-        </span>
-        <button
-          type="button"
-          onClick={() => onAddTaskOrActivity && onAddTaskOrActivity(currentDate || new Date(), { defaultTab: 'task' })}
-          className="inline-flex items-center justify-center w-6 h-6 rounded border border-slate-300 text-slate-700 hover:bg-slate-100"
-          title="Add task"
-          aria-label="Add task"
-        >
-          <FaPlus className="w-3 h-3" />
-        </button>
+      <div className="md:pr-px">
+        <div className="w-full inline-flex items-center justify-between gap-2 px-3 py-2 rounded-md border border-slate-300 bg-white text-slate-800 font-medium mb-1">
+          <span className="inline-flex items-center gap-2">
+            <span>Tasks</span>
+            <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" className="w-4 h-4 text-[#4DC3D8] shrink-0" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+              <path d="M400 32H48C21.5 32 0 53.5 0 80v352c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48V80c0-26.5-21.5-48-48-48z"></path>
+            </svg>
+          </span>
+          <button
+            type="button"
+            onClick={() => onAddTaskOrActivity && onAddTaskOrActivity(currentDate || new Date(), { defaultTab: 'task' })}
+            className="inline-flex items-center justify-center w-6 h-6 rounded border border-slate-300 text-slate-700 hover:bg-slate-100"
+            title="Add task"
+            aria-label="Add task"
+          >
+            <FaPlus className="w-3 h-3" />
+          </button>
+        </div>
       </div>
 
   <div className="w-full bg-slate-50 p-2 overflow-visible flex-1">
@@ -607,10 +661,29 @@ export default function DayView({
         ) : (((Array.isArray(todos) && todos.length) || (sideTodos && sideTodos.length)) ? (
           <div className="flex flex-col gap-0">
             {(Array.isArray(todos) && todos.length ? todos : sideTodos).slice(0,12).map((t) => {
-              const ka = (t.keyAreaId || t.key_area_id) ? keyAreaMap[String(t.keyAreaId || t.key_area_id)] : null;
+              const taskMeta = t?.id ? taskMetaMap[String(t.id)] : null;
+              const taskKeyAreaId = t?.keyAreaId ?? t?.key_area_id ?? t?.keyArea?.id ?? t?.key_area?.id ?? taskMeta?.keyAreaId ?? null;
+              const ka = taskKeyAreaId ? keyAreaMap[String(taskKeyAreaId)] : null;
               const DEFAULT_ACCENT_COLOR = '#4DC3D8';
               const kaColor = (ka && ka.color) ? ka.color : null;
               const accentColor = kaColor || DEFAULT_ACCENT_COLOR;
+              const isIdeasKeyArea = String(ka?.title || t?.keyAreaTitle || t?.key_area_title || '')
+                .trim()
+                .toLowerCase() === 'ideas';
+              const keyAreaNumber = toDisplayIndex(
+                isIdeasKeyArea
+                  ? 10
+                  : (
+                    keyAreaOrderMap[String(taskKeyAreaId)] ??
+                    ka?.position ??
+                    t?.keyAreaPosition ??
+                    t?.keyArea?.position ??
+                    t?.key_area?.position ??
+                    null
+                  )
+              );
+              const listNumber = toDisplayIndex(t?.list_index ?? t?.listIndex ?? t?.list ?? taskMeta?.listIndex);
+              const keyAreaListLabel = keyAreaNumber > 0 && listNumber > 0 ? `${keyAreaNumber}.${listNumber}` : null;
               return (
                 <div
                   key={t.id}
@@ -634,6 +707,11 @@ export default function DayView({
                   <div className="truncate flex-1 text-[15px] text-[#4DC3D8]">
                     {t.title || t.name || 'Untitled'}
                   </div>
+                  {keyAreaListLabel ? (
+                    <span className="shrink-0 text-[11px] font-semibold text-[#4DC3D8]">
+                      {keyAreaListLabel}
+                    </span>
+                  ) : null}
                   <div className="flex items-center gap-1 shrink-0">
                     {onTaskComplete && (
                       <button
@@ -688,22 +766,24 @@ export default function DayView({
   const ActivitiesBox = () => (
     <>
     <div className="flex flex-col h-full">
-      <div className="w-full inline-flex items-center justify-between gap-2 px-3 py-2 rounded-md border border-slate-300 bg-white text-slate-800 font-medium mb-1 md:ml-1">
-        <span className="inline-flex items-center gap-2">
-          <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" className="w-4 h-4 text-[#4DC3D8] shrink-0" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-            <path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z" />
-          </svg>
-          <span>Activities</span>
-        </span>
-        <button
-          type="button"
-          onClick={() => onAddTaskOrActivity && onAddTaskOrActivity(currentDate || new Date(), { defaultTab: 'activity' })}
-          className="inline-flex items-center justify-center w-6 h-6 rounded border border-slate-300 text-slate-700 hover:bg-slate-100"
-          title="Add activity"
-          aria-label="Add activity"
-        >
-          <FaPlus className="w-3 h-3" />
-        </button>
+      <div className="md:pl-px">
+        <div className="w-full inline-flex items-center justify-between gap-2 px-3 py-2 rounded-md border border-slate-300 bg-white text-slate-800 font-medium mb-1">
+          <span className="inline-flex items-center gap-2">
+            <span>Activities</span>
+            <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" className="w-4 h-4 text-[#4DC3D8] shrink-0" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+              <path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z" />
+            </svg>
+          </span>
+          <button
+            type="button"
+            onClick={() => onAddTaskOrActivity && onAddTaskOrActivity(currentDate || new Date(), { defaultTab: 'activity' })}
+            className="inline-flex items-center justify-center w-6 h-6 rounded border border-slate-300 text-slate-700 hover:bg-slate-100"
+            title="Add activity"
+            aria-label="Add activity"
+          >
+            <FaPlus className="w-3 h-3" />
+          </button>
+        </div>
       </div>
 
       <div className="w-full bg-slate-50 p-2 overflow-visible flex-1">
@@ -806,34 +886,34 @@ export default function DayView({
   );
 
   const topRows = (
-    <div className="w-full flex-shrink-0">
-      <div className="day-header-controls flex items-center justify-between min-h-[34px]">
-        <style>{`
-          .day-header-controls .day-header-btn {
-            margin-inline: 2px;
-            transition: background-color 120ms ease, border-color 120ms ease;
-          }
-          .day-header-controls .day-header-btn:hover {
-            background-color: #e0f2fe !important;
-            border-color: #7dd3fc !important;
-          }
-          .day-header-controls button:focus,
-          .day-header-controls button:focus-visible {
-            outline: none !important;
-            box-shadow: none !important;
-            ring: 0 !important;
-          }
-          .day-timeslots-scroll { scrollbar-width: none; }
-          .day-timeslots-scroll::-webkit-scrollbar { width: 0; height: 0; }
-          .day-timeslots-wrap:hover .day-timeslots-scroll { scrollbar-width: thin; }
-          .day-timeslots-wrap:hover .day-timeslots-scroll::-webkit-scrollbar { width: 8px; }
-          .day-timeslots-wrap:hover .day-timeslots-scroll::-webkit-scrollbar-thumb {
-            background: rgba(100, 116, 139, 0.45);
-            border-radius: 8px;
-          }
-          .day-timeslots-wrap:hover .day-timeslots-scroll::-webkit-scrollbar-track { background: transparent; }
-        `}</style>
-        <div className="flex items-center gap-2">
+    <>
+      <style>{`
+        .day-header-controls .day-header-btn {
+          margin-inline: 2px;
+          transition: background-color 120ms ease, border-color 120ms ease;
+        }
+        .day-header-controls .day-header-btn:hover {
+          background-color: #e0f2fe !important;
+          border-color: #7dd3fc !important;
+        }
+        .day-header-controls button:focus,
+        .day-header-controls button:focus-visible {
+          outline: none !important;
+          box-shadow: none !important;
+          ring: 0 !important;
+        }
+        .day-timeslots-scroll { scrollbar-width: none; }
+        .day-timeslots-scroll::-webkit-scrollbar { width: 0; height: 0; }
+        .day-timeslots-wrap:hover .day-timeslots-scroll { scrollbar-width: thin; }
+        .day-timeslots-wrap:hover .day-timeslots-scroll::-webkit-scrollbar { width: 8px; }
+        .day-timeslots-wrap:hover .day-timeslots-scroll::-webkit-scrollbar-thumb {
+          background: rgba(100, 116, 139, 0.45);
+          border-radius: 8px;
+        }
+        .day-timeslots-wrap:hover .day-timeslots-scroll::-webkit-scrollbar-track { background: transparent; }
+      `}</style>
+      <CalendarViewTopSection
+        left={<div className="flex items-center gap-2">
           <button
             onClick={goPrevDay}
             className="day-header-btn px-2 py-0.5 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
@@ -854,6 +934,17 @@ export default function DayView({
               <path d="M285.476 272.971L91.132 467.314c-9.373 9.373-24.569 9.373-33.941 0l-22.667-22.667c-9.357-9.357-9.375-24.522-.04-33.901L188.505 256 34.484 101.255c-9.335-9.379-9.317-24.544.04-33.901l22.667-22.667c9.373-9.373 24.569-9.373 33.941 0L285.475 239.03c9.373 9.372 9.373 24.568.001 33.941z"></path>
             </svg>
           </button>
+          <button
+            onClick={goToday}
+            className="day-header-btn px-2 py-0.5 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+            aria-label="Today"
+            style={{ minWidth: 34, minHeight: 34 }}
+          >
+            Today
+          </button>
+        </div>}
+        center={<h2 className="text-base font-bold flex items-center gap-2">{headerDate}</h2>}
+        right={<div className="flex items-center gap-2">
           <div className="relative" ref={slotMenuRef}>
             <button
               type="button"
@@ -897,17 +988,6 @@ export default function DayView({
               </div>
             )}
           </div>
-        </div>
-        <h2 className="text-base font-bold flex items-center gap-2">{headerDate}</h2>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={goToday}
-            className="day-header-btn px-2 py-0.5 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
-            aria-label="Today"
-            style={{ minWidth: 34, minHeight: 34 }}
-          >
-            Today
-          </button>
           <div className="relative" ref={viewMenuRef}>
             <button
               onClick={() => {
@@ -947,26 +1027,25 @@ export default function DayView({
               </div>
             )}
           </div>
-        </div>
-      </div>
-      {elephantTaskRow ? (
-        <>
-          <div className="w-full border-t border-slate-300" />
-          <div>{elephantTaskRow}</div>
-        </>
-      ) : null}
-    </div>
+        </div>}
+        elephantTaskRow={elephantTaskRow}
+        elephantTopGapClass="mt-1"
+      />
+    </>
   );
 
   const leftPanel = (
         <div className="flex-shrink-0 h-full min-h-0 flex flex-col">
               {/* CALENDAR CARD */}
               <div
-            className="day-timeslots-wrap bg-white border border-blue-50 border-t-0 rounded-b-lg shadow-sm p-2 pt-0 pr-1 overflow-visible flex-1 min-h-0"
+            className="day-timeslots-wrap bg-white border border-blue-50 rounded-lg shadow-sm p-0 overflow-visible flex-1 min-h-0"
           >
             <div className="w-full bg-white flex flex-col text-sm text-gray-700" style={{ height: "100%" }}>
-              <div className="w-full border-y border-slate-300 bg-slate-100/80 text-center text-[13px] md:text-[14px] font-semibold text-slate-700 py-0.5">
-                {headerWeekday}
+              <div className="w-full flex h-10 border-y border-slate-300 bg-slate-100/80">
+                <div className="w-16 h-full border-l border-slate-300" />
+                <div className="flex-1 h-full flex items-center justify-center text-[13px] md:text-[14px] font-semibold text-slate-700">
+                  {headerWeekday}
+                </div>
               </div>
               {/* all-day strip: show tasks that span multiple days with continuation indicators */}
               <div
@@ -978,7 +1057,7 @@ export default function DayView({
                 }}
                 onClick={handleCreateAllDayEvent}
               >
-                <div className="w-16 bg-white text-xs text-gray-500 flex border-l-2 border-slate-500 border-r border-gray-200">
+                <div className="w-16 bg-white text-xs text-gray-500 flex border-l border-slate-300 border-r border-gray-200">
                   <div
                     className="h-full flex items-start py-1"
                   >
@@ -1220,7 +1299,7 @@ export default function DayView({
                 {/* LEFT TIME COLUMN – clearer hourly rows */}
                 <div className="w-16 bg-white text-xs text-gray-500 min-h-0">
                   <div
-                    className="relative border-l-2 border-slate-500 border-r border-slate-300"
+                    className="relative border-l border-slate-300 border-r border-slate-300"
                     style={{ height: HOUR_HEIGHT * hours.length }}
                   >
                     {(() => {
@@ -1251,7 +1330,7 @@ export default function DayView({
                             <div
                               key={`${h}-${minute}`}
                               className={`relative flex items-center justify-end pr-1 ${borderClasses}`}
-                              style={{ height: segmentHeight, backgroundColor: slotIsWorking ? undefined : "#f8fafc" }}
+                              style={{ height: segmentHeight, backgroundColor: slotIsWorking ? "#ffffff" : "#f1f5f9" }}
                             >
                               <span className={labelClass}>
                                 {formatTime ? formatTime(slotIso) : slotIso}
@@ -1297,7 +1376,7 @@ export default function DayView({
                           }
 
                           const slotTimeStr = `${String(h).padStart(2,'0')}:${String(minute).padStart(2,'0')}`;
-                          const slotIsWorking = isWorkingTime ? isWorkingTime(slotTimeStr) : true;
+                          const slotIsWorking = isWorkingTime ? isWorkingTime(slotTimeStr) : (h >= sH && h < eH);
                           const slotKey = `${h}-${minute}`;
                           const isDraggedOver = dragOverSlot === slotKey;
                           const slotIndex = h * segmentsPerHour + i;
@@ -1316,7 +1395,7 @@ export default function DayView({
                               role="button"
                               tabIndex={0}
                               className={`w-full ${borderClasses} transition-colors ${(isDraggedOver || isHoverPreview) ? 'bg-blue-100 border-blue-300' : ''}`}
-                              style={{ height: segmentHeight, cursor: "pointer", backgroundColor: (isDraggedOver || isHoverPreview) ? undefined : (slotIsWorking ? undefined : '#f8fafc') }}
+                              style={{ height: segmentHeight, cursor: "pointer", backgroundColor: (isDraggedOver || isHoverPreview) ? undefined : (slotIsWorking ? '#ffffff' : '#f1f5f9') }}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 if (typeof onQuickCreate === "function") {
@@ -1702,16 +1781,16 @@ export default function DayView({
           </div>
         </div>
       );
-  
+
   const rightPanel = (
         <div className="flex-shrink-0 h-full min-h-0 flex flex-col">
           <div className="sticky top-0 h-full min-h-0">
-            <div className="bg-white border border-slate-200 border-t-0 rounded-b-lg shadow-sm px-1 pb-1 pt-0 mb-0 h-full min-h-0 flex flex-col">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-0 items-stretch flex-1 min-h-0">
-                <div className="h-full">
+            <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-0 mb-0 h-full min-h-0 flex flex-col">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-0 items-stretch flex-1 min-h-0 min-w-0">
+                <div className="h-full min-w-0">
                   <TasksBox />
                 </div>
-                <div className="h-full">
+                <div className="h-full min-w-0">
                   <ActivitiesBox />
                 </div>
               </div>
@@ -1719,11 +1798,11 @@ export default function DayView({
           </div>
         </div>
       );
-
+  
   return (
     <div className="w-full h-full min-h-0 flex flex-col">
       {topRows}
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 mt-1">
         <ResizablePanels
           taskPanel={leftPanel}
           activityPanel={rightPanel}
