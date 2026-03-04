@@ -7,7 +7,7 @@ export default defineConfig({
     // Use repository subpath when building for production GitHub Pages.
     // When developing locally we keep the root base for the dev server.
     base: process.env.NODE_ENV === 'production' ? '/PM-frontend/' : '/',
-    plugins: [react(), tailwindcss()],
+    plugins: [react({ fastRefresh: false }), tailwindcss()],
     // Fix: some dependencies (or older compiled code) import deep paths like
     // 'date-fns/format/index.js' which are not exposed by date-fns' package
     // exports. Add a few aliases to map those deep-import paths to the
@@ -19,6 +19,9 @@ export default defineConfig({
         },
     },
     server: {
+        hmr: {
+            overlay: false,
+        },
         proxy: {
             "/api": {
                 target: "http://localhost:3000",

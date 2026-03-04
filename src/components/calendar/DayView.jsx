@@ -51,7 +51,7 @@ function adjustEndInclusive(ed) {
     return ed;
   }
 }
-import { FaChevronDown, FaEdit, FaTrash, FaCheck } from "react-icons/fa";
+import { FaChevronDown, FaEdit, FaTrash, FaCheck, FaBars, FaPlus } from "react-icons/fa";
 
 // DayView props: startHour, endHour, slotMinutes, hourHeight
 export default function DayView({
@@ -87,6 +87,7 @@ export default function DayView({
   onDeleteRequest,
   slotSizeMinutes = 15,
   onToggleSlotSize,
+  elephantTaskRow = null,
 }) {
 
   // Always render the full 24-hour grid; non-working slots will be greyed
@@ -130,7 +131,9 @@ export default function DayView({
   const [currentDate, setCurrentDate] = useState(propDate || new Date());
   const [view, setView] = useState(propView || "day");
   const [showViewMenu, setShowViewMenu] = useState(false);
+  const [showSlotMenu, setShowSlotMenu] = useState(false);
   const viewMenuRef = useRef(null);
+  const slotMenuRef = useRef(null);
   const scrollContainerRef = useRef(null);
 
   // Sidebar data: todos, appointments and activities for selected day
@@ -181,11 +184,18 @@ export default function DayView({
 
   useEffect(() => {
     function onDocClick(e) {
-      if (!viewMenuRef.current) return;
-      if (!viewMenuRef.current.contains(e.target)) setShowViewMenu(false);
+      if (viewMenuRef.current && !viewMenuRef.current.contains(e.target)) {
+        setShowViewMenu(false);
+      }
+      if (slotMenuRef.current && !slotMenuRef.current.contains(e.target)) {
+        setShowSlotMenu(false);
+      }
     }
     function onKey(e) {
-      if (e.key === "Escape") setShowViewMenu(false);
+      if (e.key === "Escape") {
+        setShowViewMenu(false);
+        setShowSlotMenu(false);
+      }
     }
     document.addEventListener("click", onDocClick);
     document.addEventListener("keydown", onKey);
@@ -386,13 +396,9 @@ export default function DayView({
     onQuickCreate(dt, { allDay: true });
   };
 
-  // headerWeekday should be the weekday name only (e.g. 'Wed')
-  // formatDate(...) with includeWeekday returns the weekday *and* the date
-  // which led to duplication like "Wed, 12/17/2025, 12/17/2025". Use
-  // toLocaleDateString to get weekday-only and keep headerDate for the
-  // formatted date portion.
+  // Keep full weekday name for the day strip and date-only text for header.
   const headerWeekday = currentDate
-    ? new Date(currentDate).toLocaleDateString('en-US', { weekday: 'short' })
+    ? new Date(currentDate).toLocaleDateString('en-US', { weekday: 'long' })
     : "";
   const headerDate = currentDate
     ? formatDate(currentDate, { longMonth: true })
@@ -577,28 +583,34 @@ export default function DayView({
   // Sidebar subcomponents to simplify JSX and avoid nested ternary/fragment parsing issues
   const TasksBox = () => (
     <div className="flex flex-col h-full">
-      <div className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md border border-slate-300 bg-white text-slate-800 font-medium mb-2">
-        <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" className="w-4 h-4 text-[#4DC3D8] shrink-0" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-          <path d="M400 32H48C21.5 32 0 53.5 0 80v352c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48V80c0-26.5-21.5-48-48-48z"></path>
-        </svg>
-        <span>Tasks</span>
+      <div className="w-full inline-flex items-center justify-between gap-2 px-3 py-2 rounded-md border border-slate-300 bg-white text-slate-800 font-medium mb-1 md:mr-1">
+        <span className="inline-flex items-center gap-2">
+          <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" className="w-4 h-4 text-[#4DC3D8] shrink-0" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+            <path d="M400 32H48C21.5 32 0 53.5 0 80v352c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48V80c0-26.5-21.5-48-48-48z"></path>
+          </svg>
+          <span>Tasks</span>
+        </span>
+        <button
+          type="button"
+          onClick={() => onAddTaskOrActivity && onAddTaskOrActivity(currentDate || new Date(), { defaultTab: 'task' })}
+          className="inline-flex items-center justify-center w-6 h-6 rounded border border-slate-300 text-slate-700 hover:bg-slate-100"
+          title="Add task"
+          aria-label="Add task"
+        >
+          <FaPlus className="w-3 h-3" />
+        </button>
       </div>
 
-  <div className="w-full rounded border border-slate-200 bg-slate-50 p-2 overflow-visible flex-1">
+  <div className="w-full bg-slate-50 p-2 overflow-visible flex-1">
         {loadingSidebar ? (
           <div className="text-[11px] text-slate-500 text-center">Loading…</div>
         ) : (((Array.isArray(todos) && todos.length) || (sideTodos && sideTodos.length)) ? (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-0">
             {(Array.isArray(todos) && todos.length ? todos : sideTodos).slice(0,12).map((t) => {
-              const kindKey = t.kind || t.type || t.kindName || null;
-              const cat = (kindKey && categories && categories[kindKey]) ? categories[kindKey] : null;
               const ka = (t.keyAreaId || t.key_area_id) ? keyAreaMap[String(t.keyAreaId || t.key_area_id)] : null;
-              const DEFAULT_BAR_COLOR = '#4DC3D8';
-              const bgClass = cat?.color || null; // tailwind class e.g. 'bg-blue-500'
+              const DEFAULT_ACCENT_COLOR = '#4DC3D8';
               const kaColor = (ka && ka.color) ? ka.color : null;
-              const finalBg = bgClass ? null : (kaColor || DEFAULT_BAR_COLOR);
-              const textColor = finalBg ? getContrastTextColor(finalBg) : '#ffffff';
-              const style = bgClass ? undefined : { backgroundColor: finalBg, borderColor: finalBg, color: textColor };
+              const accentColor = kaColor || DEFAULT_ACCENT_COLOR;
               return (
                 <div
                   key={t.id}
@@ -611,16 +623,18 @@ export default function DayView({
                       e.dataTransfer.effectAllowed = "copy";
                     } catch (_) {}
                   }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (onTaskClick) onTaskClick(t);
-                  }}
-                  className={`group px-2 py-1 rounded border text-xs cursor-grab active:cursor-grabbing w-full flex items-center gap-2 hover:opacity-90 hover:shadow-md transition-all ${bgClass || ''}`}
-                  style={style}
+                  className="group px-1.5 py-1 text-xs cursor-grab active:cursor-grabbing w-full flex items-center gap-2 border-b border-sky-200 transition-colors hover:bg-sky-50"
                   title={`Drag to calendar to create appointment • ${t.title || t.name || 'Untitled'}`}
                 >
-                  <div className="truncate font-medium flex-1">{t.title || t.name || 'Untitled'}</div>
-                  <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <span
+                    className="w-4 h-4 rounded-[3px] shrink-0"
+                    style={{ backgroundColor: accentColor }}
+                    aria-hidden="true"
+                  />
+                  <div className="truncate flex-1 text-[15px] text-[#4DC3D8]">
+                    {t.title || t.name || 'Untitled'}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
                     {onTaskComplete && (
                       <button
                         onClick={(e) => {
@@ -629,10 +643,10 @@ export default function DayView({
                           setSideTodos((prev) => prev.filter((task) => String(task.id) !== String(t.id)));
                           onTaskComplete(t);
                         }}
-                        className="p-1 hover:bg-white/20 rounded transition-colors"
+                        className="p-1 hover:bg-green-100 rounded transition-colors"
                         title="Mark complete"
                       >
-                        <FaCheck className="w-3 h-3" />
+                        <FaCheck className="w-3 h-3 text-green-600" />
                       </button>
                     )}
                     {onTaskEdit && (
@@ -641,10 +655,10 @@ export default function DayView({
                           e.stopPropagation();
                           onTaskEdit(t);
                         }}
-                        className="p-1 hover:bg-white/20 rounded transition-colors"
+                        className="p-1 hover:bg-slate-100 rounded transition-colors"
                         title="Edit"
                       >
-                        <FaEdit className="w-3 h-3" />
+                        <FaEdit className="w-3 h-3 text-slate-600" />
                       </button>
                     )}
                     {onTaskDelete && (
@@ -653,7 +667,7 @@ export default function DayView({
                           e.stopPropagation();
                           onTaskDelete(t);
                         }}
-                        className="p-1 hover:bg-white/20 rounded transition-colors"
+                        className="p-1 hover:bg-red-100 rounded transition-colors"
                         title="Delete"
                       >
                         <FaTrash className="w-3 h-3 text-red-600" />
@@ -668,54 +682,54 @@ export default function DayView({
           <div className="text-[11px] text-slate-500 text-center">No tasks</div>
         ))}
       </div>
-      <div className="mt-2">
-        <button
-          type="button"
-          onClick={() => onAddTaskOrActivity && onAddTaskOrActivity(currentDate || new Date(), { defaultTab: 'task' })}
-          className="w-full inline-flex items-center justify-center px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm"
-        >
-          Add task
-        </button>
-      </div>
     </div>
   );
 
   const ActivitiesBox = () => (
     <>
     <div className="flex flex-col h-full">
-      <div className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md border border-slate-300 bg-white text-slate-800 font-medium mb-2">
-        <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" className="w-4 h-4 text-[#4DC3D8] shrink-0" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-          <path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z" />
-        </svg>
-        <span>Activities</span>
+      <div className="w-full inline-flex items-center justify-between gap-2 px-3 py-2 rounded-md border border-slate-300 bg-white text-slate-800 font-medium mb-1 md:ml-1">
+        <span className="inline-flex items-center gap-2">
+          <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" className="w-4 h-4 text-[#4DC3D8] shrink-0" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+            <path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z" />
+          </svg>
+          <span>Activities</span>
+        </span>
+        <button
+          type="button"
+          onClick={() => onAddTaskOrActivity && onAddTaskOrActivity(currentDate || new Date(), { defaultTab: 'activity' })}
+          className="inline-flex items-center justify-center w-6 h-6 rounded border border-slate-300 text-slate-700 hover:bg-slate-100"
+          title="Add activity"
+          aria-label="Add activity"
+        >
+          <FaPlus className="w-3 h-3" />
+        </button>
       </div>
 
-      <div className="w-full rounded border border-slate-200 bg-slate-50 p-2 overflow-visible flex-1">
+      <div className="w-full bg-slate-50 p-2 overflow-visible flex-1">
       {loadingSidebar ? (
         <div className="text-[11px] text-slate-500 text-center">Loading…</div>
       ) : (
         <>
           {(sideActivities && sideActivities.length) || (Array.isArray(unattachedActivities) && unattachedActivities.length) ? (
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-0">
                 {(sideActivities && sideActivities.length ? sideActivities : unattachedActivities).slice(0,12).map((a, i) => {
-                const kindKey = a.kind || a.type || null;
-                const cat = (kindKey && categories && categories[kindKey]) ? categories[kindKey] : null;
                 let ka = null;
-                if (a.keyAreaId || a.key_area_id) {
-                  ka = keyAreaMap[String(a.keyAreaId || a.key_area_id)];
-                } else if (a.taskId || a.task_id) {
-                  const parent = sideTodos.find((t) => String(t.id) === String(a.taskId || a.task_id));
+                if (a.taskId || a.task_id) {
+                  const parentSource = (Array.isArray(todos) && todos.length) ? todos : sideTodos;
+                  const parent = (Array.isArray(parentSource) ? parentSource : []).find(
+                    (t) => String(t.id) === String(a.taskId || a.task_id)
+                  );
                   if (parent) {
                     ka = keyAreaMap[String(parent.keyAreaId || parent.key_area_id)];
                   }
                 }
-                const DEFAULT_BAR_COLOR = '#4DC3D8';
-                const bgClass = cat?.color || null;
+                if (!ka && (a.keyAreaId || a.key_area_id)) {
+                  ka = keyAreaMap[String(a.keyAreaId || a.key_area_id)];
+                }
+                const DEFAULT_BAR_COLOR = "#4DC3D8";
                 const kaColor = (ka && ka.color) ? ka.color : null;
-                const finalBg = bgClass ? null : (kaColor || DEFAULT_BAR_COLOR);
-                const textColor = finalBg ? getContrastTextColor(finalBg) : '#ffffff';
-                const style = bgClass ? undefined : { backgroundColor: finalBg, borderColor: finalBg, color: textColor };
-                const svgColor = textColor || '#ffffff';
+                const accentColor = kaColor || DEFAULT_BAR_COLOR;
                 return (
                   <div
                     key={a.id || i}
@@ -732,25 +746,12 @@ export default function DayView({
                       e.stopPropagation();
                       if (onActivityClick) onActivityClick(a);
                     }}
-                    className={`group px-2 py-1 rounded border text-xs cursor-grab active:cursor-grabbing w-full flex items-center gap-2 hover:opacity-90 hover:shadow-md transition-all ${bgClass || ''}`}
-                    style={style}
+                    className="group px-1.5 py-1 text-xs cursor-grab active:cursor-grabbing w-full flex items-center gap-2 border-b border-sky-200 transition-colors hover:bg-sky-50"
                     title={`Drag to calendar to create appointment • ${a.text || a.desc || a.note || 'Activity'}`}
                   >
-                    <svg
-                      stroke="currentColor"
-                      fill="currentColor"
-                      strokeWidth="0"
-                      viewBox="0 0 448 512"
-                      className="w-4 h-4 shrink-0"
-                      aria-hidden="true"
-                      xmlns="http://www.w3.org/2000/svg"
-                      style={{ color: svgColor }}
-                    >
-                      <path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z" />
-                    </svg>
-
-                    <div className="truncate flex-1">{a.text || a.desc || a.note || 'Activity'}</div>
-                    <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <FaBars className="w-4 h-4 shrink-0" style={{ color: accentColor }} aria-hidden="true" />
+                    <div className="truncate flex-1 text-[15px] text-[#4DC3D8]">{a.text || a.desc || a.note || "Activity"}</div>
+                    <div className="flex items-center gap-1 shrink-0">
                       {onActivityComplete && (
                         <button
                           onClick={(e) => {
@@ -759,10 +760,10 @@ export default function DayView({
                             setSideActivities((prev) => prev.filter((activity) => String(activity.id) !== String(a.id)));
                             onActivityComplete(a);
                           }}
-                          className="p-1 hover:bg-white/20 rounded transition-colors"
+                          className="p-1 hover:bg-green-100 rounded transition-colors"
                           title="Mark complete"
                         >
-                          <FaCheck className="w-3 h-3" />
+                          <FaCheck className="w-3 h-3 text-green-600" />
                         </button>
                       )}
                       {onActivityEdit && (
@@ -771,10 +772,10 @@ export default function DayView({
                             e.stopPropagation();
                             onActivityEdit(a);
                           }}
-                          className="p-1 hover:bg-white/20 rounded transition-colors"
+                          className="p-1 hover:bg-slate-100 rounded transition-colors"
                           title="Edit"
                         >
-                          <FaEdit className="w-3 h-3" />
+                          <FaEdit className="w-3 h-3 text-slate-600" />
                         </button>
                       )}
                       {onActivityDelete && (
@@ -783,7 +784,7 @@ export default function DayView({
                             e.stopPropagation();
                             onActivityDelete(a);
                           }}
-                          className="p-1 hover:bg-white/20 rounded transition-colors"
+                          className="p-1 hover:bg-red-100 rounded transition-colors"
                           title="Delete"
                         >
                           <FaTrash className="w-3 h-3 text-red-600" />
@@ -800,144 +801,173 @@ export default function DayView({
         </>
       )}
     </div>
-
-    <div className="mt-2">
-      <button
-        type="button"
-        onClick={() => onAddTaskOrActivity && onAddTaskOrActivity(currentDate || new Date(), { defaultTab: 'activity' })}
-        className="w-full inline-flex items-center justify-center px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm"
-      >
-        Add activity
-      </button>
-    </div>
     </div>
     </>
   );
 
+  const topRows = (
+    <div className="w-full flex-shrink-0">
+      <div className="day-header-controls flex items-center justify-between min-h-[34px]">
+        <style>{`
+          .day-header-controls .day-header-btn {
+            margin-inline: 2px;
+            transition: background-color 120ms ease, border-color 120ms ease;
+          }
+          .day-header-controls .day-header-btn:hover {
+            background-color: #e0f2fe !important;
+            border-color: #7dd3fc !important;
+          }
+          .day-header-controls button:focus,
+          .day-header-controls button:focus-visible {
+            outline: none !important;
+            box-shadow: none !important;
+            ring: 0 !important;
+          }
+          .day-timeslots-scroll { scrollbar-width: none; }
+          .day-timeslots-scroll::-webkit-scrollbar { width: 0; height: 0; }
+          .day-timeslots-wrap:hover .day-timeslots-scroll { scrollbar-width: thin; }
+          .day-timeslots-wrap:hover .day-timeslots-scroll::-webkit-scrollbar { width: 8px; }
+          .day-timeslots-wrap:hover .day-timeslots-scroll::-webkit-scrollbar-thumb {
+            background: rgba(100, 116, 139, 0.45);
+            border-radius: 8px;
+          }
+          .day-timeslots-wrap:hover .day-timeslots-scroll::-webkit-scrollbar-track { background: transparent; }
+        `}</style>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={goPrevDay}
+            className="day-header-btn px-2 py-0.5 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+            aria-label="Previous day"
+            style={{ minWidth: 34, minHeight: 34 }}
+          >
+            <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 320 512" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
+              <path d="M34.52 239.03L228.87 44.69c9.37-9.37 24.57-9.37 33.94 0l22.67 22.67c9.36 9.36 9.37 24.52.04 33.9L131.49 256l154.02 154.75c9.34 9.38 9.32 24.54-.04 33.9l-22.67 22.67c-9.37 9.37-24.57 9.37-33.94 0L34.52 272.97c-9.37-9.37-9.37-24.57 0-33.94z"></path>
+            </svg>
+          </button>
+          <button
+            onClick={goNextDay}
+            className="day-header-btn px-2 py-0.5 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+            aria-label="Next day"
+            style={{ minWidth: 34, minHeight: 34 }}
+          >
+            <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 320 512" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
+              <path d="M285.476 272.971L91.132 467.314c-9.373 9.373-24.569 9.373-33.941 0l-22.667-22.667c-9.357-9.357-9.375-24.522-.04-33.901L188.505 256 34.484 101.255c-9.335-9.379-9.317-24.544.04-33.901l22.667-22.667c9.373-9.373 24.569-9.373 33.941 0L285.475 239.03c9.373 9.372 9.373 24.568.001 33.941z"></path>
+            </svg>
+          </button>
+          <div className="relative" ref={slotMenuRef}>
+            <button
+              type="button"
+              onClick={() => {
+                setShowSlotMenu((s) => !s);
+                setShowViewMenu(false);
+              }}
+              className="day-header-btn px-2 py-0.5 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center gap-2"
+              aria-haspopup="menu"
+              aria-expanded={showSlotMenu ? "true" : "false"}
+              aria-label="Time label interval"
+              title={`Time labels: ${slotSizeMinutes}m`}
+              style={{ minWidth: 48, minHeight: 34 }}
+            >
+              <span>Time</span>
+              <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
+                {slotSizeMinutes}m
+              </span>
+              <FaChevronDown className={`${showSlotMenu ? "rotate-180" : "rotate-0"} transition-transform`} />
+            </button>
+            {showSlotMenu && (
+              <div role="menu" className="absolute left-0 z-50 mt-2 w-28 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden">
+                {[15, 30].map((size) => (
+                  <button
+                    key={size}
+                    role="menuitemradio"
+                    aria-checked={slotSizeMinutes === size}
+                    className={`w-full text-left px-3 py-2 text-sm ${
+                      slotSizeMinutes === size ? "bg-blue-50 text-blue-700 font-semibold" : "text-slate-700 hover:bg-slate-50"
+                    }`}
+                    onClick={() => {
+                      if (slotSizeMinutes !== size && typeof onToggleSlotSize === "function") {
+                        onToggleSlotSize();
+                      }
+                      setShowSlotMenu(false);
+                    }}
+                  >
+                    {size}m
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+        <h2 className="text-base font-bold flex items-center gap-2">{headerDate}</h2>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={goToday}
+            className="day-header-btn px-2 py-0.5 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+            aria-label="Today"
+            style={{ minWidth: 34, minHeight: 34 }}
+          >
+            Today
+          </button>
+          <div className="relative" ref={viewMenuRef}>
+            <button
+              onClick={() => {
+                setShowViewMenu((s) => !s);
+                setShowSlotMenu(false);
+              }}
+              className="day-header-btn px-2 py-0.5 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center gap-2"
+              aria-haspopup="menu"
+              aria-expanded={showViewMenu ? "true" : "false"}
+              style={{ minWidth: 34, minHeight: 34 }}
+            >
+              <span>View</span>
+              <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
+                {view?.charAt(0).toUpperCase() + view?.slice(1)}
+              </span>
+              <FaChevronDown className={`${showViewMenu ? "rotate-180" : "rotate-0"} transition-transform`} />
+            </button>
+            {showViewMenu && (
+              <div role="menu" className="absolute right-0 z-50 mt-2 w-40 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden">
+                {["day", "week", "month", "quarter"].map((v) => (
+                  <button
+                    key={v}
+                    role="menuitemradio"
+                    aria-checked={view === v}
+                    className={`w-full text-left px-3 py-2 text-sm ${
+                      view === v ? "bg-blue-50 text-blue-700 font-semibold" : "text-slate-700 hover:bg-slate-50"
+                    }`}
+                    onClick={() => {
+                      onChangeView?.(v);
+                      setView(v);
+                      setShowViewMenu(false);
+                    }}
+                  >
+                    {v.charAt(0).toUpperCase() + v.slice(1)}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      {elephantTaskRow ? (
+        <>
+          <div className="w-full border-t border-slate-300" />
+          <div>{elephantTaskRow}</div>
+        </>
+      ) : null}
+    </div>
+  );
+
   const leftPanel = (
         <div className="flex-shrink-0 h-full min-h-0 flex flex-col">
-          {/* compact header */}
-          <div className="w-full mb-3 flex-shrink-0">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={goPrevDay}
-                  className="px-2 py-2 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
-                  aria-label="Previous day"
-                  style={{ minWidth: 36, minHeight: 36 }}
-                >
-                  {/* left chevron */}
-                  <svg
-                    stroke="currentColor"
-                    fill="currentColor"
-                    strokeWidth="0"
-                    viewBox="0 0 320 512"
-                    height="1em"
-                    width="1em"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path d="M34.52 239.03L228.87 44.69c9.37-9.37 24.57-9.37 33.94 0l22.67 22.67c9.36 9.36 9.37 24.52.04 33.9L131.49 256l154.02 154.75c9.34 9.38 9.32 24.54-.04 33.9l-22.67 22.67c-9.37 9.37-24.57 9.37-33.94 0L34.52 272.97c-9.37-9.37-9.37-24.57 0-33.94z"></path>
-                  </svg>
-                </button>
-
-                <div className="relative" ref={viewMenuRef}>
-                  <button
-                    onClick={() => setShowViewMenu((s) => !s)}
-                    className="px-2 py-1 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center gap-2"
-                    aria-haspopup="menu"
-                    aria-expanded={showViewMenu ? "true" : "false"}
-                    style={{ minWidth: 36, minHeight: 28 }}
-                  >
-                    <span>View</span>
-                    <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
-                      {view?.charAt(0).toUpperCase() + view?.slice(1)}
-                    </span>
-                    <FaChevronDown
-                      className={`${showViewMenu ? "rotate-180" : "rotate-0"} transition-transform`}
-                    />
-                  </button>
-
-                  {showViewMenu && (
-                    <div
-                      role="menu"
-                      className="absolute z-50 mt-2 w-40 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden"
-                    >
-                      {["day", "week", "month", "quarter"].map((v) => (
-                        <button
-                          key={v}
-                          role="menuitemradio"
-                          aria-checked={view === v}
-                          className={`w-full text-left px-3 py-2 text-sm ${
-                            view === v
-                              ? "bg-blue-50 text-blue-700 font-semibold"
-                              : "text-slate-700 hover:bg-slate-50"
-                          }`}
-                          onClick={() => {
-                            onChangeView?.(v);
-                            setView(v);
-                            setShowViewMenu(false);
-                          }}
-                        >
-                          {v.charAt(0).toUpperCase() + v.slice(1)}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => onToggleSlotSize && onToggleSlotSize()}
-                  className="px-2 py-1 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
-                  aria-label={`Toggle time labels to ${slotSizeMinutes === 15 ? "30 minutes" : "15 minutes"}`}
-                  title={`Time labels: ${slotSizeMinutes}m (click to switch)`}
-                  style={{ minWidth: 48, minHeight: 28 }}
-                >
-                  {slotSizeMinutes}m
-                </button>
-              </div>
-
-              <h2 className="text-xl font-bold flex items-center gap-2">
-                { headerWeekday}, {headerDate}
-              </h2>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={goToday}
-                  className="px-2 py-2 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
-                  aria-label="Today"
-                  style={{ minWidth: 36, minHeight: 36 }}
-                >
-                  Today
-                </button>
-
-                <button
-                  onClick={goNextDay}
-                  className="px-2 py-2 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
-                  aria-label="Next day"
-                  style={{ minWidth: 36, minHeight: 36 }}
-                >
-                  {/* right chevron */}
-                  <svg
-                    stroke="currentColor"
-                    fill="currentColor"
-                    strokeWidth="0"
-                    viewBox="0 0 320 512"
-                    height="1em"
-                    width="1em"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path d="M285.476 272.971L91.132 467.314c-9.373 9.373-24.569 9.373-33.941 0l-22.667-22.667c-9.357-9.357-9.375-24.522-.04-33.901L188.505 256 34.484 101.255c-9.335-9.379-9.317-24.544.04-33.901l22.667-22.667c9.373-9.373 24.569-9.373 33.941 0L285.475 239.03c9.373 9.372 9.373 24.568.001 33.941z"></path>
-                  </svg>
-                </button>
-              </div>
-            </div>
-          </div>
-
               {/* CALENDAR CARD */}
               <div
-            className="bg-white border border-blue-50 rounded-lg shadow-sm p-2 pr-1 overflow-visible flex-1 min-h-0"
+            className="day-timeslots-wrap bg-white border border-blue-50 border-t-0 rounded-b-lg shadow-sm p-2 pt-0 pr-1 overflow-visible flex-1 min-h-0"
           >
             <div className="w-full bg-white flex flex-col text-sm text-gray-700" style={{ height: "100%" }}>
+              <div className="w-full border-y border-slate-300 bg-slate-100/80 text-center text-[13px] md:text-[14px] font-semibold text-slate-700 py-0.5">
+                {headerWeekday}
+              </div>
               {/* all-day strip: show tasks that span multiple days with continuation indicators */}
               <div
                 className="flex relative z-20 cursor-pointer transition-colors hover:bg-blue-100"
@@ -948,7 +978,7 @@ export default function DayView({
                 }}
                 onClick={handleCreateAllDayEvent}
               >
-                <div className="w-16 bg-white text-xs text-gray-500 flex border-r border-gray-200">
+                <div className="w-16 bg-white text-xs text-gray-500 flex border-l-2 border-slate-500 border-r border-gray-200">
                   <div
                     className="h-full flex items-start py-1"
                   >
@@ -1184,13 +1214,13 @@ export default function DayView({
               {/* MAIN SCROLL AREA */}
               <div
                 ref={scrollContainerRef}
-                className="flex-1 flex min-h-0 relative z-0 pr-2"
+                className="day-timeslots-scroll flex-1 flex min-h-0 relative z-0 pr-0"
                 style={{ overflowX: "hidden", overflowY: "auto", scrollbarGutter: "stable" }}
               >
                 {/* LEFT TIME COLUMN – clearer hourly rows */}
                 <div className="w-16 bg-white text-xs text-gray-500 min-h-0">
                   <div
-                    className="relative border-r border-gray-200"
+                    className="relative border-l-2 border-slate-500 border-r border-slate-300"
                     style={{ height: HOUR_HEIGHT * hours.length }}
                   >
                     {(() => {
@@ -1471,8 +1501,15 @@ export default function DayView({
                         const bgClass = cat?.color || null;
                         // try key area from appointment or (if present) parent task
                         let ka = null;
-                        if (appt.keyAreaId || appt.key_area_id) ka = keyAreaMap[String(appt.keyAreaId || appt.key_area_id)];
-                        else if (appt.taskId || appt.task_id) ka = keyAreaMap[String(appt.taskId || appt.task_id)];
+                        if (appt.taskId || appt.task_id) {
+                          const parent = (Array.isArray(todos) ? todos : []).find(
+                            (t) => String(t.id) === String(appt.taskId || appt.task_id)
+                          );
+                          if (parent) ka = keyAreaMap[String(parent.keyAreaId || parent.key_area_id)];
+                        }
+                        if (!ka && (appt.keyAreaId || appt.key_area_id)) {
+                          ka = keyAreaMap[String(appt.keyAreaId || appt.key_area_id)];
+                        }
                         const kaColor = ka && ka.color ? ka.color : null;
                         const DEFAULT_BAR_COLOR = '#4DC3D8';
                         const finalBg = bgClass ? null : (kaColor || DEFAULT_BAR_COLOR);
@@ -1667,10 +1704,10 @@ export default function DayView({
       );
   
   const rightPanel = (
-        <div className="flex-shrink-0 h-full">
-          <div className="sticky top-2">
-            <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-2 mb-3">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-stretch">
+        <div className="flex-shrink-0 h-full min-h-0 flex flex-col">
+          <div className="sticky top-0 h-full min-h-0">
+            <div className="bg-white border border-slate-200 border-t-0 rounded-b-lg shadow-sm px-1 pb-1 pt-0 mb-0 h-full min-h-0 flex flex-col">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-0 items-stretch flex-1 min-h-0">
                 <div className="h-full">
                   <TasksBox />
                 </div>
@@ -1684,13 +1721,18 @@ export default function DayView({
       );
 
   return (
-    <ResizablePanels
-      taskPanel={leftPanel}
-      activityPanel={rightPanel}
-      initialTaskWidth={50}
-      minTaskWidth={25}
-      minActivityWidth={25}
-      leftPanelScrollable={false}
-    />
+    <div className="w-full h-full min-h-0 flex flex-col">
+      {topRows}
+      <div className="flex-1 min-h-0">
+        <ResizablePanels
+          taskPanel={leftPanel}
+          activityPanel={rightPanel}
+          initialTaskWidth={50}
+          minTaskWidth={25}
+          minActivityWidth={25}
+          leftPanelScrollable={false}
+        />
+      </div>
+    </div>
   );
 }

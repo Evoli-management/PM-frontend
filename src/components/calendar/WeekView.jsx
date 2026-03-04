@@ -55,6 +55,7 @@ const WeekView = ({
   onDeleteRequest = null,
   slotSizeMinutes = 30,
   onToggleSlotSize = null,
+  elephantTaskRow = null,
 }) => {
   const [slotSize, setSlotSize] = useState(slotSizeMinutes || defaultSlotSize);
   const {
@@ -74,6 +75,7 @@ const WeekView = ({
 
   const [elephantTask, setElephantTask] = useState("");
   const [showViewMenu, setShowViewMenu] = useState(false);
+  const [showSlotMenu, setShowSlotMenu] = useState(false);
   const [colOverlay, setColOverlay] = useState(null);
   const [allDayOverflow, setAllDayOverflow] = useState(null);
   const [hoveredQuickCreateCell, setHoveredQuickCreateCell] = useState(null);
@@ -90,6 +92,8 @@ const WeekView = ({
   const weekScrollRef = useRef(null);
   const listOuterRef = useRef(null);
   const allDayPopupRef = useRef(null);
+  const viewMenuRef = useRef(null);
+  const slotMenuRef = useRef(null);
   const [columnWidth, setColumnWidth] = useState(null);
   const [keyAreaMap, setKeyAreaMap] = useState({});
   const [calculatedListHeight, setCalculatedListHeight] = useState(400);
@@ -369,6 +373,29 @@ const WeekView = ({
     return () => document.removeEventListener("mousedown", onDocMouseDown);
   }, [allDayOverflow]);
 
+  useEffect(() => {
+    const onDocClick = (ev) => {
+      if (viewMenuRef.current && !viewMenuRef.current.contains(ev.target)) {
+        setShowViewMenu(false);
+      }
+      if (slotMenuRef.current && !slotMenuRef.current.contains(ev.target)) {
+        setShowSlotMenu(false);
+      }
+    };
+    const onKeyDown = (ev) => {
+      if (ev.key === "Escape") {
+        setShowViewMenu(false);
+        setShowSlotMenu(false);
+      }
+    };
+    document.addEventListener("click", onDocClick);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("click", onDocClick);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, []);
+
   // Drag-and-drop handler
   const handleDrop = (e, day, slot) => {
     try {
@@ -584,15 +611,38 @@ const WeekView = ({
         .week-time-grid-wrap:hover .week-time-grid-scroll::-webkit-scrollbar { width: 8px; }
         .week-time-grid-wrap:hover .week-time-grid-scroll::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.45); border-radius: 8px; }
         .week-time-grid-wrap:hover .week-time-grid-scroll::-webkit-scrollbar-track { background: transparent; }
+
+        .week-bottom-list-scroll {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(100, 116, 139, 0.45) transparent;
+        }
+        .week-bottom-list-scroll::-webkit-scrollbar { width: 5px; }
+        .week-bottom-list-scroll::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.45); border-radius: 8px; }
+        .week-bottom-list-scroll::-webkit-scrollbar-track { background: transparent; }
+
+        .day-header-controls .day-header-btn {
+          margin-inline: 2px;
+          transition: background-color 120ms ease, border-color 120ms ease;
+        }
+        .day-header-controls .day-header-btn:hover {
+          background-color: #e0f2fe !important;
+          border-color: #7dd3fc !important;
+        }
+        .day-header-controls button.day-header-btn:focus,
+        .day-header-controls button.day-header-btn:focus-visible {
+          outline: none !important;
+          box-shadow: none !important;
+          ring: 0 !important;
+        }
       `}</style>
 
       <div className="p-0 flex flex-col h-full min-h-0" style={{ overflow: "hidden", position: "relative" }}>
         {/* Header */}
-        <div className="flex items-center justify-between mb-2">
+        <div className="day-header-controls flex items-center justify-between min-h-[34px]">
           <div className="flex items-center gap-2">
             <button
-              className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
-              style={{ minWidth: 36, minHeight: 36 }}
+              className="day-header-btn px-2 py-0.5 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+              style={{ minWidth: 34, minHeight: 34 }}
               aria-label="Previous week"
               onClick={() => {
                 hasAutoScrolledRef.current = null;
@@ -602,52 +652,60 @@ const WeekView = ({
               <FaChevronLeft />
             </button>
 
-            <div className="relative">
+            <button
+              className="day-header-btn px-2 py-0.5 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+              style={{ minWidth: 34, minHeight: 34 }}
+              aria-label="Next week"
+              onClick={() => {
+                hasAutoScrolledRef.current = null;
+                onShiftDate && onShiftDate(1);
+              }}
+            >
+              <FaChevronRight />
+            </button>
+            <div className="relative" ref={slotMenuRef}>
               <button
-                className="px-2 py-1 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center gap-2"
-                style={{ minWidth: 36, minHeight: 28 }}
-                onClick={() => setShowViewMenu((s) => !s)}
+                type="button"
+                onClick={() => {
+                  setShowSlotMenu((s) => !s);
+                  setShowViewMenu(false);
+                }}
+                className="day-header-btn px-2 py-0.5 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center gap-2"
+                style={{ minWidth: 48, minHeight: 34 }}
                 aria-haspopup="menu"
-                aria-expanded={showViewMenu ? "true" : "false"}
+                aria-expanded={showSlotMenu ? "true" : "false"}
+                aria-label="Time label interval"
+                title={`Time labels: ${slotSize}m`}
               >
-                <span>View</span>
+                <span>Time</span>
                 <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
-                  {view?.charAt(0).toUpperCase() + view?.slice(1)}
+                  {slotSize}m
                 </span>
-                <FaChevronDown className={`${showViewMenu ? "rotate-180" : "rotate-0"} transition-transform`} />
+                <FaChevronDown className={`${showSlotMenu ? "rotate-180" : "rotate-0"} transition-transform`} />
               </button>
-
-              {showViewMenu && (
-                <div role="menu" className="absolute z-50 mt-2 w-40 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden">
-                  {["day", "week", "month", "quarter"].map((v) => (
+              {showSlotMenu && (
+                <div role="menu" className="absolute left-0 z-50 mt-2 w-28 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden">
+                  {[15, 30].map((size) => (
                     <button
-                      key={v}
+                      key={size}
                       role="menuitemradio"
-                      aria-checked={view === v}
+                      aria-checked={slotSize === size}
                       className={`w-full text-left px-3 py-2 text-sm ${
-                        view === v ? "bg-blue-50 text-blue-700 font-semibold" : "text-slate-700 hover:bg-slate-50"
+                        slotSize === size ? "bg-blue-50 text-blue-700 font-semibold" : "text-slate-700 hover:bg-slate-50"
                       }`}
                       onClick={() => {
-                        onChangeView && onChangeView(v);
-                        setShowViewMenu(false);
+                        if (slotSize !== size && typeof onToggleSlotSize === "function") {
+                          onToggleSlotSize();
+                        }
+                        setShowSlotMenu(false);
                       }}
                     >
-                      {v.charAt(0).toUpperCase() + v.slice(1)}
+                      {size}m
                     </button>
                   ))}
                 </div>
               )}
             </div>
-            <button
-              type="button"
-              onClick={() => onToggleSlotSize && onToggleSlotSize()}
-              className="px-2 py-1 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
-              style={{ minWidth: 48, minHeight: 28 }}
-              aria-label={`Toggle time labels to ${slotSize === 15 ? "30 minutes" : "15 minutes"}`}
-              title={`Time labels: ${slotSize}m (click to switch)`}
-            >
-              {slotSize}m
-            </button>
           </div>
 
           <h2 className="text-xl font-bold flex items-center gap-2">
@@ -711,8 +769,8 @@ const WeekView = ({
             </div>
 
             <button
-              className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
-              style={{ minWidth: 36, minHeight: 36 }}
+              className="day-header-btn px-2 py-0.5 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+              style={{ minWidth: 34, minHeight: 34 }}
               aria-label="Today"
               onClick={() => {
                 try {
@@ -782,19 +840,54 @@ const WeekView = ({
               Today
             </button>
 
-            <button
-              className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
-              style={{ minWidth: 36, minHeight: 36 }}
-              aria-label="Next week"
-              onClick={() => {
-                hasAutoScrolledRef.current = null;
-                onShiftDate && onShiftDate(1);
-              }}
-            >
-              <FaChevronRight />
-            </button>
+            <div className="relative" ref={viewMenuRef}>
+              <button
+                className="day-header-btn px-2 py-0.5 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center gap-2"
+                style={{ minWidth: 34, minHeight: 34 }}
+                onClick={() => {
+                  setShowViewMenu((s) => !s);
+                  setShowSlotMenu(false);
+                }}
+                aria-haspopup="menu"
+                aria-expanded={showViewMenu ? "true" : "false"}
+              >
+                <span>View</span>
+                <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
+                  {view?.charAt(0).toUpperCase() + view?.slice(1)}
+                </span>
+                <FaChevronDown className={`${showViewMenu ? "rotate-180" : "rotate-0"} transition-transform`} />
+              </button>
+
+              {showViewMenu && (
+                <div role="menu" className="absolute right-0 z-50 mt-2 w-40 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden">
+                  {["day", "week", "month", "quarter"].map((v) => (
+                    <button
+                      key={v}
+                      role="menuitemradio"
+                      aria-checked={view === v}
+                      className={`w-full text-left px-3 py-2 text-sm ${
+                        view === v ? "bg-blue-50 text-blue-700 font-semibold" : "text-slate-700 hover:bg-slate-50"
+                      }`}
+                      onClick={() => {
+                        onChangeView && onChangeView(v);
+                        setShowViewMenu(false);
+                      }}
+                    >
+                      {v.charAt(0).toUpperCase() + v.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
+
+        {elephantTaskRow ? (
+          <>
+            <div className="w-full border-t border-slate-300" />
+            <div>{elephantTaskRow}</div>
+          </>
+        ) : null}
 
         {/* Calendar grid */}
         <div
@@ -1593,9 +1686,16 @@ const WeekView = ({
                                     : Math.max(24, colWidth - 4);
 
                                   const kindColor = (() => {
-                                    const ka = ev.keyAreaId || ev.key_area_id
-                                      ? keyAreaMap[String(ev.keyAreaId || ev.key_area_id)]
-                                      : null;
+                                    let ka = null;
+                                    if (ev.taskId || ev.task_id) {
+                                      const parent = (Array.isArray(todos) ? todos : []).find(
+                                        (t) => String(t.id) === String(ev.taskId || ev.task_id)
+                                      );
+                                      if (parent) ka = keyAreaMap[String(parent.keyAreaId || parent.key_area_id)];
+                                    }
+                                    if (!ka && (ev.keyAreaId || ev.key_area_id)) {
+                                      ka = keyAreaMap[String(ev.keyAreaId || ev.key_area_id)];
+                                    }
                                     return ka?.color || categories?.[ev.kind]?.color || "#4DC3D8";
                                   })();
                                   const isKindTailwind =
@@ -2183,23 +2283,15 @@ const WeekView = ({
                         verticalAlign: "top",
                       }}
                     >
-                      <div className="h-full min-h-0 flex flex-col gap-2 overflow-y-auto overflow-x-hidden" style={{ paddingRight: "6px" }}>
+                      <div className="week-bottom-list-scroll h-full min-h-0 flex flex-col gap-0 overflow-y-auto overflow-x-hidden" style={{ paddingRight: "3px" }}>
                         {combined.map((item) => {
                           if (item.__type === "task") {
                             const t = item;
-
-                            const kindKey = t.kind || t.type || t.kindName || null;
-                            const cat = kindKey && categories && categories[kindKey] ? categories[kindKey] : null;
-                            const bgClass = cat?.color || null;
-
                             const ka =
                               t.keyAreaId || t.key_area_id ? keyAreaMap[String(t.keyAreaId || t.key_area_id)] : null;
-
-                            const DEFAULT_BAR_COLOR = "#4DC3D8";
+                            const DEFAULT_ACCENT_COLOR = "#4DC3D8";
                             const kaColor = ka && ka.color ? ka.color : null;
-                            const finalBg = bgClass ? null : kaColor || DEFAULT_BAR_COLOR;
-                            const textColor = finalBg ? getContrastTextColor(finalBg) : "#ffffff";
-                            const style = bgClass ? undefined : { backgroundColor: finalBg, borderColor: finalBg, color: textColor };
+                            const accentColor = kaColor || DEFAULT_ACCENT_COLOR;
 
                             return (
                               <div
@@ -2220,24 +2312,26 @@ const WeekView = ({
                                     console.error("[WeekView] Task drag start error", err);
                                   }
                                 }}
-                                className={`group px-2 py-1 rounded border text-xs cursor-grab active:cursor-grabbing min-w-0 flex items-center gap-2 hover:opacity-90 shrink-0 min-h-[28px] ${
-                                  bgClass || ""
-                                }`}
-                                style={style}
+                                className="group px-1.5 py-1 text-xs cursor-grab active:cursor-grabbing min-w-0 flex items-center gap-2 border-b border-sky-200 transition-colors hover:bg-sky-50 shrink-0 min-h-[28px]"
                                 title={t.title || t.name}
                               >
-                                <div className="truncate font-medium flex-1">{t.title || t.name}</div>
-                                <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <span
+                                  className="w-4 h-4 rounded-[3px] shrink-0"
+                                  style={{ backgroundColor: accentColor }}
+                                  aria-hidden="true"
+                                />
+                                <div className="truncate flex-1 text-[15px] text-[#4DC3D8]">{t.title || t.name}</div>
+                                <div className="flex items-center gap-1 shrink-0">
                                   {onTaskComplete && (
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         onTaskComplete(t);
                                       }}
-                                      className="p-1 hover:bg-white/20 rounded transition-colors"
+                                      className="p-1 hover:bg-green-100 rounded transition-colors"
                                       title="Mark complete"
                                     >
-                                      <FaCheck className="w-3 h-3" />
+                                      <FaCheck className="w-3 h-3 text-green-600" />
                                     </button>
                                   )}
                                   {onTaskEdit && (
@@ -2246,10 +2340,10 @@ const WeekView = ({
                                         e.stopPropagation();
                                         onTaskEdit(t);
                                       }}
-                                      className="p-1 hover:bg-white/20 rounded transition-colors"
+                                      className="p-1 hover:bg-slate-100 rounded transition-colors"
                                       title="Edit"
                                     >
-                                      <FaEdit className="w-3 h-3" />
+                                      <FaEdit className="w-3 h-3 text-slate-600" />
                                     </button>
                                   )}
                                   {onTaskDelete && (
@@ -2258,7 +2352,7 @@ const WeekView = ({
                                         e.stopPropagation();
                                         onTaskDelete(t);
                                       }}
-                                      className="p-1 hover:bg-white/20 rounded transition-colors"
+                                      className="p-1 hover:bg-red-100 rounded transition-colors"
                                       title="Delete"
                                     >
                                       <FaTrash className="w-3 h-3 text-red-600" />
@@ -2271,23 +2365,20 @@ const WeekView = ({
 
                           // activity
                           const a = item;
-                          const kindKey = a.kind || a.type || null;
-                          const cat = kindKey && categories && categories[kindKey] ? categories[kindKey] : null;
                           let ka = null;
-                          if (a.keyAreaId || a.key_area_id) ka = keyAreaMap[String(a.keyAreaId || a.key_area_id)];
-                          else if (a.taskId || a.task_id) {
+                          if (a.taskId || a.task_id) {
                             const parent = (Array.isArray(todos) ? todos : []).find(
                               (t) => String(t.id) === String(a.taskId || a.task_id)
                             );
                             if (parent) ka = keyAreaMap[String(parent.keyAreaId || parent.key_area_id)];
                           }
+                          if (!ka && (a.keyAreaId || a.key_area_id)) {
+                            ka = keyAreaMap[String(a.keyAreaId || a.key_area_id)];
+                          }
 
-                          const bgClass = cat?.color || null;
-                          const DEFAULT_BAR_COLOR = "#4DC3D8";
+                          const DEFAULT_ACCENT_COLOR = "#4DC3D8";
                           const kaColor = ka && ka.color ? ka.color : null;
-                          const finalBg = bgClass ? null : kaColor || DEFAULT_BAR_COLOR;
-                          const textColor = finalBg ? getContrastTextColor(finalBg) : "#ffffff";
-                          const style = bgClass ? undefined : { backgroundColor: finalBg, borderColor: finalBg, color: textColor };
+                          const accentColor = kaColor || DEFAULT_ACCENT_COLOR;
 
                           return (
                             <div
@@ -2308,35 +2399,22 @@ const WeekView = ({
                                   console.error("[WeekView] Activity drag start error", err);
                                 }
                               }}
-                              className={`group px-2 py-1 rounded border text-xs truncate w-full flex items-center gap-2 shrink-0 min-h-[28px] ${
-                                bgClass || ""
-                              }`}
-                              style={style}
+                              className="group px-1.5 py-1 text-xs truncate w-full flex items-center gap-2 border-b border-sky-200 transition-colors hover:bg-sky-50 shrink-0 min-h-[28px]"
                               title={a.text || a.title}
                             >
-                              <svg
-                                stroke="currentColor"
-                                fill="currentColor"
-                                strokeWidth="0"
-                                viewBox="0 0 448 512"
-                                className="w-4 h-4 text-[#4DC3D8] shrink-0"
-                                aria-hidden="true"
-                                xmlns="http://www.w3.org/2000/svg"
-                              >
-                                <path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z"></path>
-                              </svg>
-                              <div className="truncate font-medium flex-1">{a.text || a.title}</div>
-                              <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <FaBars className="w-4 h-4 shrink-0" style={{ color: accentColor }} aria-hidden="true" />
+                              <div className="truncate flex-1 text-[15px] text-[#4DC3D8]">{a.text || a.title}</div>
+                              <div className="flex items-center gap-1 shrink-0">
                                 {onActivityComplete && (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       onActivityComplete(a);
                                     }}
-                                    className="p-1 hover:bg-white/20 rounded transition-colors"
+                                    className="p-1 hover:bg-green-100 rounded transition-colors"
                                     title="Mark complete"
                                   >
-                                    <FaCheck className="w-3 h-3" />
+                                    <FaCheck className="w-3 h-3 text-green-600" />
                                   </button>
                                 )}
                                 {onActivityEdit && (
@@ -2345,10 +2423,10 @@ const WeekView = ({
                                       e.stopPropagation();
                                       onActivityEdit(a);
                                     }}
-                                    className="p-1 hover:bg-white/20 rounded transition-colors"
+                                    className="p-1 hover:bg-slate-100 rounded transition-colors"
                                     title="Edit"
                                   >
-                                    <FaEdit className="w-3 h-3" />
+                                    <FaEdit className="w-3 h-3 text-slate-600" />
                                   </button>
                                 )}
                                 {onActivityDelete && (
@@ -2357,7 +2435,7 @@ const WeekView = ({
                                       e.stopPropagation();
                                       onActivityDelete(a);
                                     }}
-                                    className="p-1 hover:bg-white/20 rounded transition-colors"
+                                    className="p-1 hover:bg-red-100 rounded transition-colors"
                                     title="Delete"
                                   >
                                     <FaTrash className="w-3 h-3 text-red-600" />

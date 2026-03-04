@@ -1,6 +1,16 @@
 import apiClient from "./apiClient";
 
 const base = "/calendar";
+const isObject = (v) => v !== null && typeof v === "object";
+
+function isPopupOAuthMessage(event, popup, providers = []) {
+    if (!event || !popup) return false;
+    // Only handle messages coming from the OAuth popup window.
+    if (event.source !== popup) return false;
+    const data = event.data;
+    if (!isObject(data)) return false;
+    return providers.includes(data.provider);
+}
 
 const calendarService = {
             // Trigger backend sync after OAuth
@@ -37,8 +47,8 @@ const calendarService = {
                     clearInterval(checkClosed);
                     try { popup.close(); } catch(e) {}
                 };
-                const messageHandler = async (event) => {
-                    if (event.data && (event.data.provider === 'google-tasks' || event.data.provider === 'google')) {
+                const messageHandler = (event) => {
+                    if (isPopupOAuthMessage(event, popup, ['google-tasks', 'google'])) {
                         cleanup();
                         if (event.data.success === true) {
                             resolve({ success: true });
@@ -115,8 +125,8 @@ const calendarService = {
                     clearInterval(checkClosed);
                     try { popup.close(); } catch(e) {}
                 };
-                const messageHandler = async (event) => {
-                    if (event.data && (event.data.provider === 'microsoft-todo' || event.data.provider === 'graph')) {
+                const messageHandler = (event) => {
+                    if (isPopupOAuthMessage(event, popup, ['microsoft-todo', 'graph'])) {
                         cleanup();
                         if (event.data.success === true) {
                             resolve({ success: true });
@@ -289,10 +299,8 @@ const calendarService = {
             };
             
             // Method 1: Listen for postMessage from popup
-            const messageHandler = async (event) => {
-                console.log('Received postMessage:', event.data);
-                if (event.data && event.data.provider === 'google') {
-                    console.log('Google OAuth success via postMessage');
+            const messageHandler = (event) => {
+                if (isPopupOAuthMessage(event, popup, ['google'])) {
                     cleanup();
                     if (event.data.success === true) {
                         resolve({ success: true });
@@ -305,15 +313,13 @@ const calendarService = {
             
             // Method 2: BroadcastChannel (for COOP-blocked scenarios)
             let broadcastChannel;
-            try {
-                broadcastChannel = new BroadcastChannel('oauth-callback');
-                broadcastChannel.onmessage = (event) => {
-                    console.log('Received BroadcastChannel:', event.data);
-                    if (event.data && event.data.provider === 'google') {
-                        console.log('Google OAuth success via BroadcastChannel');
-                        cleanup();
-                        if (event.data.success === true) {
-                            resolve({ success: true });
+                try {
+                    broadcastChannel = new BroadcastChannel('oauth-callback');
+                    broadcastChannel.onmessage = (event) => {
+                        if (event.data && event.data.provider === 'google') {
+                            cleanup();
+                            if (event.data.success === true) {
+                                resolve({ success: true });
                         } else {
                             reject(new Error('OAuth cancelled by user'));
                         }
@@ -325,13 +331,10 @@ const calendarService = {
             
             // Method 3: localStorage event (fallback)
             const storageHandler = (event) => {
-                console.log('Storage event:', event.key, event.newValue);
                 if (event.key === 'oauth-callback' && event.newValue) {
                     try {
                         const data = JSON.parse(event.newValue);
-                        console.log('Parsed oauth-callback data:', data);
                         if (data.provider === 'google') {
-                            console.log('Google OAuth success via localStorage');
                             cleanup();
                             if (data.success === true) {
                                 resolve({ success: true });
@@ -339,9 +342,7 @@ const calendarService = {
                                 reject(new Error('OAuth cancelled by user'));
                             }
                         }
-                    } catch (e) {
-                        console.error('Error parsing oauth-callback:', e);
-                    }
+                    } catch (e) {}
                 }
             };
             window.addEventListener('storage', storageHandler);
@@ -350,7 +351,6 @@ const calendarService = {
             const checkClosed = setInterval(() => {
                 try {
                     if (popup && popup.closed) {
-                        console.log('OAuth popup was closed');
                         clearInterval(checkClosed);
                         // Don't immediately reject - give BroadcastChannel/storage 2 more seconds
                         if (!resolved) {
@@ -363,9 +363,7 @@ const calendarService = {
                         }
                         return;
                     }
-                } catch (e) {
-                    console.error('Error checking popup.closed:', e);
-                }
+                } catch (e) {}
             }, 500);
         });
     },
@@ -394,10 +392,8 @@ const calendarService = {
             };
             
             // Method 1: Listen for postMessage from popup
-            const messageHandler = async (event) => {
-                console.log('Received postMessage:', event.data);
-                if (event.data && event.data.provider === 'graph') {
-                    console.log('Graph OAuth success via postMessage');
+            const messageHandler = (event) => {
+                if (isPopupOAuthMessage(event, popup, ['graph'])) {
                     cleanup();
                     if (event.data.success === true) {
                         resolve({ success: true });
@@ -410,15 +406,13 @@ const calendarService = {
             
             // Method 2: BroadcastChannel (for COOP-blocked scenarios)
             let broadcastChannel;
-            try {
-                broadcastChannel = new BroadcastChannel('oauth-callback');
-                broadcastChannel.onmessage = (event) => {
-                    console.log('Received BroadcastChannel:', event.data);
-                    if (event.data && event.data.provider === 'graph') {
-                        console.log('Graph OAuth success via BroadcastChannel');
-                        cleanup();
-                        if (event.data.success === true) {
-                            resolve({ success: true });
+                try {
+                    broadcastChannel = new BroadcastChannel('oauth-callback');
+                    broadcastChannel.onmessage = (event) => {
+                        if (event.data && event.data.provider === 'graph') {
+                            cleanup();
+                            if (event.data.success === true) {
+                                resolve({ success: true });
                         } else {
                             reject(new Error('OAuth cancelled by user'));
                         }
@@ -430,13 +424,10 @@ const calendarService = {
             
             // Method 3: localStorage event (fallback)
             const storageHandler = (event) => {
-                console.log('Storage event:', event.key, event.newValue);
                 if (event.key === 'oauth-callback' && event.newValue) {
                     try {
                         const data = JSON.parse(event.newValue);
-                        console.log('Parsed oauth-callback data:', data);
                         if (data.provider === 'graph') {
-                            console.log('Graph OAuth success via localStorage');
                             cleanup();
                             if (data.success === true) {
                                 resolve({ success: true });
@@ -444,9 +435,7 @@ const calendarService = {
                                 reject(new Error('OAuth cancelled by user'));
                             }
                         }
-                    } catch (e) {
-                        console.error('Error parsing oauth-callback:', e);
-                    }
+                    } catch (e) {}
                 }
             };
             window.addEventListener('storage', storageHandler);
@@ -455,7 +444,6 @@ const calendarService = {
             const checkClosed = setInterval(() => {
                 try {
                     if (popup && popup.closed) {
-                        console.log('OAuth popup was closed');
                         clearInterval(checkClosed);
                         // Don't immediately reject - give BroadcastChannel/storage 2 more seconds
                         if (!resolved) {
@@ -468,9 +456,7 @@ const calendarService = {
                         }
                         return;
                     }
-                } catch (e) {
-                    console.error('Error checking popup.closed:', e);
-                }
+                } catch (e) {}
             }, 500);
         });
     },

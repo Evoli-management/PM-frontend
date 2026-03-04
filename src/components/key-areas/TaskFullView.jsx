@@ -24,12 +24,6 @@ const CreateActivityModal = React.lazy(() => import('../../components/modals/Cre
 const EditActivityModal = React.lazy(() => import('./EditActivityModal.jsx'));
 const TaskDelegationModal = React.lazy(() => import('../modals/TaskDelegationModal.jsx'));
 
-// dev helper: HMR verification
-if (import.meta && import.meta.hot) {
-    // will show in browser console when module loads via HMR
-    // eslint-disable-next-line no-console
-    console.log('[HMR] TaskFullView module loaded');
-}
 
 let _activityService = null;
 const getActivityService = async () => {
@@ -82,6 +76,26 @@ export default function TaskFullView({
         const [anchor, setAnchor] = useState(null);
         const btnRef = useRef(null);
 
+        const updateAnchor = () => {
+            const btn = btnRef.current;
+            if (!btn) return;
+            const rect = btn.getBoundingClientRect();
+            const menuEl = document.getElementById(`activity-menu-${item.id}`);
+            const menuHeight = menuEl?.offsetHeight || 140;
+            const menuWidth = menuEl?.offsetWidth || 176;
+            const spaceBelow = window.innerHeight - rect.bottom;
+            const spaceAbove = rect.top;
+            const openUp = spaceBelow < menuHeight + 12 && spaceAbove > spaceBelow;
+            let left = rect.left;
+            const maxLeft = window.innerWidth - menuWidth - 8;
+            if (left > maxLeft) left = Math.max(8, maxLeft);
+            if (left < 8) left = 8;
+            const top = openUp
+                ? Math.max(8, rect.top - menuHeight - 4)
+                : Math.min(window.innerHeight - menuHeight - 8, rect.bottom + 4);
+            setAnchor({ top, left });
+        };
+
         useEffect(() => {
             if (!open) return;
             const onDown = (e) => {
@@ -93,15 +107,22 @@ export default function TaskFullView({
                 setOpen(false);
             };
             const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+            const onReposition = () => updateAnchor();
+            updateAnchor();
             document.addEventListener('mousedown', onDown);
             document.addEventListener('keydown', onKey);
-            return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+            window.addEventListener('resize', onReposition);
+            window.addEventListener('scroll', onReposition, true);
+            return () => {
+                document.removeEventListener('mousedown', onDown);
+                document.removeEventListener('keydown', onKey);
+                window.removeEventListener('resize', onReposition);
+                window.removeEventListener('scroll', onReposition, true);
+            };
         }, [open, item.id]);
 
         const toggle = (e) => {
             e.stopPropagation();
-            const rect = e.currentTarget.getBoundingClientRect();
-            setAnchor({ top: rect.bottom + window.scrollY + 6, left: rect.left + window.scrollX });
             setOpen((s) => !s);
         };
 
@@ -244,8 +265,6 @@ export default function TaskFullView({
                 if (!mounted) return;
                 try {
                     lastNotifiedRef.current = signature;
-                    // eslint-disable-next-line no-console
-                    console.log('[TaskFullView] notifying parent for task', String(task.id), 'list:', list);
                     onUpdateActivities && onUpdateActivities(String(task.id), list || []);
                 } catch (e) {
                     console.error('Failed to notify parent of activities change', e);
@@ -604,7 +623,7 @@ export default function TaskFullView({
                                 {/* show high-priority marker before the title when applicable */}
                                 {(() => {
                                     const isHigh = getPriorityLevel(task.priority) === 3;
-                                    if (isHigh) return (<span className="inline-block text-xs font-bold leading-none text-red-600" title="Priority: High">!</span>);
+                                    if (isHigh) return (<img src="/high-priority.svg" alt="High priority" className="inline-block w-2 h-4" title="Priority: High" />);
                                     return null;
                                 })()}
                                 <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" className="absolute left-0 top-1/2 -translate-y-1/2 pointer-events-none text-[20px]" aria-hidden="true" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg" style={{ color: kaColor }}><path d="M400 32H48C21.5 32 0 53.5 0 80v352c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48V80c0-26.5-21.5-48-48-48z"></path></svg>

@@ -713,10 +713,15 @@ export default function CreateTaskModal({
               <div style={rowMinHeight ? { minHeight: rowMinHeight } : undefined}>
                 <label className="text-sm font-medium text-slate-700">Priority</label>
                 <div className="relative mt-0">
-                  <select name="priority" className={selectCls} value={String(priority)} onChange={(e) => setPriority(Number(e.target.value))}>
-                    <option value={3} >❗️ High</option>
+                  <select
+                    name="priority"
+                    className={selectCls}
+                    value={String(priority)}
+                    onChange={(e) => setPriority(Number(e.target.value))}
+                  >
+                    <option value={3}>High</option>
                     <option value={2}>Normal</option>
-                    <option value={1} style={{ color: "#6b7280" }}>↓ Low</option>
+                    <option value={1} style={{ color: "#6b7280" }}>Low</option>
                   </select>
                   <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 </div>

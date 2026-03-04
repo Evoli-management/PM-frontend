@@ -80,6 +80,7 @@ export default function QuarterView({
     onChangeFilter,
     slotSizeMinutes = 15,
     onToggleSlotSize,
+    elephantTaskRow = null,
 }) {
     const { formatDate } = useCalendarPreferences();
     const [keyAreaMap, setKeyAreaMap] = useState({});
@@ -246,8 +247,11 @@ export default function QuarterView({
     }
 
     const [showViewMenu, setShowViewMenu] = useState(false);
+    const [showSlotMenu, setShowSlotMenu] = useState(false);
     const [popup, setPopup] = useState(null);
     const [selectedDateIso, setSelectedDateIso] = useState(null);
+    const viewMenuRef = useRef(null);
+    const slotMenuRef = useRef(null);
     // popup: { iso: 'YYYY-MM-DD', events: [], rect: DOMRect }
     // refs to allow equalizing row heights across the three month columns
     const rowRefs = useRef([]); // rowRefs.current[mIdx][wIdx][dayIdx] = tr element
@@ -454,6 +458,29 @@ export default function QuarterView({
             document.removeEventListener('keydown', onKey);
         };
     }, [popup]);
+
+    useEffect(() => {
+        const onDocClick = (e) => {
+            if (viewMenuRef.current && !viewMenuRef.current.contains(e.target)) {
+                setShowViewMenu(false);
+            }
+            if (slotMenuRef.current && !slotMenuRef.current.contains(e.target)) {
+                setShowSlotMenu(false);
+            }
+        };
+        const onKey = (e) => {
+            if (e.key === "Escape") {
+                setShowViewMenu(false);
+                setShowSlotMenu(false);
+            }
+        };
+        document.addEventListener("click", onDocClick);
+        document.addEventListener("keydown", onKey);
+        return () => {
+            document.removeEventListener("click", onDocClick);
+            document.removeEventListener("keydown", onKey);
+        };
+    }, []);
     return (
         <>
             <style>{`
@@ -465,25 +492,112 @@ export default function QuarterView({
                     100% { background-color: rgba(59,130,246,0.12) !important; box-shadow: none !important; }
                 }
                 .today-row-overlay { animation: blinkRow 0.45s linear 4; background-clip: padding-box; border-radius: 4px; }
+
+                .day-header-controls .day-header-btn {
+                    margin-inline: 2px;
+                    transition: background-color 120ms ease, border-color 120ms ease;
+                }
+                .day-header-controls .day-header-btn:hover {
+                    background-color: #e0f2fe !important;
+                    border-color: #7dd3fc !important;
+                }
+                .day-header-controls button.day-header-btn:focus,
+                .day-header-controls button.day-header-btn:focus-visible {
+                    outline: none !important;
+                    box-shadow: none !important;
+                    ring: 0 !important;
+                }
             `}</style>
             <div className="h-full min-h-0 flex flex-col">
                 {/* Quarter navigation inside view */}
-                <div className="flex items-center justify-between py-3 bg-white border-b border-gray-200 flex-shrink-0">
+                <div className="day-header-controls flex items-center justify-between bg-white flex-shrink-0 min-h-[34px]">
                     <div className="flex items-center gap-2">
                         {/* Back first, then View dropdown */}
                         <button
-                            className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
-                            style={{ minWidth: 36, minHeight: 36 }}
+                            className="day-header-btn px-2 py-0.5 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+                            style={{ minWidth: 34, minHeight: 34 }}
                             aria-label="Previous month"
                             onClick={() => onShiftDate && onShiftDate({ months: -1 })}
                         >
                             <FaChevronLeft />
                         </button>
-                        <div className="relative">
+                        <button
+                            className="day-header-btn px-2 py-0.5 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+                            style={{ minWidth: 34, minHeight: 34 }}
+                            aria-label="Next month"
+                            onClick={() => onShiftDate && onShiftDate({ months: 1 })}
+                        >
+                            <FaChevronRight />
+                        </button>
+                        <div className="relative" ref={slotMenuRef}>
                             <button
-                                className="px-2 py-1 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center gap-2"
-                                style={{ minWidth: 36, minHeight: 28 }}
-                                onClick={() => setShowViewMenu((s) => !s)}
+                                type="button"
+                                onClick={() => {
+                                    setShowSlotMenu((s) => !s);
+                                    setShowViewMenu(false);
+                                }}
+                                className="day-header-btn px-2 py-0.5 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center gap-2"
+                                style={{ minWidth: 48, minHeight: 34 }}
+                                aria-haspopup="menu"
+                                aria-expanded={showSlotMenu ? "true" : "false"}
+                                aria-label="Time label interval"
+                                title={`Time labels: ${slotSizeMinutes}m`}
+                            >
+                                <span>Time</span>
+                                <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
+                                    {slotSizeMinutes}m
+                                </span>
+                                <FaChevronDown className={`${showSlotMenu ? "rotate-180" : "rotate-0"} transition-transform`} />
+                            </button>
+                            {showSlotMenu && (
+                                <div
+                                    role="menu"
+                                    className="absolute left-0 z-50 mt-2 w-28 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden"
+                                >
+                                    {[15, 30].map((size) => (
+                                        <button
+                                            key={size}
+                                            role="menuitemradio"
+                                            aria-checked={slotSizeMinutes === size}
+                                            className={`w-full text-left px-3 py-2 text-sm ${slotSizeMinutes === size ? "bg-blue-50 text-blue-700 font-semibold" : "text-slate-700 hover:bg-slate-50"}`}
+                                            onClick={() => {
+                                                if (slotSizeMinutes !== size && typeof onToggleSlotSize === "function") {
+                                                    onToggleSlotSize();
+                                                }
+                                                setShowSlotMenu(false);
+                                            }}
+                                        >
+                                            {size}m
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    <span className="text-lg font-semibold text-blue-700">{quarterLabel}</span>
+                    <div className="flex items-center gap-2">
+                        <button
+                            className="day-header-btn px-2 py-0.5 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+                            style={{ minWidth: 34, minHeight: 34 }}
+                            aria-label="Today"
+                            onClick={() => {
+                                try {
+                                    if (typeof onSetDate === 'function') onSetDate(new Date());
+                                } catch (_) {}
+                                // scroll to and highlight today's cell after render
+                                setTimeout(() => scrollToDate(new Date()), 80);
+                            }}
+                        >
+                            Today
+                        </button>
+                        <div className="relative" ref={viewMenuRef}>
+                            <button
+                                className="day-header-btn px-2 py-0.5 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center gap-2"
+                                style={{ minWidth: 34, minHeight: 34 }}
+                                onClick={() => {
+                                    setShowViewMenu((s) => !s);
+                                    setShowSlotMenu(false);
+                                }}
                                 aria-haspopup="menu"
                                 aria-expanded={showViewMenu ? "true" : "false"}
                             >
@@ -498,7 +612,7 @@ export default function QuarterView({
                             {showViewMenu && (
                                 <div
                                     role="menu"
-                                    className="absolute z-50 mt-2 w-40 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden"
+                                    className="absolute right-0 z-50 mt-2 w-40 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden"
                                 >
                                     {["day", "week", "month", "quarter"].map((v) => (
                                         <button
@@ -517,43 +631,14 @@ export default function QuarterView({
                                 </div>
                             )}
                         </div>
-                        <button
-                            type="button"
-                            onClick={() => onToggleSlotSize && onToggleSlotSize()}
-                            className="px-2 py-1 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
-                            style={{ minWidth: 48, minHeight: 28 }}
-                            aria-label={`Toggle time labels to ${slotSizeMinutes === 15 ? "30 minutes" : "15 minutes"}`}
-                            title={`Time labels: ${slotSizeMinutes}m (click to switch)`}
-                        >
-                            {slotSizeMinutes}m
-                        </button>
-                    </div>
-                    <span className="text-lg font-semibold text-blue-700">{quarterLabel}</span>
-                    <div className="flex items-center gap-2">
-                        <button
-                            className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
-                            style={{ minWidth: 36, minHeight: 36 }}
-                            aria-label="Today"
-                            onClick={() => {
-                                try {
-                                    if (typeof onSetDate === 'function') onSetDate(new Date());
-                                } catch (_) {}
-                                // scroll to and highlight today's cell after render
-                                setTimeout(() => scrollToDate(new Date()), 80);
-                            }}
-                        >
-                            Today
-                        </button>
-                        <button
-                            className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
-                            style={{ minWidth: 36, minHeight: 36 }}
-                            aria-label="Next month"
-                            onClick={() => onShiftDate && onShiftDate({ months: 1 })}
-                        >
-                            <FaChevronRight />
-                        </button>
                     </div>
                 </div>
+                {elephantTaskRow ? (
+                    <>
+                        <div className="w-full border-t border-slate-300" />
+                        <div>{elephantTaskRow}</div>
+                    </>
+                ) : null}
                 <div className="relative grid grid-cols-3 gap-6 flex-shrink-0 bg-white border-b border-blue-100">
                     {monthLongNames.map((monthName, idx) => (
                         <div key={`month-header-${idx}`} className="text-left px-2 py-2 text-blue-500 text-base font-semibold bg-white min-w-0">

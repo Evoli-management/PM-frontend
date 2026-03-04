@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import StatusIndicator from '../ui/StatusIndicator';
 import PriorityBadge from '../ui/PriorityBadge';
 import { getQuadrantColorClass } from '../../utils/keyareasHelpers';
@@ -51,6 +52,7 @@ const TaskRow = ({
     completed: true,
   };
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
   const menuBtnRef = useRef(null);
   const [editingKey, setEditingKey] = useState(null);
   const [localValue, setLocalValue] = useState("");
@@ -72,6 +74,33 @@ const TaskRow = ({
     return () => {
       document.removeEventListener('mousedown', onDown);
       document.removeEventListener('keydown', onKey);
+    };
+  }, [menuOpen]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const updatePlacement = () => {
+      const btn = menuBtnRef.current;
+      if (!btn) return;
+      const menuHeight = menuRef.current?.offsetHeight || 120;
+      const menuWidth = menuRef.current?.offsetWidth || 160;
+      const rect = btn.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      const openUp = spaceBelow < menuHeight + 12 && spaceAbove > spaceBelow;
+      let left = rect.left;
+      const maxLeft = window.innerWidth - menuWidth - 8;
+      if (left > maxLeft) left = Math.max(8, maxLeft);
+      if (left < 8) left = 8;
+      const top = openUp ? Math.max(8, rect.top - menuHeight - 4) : Math.min(window.innerHeight - menuHeight - 8, rect.bottom + 4);
+      setMenuPos({ top, left });
+    };
+    updatePlacement();
+    window.addEventListener('resize', updatePlacement);
+    window.addEventListener('scroll', updatePlacement, true);
+    return () => {
+      window.removeEventListener('resize', updatePlacement);
+      window.removeEventListener('scroll', updatePlacement, true);
     };
   }, [menuOpen]);
 
@@ -107,43 +136,44 @@ const TaskRow = ({
             >
               <FaEllipsisV />
             </button>
-            {menuOpen && (
-              <div 
-                ref={menuRef} 
-                id={`task-row-menu-${t.id}`} 
-                style={{ position: 'absolute', top: '100%', left: 0, zIndex: 50, minWidth: 160, marginTop: '0.25rem' }} 
+            {menuOpen && createPortal(
+              <div
+                ref={menuRef}
+                id={`task-row-menu-${t.id}`}
+                style={{ position: 'fixed', top: menuPos.top, left: menuPos.left, zIndex: 1000, minWidth: 160 }}
                 className="bg-white border border-slate-200 rounded shadow"
               >
-              <button
-                type="button"
-                className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex items-center gap-2"
-                onClick={(e) => { try { e.stopPropagation(); } catch (__) {} setMenuOpen(false); onEditClick && onEditClick(); }}
-              >
-                <FaEdit className="w-3 h-3" />
-                Edit
-              </button>
-              <button
-                type="button"
-                className="block w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                onClick={async (e) => {
-                  try { e.stopPropagation(); } catch (__) {}
-                  setMenuOpen(false);
-                  if (typeof onDeleteClick === 'function') {
-                    const ok = window.confirm(`Delete task "${t.title}"?`);
-                    if (ok) {
-                      try {
-                        await onDeleteClick();
-                      } catch (err) {
-                        console.error('Delete failed:', err);
+                <button
+                  type="button"
+                  className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex items-center gap-2"
+                  onClick={(e) => { try { e.stopPropagation(); } catch (__) {} setMenuOpen(false); onEditClick && onEditClick(); }}
+                >
+                  <FaEdit className="w-3 h-3" />
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  className="block w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                  onClick={async (e) => {
+                    try { e.stopPropagation(); } catch (__) {}
+                    setMenuOpen(false);
+                    if (typeof onDeleteClick === 'function') {
+                      const ok = window.confirm(`Delete task "${t.title}"?`);
+                      if (ok) {
+                        try {
+                          await onDeleteClick();
+                        } catch (err) {
+                          console.error('Delete failed:', err);
+                        }
                       }
                     }
-                  }
-                }}
-              >
-                <FaTrash className="w-3 h-3" />
-                Delete
-              </button>
-            </div>
+                  }}
+                >
+                  <FaTrash className="w-3 h-3" />
+                  Delete
+                </button>
+              </div>,
+              document.body
             )}
           </div>
         </div>
@@ -155,15 +185,11 @@ const TaskRow = ({
             if (lvl === 2) return null;
             if (lvl === 3) {
               return (
-                <span className="mt-0.5 inline-block shrink-0 text-sm font-bold leading-none text-red-600" title="Priority: High">
-                  !
-                </span>
+                <img src="/high-priority.svg" alt="High priority" className="mt-0.5 inline-block shrink-0 w-2 h-4" title="Priority: High" />
               );
             }
             return (
-              <span className="mt-0.5 inline-block shrink-0 text-sm font-bold leading-none text-slate-500" title="Priority: Low">
-                ↓
-              </span>
+              <img src="/low-priority-down.svg" alt="Low priority" className="mt-0.5 inline-block shrink-0 w-2 h-4" title="Priority: Low" />
             );
           })()}
           <div className="flex flex-col">
@@ -263,25 +289,30 @@ const TaskRow = ({
       {vc.priority && (
         <td className="px-3 py-2 align-top w-[100px]">
           {enableInlineEditing ? (
-            <select
-              className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-sm"
-              value={(() => {
+            (() => {
+              const priorityValue = (() => {
                 const raw = t.priority ?? t.priority_level ?? t.priorityLevel ?? null;
                 if (raw === 1 || raw === '1' || String(raw) === '1') return 'low';
                 if (raw === 3 || raw === '3' || String(raw) === '3') return 'high';
                 const s = String(raw || '').toLowerCase();
                 if (s === 'low' || s === 'high' || s === 'normal') return s;
                 return 'normal';
-              })()}
-              onChange={async (e) => {
-                const v = e.target.value;
-                try { await updateField && updateField(t.id, 'priority', v); } catch (err) {}
-              }}
-            >
-              <option value="high" >❗️ High</option>
-              <option value="normal">Normal</option>
-              <option value="low" style={{ color: "#6b7280" }}>↓ Low</option>
-            </select>
+              })();
+              return (
+                <select
+                  className="w-[96px] rounded-md border border-slate-300 bg-white py-0.5 text-sm px-2"
+                  value={priorityValue}
+                  onChange={async (e) => {
+                    const v = e.target.value;
+                    try { await updateField && updateField(t.id, 'priority', v); } catch (err) {}
+                  }}
+                >
+                  <option value="high">High</option>
+                  <option value="normal">Normal</option>
+                  <option value="low" style={{ color: "#6b7280" }}>Low</option>
+                </select>
+              );
+            })()
           ) : (
             (() => {
               const raw = t.priority ?? t.priority_level ?? t.priorityLevel ?? null;

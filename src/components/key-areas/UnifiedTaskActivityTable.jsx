@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { format } from 'date-fns';
 import { FaCheck, FaTimes, FaTrash, FaLock, FaLockOpen, FaExternalLinkAlt, FaStop, FaAlignJustify, FaBan, FaSquare, FaListUl, FaEllipsisV } from 'react-icons/fa';
 import { toDateOnly } from '../../utils/keyareasHelpers';
@@ -55,6 +56,7 @@ export default function UnifiedTaskActivityTable({
     const [selectedTaskForActivity, setSelectedTaskForActivity] = useState(''); // For accept-into-task
     const [respondingTaskId, setRespondingTaskId] = useState(null);
     const [openRowMenuId, setOpenRowMenuId] = useState(null);
+    const [rowMenuPos, setRowMenuPos] = useState({ top: 0, left: 0 });
 
     useEffect(() => {
         if (!openRowMenuId) return;
@@ -965,15 +967,33 @@ export default function UnifiedTaskActivityTable({
                                                     title="More actions"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        setOpenRowMenuId((prev) => (prev === item.itemId ? null : item.itemId));
+                                                        setOpenRowMenuId((prev) => {
+                                                            if (prev === item.itemId) return null;
+                                                            const rect = e.currentTarget.getBoundingClientRect();
+                                                            const menuHeight = 220;
+                                                            const menuWidth = 170;
+                                                            const spaceBelow = window.innerHeight - rect.bottom;
+                                                            const spaceAbove = rect.top;
+                                                            const openUp = spaceBelow < menuHeight + 12 && spaceAbove > spaceBelow;
+                                                            let left = rect.left;
+                                                            const maxLeft = window.innerWidth - menuWidth - 8;
+                                                            if (left > maxLeft) left = Math.max(8, maxLeft);
+                                                            if (left < 8) left = 8;
+                                                            const top = openUp
+                                                                ? Math.max(8, rect.top - menuHeight - 4)
+                                                                : Math.min(window.innerHeight - menuHeight - 8, rect.bottom + 4);
+                                                            setRowMenuPos({ top, left });
+                                                            return item.itemId;
+                                                        });
                                                     }}
                                                 >
                                                     <FaEllipsisV />
                                                 </button>
-                                                {openRowMenuId === item.itemId && (
+                                                {openRowMenuId === item.itemId && createPortal(
                                                     <div
                                                         data-row-actions-menu="true"
-                                                        className="absolute left-0 mt-1 z-20 min-w-[170px] rounded-md border border-slate-200 bg-white shadow-lg"
+                                                        style={{ position: 'fixed', top: rowMenuPos.top, left: rowMenuPos.left, zIndex: 1000, minWidth: 170 }}
+                                                        className="rounded-md border border-slate-200 bg-white shadow-lg"
                                                     >
                                                         <button
                                                             type="button"
@@ -1029,7 +1049,7 @@ export default function UnifiedTaskActivityTable({
                                                             </>
                                                         )}
                                                     </div>
-                                                )}
+                                                , document.body)}
                                             </div>
                                         </div>
                                     </td>
@@ -1163,21 +1183,26 @@ export default function UnifiedTaskActivityTable({
                                         <td
                                             className="px-3 py-2 align-top text-slate-800 w-28"
                                         >
-                                            <select
-                                                className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-sm w-full"
-                                                value={(() => {
+                                            {(() => {
+                                                const priorityValue = (() => {
                                                     const raw = item.priority ?? item.priority_level ?? item.priorityLevel;
                                                     if (raw === 1 || String(raw) === '1' || String(raw).toLowerCase() === 'low') return 'low';
                                                     if (raw === 3 || String(raw) === '3' || String(raw).toLowerCase() === 'high') return 'high';
                                                     return 'normal';
-                                                })()}
-                                                onChange={(e) => saveEdit(item, 'priority', e.target.value)}
-                                                onClick={(e) => e.stopPropagation()}
-                                            >
-                                                <option value="high" >❗️ High</option>
-                                                <option value="normal">Normal</option>
-                                                <option value="low" style={{ color: "#6b7280" }}>↓ Low</option>
-                                            </select>
+                                                })();
+                                                return (
+                                                    <select
+                                                        className="w-[96px] rounded-md border border-slate-300 bg-white py-0.5 text-sm px-2"
+                                                        value={priorityValue}
+                                                        onChange={(e) => saveEdit(item, 'priority', e.target.value)}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        <option value="high">High</option>
+                                                        <option value="normal">Normal</option>
+                                                        <option value="low" style={{ color: "#6b7280" }}>Low</option>
+                                                    </select>
+                                                );
+                                            })()}
                                         </td>
                                     )}
                                     {columns.includes('goal') && (

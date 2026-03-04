@@ -228,6 +228,7 @@ export default function MonthView({
   onTaskDrop,
   slotSizeMinutes = 15,
   onToggleSlotSize,
+  elephantTaskRow = null,
 }) {
   const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -1266,6 +1267,32 @@ export default function MonthView({
   }, [highlightTodayPulse, year, month]);
 
   const [showViewMenu, setShowViewMenu] = useState(false);
+  const [showSlotMenu, setShowSlotMenu] = useState(false);
+  const viewMenuRef = useRef(null);
+  const slotMenuRef = useRef(null);
+
+  useEffect(() => {
+    const onDocClick = (ev) => {
+      if (viewMenuRef.current && !viewMenuRef.current.contains(ev.target)) {
+        setShowViewMenu(false);
+      }
+      if (slotMenuRef.current && !slotMenuRef.current.contains(ev.target)) {
+        setShowSlotMenu(false);
+      }
+    };
+    const onKeyDown = (ev) => {
+      if (ev.key === "Escape") {
+        setShowViewMenu(false);
+        setShowSlotMenu(false);
+      }
+    };
+    document.addEventListener("click", onDocClick);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("click", onDocClick);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, []);
 
   const shiftMonthFromNav = (delta) => {
     if (!onShiftDate) return;
@@ -1309,25 +1336,131 @@ export default function MonthView({
           opacity: 1;
           pointer-events: auto;
         }
+
+        .day-header-controls .day-header-btn {
+          margin-inline: 2px;
+          transition: background-color 120ms ease, border-color 120ms ease;
+        }
+        .day-header-controls .day-header-btn:hover {
+          background-color: #e0f2fe !important;
+          border-color: #7dd3fc !important;
+        }
+        .day-header-controls button.day-header-btn:focus,
+        .day-header-controls button.day-header-btn:focus-visible {
+          outline: none !important;
+          box-shadow: none !important;
+          ring: 0 !important;
+        }
       `}</style>
 
       {/* Header */}
-      <div className="relative z-[400] flex items-center justify-between mb-2">
+      <div className="day-header-controls relative z-[400] flex items-center justify-between min-h-[34px]">
         <div className="flex items-center gap-2">
           <button
-            className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
-            style={{ minWidth: 36, minHeight: 36 }}
+            className="day-header-btn px-2 py-0.5 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+            style={{ minWidth: 34, minHeight: 34 }}
             aria-label="Previous month"
             onClick={() => shiftMonthFromNav(-1)}
           >
             <FaChevronLeft />
           </button>
 
-          <div className="relative">
+          <button
+            className="day-header-btn px-2 py-0.5 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+            style={{ minWidth: 34, minHeight: 34 }}
+            aria-label="Next month"
+            onClick={() => shiftMonthFromNav(1)}
+          >
+            <FaChevronRight />
+          </button>
+          <div className="relative" ref={slotMenuRef}>
             <button
-              className="px-2 py-1 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center gap-2"
-              style={{ minWidth: 36, minHeight: 28 }}
-              onClick={() => setShowViewMenu((s) => !s)}
+              type="button"
+              onClick={() => {
+                setShowSlotMenu((s) => !s);
+                setShowViewMenu(false);
+              }}
+              className="day-header-btn px-2 py-0.5 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center gap-2"
+              style={{ minWidth: 48, minHeight: 34 }}
+              aria-haspopup="menu"
+              aria-expanded={showSlotMenu ? "true" : "false"}
+              aria-label="Time label interval"
+              title={`Time labels: ${slotSizeMinutes}m`}
+            >
+              <span>Time</span>
+              <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
+                {slotSizeMinutes}m
+              </span>
+              <FaChevronDown className={`${showSlotMenu ? "rotate-180" : "rotate-0"} transition-transform`} />
+            </button>
+            {showSlotMenu && (
+              <div role="menu" className="absolute left-0 z-[450] mt-2 w-28 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden">
+                {[15, 30].map((size) => (
+                  <button
+                    key={size}
+                    role="menuitemradio"
+                    aria-checked={slotSizeMinutes === size}
+                    className={`w-full text-left px-3 py-2 text-sm ${
+                      slotSizeMinutes === size ? "bg-blue-50 text-blue-700 font-semibold" : "text-slate-700 hover:bg-slate-50"
+                    }`}
+                    onClick={() => {
+                      if (slotSizeMinutes !== size && typeof onToggleSlotSize === "function") {
+                        onToggleSlotSize();
+                      }
+                      setShowSlotMenu(false);
+                    }}
+                  >
+                    {size}m
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <h2 className="text-xl font-bold flex items-center gap-2">
+          <img src={calendarSrc} alt="Calendar" style={{ width: 18, height: 18 }} />
+          {new Intl.DateTimeFormat(undefined, {
+            month: "long",
+            year: "numeric",
+            timeZone: userTimeZone,
+          }).format(baseDate)}
+          {prefsLoading && (
+            <span className="text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-0.5">
+              Loading
+            </span>
+          )}
+        </h2>
+
+        <div className="flex items-center gap-2">
+          <button
+            className="day-header-btn px-3 py-0.5 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50"
+            style={{ minHeight: 34 }}
+            aria-label="Today"
+            onClick={() => {
+              const now = new Date();
+              const monthDelta = (now.getFullYear() - year) * 12 + (now.getMonth() - month);
+
+              if (monthDelta !== 0 && onShiftDate) {
+                focusTodayAfterMonthJumpRef.current = true;
+                onShiftDate({ months: monthDelta });
+                return;
+              }
+
+              focusNowInMonthGrid();
+              triggerTodayHighlight();
+            }}
+          >
+            Today
+          </button>
+          <div className="relative" ref={viewMenuRef}>
+            <button
+              className="day-header-btn px-2 py-0.5 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center gap-2"
+              style={{ minWidth: 34, minHeight: 34 }}
+              onClick={() => {
+                setShowViewMenu((s) => !s);
+                setShowSlotMenu(false);
+              }}
               aria-haspopup="menu"
               aria-expanded={showViewMenu ? "true" : "false"}
             >
@@ -1343,7 +1476,7 @@ export default function MonthView({
             {showViewMenu && (
               <div
                 role="menu"
-                className="absolute z-[450] mt-2 w-40 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden"
+                className="absolute right-0 z-[450] mt-2 w-40 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden"
               >
                 {["day", "week", "month", "quarter"].map((v) => (
                   <button
@@ -1366,63 +1499,15 @@ export default function MonthView({
               </div>
             )}
           </div>
-          <button
-            type="button"
-            onClick={() => onToggleSlotSize && onToggleSlotSize()}
-            className="px-2 py-1 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
-            style={{ minWidth: 48, minHeight: 28 }}
-            aria-label={`Toggle time labels to ${slotSizeMinutes === 15 ? "30 minutes" : "15 minutes"}`}
-            title={`Time labels: ${slotSizeMinutes}m (click to switch)`}
-          >
-            {slotSizeMinutes}m
-          </button>
-        </div>
-
-        <h2 className="text-xl font-bold flex items-center gap-2">
-          <img src={calendarSrc} alt="Calendar" style={{ width: 18, height: 18 }} />
-          {new Intl.DateTimeFormat(undefined, {
-            month: "long",
-            year: "numeric",
-            timeZone: userTimeZone,
-          }).format(baseDate)}
-          {prefsLoading && (
-            <span className="text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-0.5">
-              Loading
-            </span>
-          )}
-        </h2>
-
-        <div className="flex items-center gap-2">
-          <button
-            className="px-3 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50"
-            style={{ minHeight: 36 }}
-            aria-label="Today"
-            onClick={() => {
-              const now = new Date();
-              const monthDelta = (now.getFullYear() - year) * 12 + (now.getMonth() - month);
-
-              if (monthDelta !== 0 && onShiftDate) {
-                focusTodayAfterMonthJumpRef.current = true;
-                onShiftDate({ months: monthDelta });
-                return;
-              }
-
-              focusNowInMonthGrid();
-              triggerTodayHighlight();
-            }}
-          >
-            Today
-          </button>
-          <button
-            className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
-            style={{ minWidth: 36, minHeight: 36 }}
-            aria-label="Next month"
-            onClick={() => shiftMonthFromNav(1)}
-          >
-            <FaChevronRight />
-          </button>
         </div>
       </div>
+
+      {elephantTaskRow ? (
+        <>
+          <div className="w-full border-t border-slate-300" />
+          <div>{elephantTaskRow}</div>
+        </>
+      ) : null}
 
       <div className="relative mv-shell">
         {/* Fixed header row (outside vertical scroll) */}
