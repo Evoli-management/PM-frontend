@@ -127,6 +127,7 @@ export default function DayView({
   });
 
   const HOUR_HEIGHT = slotMinutes === 15 ? Math.max(hourHeight, 96) : hourHeight;
+  const allDayBarHeightPx = Math.max(16, Math.max(18, (15 / 60) * HOUR_HEIGHT) - 1);
 
   const [nowMs, setNowMs] = useState(() => Date.now());
   // current time position (live)
@@ -1163,8 +1164,8 @@ export default function DayView({
                                       try { e.stopPropagation(); } catch (_) {}
                                       if (onEventClick) onEventClick(t);
                                     }}
-                                    className={`w-full group flex items-center gap-2 px-3 py-2 rounded text-xs overflow-hidden ${useCategoryClass ? bgClass : ''}`}
-                                    style={{ ...(styleBar || {}), width: '100%' }}
+                                    className={`w-full group flex items-center gap-2 px-2.5 py-0 rounded text-[11px] overflow-hidden ${useCategoryClass ? bgClass : ''}`}
+                                    style={{ ...(styleBar || {}), width: '100%', minHeight: `${allDayBarHeightPx}px`, height: `${allDayBarHeightPx}px` }}
                                     title={title}
                                   >
                                     <span className="shrink-0 inline-flex items-center justify-center w-4 text-sm" style={{ color: textColor || ((styleBar && styleBar.color) || undefined) }}>
@@ -1174,7 +1175,7 @@ export default function DayView({
                                           </svg>
                                         ) : ''}
                                     </span>
-                                    <span className="flex-1 truncate font-medium leading-[26px]">{title}</span>
+                                    <span className="flex-1 truncate font-medium leading-none">{title}</span>
                                     <span className="inline-flex items-center gap-1 shrink-0 ml-2">
                                       <button
                                         type="button"

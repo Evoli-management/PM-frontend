@@ -65,6 +65,14 @@ function getContrastTextColor(hex) {
     }
 }
 
+const OUTER_CARD_LINE = "rgba(100, 116, 139, 0.65)";
+const toLocalIsoDate = (d) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+};
+
 // ...existing code...
 export default function QuarterView({
     currentDate,
@@ -75,6 +83,7 @@ export default function QuarterView({
     onDayClick,
     onQuickCreate,
     onEventClick,
+    onEventMove,
     view,
     onChangeView,
     filterType,
@@ -158,6 +167,17 @@ export default function QuarterView({
         a.getFullYear() === b.getFullYear() &&
         a.getMonth() === b.getMonth() &&
         a.getDate() === b.getDate();
+    const addDaysDateOnly = (d, days) => {
+        const next = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+        next.setDate(next.getDate() + days);
+        return next;
+    };
+    const clampDateOnly = (d, minD, maxD) => {
+        const t = d.getTime();
+        if (t < minD.getTime()) return new Date(minD);
+        if (t > maxD.getTime()) return new Date(maxD);
+        return d;
+    };
 
     const getEventKey = (ev, idx = 0) => {
         try {
@@ -165,7 +185,10 @@ export default function QuarterView({
             const s = ev?.start || ev?.startDate || ev?.start_at || '';
             const e = ev?.end || ev?.endDate || ev?.end_at || '';
             const t = ev?.title || '';
-            return `${s}|${e}|${t}|${idx}`;
+            const kind = ev?.kind || ev?.type || '';
+            const srcTask = ev?.taskId || ev?.task_id || '';
+            const srcActivity = ev?.activityId || ev?.activity_id || '';
+            return `${s}|${e}|${t}|${kind}|${srcTask}|${srcActivity}|${idx}`;
         } catch (_) {
             return `ev-${idx}`;
         }
@@ -173,13 +196,14 @@ export default function QuarterView({
 
     const quarterEventLanes = useMemo(() => {
         const source = (Array.isArray(events) ? events : [])
-            .filter((ev) => String(ev?.kind || '').toLowerCase() !== 'appointment' && !ev?.taskId && !ev?.task_id)
-            .map((ev, idx) => {
+            .map((ev, originalIdx) => ({ ev, originalIdx }))
+            .filter(({ ev }) => String(ev?.kind || '').toLowerCase() !== 'appointment' && !ev?.taskId && !ev?.task_id)
+            .map(({ ev, originalIdx }) => {
                 const span = eventSpanByDate(ev);
                 if (!span) return null;
                 return {
                     ev,
-                    key: getEventKey(ev, idx),
+                    key: getEventKey(ev, originalIdx),
                     span,
                     createdAt: new Date(ev?.createdAt || ev?.created_at || 0).getTime(),
                     startTs: new Date(ev?.start || ev?.startDate || ev?.start_at || 0).getTime(),
@@ -250,7 +274,12 @@ export default function QuarterView({
     const [showViewMenu, setShowViewMenu] = useState(false);
     const [showSlotMenu, setShowSlotMenu] = useState(false);
     const [popup, setPopup] = useState(null);
+    const [allDaySpanPreview, setAllDaySpanPreview] = useState({});
+    const allDaySpanPreviewRef = useRef({});
+    const allDayEdgeDragRef = useRef(null);
+    const lastAllDayResizeAtRef = useRef(0);
     const [selectedDateIso, setSelectedDateIso] = useState(null);
+    const [hoveredRowIso, setHoveredRowIso] = useState(null);
     const viewMenuRef = useRef(null);
     const slotMenuRef = useRef(null);
     // popup: { iso: 'YYYY-MM-DD', events: [], rect: DOMRect }
@@ -258,6 +287,7 @@ export default function QuarterView({
     const rowRefs = useRef([]); // rowRefs.current[mIdx][wIdx][dayIdx] = tr element
     const weekBlockRefs = useRef([]); // weekBlockRefs.current[mIdx][wIdx] = tbody element
     const monthColRefs = useRef([]); // monthColRefs.current[mIdx] = month column div
+    const shellRef = useRef(null);
     const setRowRef = (mIdx, wIdx, dayIdx, el) => {
         if (!rowRefs.current[mIdx]) rowRefs.current[mIdx] = [];
         if (!rowRefs.current[mIdx][wIdx]) rowRefs.current[mIdx][wIdx] = [];
@@ -273,11 +303,118 @@ export default function QuarterView({
     const gridRef = useRef(null);
     const [weekSeparators, setWeekSeparators] = useState([]);
     const [weekVerticalDividers, setWeekVerticalDividers] = useState([]);
+    const { quarterStartDay, quarterEndDay } = useMemo(() => ({
+        quarterStartDay: new Date(months[0].getFullYear(), months[0].getMonth(), 1, 0, 0, 0, 0),
+        quarterEndDay: new Date(months[2].getFullYear(), months[2].getMonth() + 1, 0, 0, 0, 0, 0),
+    }), [months]);
+
+    const startAllDayEdgeDrag = (e, edge, meta) => {
+        try {
+            e.stopPropagation();
+            e.preventDefault();
+        } catch (_) {}
+        allDayEdgeDragRef.current = {
+            edge,
+            startY: e.clientY || 0,
+            rowHeight: Math.max(1, Number(meta?.rowHeight) || 1),
+            meta,
+        };
+        try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch (_) {}
+    };
+
+    useEffect(() => {
+        allDaySpanPreviewRef.current = allDaySpanPreview || {};
+    }, [allDaySpanPreview]);
+
+    useEffect(() => {
+        const onMove = (e) => {
+            const drag = allDayEdgeDragRef.current;
+            if (!drag?.meta?.eventKey) return;
+            const dy = (e.clientY || 0) - drag.startY;
+            const deltaDays = Math.round(dy / drag.rowHeight);
+            const originalStart = drag.meta.originalStart;
+            const originalEnd = drag.meta.originalEnd;
+            if (!originalStart || !originalEnd) return;
+
+            let nextStart = originalStart;
+            let nextEnd = originalEnd;
+            if (drag.edge === "top") {
+                nextStart = clampDateOnly(addDaysDateOnly(originalStart, deltaDays), quarterStartDay, quarterEndDay);
+                if (nextStart > nextEnd) nextStart = new Date(nextEnd);
+            } else {
+                nextEnd = clampDateOnly(addDaysDateOnly(originalEnd, deltaDays), quarterStartDay, quarterEndDay);
+                if (nextEnd < nextStart) nextEnd = new Date(nextStart);
+            }
+
+            setAllDaySpanPreview((prev) => ({
+                ...prev,
+                [drag.meta.eventKey]: { start: nextStart, end: nextEnd },
+            }));
+        };
+
+        const onUp = async () => {
+            const drag = allDayEdgeDragRef.current;
+            allDayEdgeDragRef.current = null;
+            if (!drag?.meta?.eventKey) return;
+
+            const preview = allDaySpanPreviewRef.current?.[drag.meta.eventKey];
+            const nextStart = preview?.start || drag.meta.originalStart;
+            const nextEnd = preview?.end || drag.meta.originalEnd;
+            lastAllDayResizeAtRef.current = Date.now();
+
+            try {
+                const changed =
+                    nextStart &&
+                    nextEnd &&
+                    (nextStart.getTime() !== drag.meta.originalStart.getTime() ||
+                        nextEnd.getTime() !== drag.meta.originalEnd.getTime());
+                if (changed && typeof onEventMove === "function" && drag.meta.eventId) {
+                    const buildNextDate = (dateOnly, endOfDay = false, fallbackIso = null) => {
+                        const out = new Date(
+                            dateOnly.getFullYear(),
+                            dateOnly.getMonth(),
+                            dateOnly.getDate(),
+                            endOfDay ? 23 : 0,
+                            endOfDay ? 59 : 0,
+                            endOfDay ? 59 : 0,
+                            endOfDay ? 999 : 0
+                        );
+                        if (!fallbackIso || endOfDay) return out;
+                        const f = new Date(fallbackIso);
+                        if (Number.isNaN(f.getTime())) return out;
+                        out.setHours(f.getHours(), f.getMinutes(), f.getSeconds(), f.getMilliseconds());
+                        return out;
+                    };
+                    const nextStartAt = buildNextDate(nextStart, false, drag.meta.startRaw);
+                    const nextEndAt = buildNextDate(nextEnd, true, drag.meta.endRaw || drag.meta.startRaw);
+                    await onEventMove(drag.meta.eventId, nextStartAt, nextEndAt, { allDay: true, source: "quarter-all-day-stretch" });
+                }
+            } catch (_) {
+                // keep UI responsive even if save fails
+            } finally {
+                setAllDaySpanPreview((prev) => {
+                    if (!prev || !Object.prototype.hasOwnProperty.call(prev, drag.meta.eventKey)) return prev;
+                    const next = { ...prev };
+                    delete next[drag.meta.eventKey];
+                    return next;
+                });
+            }
+        };
+
+        window.addEventListener("pointermove", onMove);
+        window.addEventListener("pointerup", onUp);
+        window.addEventListener("pointercancel", onUp);
+        return () => {
+            window.removeEventListener("pointermove", onMove);
+            window.removeEventListener("pointerup", onUp);
+            window.removeEventListener("pointercancel", onUp);
+        };
+    }, [onEventMove, quarterEndDay, quarterStartDay]);
 
     const scrollToDate = (date) => {
         try {
             if (!gridRef.current) return;
-            const iso = date.toISOString().slice(0, 10);
+            const iso = toLocalIsoDate(date);
             const el = gridRef.current.querySelector(`[data-date="${iso}"]`);
             if (!el) return;
             const container = gridRef.current;
@@ -410,20 +547,19 @@ export default function QuarterView({
                     for (let wIdx = 0; wIdx < maxWeeks - 1; wIdx++) {
                         for (let mIdx = 0; mIdx < monthColRefs.current.length; mIdx++) {
                             const el = weekBlockRefs.current[mIdx]?.[wIdx];
-                            const colRect = colRects[mIdx];
-                            if (!el || !colRect) continue;
+                            if (!el) continue;
 
                             const r = el.getBoundingClientRect();
                             const top = r.bottom - rect.top + container.scrollTop;
-                            const left = colRect.left - rect.left + container.scrollLeft;
-                            const right = colRect.right - rect.left + container.scrollLeft;
+                            const left = r.left - rect.left + container.scrollLeft;
+                            const right = r.right - rect.left + container.scrollLeft;
 
                             lines.push({ top, left, right });
                         }
                     }
 
                     setWeekSeparators(lines);
-                    setWeekVerticalDividers(verticalDividers);
+                    setWeekVerticalDividers([]);
                 } catch (_) {}
             });
         };
@@ -482,6 +618,18 @@ export default function QuarterView({
             document.removeEventListener("keydown", onKey);
         };
     }, []);
+
+    useEffect(() => {
+        const onDocMouseDown = (e) => {
+            try {
+                const inDateSlot = e.target?.closest?.('[data-qv-date-slot="true"]');
+                if (inDateSlot) return;
+            } catch (_) {}
+            setSelectedDateIso(null);
+        };
+        document.addEventListener("mousedown", onDocMouseDown);
+        return () => document.removeEventListener("mousedown", onDocMouseDown);
+    }, []);
     return (
         <>
             <style>{`
@@ -531,7 +679,7 @@ export default function QuarterView({
             <div className="h-full min-h-0 flex flex-col">
                 {/* Quarter navigation inside view */}
                 <CalendarViewTopSection elephantTaskRow={elephantTaskRow} elephantTopGapClass="mt-1" showElephantSeparator={false}>
-                <div className="day-header-controls flex items-center justify-between bg-white flex-shrink-0 min-h-[34px]">
+                <div className="day-header-controls relative z-[400] flex items-center justify-between min-h-[34px]">
                     <div className="flex items-center gap-2">
                         {/* Back first, then View dropdown */}
                         <button
@@ -564,7 +712,7 @@ export default function QuarterView({
                             Today
                         </button>
                     </div>
-                    <span className="text-lg font-semibold text-blue-700">{quarterLabel}</span>
+                    <span className="text-lg font-semibold">{quarterLabel}</span>
                     <div className="flex items-center gap-2">
                         <div className="relative" ref={slotMenuRef}>
                             <button
@@ -589,7 +737,7 @@ export default function QuarterView({
                             {showSlotMenu && (
                                 <div
                                     role="menu"
-                                    className="absolute left-0 z-50 mt-2 w-28 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden"
+                                    className="absolute left-0 z-[450] mt-2 w-28 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden"
                                 >
                                     {[15, 30].map((size) => (
                                         <button
@@ -632,7 +780,7 @@ export default function QuarterView({
                             {showViewMenu && (
                                 <div
                                     role="menu"
-                                    className="absolute right-0 z-50 mt-2 w-40 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden"
+                                    className="absolute right-0 z-[450] mt-2 w-40 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden"
                                 >
                                     {["day", "week", "month", "quarter"].map((v) => (
                                         <button
@@ -654,47 +802,38 @@ export default function QuarterView({
                     </div>
                 </div>
                 </CalendarViewTopSection>
-                <div className="relative grid grid-cols-3 gap-6 flex-shrink-0 bg-white border-b border-blue-100 mt-1">
-                    {monthLongNames.map((monthName, idx) => (
-                        <div key={`month-header-${idx}`} className="text-left px-2 py-2 text-blue-500 text-base font-semibold bg-white min-w-0">
-                            {monthName}
-                        </div>
-                    ))}
-                </div>
-                {/* Calendar grid: three independent month columns */}
-                <div
-                    className="qv-scroll-wrap relative flex-1 min-h-0"
-                    style={{ maxWidth: "100%", maxHeight: "100%", overflow: "hidden" }}
-                >
-                <div
-                    ref={gridRef}
-                    className="qv-vscroll relative h-full min-h-0"
-                    style={{ maxHeight: "100%" }}
-                >
-                <div className="relative grid grid-cols-3 gap-6 min-w-full pb-6">
-                    {weekSeparators.length > 0 && (
-                        <div className="pointer-events-none absolute left-0 right-0 top-0">
-                            {weekSeparators.map((line, idx) => (
-                                <div
-                                    key={`wk-line-${idx}`}
-                                    style={{ top: line.top, left: line.left, width: Math.max(0, line.right - line.left) }}
-                                    className="absolute h-[2px] bg-blue-300"
-                                />
-                            ))}
-                        </div>
-                    )}
-                    {weekVerticalDividers.length > 0 && (
-                        <div className="pointer-events-none absolute left-0 right-0 top-0">
-                            {weekVerticalDividers.map((line, idx) => (
-                                <div
-                                    key={`wk-vline-${idx}`}
-                                    style={{ left: line.left, top: line.top, height: line.height }}
-                                    className="absolute w-px bg-slate-200/60"
-                                />
-                            ))}
-                        </div>
-                    )}
+                <div className="overflow-hidden bg-white flex-1 min-h-0 mt-1">
+                <div ref={shellRef} className="relative mv-shell bg-white border border-transparent rounded-lg shadow-sm p-0 overflow-hidden h-full min-h-0 flex flex-col">
+                    <div
+                        aria-hidden="true"
+                        className="pointer-events-none absolute inset-0 rounded-lg z-[305]"
+                        style={{ boxShadow: `inset 0 0 0 1px ${OUTER_CARD_LINE}` }}
+                    />
+                    <div className="relative grid grid-cols-3 gap-4 flex-shrink-0">
+                        {monthLongNames.map((monthName, idx) => (
+                            <div
+                                key={`month-header-${idx}`}
+                                className="text-center px-3 py-1 text-blue-500 text-xs font-semibold bg-slate-100/80 border-b border-slate-300 min-w-0"
+                            >
+                                {monthName}
+                            </div>
+                        ))}
+                    </div>
+                    {/* Calendar grid: three independent month columns */}
+                    <div
+                        className="qv-scroll-wrap relative flex-1 min-h-0"
+                        style={{ maxWidth: "100%", maxHeight: "100%", overflow: "hidden" }}
+                    >
+                    <div
+                        ref={gridRef}
+                        className="qv-vscroll relative h-full min-h-0"
+                        style={{ maxHeight: "100%" }}
+                    >
+                    <div className="relative grid grid-cols-3 gap-4 min-w-full pb-6">
+                    {weekSeparators.length > 0 && null}
+                    {weekVerticalDividers.length > 0 && null}
                     {months.map((monthDate, mIdx) => {
+                        const monthLastDate = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
                         const monthWeeks = weeks
                             .map((w) => {
                                 const days = w.days.filter(
@@ -709,108 +848,198 @@ export default function QuarterView({
 
                         return (
                             <div key={mIdx} ref={(el) => setMonthColRef(mIdx, el)} className="min-w-0">
-                                <table className="w-full" style={{ tableLayout: 'fixed' }}>
+                                <table
+                                    className="w-full border-x border-slate-300"
+                                    style={{ tableLayout: 'fixed', borderCollapse: "separate", borderSpacing: 0 }}
+                                >
+                                    <colgroup>
+                                        <col style={{ width: 76 }} />
+                                        <col />
+                                    </colgroup>
                                     {monthWeeks.map((week, wIdx) => {
                                     const weekTbody = (
                                         <tbody
                                             key={`week-${wIdx}`}
                                             ref={(el) => setWeekBlockRef(mIdx, wIdx, el)}
-                                            className="bg-white border border-blue-200 my-1"
+                                            className="bg-white border border-slate-300 my-1"
                                         >
                                             {week.days.map((date, dayIdx) => {
-                                                const iso = date.toISOString().slice(0, 10);
+                                                const iso = toLocalIsoDate(date);
                                                 const isSelectedDate = selectedDateIso === iso;
                                                 const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+                                                const isToday =
+                                                    date.getDate() === today.getDate() &&
+                                                    date.getMonth() === today.getMonth() &&
+                                                    date.getFullYear() === today.getFullYear();
+                                                const weekdayLabel = new Intl.DateTimeFormat(undefined, {
+                                                    weekday: "short",
+                                                }).format(date);
                                                 const showWeekNum = dayIndexMonday(date) === 0; // show only on Monday
-                                                const rowBorderClass = dayIdx < week.days.length - 1 ? "border-b border-blue-100" : "";
+                                                const rowBorderClass = dayIdx < week.days.length - 1 ? "border-b border-slate-300" : "";
+                                                const isWeekStartRow = date.getDay() === 1; // Monday only
+                                                const isMonthEnd = date.getDate() === monthLastDate;
+                                                const isMonthEndSunday =
+                                                    isMonthEnd && date.getDay() === 0;
+                                                const isMonthEndMidWeek =
+                                                    isMonthEnd && date.getDay() !== 0;
                                                 return (
-                                                    <tr ref={(el) => setRowRef(mIdx, wIdx, dayIdx, el)} key={dayIdx} className="bg-white">
+                                                    <tr
+                                                        ref={(el) => setRowRef(mIdx, wIdx, dayIdx, el)}
+                                                        key={dayIdx}
+                                                        className="bg-white"
+                                                    >
                                                         <td
-                                                            className={`px-3 py-3 text-left align-top ${rowBorderClass} ${isSelectedDate ? "bg-blue-50/70" : ""}`}
+                                                            className={`px-2 py-0 text-sm font-semibold text-left ${(isWeekend ? 'text-red-500' : 'text-gray-700')} ${isToday ? 'text-blue-600' : ''}`}
                                                             data-date={iso}
                                                             style={{
-                                                                minWidth: 80,
+                                                                width: 76,
+                                                                minWidth: 76,
+                                                                maxWidth: 76,
                                                                 position: 'relative',
-                                                                boxShadow: isSelectedDate ? "inset 0 0 0 2px rgba(59, 130, 246, 0.35)" : undefined,
-                                                                cursor: typeof onQuickCreate === "function" ? "pointer" : undefined,
+                                                                borderTop: isWeekStartRow ? "2px solid rgb(100, 116, 139)" : "none",
+                                                                borderBottom: isMonthEndSunday
+                                                                    ? "2px solid rgb(100, 116, 139)"
+                                                                    : "1px solid rgba(148, 163, 184, 0.3)",
+                                                                borderRight: "1px solid rgb(148, 163, 184)",
+                                                                backgroundColor: isSelectedDate
+                                                                    ? "rgba(191, 219, 254, 0.65)"
+                                                                    : (isToday ? "rgba(59, 130, 246, 0.1)" : (isWeekend ? "rgb(241, 245, 249)" : "white")),
+                                                                display: "flex",
+                                                                alignItems: "center",
+                                                                boxSizing: "border-box",
+                                                                height: 30,
                                                             }}
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setSelectedDateIso(iso);
+                                                        >
+                                                            <div
+                                                                data-qv-date-slot="true"
+                                                                className="flex items-center gap-1 text-[12px] font-semibold w-full whitespace-nowrap pr-2 cursor-pointer"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setSelectedDateIso(iso);
+                                                                }}
+                                                                onDoubleClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    if (typeof onChangeView === "function") {
+                                                                        onChangeView("day", { date: new Date(date) });
+                                                                    } else if (typeof onSetDate === "function") {
+                                                                        onSetDate(new Date(date));
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <span className="min-w-0">{`${weekdayLabel} ${date.getDate()}`}</span>
+                                                                {showWeekNum && week.weekNum ? (
+                                                                    <sup className="text-[9px] text-slate-500 shrink-0 align-super">
+                                                                        {week.weekNum}
+                                                                    </sup>
+                                                                ) : null}
+                                                            </div>
+                                                        </td>
+                                                        <td
+                                                            className={`group px-0 py-0 align-top relative ${rowBorderClass}`}
+                                                            style={{
+                                                                position: "relative",
+                                                                minWidth: 0,
+                                                                borderTop: isWeekStartRow ? "2px solid rgb(100, 116, 139)" : undefined,
+                                                                borderBottom: isMonthEndSunday
+                                                                    ? "2px solid rgb(100, 116, 139)"
+                                                                    : (isMonthEndMidWeek ? "1px solid rgba(148, 163, 184, 0.3)" : undefined),
+                                                                backgroundColor: hoveredRowIso === iso ? "rgba(191, 219, 254, 0.65)" : undefined,
+                                                            }}
+                                                            onMouseMove={(e) => {
+                                                                const overBlocked = Boolean(
+                                                                    e.target?.closest?.('[data-qv-event-bar="true"], [data-qv-plus-trigger="true"]')
+                                                                );
+                                                                if (overBlocked) {
+                                                                    setHoveredRowIso((curr) => (curr === iso ? null : curr));
+                                                                    return;
+                                                                }
+                                                                setHoveredRowIso(iso);
+                                                            }}
+                                                            onMouseLeave={() => {
+                                                                setHoveredRowIso((curr) => (curr === iso ? null : curr));
                                                             }}
                                                             onDoubleClick={(e) => {
                                                                 e.stopPropagation();
+                                                                if (e.target?.closest?.('[data-qv-event-bar="true"], [data-qv-plus-trigger="true"]')) return;
                                                                 if (typeof onQuickCreate !== "function") return;
                                                                 const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
                                                                 onQuickCreate(dayStart, { allDay: true });
                                                             }}
                                                         >
-                                                            <div className={`text-sm font-semibold flex items-center justify-between ${isWeekend ? 'text-red-500' : 'text-gray-700'}`}>
-                                                                <div className="flex flex-col w-20 pr-2">
-                                                                    {showWeekNum && week.weekNum && (
-                                                                        <span className="text-[10px] text-gray-500 leading-none self-end mr-2 mb-0.5 px-1 rounded bg-white">
-                                                                            {week.weekNum}
-                                                                        </span>
-                                                                    )}
-                                                                    <div className="flex items-center gap-0.5">
-                                                                        <span className="w-8 inline-block">{formatDate(date, { includeWeekday: true }).split(',')[0]}</span>
-                                                                        <span className="">{date.getDate()}</span>
-                                                                    </div>
-                                                                </div>
-                                                                {(() => {
-                                                                    const dayEvents = (events || []).filter((ev) =>
-                                                                        overlapsDayByCalendarDate(ev.start, ev.end, date) &&
-                                                                        String(ev?.kind || '').toLowerCase() !== 'appointment' &&
-                                                                        !ev?.taskId &&
-                                                                        !ev?.task_id
-                                                                    );
+                                                            {(() => {
+                                                                    const dayEvents = (events || []).reduce((acc, ev, evIdx) => {
+                                                                        if (String(ev?.kind || '').toLowerCase() === 'appointment') return acc;
+                                                                        if (ev?.taskId || ev?.task_id) return acc;
+                                                                        const eventKey = getEventKey(ev, evIdx);
+                                                                        const previewSpan = allDaySpanPreview[eventKey];
+                                                                        const inDay = previewSpan
+                                                                            ? overlapsDayByCalendarDate(previewSpan.start, previewSpan.end, date)
+                                                                            : overlapsDayByCalendarDate(ev.start, ev.end, date);
+                                                                        if (!inDay) return acc;
+                                                                        acc.push({ ev, eventKey });
+                                                                        return acc;
+                                                                    }, []);
                                                                     const dayAppointments = (events || []).filter((ev) =>
                                                                         overlapsDayByCalendarDate(ev.start, ev.end, date) &&
                                                                         String(ev?.kind || '').toLowerCase() === 'appointment'
                                                                     );
-                                                                    // For quarter view we don't render chips inline. Instead show a '+' icon
-                                                                    // to the right which opens a popup listing appointments for the date.
-                                                                    if (dayEvents.length === 0 && dayAppointments.length === 0) return null;
+                                                                    // For quarter view we render all-day bars inline and keep a
+                                                                    // dedicated right lane for the appointments '+' action.
                                                                     const dayEventsSorted = [...dayEvents].sort((a, b) => {
                                                                         try {
-                                                                            const as = new Date(a.start || a.startDate || a.start_at || 0).getTime();
-                                                                            const bs = new Date(b.start || b.startDate || b.start_at || 0).getTime();
+                                                                            const as = new Date(a.ev?.start || a.ev?.startDate || a.ev?.start_at || 0).getTime();
+                                                                            const bs = new Date(b.ev?.start || b.ev?.startDate || b.ev?.start_at || 0).getTime();
                                                                             if (as !== bs) return as - bs;
-                                                                            const ac = new Date(a.createdAt || a.created_at || 0).getTime();
-                                                                            const bc = new Date(b.createdAt || b.created_at || 0).getTime();
+                                                                            const ac = new Date(a.ev?.createdAt || a.ev?.created_at || 0).getTime();
+                                                                            const bc = new Date(b.ev?.createdAt || b.ev?.created_at || 0).getTime();
                                                                             if (!Number.isNaN(ac) && !Number.isNaN(bc) && ac !== bc) return ac - bc;
                                                                         } catch (_) {}
-                                                                        return String(a?.title || '').localeCompare(String(b?.title || ''));
+                                                                        return String(a.ev?.title || '').localeCompare(String(b.ev?.title || ''));
                                                                     });
                                                                     const dayOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
                                                                     const isPopupOpen = popup && popup.iso === iso;
-                                                                    const dayEventsWithLane = dayEventsSorted.map((ev, idx) => ({
-                                                                        ev,
-                                                                        lane: quarterEventLanes.laneByKey.get(getEventKey(ev, idx)) ?? 0,
+                                                                    const dayEventsWithLane = dayEventsSorted.map((item, idx) => ({
+                                                                        ev: item.ev,
+                                                                        eventKey: item.eventKey || getEventKey(item.ev, idx),
+                                                                        lane: quarterEventLanes.laneByKey.get(item.eventKey || getEventKey(item.ev, idx)) ?? 0,
                                                                     }));
                                                                     const visibleEvents = dayEventsWithLane
                                                                         .sort((a, b) => a.lane - b.lane);
                                                                     // Keep lane columns stable across the quarter so bars
-                                                                    // do not expand/shift when adjacent events end.
+                                                                    // remain straight vertically and don't shift when
+                                                                    // neighboring events start/end on nearby dates.
                                                                     const laneCount = Math.max(1, quarterEventLanes.maxLaneCount || 1);
-                                                                    const ACTION_GUTTER_WIDTH = 22;
+                                                                    const ACTION_GUTTER_WIDTH = 8;
                                                                     return (
                                                                         <div
-                                                                            className="ml-2 flex items-center"
-                                                                            style={{ position: 'absolute', left: 76, right: 8, top: -1, bottom: -1, zIndex: isPopupOpen ? 2000 : 20 }}
+                                                                            className="flex items-center"
+                                                                            style={{
+                                                                                position: 'absolute',
+                                                                                left: 2,
+                                                                                right: 8,
+                                                                                top: -1,
+                                                                                bottom: -1,
+                                                                                zIndex: isPopupOpen ? 2000 : 20,
+                                                                                backgroundColor: "transparent",
+                                                                                borderRadius: 4,
+                                                                            }}
                                                                         >
                                                                             <div
                                                                                 style={{
                                                                                     position: 'absolute',
                                                                                     left: 0,
-                                                                                    right: `${ACTION_GUTTER_WIDTH}px`,
+                                                                                    right: ACTION_GUTTER_WIDTH > 0 ? `${ACTION_GUTTER_WIDTH}px` : 0,
                                                                                     top: 0,
                                                                                     bottom: 0,
                                                                                     overflow: 'hidden',
                                                                                 }}
                                                                             >
-                                                                                {visibleEvents.map(({ ev, lane }, idx) => {
-                                                                                    const span = eventSpanByDate(ev);
+                                                                                {visibleEvents.map(({ ev, lane, eventKey }, idx) => {
+                                                                                    const rawSpan = eventSpanByDate(ev);
+                                                                                    const previewSpan = allDaySpanPreview[eventKey];
+                                                                                    const span = previewSpan
+                                                                                        ? { start: previewSpan.start, end: previewSpan.end }
+                                                                                        : rawSpan;
                                                                                     const startsHere = span ? sameDateOnly(span.start, dayOnly) : false;
                                                                                     const endsHere = span ? sameDateOnly(span.end, dayOnly) : false;
                                                                                     const colIndex = Math.max(0, Math.min(laneCount - 1, Number(lane) || 0));
@@ -827,17 +1056,44 @@ export default function QuarterView({
                                                                                     const kaColor = ka?.color || null;
                                                                                     const finalBg = bgClass ? null : (kaColor || DEFAULT_BAR_COLOR);
                                                                                     const textColor = finalBg ? getContrastTextColor(finalBg) : '#ffffff';
+                                                                                    const rowHeight = rowRefs.current?.[mIdx]?.[wIdx]?.[dayIdx]?.getBoundingClientRect?.().height || 32;
+                                                                                    const hasOverlapInOwnSpan = (() => {
+                                                                                        if (!span?.start || !span?.end) return false;
+                                                                                        const thisStart = span.start.getTime();
+                                                                                        const thisEnd = span.end.getTime();
+                                                                                        const source = Array.isArray(events) ? events : [];
+                                                                                        for (let i = 0; i < source.length; i += 1) {
+                                                                                            const other = source[i];
+                                                                                            if (String(other?.kind || '').toLowerCase() === 'appointment') continue;
+                                                                                            if (other?.taskId || other?.task_id) continue;
+                                                                                            const otherKey = getEventKey(other, i);
+                                                                                            if (otherKey === eventKey) continue;
+                                                                                            const otherPreview = allDaySpanPreview[otherKey];
+                                                                                            const otherSpan = otherPreview
+                                                                                                ? { start: otherPreview.start, end: otherPreview.end }
+                                                                                                : eventSpanByDate(other);
+                                                                                            if (!otherSpan?.start || !otherSpan?.end) continue;
+                                                                                            const otherStart = otherSpan.start.getTime();
+                                                                                            const otherEnd = otherSpan.end.getTime();
+                                                                                            if (otherStart <= thisEnd && otherEnd >= thisStart) return true;
+                                                                                        }
+                                                                                        return false;
+                                                                                    })();
+                                                                                    const useFullWidthSingle =
+                                                                                        visibleEvents.length === 1 &&
+                                                                                        !hasOverlapInOwnSpan;
                                                                                     return (
                                                                                         <button
                                                                                             key={`qv-ev-${iso}-${ev.id || idx}`}
+                                                                                            data-qv-event-bar="true"
                                                                                             type="button"
                                                                                             className={`group text-left px-2 text-[12px] font-medium text-white ${bgClass || ''}`}
                                                                                             style={{
                                                                                                 position: 'absolute',
                                                                                                 top: 0,
                                                                                                 bottom: 0,
-                                                                                                left: `calc(${(colIndex * 100) / laneCount}% + 1px)`,
-                                                                                                width: `calc(${100 / laneCount}% - 2px)`,
+                                                                                                left: useFullWidthSingle ? 0 : `calc(${(colIndex * 100) / laneCount}% + 1px)`,
+                                                                                                width: useFullWidthSingle ? '100%' : `calc(${100 / laneCount}% - 2px)`,
                                                                                                 ...(finalBg ? { backgroundColor: finalBg, border: `1px solid ${finalBg}`, color: textColor } : {}),
                                                                                                 borderRadius: startsHere && endsHere ? 6 : startsHere ? '6px 6px 0 0' : endsHere ? '0 0 6px 6px' : 0,
                                                                                                 boxShadow: '0 0 0 1px rgba(0,0,0,0.03)',
@@ -845,10 +1101,45 @@ export default function QuarterView({
                                                                                             }}
                                                                                             onClick={(e) => {
                                                                                                 e.stopPropagation();
+                                                                                                if (Date.now() - (lastAllDayResizeAtRef.current || 0) < 350) return;
                                                                                                 if (onEventClick) onEventClick(ev);
                                                                                             }}
                                                                                             title={ev.title || '(event)'}
                                                                                         >
+                                                                                            {startsHere && (
+                                                                                                <div
+                                                                                                    role="separator"
+                                                                                                    aria-orientation="horizontal"
+                                                                                                    onPointerDown={(e) => startAllDayEdgeDrag(e, "top", {
+                                                                                                        eventKey,
+                                                                                                        eventId: ev?.id || null,
+                                                                                                        originalStart: span?.start || rawSpan?.start || dayOnly,
+                                                                                                        originalEnd: span?.end || rawSpan?.end || dayOnly,
+                                                                                                        startRaw: ev?.start || ev?.startDate || ev?.start_at || null,
+                                                                                                        endRaw: ev?.end || ev?.endDate || ev?.end_at || null,
+                                                                                                        rowHeight,
+                                                                                                    })}
+                                                                                                    className="absolute left-0 right-0 h-2 -top-1 cursor-ns-resize"
+                                                                                                    style={{ zIndex: 30 }}
+                                                                                                />
+                                                                                            )}
+                                                                                            {endsHere && (
+                                                                                                <div
+                                                                                                    role="separator"
+                                                                                                    aria-orientation="horizontal"
+                                                                                                    onPointerDown={(e) => startAllDayEdgeDrag(e, "bottom", {
+                                                                                                        eventKey,
+                                                                                                        eventId: ev?.id || null,
+                                                                                                        originalStart: span?.start || rawSpan?.start || dayOnly,
+                                                                                                        originalEnd: span?.end || rawSpan?.end || dayOnly,
+                                                                                                        startRaw: ev?.start || ev?.startDate || ev?.start_at || null,
+                                                                                                        endRaw: ev?.end || ev?.endDate || ev?.end_at || null,
+                                                                                                        rowHeight,
+                                                                                                    })}
+                                                                                                    className="absolute left-0 right-0 h-2 -bottom-1 cursor-ns-resize"
+                                                                                                    style={{ zIndex: 30 }}
+                                                                                                />
+                                                                                            )}
                                                                                             <div className="w-full h-full flex items-center justify-between gap-2">
                                                                                                 <span className="truncate">{startsHere ? (ev.title || '(event)') : ''}</span>
                                                                                                 {startsHere && (
@@ -889,8 +1180,16 @@ export default function QuarterView({
                                                                             >
                                                                                 {dayAppointments.length > 0 && (
                                                                                     <button
+                                                                                        data-qv-plus-trigger="true"
                                                                                         aria-label={`Show appointments for ${iso}`}
-                                                                                        className="inline-flex items-center justify-center px-1 text-base leading-none text-sky-600 hover:text-sky-700"
+                                                                                        title={`Show appointments for ${iso}`}
+                                                                                        className="inline-flex items-center justify-center w-4 h-4 rounded text-base leading-none text-sky-600 hover:text-sky-700 hover:bg-sky-100 transition-colors focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0"
+                                                                                        onMouseDown={(e) => {
+                                                                                            e.preventDefault();
+                                                                                        }}
+                                                                                        onFocus={(e) => {
+                                                                                            e.currentTarget.blur();
+                                                                                        }}
                                                                                         onClick={(e) => {
                                                                                             e.stopPropagation();
                                                                                             setPopup((curr) =>
@@ -919,7 +1218,6 @@ export default function QuarterView({
                                                                                     <div className="max-h-64 overflow-auto">
                                                                                         {popup.appointments && popup.appointments.length > 0 && (
                                                                                             <div className="mb-2">
-                                                                                                <div className="text-xs text-gray-500 mb-1">Appointments</div>
                                                                                                 {popup.appointments.map((ev) => {
                                                                                                     const title = ev.title || '(event)';
                                                                                                     return (
@@ -980,7 +1278,6 @@ export default function QuarterView({
                                                                         </div>
                                                                     );
                                                                 })()}
-                                                            </div>
                                                         </td>
                                                     </tr>
                                                 );
@@ -993,7 +1290,9 @@ export default function QuarterView({
                             </div>
                         );
                     })}
-                </div>
+                    </div>
+                    </div>
+                    </div>
                 </div>
                 </div>
             </div>
