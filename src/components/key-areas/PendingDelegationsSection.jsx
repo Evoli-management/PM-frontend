@@ -388,6 +388,10 @@ export default function PendingDelegationsSection({
                     const maxIdx = namedKeys.length ? Math.max(...namedKeys) : 1;
                     const lists = Array.from({ length: maxIdx }, (_, i) => i + 1);
                     setAvailableLists(lists);
+                    // Auto-select if only one list available
+                    if (lists.length === 1) {
+                      setSelectedListIndex(String(lists[0]));
+                    }
                     if (acceptingItem?.type === 'activity' && acceptMode === 'add-to-task') {
                       loadTasksForKeyArea(opt?.value || '');
                     }
