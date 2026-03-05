@@ -1450,7 +1450,7 @@ const CalendarContainer = () => {
     };
 
     // Move event (drag existing event into a new slot)
-    const handleEventMove = async (eventId, newStartDate, newEndDate) => {
+    const handleEventMove = async (eventId, newStartDate, newEndDate, options = {}) => {
         try {
             // Determine end time: use provided newEndDate (resize) or default 30 minutes (move)
             const targetEnd = newEndDate ? newEndDate : new Date(newStartDate.getTime() + 30 * 60 * 1000);
@@ -1479,6 +1479,7 @@ const CalendarContainer = () => {
             };
 
             const payload = { start: toOffsetISO(newStartDate), end: toOffsetISO(targetEnd), timezone: tz };
+            if (options && options.allDay === true) payload.allDay = true;
             // Decide endpoint based on event kind in current state
             const current = events.find((e) => e.id === eventId);
 
@@ -1616,11 +1617,23 @@ const CalendarContainer = () => {
         setCurrentDate(d);
     };
 
-    const handleChangeView = useCallback((nextView) => {
+    const handleChangeView = useCallback((nextView, options = {}) => {
         if (!VIEWS.includes(nextView)) return;
         if (nextView === view) return;
         setView(nextView);
-        setCurrentDate(new Date());
+        if (options?.date) {
+            const d = new Date(options.date);
+            if (!Number.isNaN(d.getTime())) {
+                setCurrentDate(d);
+                return;
+            }
+        }
+        // Keep the current anchor date when no explicit target date is provided.
+        // This avoids jump-to-today flashes when child views report their active view on mount.
+        setCurrentDate((prev) => {
+            const d = prev ? new Date(prev) : new Date();
+            return Number.isNaN(d.getTime()) ? new Date() : d;
+        });
     }, [view]);
 
     // Human-readable label for current range (day/week/month/quarter)
@@ -1769,6 +1782,7 @@ const CalendarContainer = () => {
                         onDayClick={(date) => openAddModal(date, { defaultTab: "task" })}
                         onQuickCreate={handleQuickCreate}
                         onEventClick={handleCalendarEventClick}
+                        onEventMove={handleEventMove}
                         onTaskClick={openEditTask}
                         slotSizeMinutes={slotSizeMinutes}
                         onToggleSlotSize={() => setSlotSizeMinutes((prev) => (prev === 15 ? 30 : 15))}
@@ -1803,6 +1817,7 @@ const CalendarContainer = () => {
                         onEventClick={(ev, action) => openModal(ev, action)}
                         onTaskClick={openEditTask}
                         onTaskDrop={handleTaskDrop}
+                        onEventMove={handleEventMove}
                         onQuickCreate={handleQuickCreate}
                         enableQuickCreate={true}
                         slotSizeMinutes={slotSizeMinutes}

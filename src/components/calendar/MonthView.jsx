@@ -19,6 +19,8 @@ function getRangeTaskKey(r) {
   );
 }
 
+const EVENT_BAR_VERTICAL_STRETCH = 2;
+
 // Memoized small renderers to avoid re-renders during MonthView updates
 const EventOverlayItem = React.memo(function EventOverlayItem({
   o,
@@ -318,6 +320,7 @@ export default function MonthView({
   onQuickCreate,
   enableQuickCreate = true,
   onTaskDrop,
+  onEventMove,
   slotSizeMinutes = 15,
   onToggleSlotSize,
   elephantTaskRow = null,
@@ -360,7 +363,7 @@ export default function MonthView({
   const DATE_COL_WIDTH = 76;
   const ALL_DAY_COL_WIDTH = 80;
   const ROW_HEIGHT = 30;
-  const HOUR_COL_WIDTH = 125;
+  const HOUR_COL_WIDTH = slotSizeMinutes === 15 ? 220 : 125;
   const rightTableMinWidth = Math.max(800, HOUR_SLOTS.length * HOUR_COL_WIDTH);
   const MONTH_HLINE = "rgba(148,163,184,0.3)";
   const inHourSeparatorStyle = useMemo(() => {
@@ -401,24 +404,6 @@ export default function MonthView({
     DEBUG = false;
   }
 
-  let PUBLIC_URL = "";
-  try {
-    PUBLIC_URL = (process && process.env && process.env.PUBLIC_URL) || "";
-  } catch (e) {}
-  try {
-    if (!PUBLIC_URL && import.meta && import.meta.env && import.meta.env.BASE_URL) {
-      PUBLIC_URL = import.meta.env.BASE_URL || "";
-    }
-  } catch (e) {}
-
-  const calendarSrc = (() => {
-    try {
-      const base = String(PUBLIC_URL || "").replace(/\/+$/g, "");
-      return base ? `${base}/calendar.png` : "/calendar.png";
-    } catch (e) {
-      return "/calendar.png";
-    }
-  })();
 
   const WORK_START = workingHours?.startTime
     ? parseInt(String(workingHours.startTime).split(":")[0], 10)
@@ -914,6 +899,10 @@ export default function MonthView({
 
   const [overlayMetrics, setOverlayMetrics] = useState({ colLeft: 0, colWidth: 0, rows: [] });
   const [eventOverlays, setEventOverlays] = useState([]);
+  const [allDayEdgeAdjust, setAllDayEdgeAdjust] = useState({});
+  const allDayEdgeAdjustRef = useRef({});
+  const allDayEdgeDragRef = useRef(null);
+  const lastAllDayResizeAtRef = useRef(0);
   const [highlightTodayPulse, setHighlightTodayPulse] = useState(0);
   const [rowOverlay, setRowOverlay] = useState(null);
   const hSyncLockRef = useRef(false);
@@ -979,6 +968,91 @@ export default function MonthView({
       }
     } catch (_) {}
   };
+
+  const startAllDayEdgeDrag = (e, runKey, edge, baseHeight, meta = null) => {
+    try {
+      e.stopPropagation();
+      e.preventDefault();
+    } catch (_) {}
+    const current = allDayEdgeAdjust[runKey] || { top: 0, bottom: 0 };
+    allDayEdgeDragRef.current = {
+      runKey,
+      edge,
+      startY: e.clientY || 0,
+      initTop: current.top || 0,
+      initBottom: current.bottom || 0,
+      baseHeight: Number(baseHeight) || 16,
+      meta,
+    };
+    try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch (_) {}
+  };
+
+  useEffect(() => {
+    allDayEdgeAdjustRef.current = allDayEdgeAdjust || {};
+  }, [allDayEdgeAdjust]);
+
+  useEffect(() => {
+    const onMove = (e) => {
+      const drag = allDayEdgeDragRef.current;
+      if (!drag) return;
+      const delta = (e.clientY || 0) - drag.startY;
+      let nextTop = drag.initTop;
+      let nextBottom = drag.initBottom;
+      if (drag.edge === "top") nextTop = drag.initTop + delta;
+      else nextBottom = drag.initBottom + delta;
+      if (drag.baseHeight + nextBottom - nextTop < 12) return;
+      setAllDayEdgeAdjust((prev) => ({ ...prev, [drag.runKey]: { top: nextTop, bottom: nextBottom } }));
+    };
+    const onUp = async () => {
+      const drag = allDayEdgeDragRef.current;
+      allDayEdgeDragRef.current = null;
+      if (!drag || !drag.meta) return;
+      lastAllDayResizeAtRef.current = Date.now();
+      try {
+        const adj = (allDayEdgeAdjustRef.current && allDayEdgeAdjustRef.current[drag.runKey]) || { top: 0, bottom: 0 };
+        const deltaStartDays = Math.round((adj.top || 0) / Math.max(1, ROW_HEIGHT));
+        const deltaEndDays = Math.round((adj.bottom || 0) / Math.max(1, ROW_HEIGHT));
+        const maxIdx = Math.max(0, daysInMonth - 1);
+        let nextStartIdx = Math.max(0, Math.min(maxIdx, drag.meta.startIdx + deltaStartDays));
+        let nextEndIdx = Math.max(0, Math.min(maxIdx, drag.meta.endIdx + deltaEndDays));
+        if (nextEndIdx < nextStartIdx) nextEndIdx = nextStartIdx;
+
+        const buildLocalDate = (idx, endOfDay = false, fallbackIso = null) => {
+          const base = new Date(year, month, idx + 1, endOfDay ? 23 : 0, endOfDay ? 59 : 0, endOfDay ? 59 : 0, endOfDay ? 999 : 0);
+          if (!fallbackIso) return base;
+          const f = new Date(fallbackIso);
+          if (Number.isNaN(f.getTime())) return base;
+          if (endOfDay) return base;
+          base.setHours(f.getHours(), f.getMinutes(), f.getSeconds(), f.getMilliseconds());
+          return base;
+        };
+
+        const nextStart = buildLocalDate(nextStartIdx, false, drag.meta.startRaw);
+        const nextEnd = buildLocalDate(nextEndIdx, true, drag.meta.endRaw || drag.meta.startRaw);
+
+        if (typeof onEventMove === "function" && drag.meta.eventId) {
+          await onEventMove(drag.meta.eventId, nextStart, nextEnd, { allDay: true, source: "month-all-day-stretch" });
+        }
+      } catch (_) {
+        // keep UI responsive even if save fails
+      } finally {
+        setAllDayEdgeAdjust((prev) => {
+          if (!prev || !Object.prototype.hasOwnProperty.call(prev, drag.runKey)) return prev;
+          const next = { ...prev };
+          delete next[drag.runKey];
+          return next;
+        });
+      }
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+  }, [daysInMonth, month, onEventMove, year, ROW_HEIGHT]);
 
   // All-day overlay metrics (left side)
   useLayoutEffect(() => {
@@ -1617,7 +1691,6 @@ export default function MonthView({
           </div>
 
           <h2 className="text-xl font-bold flex items-center gap-2">
-            <img src={calendarSrc} alt="Calendar" style={{ width: 18, height: 18 }} />
             {new Intl.DateTimeFormat(undefined, {
               month: "long",
               year: "numeric",
@@ -1734,7 +1807,7 @@ export default function MonthView({
           style={{
             left: `${DATE_COL_WIDTH}px`,
             top: 0,
-            bottom: 0,
+            bottom: `${BOTTOM_HSCROLL_HEIGHT}px`,
             width: "1px",
             backgroundColor: GRID_LINE_STRONG,
           }}
@@ -1745,7 +1818,7 @@ export default function MonthView({
           style={{
             left: `${DATE_COL_WIDTH + ALL_DAY_COL_WIDTH}px`,
             top: 0,
-            bottom: 0,
+            bottom: `${BOTTOM_HSCROLL_HEIGHT}px`,
             width: "1px",
             backgroundColor: GRID_LINE_SOFT,
             transform: "translateX(-0.5px)",
@@ -1890,7 +1963,7 @@ export default function MonthView({
                             {slotSizeMinutes === 30 ? (
                               <div className="relative w-full h-full">
                                 <span
-                                  className="absolute text-[11px] font-medium text-gray-400 whitespace-nowrap"
+                                  className="absolute text-[11px] font-semibold text-gray-500 whitespace-nowrap"
                                   style={{ left: "calc(0% - 1px)", top: "50%", transform: "translateY(-50%)" }}
                                 >
                                   {formatTime ? formatTime(h) : h}
@@ -1916,7 +1989,7 @@ export default function MonthView({
                                   return (
                                     <span
                                       key={`${h}-${min}`}
-                                      className="absolute text-[11px] font-medium text-gray-400 whitespace-nowrap"
+                                      className={`absolute text-[11px] whitespace-nowrap ${min === 0 ? "font-semibold text-gray-500" : "font-medium text-gray-400"}`}
                                       style={{ left: `calc(${leftLinePct} - 1px)`, top: "50%", transform: "translateY(-50%)" }}
                                     >
                                       {label}
@@ -2177,9 +2250,13 @@ export default function MonthView({
                     horizontalPadding + laneIndex * (barWidth + laneGap)
                   );
 
-                  const top = startRow.top + 2;
-                  const bottom = endRow.bottom - 2;
-                  const height = Math.max(16, bottom - top);
+                  const baseTop = Math.max(0, startRow.top + 2 - EVENT_BAR_VERTICAL_STRETCH);
+                  const baseBottom = endRow.bottom - 2 + EVENT_BAR_VERTICAL_STRETCH;
+                  const baseHeight = Math.max(16, baseBottom - baseTop);
+                  const runKey = `${run.item?.task?.id || "run"}-${run.startIdx}-${run.endIdx}-${run.lane}`;
+                  const edgeAdj = allDayEdgeAdjust[runKey] || { top: 0, bottom: 0 };
+                  const top = baseTop + (edgeAdj.top || 0);
+                  const height = Math.max(16, baseHeight + (edgeAdj.bottom || 0) - (edgeAdj.top || 0));
                   const { classForBgFinal, styleBg } = getAllDayStyle(run.item);
 
                   return (
@@ -2204,10 +2281,41 @@ export default function MonthView({
                       title={run.item?.task?.title}
                       onClick={(e) => {
                         e.stopPropagation();
+                        if (Date.now() - (lastAllDayResizeAtRef.current || 0) < 350) return;
                         if (typeof onEventClick === "function") onEventClick(run.item.task);
                         else if (typeof onTaskClick === "function") onTaskClick(run.item.task);
                       }}
                     >
+                      <div
+                        role="separator"
+                        aria-orientation="horizontal"
+                        onPointerDown={(e) =>
+                          startAllDayEdgeDrag(e, runKey, "top", baseHeight, {
+                            eventId: run.item?.task?.id || null,
+                            startIdx: run.startIdx,
+                            endIdx: run.endIdx,
+                            startRaw: run.item?.task?.start || run.item?.task?.startAt || run.item?.task?.start_at || run.item?.task?.startDate || run.item?.task?.start_date || null,
+                            endRaw: run.item?.task?.end || run.item?.task?.endAt || run.item?.task?.end_at || run.item?.task?.endDate || run.item?.task?.end_date || null,
+                          })
+                        }
+                        className="absolute left-0 right-0 h-2 -top-1 cursor-ns-resize"
+                        style={{ zIndex: 40 }}
+                      />
+                      <div
+                        role="separator"
+                        aria-orientation="horizontal"
+                        onPointerDown={(e) =>
+                          startAllDayEdgeDrag(e, runKey, "bottom", baseHeight, {
+                            eventId: run.item?.task?.id || null,
+                            startIdx: run.startIdx,
+                            endIdx: run.endIdx,
+                            startRaw: run.item?.task?.start || run.item?.task?.startAt || run.item?.task?.start_at || run.item?.task?.startDate || run.item?.task?.start_date || null,
+                            endRaw: run.item?.task?.end || run.item?.task?.endAt || run.item?.task?.end_at || run.item?.task?.endDate || run.item?.task?.end_date || null,
+                          })
+                        }
+                        className="absolute left-0 right-0 h-2 -bottom-1 cursor-ns-resize"
+                        style={{ zIndex: 40 }}
+                      />
                       <span className="truncate text-xs min-w-0 flex-1" style={{ pointerEvents: "none" }}>
                         {run.item?.task?.title}
                       </span>

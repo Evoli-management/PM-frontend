@@ -17,6 +17,12 @@ const defaultSlotSize = 30;
 const MIN_BOTTOM_PANEL_HEIGHT = 104;
 const DEFAULT_HOUR_HEIGHT_PX = 60;
 const DENSE_HOUR_HEIGHT_PX_15MIN = 96;
+// Match the rendered height of a 15-minute timed appointment block in week grid
+// (24px slot minus 1px top inset and 1px bottom inset = 22px).
+const ALL_DAY_BAR_HEIGHT_PX = Math.max(
+  16,
+  Math.round((DENSE_HOUR_HEIGHT_PX_15MIN * 15) / 60) - 4
+);
 
 const getSlotPixelHeight = (slotSizeMinutes) => {
   const safeMinutes = Math.max(1, Number(slotSizeMinutes) || defaultSlotSize);
@@ -195,9 +201,14 @@ const WeekView = ({
 
       const openAndFocus = () => {
         try {
+          const rect = summaryEl.getBoundingClientRect();
+          const menuWidth = 112;
+          const menuHeight = 96;
+          const left = Math.max(8, Math.min(Math.round(rect.right - menuWidth), window.innerWidth - menuWidth - 8));
+          const top = Math.max(8, Math.min(Math.round(rect.bottom + 4), window.innerHeight - menuHeight - 8));
+          detailsEl.style.setProperty("--week-actions-menu-left", `${left}px`);
+          detailsEl.style.setProperty("--week-actions-menu-top", `${top}px`);
           detailsEl.setAttribute("open", "");
-          const firstAction = detailsEl.querySelector("button");
-          if (firstAction) firstAction.focus();
         } catch (_) {}
       };
 
@@ -1218,8 +1229,8 @@ const WeekView = ({
                         {(() => {
                           try {
                             const dayMs = 24 * 60 * 60 * 1000;
-                            const BAR_TOP = 4;
-                            const BAR_HEIGHT = 24;
+                            const BAR_TOP = 1;
+                            const BAR_HEIGHT = ALL_DAY_BAR_HEIGHT_PX;
                             const BAR_GAP = 4;
                             const toUtcDaySerial = (d) =>
                               Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / dayMs;
@@ -1366,12 +1377,12 @@ const WeekView = ({
                             const laneCount = Math.max(1, laneEndByIndex.length);
                             const visibleLaneCount = Math.max(1, Math.min(2, laneCount));
                             const hasOverflowLanes = laneCount > 2;
-                            const overflowRowSpace = hasOverflowLanes ? 22 : 0;
+                            const overflowRowSpace = hasOverflowLanes ? 18 : 0;
                             const minHeight =
                               BAR_TOP +
                               visibleLaneCount * BAR_HEIGHT +
                               Math.max(0, visibleLaneCount - 1) * BAR_GAP +
-                              8 +
+                              2 +
                               overflowRowSpace;
                             const overflowTopPx =
                               BAR_TOP +
@@ -1508,7 +1519,7 @@ const WeekView = ({
                                             style={{ color: textColor, zIndex: 6, fontWeight: 700 }}
                                           />
                                         )}
-                                        <div className="truncate font-medium leading-[26px]">{t.title || t.name}</div>
+                                      <div className="truncate font-medium h-full flex items-center text-[11px] leading-none">{t.title || t.name}</div>
                                         <div
                                           className="flex items-center gap-1 absolute top-1/2 -translate-y-1/2 z-20"
                                           style={{ right: continuesRight ? "18px" : "4px" }}
@@ -2855,7 +2866,13 @@ const WeekView = ({
                                   >
                                     <FaEllipsisV className="w-3 h-3 text-slate-600" />
                                   </summary>
-                                  <div className="absolute right-0 top-6 z-20 w-28 rounded-md border border-slate-200 bg-white shadow-lg py-0.5">
+                                  <div
+                                    className="fixed z-[3000] w-28 rounded-md border border-slate-200 bg-white shadow-lg py-0.5"
+                                    style={{
+                                      left: "var(--week-actions-menu-left, 0px)",
+                                      top: "var(--week-actions-menu-top, 0px)",
+                                    }}
+                                  >
                                     {onTaskComplete && (
                                       <button
                                         onClick={(e) => {
@@ -2960,7 +2977,13 @@ const WeekView = ({
                                 >
                                   <FaEllipsisV className="w-3 h-3 text-slate-600" />
                                 </summary>
-                                <div className="absolute right-0 top-6 z-20 w-28 rounded-md border border-slate-200 bg-white shadow-lg py-0.5">
+                                <div
+                                  className="fixed z-[3000] w-28 rounded-md border border-slate-200 bg-white shadow-lg py-0.5"
+                                  style={{
+                                    left: "var(--week-actions-menu-left, 0px)",
+                                    top: "var(--week-actions-menu-top, 0px)",
+                                  }}
+                                >
                                   {onActivityComplete && (
                                     <button
                                       onClick={(e) => {
