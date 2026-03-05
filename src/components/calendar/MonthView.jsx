@@ -1741,13 +1741,14 @@ export default function MonthView({
         />
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute z-[420]"
+          className="pointer-events-none absolute z-[650]"
           style={{
             left: `${DATE_COL_WIDTH + ALL_DAY_COL_WIDTH}px`,
             top: 0,
             bottom: 0,
             width: "1px",
-            backgroundColor: GRID_LINE_STRONG,
+            backgroundColor: GRID_LINE_SOFT,
+            transform: "translateX(-0.5px)",
           }}
         />
         {/* Fixed header row (outside vertical scroll) */}
@@ -1770,6 +1771,7 @@ export default function MonthView({
                 tableLayout: "fixed",
                 backgroundColor: "white",
                 borderColor: GRID_LINE_STRONG,
+                borderRight: "none",
               }}
             >
               <thead>
@@ -1779,7 +1781,7 @@ export default function MonthView({
                     style={{
                       width: `${DATE_COL_WIDTH}px`,
                       borderRight: "none",
-                      borderBottom: `1px solid ${MONTH_HLINE}`,
+                      borderBottom: `0.5px solid ${MONTH_HLINE}`,
                       backgroundColor: "white",
                     }}
                   >
@@ -1791,7 +1793,7 @@ export default function MonthView({
                       width: `${ALL_DAY_COL_WIDTH}px`,
                       borderLeft: "none",
                       borderRight: "none",
-                      borderBottom: `1px solid ${MONTH_HLINE}`,
+                      borderBottom: `0.5px solid ${MONTH_HLINE}`,
                       backgroundColor: "white",
                     }}
                   >
@@ -1881,7 +1883,7 @@ export default function MonthView({
                               backgroundColor: slotIsWorking ? "white" : NON_WORK_BG,
                               borderLeft: idx === 0 ? "none" : `1px solid ${GRID_LINE_SOFT}`,
                               borderRight: "none",
-                              borderBottom: `1px solid ${MONTH_HLINE}`,
+                              borderBottom: `0.5px solid ${MONTH_HLINE}`,
                               ...inHourSeparatorStyle,
                             }}
                           >
@@ -1979,6 +1981,8 @@ export default function MonthView({
                 width: DATE_COL_WIDTH + ALL_DAY_COL_WIDTH,
                 tableLayout: "fixed",
                 borderColor: GRID_LINE_STRONG,
+                borderRight: "none",
+                borderTop: "none",
               }}
             >
               <thead style={{ display: "none" }}>
@@ -2396,6 +2400,7 @@ export default function MonthView({
                     minWidth: rightTableMinWidth,
                     tableLayout: "fixed",
                     borderColor: GRID_LINE_STRONG,
+                    borderTop: "none",
                   }}
                 >
                   <tbody>
