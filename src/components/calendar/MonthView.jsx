@@ -363,6 +363,26 @@ export default function MonthView({
   const HOUR_COL_WIDTH = 125;
   const rightTableMinWidth = Math.max(800, HOUR_SLOTS.length * HOUR_COL_WIDTH);
   const MONTH_HLINE = "rgba(148,163,184,0.3)";
+  const inHourSeparatorStyle = useMemo(() => {
+    if (slotSizeMinutes === 30) {
+      const c = "rgba(148,163,184,0.35)";
+      return {
+        backgroundImage: `linear-gradient(to right, transparent calc(50% - 0.5px), ${c} calc(50% - 0.5px), ${c} calc(50% + 0.5px), transparent calc(50% + 0.5px))`,
+      };
+    }
+    if (slotSizeMinutes === 15) {
+      const cSoft = "rgba(148,163,184,0.22)";
+      const cMid = "rgba(148,163,184,0.35)";
+      return {
+        backgroundImage: [
+          `linear-gradient(to right, transparent calc(25% - 0.5px), ${cSoft} calc(25% - 0.5px), ${cSoft} calc(25% + 0.5px), transparent calc(25% + 0.5px))`,
+          `linear-gradient(to right, transparent calc(50% - 0.5px), ${cMid} calc(50% - 0.5px), ${cMid} calc(50% + 0.5px), transparent calc(50% + 0.5px))`,
+          `linear-gradient(to right, transparent calc(75% - 0.5px), ${cSoft} calc(75% - 0.5px), ${cSoft} calc(75% + 0.5px), transparent calc(75% + 0.5px))`,
+        ].join(", "),
+      };
+    }
+    return {};
+  }, [slotSizeMinutes]);
 
   const BOTTOM_RADAR_HEIGHT = 0;
   const BOTTOM_HSCROLL_HEIGHT = 14;
@@ -1790,10 +1810,26 @@ export default function MonthView({
               className="mv-hide-scrollbar mv-hide-xscrollbar"
               style={{
                 background: "white",
-                overflowX: "auto",
+                overflowX: "hidden",
                 overflowY: "hidden",
                 width: "100%",
                 minWidth: 0,
+              }}
+              onWheel={(e) => {
+                try {
+                  const dx = Math.abs(e.deltaX) > 0 ? e.deltaX : (e.shiftKey ? e.deltaY : 0);
+                  if (!dx) return;
+                  const body = rightBodyScrollRef.current;
+                  if (!body) return;
+                  e.preventDefault();
+                  const nextLeft = Math.max(0, (body.scrollLeft || 0) + dx);
+                  body.scrollLeft = nextLeft;
+                  if (hSyncLockRef.current) return;
+                  hSyncLockRef.current = true;
+                  syncHorizontalPosition(nextLeft, "body");
+                } finally {
+                  hSyncLockRef.current = false;
+                }
               }}
             >
               <div
@@ -1839,16 +1875,38 @@ export default function MonthView({
                         return (
                           <th
                             key={`hour-header-${idx}`}
-                            className="text-center px-1 py-1 text-xs font-semibold text-gray-400 w-16"
+                            className={`text-center px-1 ${slotSizeMinutes === 30 ? "py-[12px]" : "py-1"} text-xs font-semibold text-gray-400 w-16`}
                             style={{
                               minWidth: 40,
                               backgroundColor: slotIsWorking ? "white" : NON_WORK_BG,
                               borderLeft: idx === 0 ? "none" : `1px solid ${GRID_LINE_SOFT}`,
                               borderRight: "none",
                               borderBottom: `1px solid ${MONTH_HLINE}`,
+                              ...inHourSeparatorStyle,
                             }}
                           >
-                            {showLabel ? (formatTime ? formatTime(h) : h) : ""}
+                            {slotSizeMinutes === 30 ? (
+                              <div className="relative w-full h-full">
+                                <span
+                                  className="absolute text-xs font-semibold text-gray-400 whitespace-nowrap"
+                                  style={{ left: "25%", top: "50%", transform: "translate(-50%, -50%)" }}
+                                >
+                                  {formatTime ? formatTime(h) : h}
+                                </span>
+                                <span
+                                  className="absolute text-xs font-semibold text-gray-400 whitespace-nowrap"
+                                  style={{ left: "75%", top: "50%", transform: "translate(-50%, -50%)" }}
+                                >
+                                  {(() => {
+                                    const hour = Number(String(h || "00:00").split(":")[0] || 0);
+                                    const half = `${String(hour).padStart(2, "0")}:30`;
+                                    return formatTime ? formatTime(half) : half;
+                                  })()}
+                                </span>
+                              </div>
+                            ) : (
+                              showLabel ? (formatTime ? formatTime(h) : h) : ""
+                            )}
                           </th>
                         );
                       })}
@@ -1966,7 +2024,7 @@ export default function MonthView({
                         style={{
                           width: `${DATE_COL_WIDTH}px`,
                           height: `${ROW_HEIGHT}px`,
-                          borderTop: `1px solid ${MONTH_HLINE}`,
+                          borderTop: "none",
                           borderBottom: `1px solid ${MONTH_HLINE}`,
                           borderRight: "none",
                           backgroundColor: isToday
@@ -1992,7 +2050,7 @@ export default function MonthView({
                         style={{
                           width: `${ALL_DAY_COL_WIDTH}px`,
                           height: `${ROW_HEIGHT}px`,
-                          borderTop: `1px solid ${MONTH_HLINE}`,
+                          borderTop: "none",
                           borderBottom: `1px solid ${MONTH_HLINE}`,
                           borderLeft: "none",
                           borderRight: "none",
@@ -2294,6 +2352,7 @@ export default function MonthView({
                 overflowX: "auto",
                 overflowY: "hidden",
                 marginBottom: 0,
+                marginTop: 0,
                 width: "100%",
                 minWidth: 0,
               }}
@@ -2367,11 +2426,12 @@ export default function MonthView({
                                   boxSizing: "border-box",
                                   borderLeft: hIdx === 0 ? "none" : `1px solid ${GRID_LINE_SOFT}`,
                                   borderRight: "none",
-                                  borderTop: `1px solid ${MONTH_HLINE}`,
+                                  borderTop: "none",
                                   borderBottom: `1px solid ${MONTH_HLINE}`,
                                   backgroundColor: (isWeekend || !isWorking)
                                     ? (isToday ? "rgba(59,130,246,0.12)" : NON_WORK_BG)
                                     : (isToday ? "rgba(59,130,246,0.10)" : "#ffffff"),
+                                  ...inHourSeparatorStyle,
                                   boxShadow:
                                     selectedSlot &&
                                     selectedSlot.type === "timed" &&
