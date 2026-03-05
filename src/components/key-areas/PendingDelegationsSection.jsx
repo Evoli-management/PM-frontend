@@ -381,12 +381,16 @@ export default function PendingDelegationsSection({
                     // Find selected key area object
                     const kaObj = keyAreas.find((ka) => String(ka.id) === String(opt?.value));
                     // Sync listNames from selected key area (like CreateTaskModal)
-                    if (kaObj && kaObj.listNames) {
-                      setListNames(kaObj.listNames);
-                      setAvailableLists(Object.keys(kaObj.listNames));
-                    } else {
-                      setListNames({});
-                      setAvailableLists([]);
+                    const names = (kaObj && kaObj.listNames) ? kaObj.listNames : {};
+                    setListNames(names);
+                    // Build available list indices: 1..max(named keys), always at least [1]
+                    const namedKeys = Object.keys(names).map(Number).filter((n) => n >= 1);
+                    const maxIdx = namedKeys.length ? Math.max(...namedKeys) : 1;
+                    const lists = Array.from({ length: maxIdx }, (_, i) => i + 1);
+                    setAvailableLists(lists);
+                    // Auto-select if only one list available
+                    if (lists.length === 1) {
+                      setSelectedListIndex(String(lists[0]));
                     }
                     if (acceptingItem?.type === 'activity' && acceptMode === 'add-to-task') {
                       loadTasksForKeyArea(opt?.value || '');
@@ -421,12 +425,12 @@ export default function PendingDelegationsSection({
                     setListError('');
                   }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-                  disabled={!selectedKeyArea || Object.keys(listNames).length === 0}
+                  disabled={!selectedKeyArea || availableLists.length === 0}
                 >
                   <option value="">-- Select a Task List --</option>
-                  {Object.keys(listNames).map((idx) => (
-                    <option key={idx} value={idx}>
-                      {listNames[idx] || `List ${idx}`}
+                  {availableLists.map((n) => (
+                    <option key={n} value={n}>
+                      {listNames[n] || `List ${n}`}
                     </option>
                   ))}
                 </select>
