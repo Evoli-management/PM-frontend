@@ -1875,7 +1875,7 @@ export default function MonthView({
                         return (
                           <th
                             key={`hour-header-${idx}`}
-                            className={`text-center px-1 ${slotSizeMinutes === 30 ? "py-[12px]" : "py-1"} text-xs font-semibold text-gray-400 w-16`}
+                            className={`text-center ${slotSizeMinutes === 30 || slotSizeMinutes === 15 ? "px-0 py-[12px]" : "px-1 py-1"} text-xs font-semibold text-gray-400 w-16`}
                             style={{
                               minWidth: 40,
                               backgroundColor: slotIsWorking ? "white" : NON_WORK_BG,
@@ -1888,14 +1888,14 @@ export default function MonthView({
                             {slotSizeMinutes === 30 ? (
                               <div className="relative w-full h-full">
                                 <span
-                                  className="absolute text-xs font-semibold text-gray-400 whitespace-nowrap"
-                                  style={{ left: "25%", top: "50%", transform: "translate(-50%, -50%)" }}
+                                  className="absolute text-[11px] font-medium text-gray-400 whitespace-nowrap"
+                                  style={{ left: "calc(0% - 1px)", top: "50%", transform: "translateY(-50%)" }}
                                 >
                                   {formatTime ? formatTime(h) : h}
                                 </span>
                                 <span
-                                  className="absolute text-xs font-semibold text-gray-400 whitespace-nowrap"
-                                  style={{ left: "75%", top: "50%", transform: "translate(-50%, -50%)" }}
+                                  className="absolute text-[11px] font-medium text-gray-400 whitespace-nowrap"
+                                  style={{ left: "calc(50% - 1px)", top: "50%", transform: "translateY(-50%)" }}
                                 >
                                   {(() => {
                                     const hour = Number(String(h || "00:00").split(":")[0] || 0);
@@ -1903,6 +1903,24 @@ export default function MonthView({
                                     return formatTime ? formatTime(half) : half;
                                   })()}
                                 </span>
+                              </div>
+                            ) : slotSizeMinutes === 15 ? (
+                              <div className="relative w-full h-full">
+                                {[0, 15, 30, 45].map((min, posIdx) => {
+                                  const hour = Number(String(h || "00:00").split(":")[0] || 0);
+                                  const t = `${String(hour).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+                                  const label = formatTime ? formatTime(t) : t;
+                                  const leftLinePct = `${posIdx * 25}%`;
+                                  return (
+                                    <span
+                                      key={`${h}-${min}`}
+                                      className="absolute text-[11px] font-medium text-gray-400 whitespace-nowrap"
+                                      style={{ left: `calc(${leftLinePct} - 1px)`, top: "50%", transform: "translateY(-50%)" }}
+                                    >
+                                      {label}
+                                    </span>
+                                  );
+                                })}
                               </div>
                             ) : (
                               showLabel ? (formatTime ? formatTime(h) : h) : ""
