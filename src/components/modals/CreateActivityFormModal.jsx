@@ -462,6 +462,7 @@ export default function CreateActivityFormModal({
                     const v = e.target.value
                     setEndDate(v)
                     if (deadlineAuto) setDeadline(v)
+                    if (v && startDate && v < startDate) setStartDate(v)
                     try { setEndAuto(false) } catch (__) {}
                   }}
                   ref={endRef}

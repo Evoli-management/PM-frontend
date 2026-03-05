@@ -179,7 +179,7 @@ export default function CreateTaskModal({
     if (startDate !== nextStart) setStartDate(nextStart);
     const nextStartTime = initialData.start_time || initialData.startTime || initialData.time || '';
     if (nextStartTime && startTime !== nextStartTime) setStartTime(nextStartTime);
-  const nextEnd = safeDate(initialData.end_date || initialData.endDate) || defaultDate;
+  const nextEnd = safeDate(initialData.end_date || initialData.endDate || initialData.date) || defaultDate;
   if (endDate !== nextEnd) setEndDate(nextEnd);
   const nextEndTime = initialData.end_time || initialData.endTime || initialData.endTime || '';
   if (nextEndTime && endTime !== nextEndTime) setEndTime(nextEndTime);
@@ -613,7 +613,12 @@ export default function CreateTaskModal({
                     required
                     className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar"
                     value={endDate}
-                    onChange={(e) => { setEndDate(e.target.value); setEndAuto(false); }}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setEndDate(v);
+                      setEndAuto(false);
+                      if (v && startDate && v < startDate) setStartDate(v);
+                    }}
                     ref={endRef}
                   />
                   <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600" aria-label="Open date picker" onClick={() => { try { endRef.current?.showPicker?.(); endRef.current?.focus(); } catch (__) {} }}>

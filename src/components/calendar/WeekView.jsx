@@ -89,6 +89,8 @@ const WeekView = ({
   const [colOverlay, setColOverlay] = useState(null);
   const [allDayOverflow, setAllDayOverflow] = useState(null);
   const [hoveredQuickCreateCell, setHoveredQuickCreateCell] = useState(null);
+  const [dragOverTimeSlot, setDragOverTimeSlot] = useState(null);
+  const [dragOverBottomDayKey, setDragOverBottomDayKey] = useState(null);
 
   // Fixed time column width; day columns will flex to fill available space
   const TIME_COL_PX = 48;
@@ -239,6 +241,19 @@ const WeekView = ({
     document.addEventListener("mousedown", onDocMouseDown);
     return () => document.removeEventListener("mousedown", onDocMouseDown);
   }, [quickAddMenu.open]);
+
+  useEffect(() => {
+    const clearDragHighlight = () => {
+      setDragOverTimeSlot(null);
+      setDragOverBottomDayKey(null);
+    };
+    window.addEventListener("dragend", clearDragHighlight);
+    window.addEventListener("drop", clearDragHighlight);
+    return () => {
+      window.removeEventListener("dragend", clearDragHighlight);
+      window.removeEventListener("drop", clearDragHighlight);
+    };
+  }, []);
 
   // Keep the time grid sized to the remaining space after header + splitter + bottom panel.
   useEffect(() => {
@@ -565,6 +580,7 @@ const WeekView = ({
     try {
       e.preventDefault();
       e.stopPropagation();
+      setDragOverTimeSlot(null);
       const [h, m] = slot.split(":");
       const date = new Date(day.getFullYear(), day.getMonth(), day.getDate(), Number(h), Number(m));
       const eventId = e.dataTransfer.getData("eventId");
@@ -594,6 +610,7 @@ const WeekView = ({
     try {
       e.preventDefault();
       e.stopPropagation();
+      setDragOverBottomDayKey(null);
 
       const dragEffect = e.dataTransfer.getData("dragEffect");
       const sourceIso = e.dataTransfer.getData("dragSourceStart") || null;
@@ -800,6 +817,17 @@ const WeekView = ({
           width: 100%;
         }
         .week-time-grid-scroll::-webkit-scrollbar { width: 0; height: 0; }
+        .week-time-grid-wrap:hover .week-time-grid-scroll {
+          scrollbar-width: thin;
+          width: calc(100% + 8px);
+          margin-right: -8px;
+        }
+        .week-time-grid-wrap:hover .week-time-grid-scroll::-webkit-scrollbar { width: 8px; }
+        .week-time-grid-wrap:hover .week-time-grid-scroll::-webkit-scrollbar-thumb {
+          background: rgba(100, 116, 139, 0.45);
+          border-radius: 8px;
+        }
+        .week-time-grid-wrap:hover .week-time-grid-scroll::-webkit-scrollbar-track { background: transparent; }
 
         .week-bottom-list-scroll {
           scrollbar-width: none;
@@ -889,34 +917,15 @@ const WeekView = ({
                     columnWidth ||
                     (container.getBoundingClientRect().width - TIME_COL_PX) / daysCount;
                   let top = 0;
-                  let height = container.scrollHeight || container.getBoundingClientRect().height;
+                  let height = container.clientHeight || container.getBoundingClientRect().height;
 
                   if (th) {
                     const crect = container.getBoundingClientRect();
                     const r = th.getBoundingClientRect();
                     left = r.left - crect.left + container.scrollLeft;
                     width = r.width;
-
-                    try {
-                      const theadTr = table.querySelector("thead tr");
-                      if (theadTr) {
-                        const trRect = theadTr.getBoundingClientRect();
-                        top = trRect.bottom - crect.top + container.scrollTop;
-                      } else {
-                        top = r.top - crect.top + container.scrollTop;
-                      }
-                    } catch {
-                      top = r.top - crect.top + container.scrollTop;
-                    }
-
-                    const last = container.querySelector(".flex-1");
-                    if (last) {
-                      const lr = last.getBoundingClientRect();
-                      const lastBottom = lr.bottom - crect.top + container.scrollTop;
-                      height = Math.max(0, lastBottom - top);
-                    } else {
-                      height = Math.max(0, container.scrollHeight - top);
-                    }
+                    top = 0;
+                    height = container.clientHeight || crect.height;
                   }
 
                   setColOverlay({ left, top, width, height, visible: true });
@@ -2154,8 +2163,8 @@ const WeekView = ({
                                         {concurrent.length > 1 && heightPx < 40 ? (
                                           // Concurrent small bar: truncated text with icons below
                                           <div className="h-full flex flex-col items-start justify-between gap-0.5 w-full">
-                                            <div className="flex items-start gap-1 min-w-0 w-full">
-                                              <span className="shrink-0 text-[9px]">
+                                            <div className="flex items-center gap-1.5 min-w-0 w-full">
+                                              <span className="shrink-0 inline-flex items-center leading-none text-[9px]">
                                                 {isActivityCopy ? (
                                                   <FaBars className="w-2.5 h-2.5" style={{ color: copyIconColor || undefined }} />
                                                 ) : isTaskCopy ? (
@@ -2212,8 +2221,8 @@ const WeekView = ({
                                           </div>
                                         ) : (
                                           // Non-concurrent or larger bar: inline icons
-                                          <div className="h-full flex items-center gap-1 w-full min-w-0">
-                                            <span className="shrink-0">
+                                          <div className="h-full flex items-center gap-1.5 w-full min-w-0">
+                                            <span className="shrink-0 inline-flex items-center leading-none">
                                               {isActivityCopy ? (
                                                 <FaBars className="w-3 h-3" style={{ color: copyIconColor || undefined }} />
                                               ) : isTaskCopy ? (
@@ -2386,6 +2395,8 @@ const WeekView = ({
                             hoveredQuickCreateCell.dayKey === dayKey &&
                             index >= hoveredQuickCreateCell.slotIndex &&
                             index < hoveredQuickCreateCell.slotIndex + previewSlotCount;
+                          const slotDragKey = `${dayKey}|${slot}`;
+                          const isDragOverSlot = dragOverTimeSlot === slotDragKey;
                           return (
                             <div
                               key={dIdx}
@@ -2396,7 +2407,11 @@ const WeekView = ({
                                 height: ITEM_SIZE,
                                 boxSizing: "border-box",
                                 cursor: "pointer",
-                                backgroundColor: isHoverPreview ? "rgba(191, 219, 254, 0.65)" : (slotIsWorking ? "#ffffff" : NON_WORK_BG),
+                                backgroundColor: isDragOverSlot
+                                  ? "rgba(191, 219, 254, 0.65)"
+                                  : isHoverPreview
+                                    ? "rgba(191, 219, 254, 0.65)"
+                                    : (slotIsWorking ? "#ffffff" : NON_WORK_BG),
                                 opacity: slotIsWorking ? 1 : NON_WORK_OPACITY,
                                 borderTopStyle: !isHourBoundary && (isHalfHourBoundary || isQuarterHourBoundary)
                                   ? (isHalfHourBoundary ? "solid" : "dotted")
@@ -2412,6 +2427,13 @@ const WeekView = ({
                                 e.preventDefault();
                                 e.stopPropagation();
                                 try { e.dataTransfer.dropEffect = "copy"; } catch {}
+                                setDragOverTimeSlot(slotDragKey);
+                              }}
+                              onDragLeave={(e) => {
+                                e.preventDefault();
+                                if (!e.currentTarget.contains(e.relatedTarget)) {
+                                  setDragOverTimeSlot((prev) => (prev === slotDragKey ? null : prev));
+                                }
                               }}
                               onDrop={(e) => handleDrop(e, date, slot)}
                               onClick={(e) => {
@@ -2692,6 +2714,14 @@ const WeekView = ({
                         e.preventDefault();
                         e.stopPropagation();
                         try { e.dataTransfer.dropEffect = "move"; } catch {}
+                        setDragOverBottomDayKey(`${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`);
+                      }}
+                      onDragLeave={(e) => {
+                        e.preventDefault();
+                        const dayKey = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+                        if (!e.currentTarget.contains(e.relatedTarget)) {
+                          setDragOverBottomDayKey((prev) => (prev === dayKey ? null : prev));
+                        }
                       }}
                       onDrop={(e) => handleBottomColumnDrop(e, date)}
                       onMouseMove={(e) => {
@@ -2730,6 +2760,9 @@ const WeekView = ({
                       }}
                       style={{
                         backgroundColor:
+                          dragOverBottomDayKey === `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
+                            ? "rgba(191, 219, 254, 0.65)"
+                            :
                           hoveredQuickAddDayKey === `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
                             ? "rgba(239, 246, 255, 0.45)"
                             : (isTodayCol ? "rgba(59,130,246,0.10)" : undefined),
@@ -2808,7 +2841,7 @@ const WeekView = ({
                                   style={{ backgroundColor: accentColor }}
                                   aria-hidden="true"
                                 />
-                                <div className="truncate flex-1 text-[15px] text-[#4DC3D8]">{t.title || t.name}</div>
+                                <div className="truncate flex-1 text-xs text-[#4DC3D8]">{t.title || t.name}</div>
                                 {keyAreaListLabel ? (
                                   <span className="shrink-0 text-[11px] font-semibold text-[#4DC3D8] mr-0.5">
                                     {keyAreaListLabel}
@@ -2918,7 +2951,7 @@ const WeekView = ({
                               title={a.text || a.title}
                             >
                               <FaBars className="w-3 h-3 shrink-0" style={{ color: accentColor }} aria-hidden="true" />
-                              <div className="truncate flex-1 text-[15px] text-[#4DC3D8]">{a.text || a.title}</div>
+                              <div className="truncate flex-1 text-xs text-[#4DC3D8]">{a.text || a.title}</div>
                               <details data-week-actions-menu="true" className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
                                 <summary
                                   onClick={handleRowMenuSummaryClick}

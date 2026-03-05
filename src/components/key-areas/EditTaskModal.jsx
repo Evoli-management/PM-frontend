@@ -608,7 +608,7 @@ export default function EditTaskModal({
               <div style={{ minHeight: '64px' }}>
                 <label className="text-sm font-medium text-slate-700">End date</label>
                 <div className="relative mt-0">
-                  <input ref={endRef} className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar" type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setEndAuto(false); }} />
+                  <input ref={endRef} className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar" type="date" value={endDate} onChange={(e) => { const v = e.target.value; setEndDate(v); setEndAuto(false); if (v && startDate && v < startDate) setStartDate(v); }} />
                   <button
                     type="button"
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600"

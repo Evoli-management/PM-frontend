@@ -190,6 +190,12 @@ export default function CreateTaskModal({
                     next.endDate = value;
                 }
             }
+            if (name === 'endDate') {
+                // Keep start date aligned when end date is moved earlier.
+                if (value && prev.date && value < prev.date) {
+                    next.date = value;
+                }
+            }
             return next;
         });
     };

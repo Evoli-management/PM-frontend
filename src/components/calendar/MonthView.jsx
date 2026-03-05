@@ -77,9 +77,9 @@ const EventOverlayItem = React.memo(function EventOverlayItem({
           boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
           ...styleBg,
         }}
-        className={`${classForBg} group text-xs truncate whitespace-nowrap`}
+        className={`${classForBg} group text-xs truncate whitespace-nowrap gap-1.5`}
       >
-        <span className="shrink-0 h-full inline-flex items-center" style={{ pointerEvents: "none" }}>
+        <span className="shrink-0 h-full inline-flex items-center leading-none" style={{ pointerEvents: "none" }}>
           {isActivityCopy ? (
             <FaBars className="w-3 h-3" style={{ color: copyIconColor || undefined }} />
           ) : isTaskCopy ? (
@@ -230,7 +230,7 @@ const RangeTaskBar = React.memo(function RangeTaskBar({
           else if (typeof onTaskClick === "function") onTaskClick(r.task);
         }}
       >
-        <span className="shrink-0 h-full inline-flex items-center" style={{ pointerEvents: "none" }}>
+        <span className="shrink-0 h-full inline-flex items-center leading-none" style={{ pointerEvents: "none" }}>
           {categories?.[r.task?.kind]?.icon || ""}
         </span>
         <span

@@ -372,12 +372,22 @@ const buildRecurringPattern = ({
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [deleteScopeChoice, setDeleteScopeChoice] = useState('occurrence');
     const [deleting, setDeleting] = useState(false);
+    const isAppointmentLikeEvent = useMemo(() => {
+        if (!isEdit || !event) return false;
+        const kind = String(event?.kind || "").toLowerCase();
+        if (kind === "appointment" || kind === "appointment_exception") return true;
+        if (kind.includes("appointment")) return true;
+        if (kind === "task.activity" || kind === "task_activity" || kind === "task-activity") return true;
+
+        const sourceType = String(event?.sourceType || event?.source_type || "").toLowerCase();
+        if (sourceType === "manual" || sourceType === "task" || sourceType === "activity") return true;
+
+        if (event?.appointmentId || event?.appointment_id) return true;
+        return false;
+    }, [isEdit, event]);
     const modalEntityLabel = useMemo(() => {
         if (isEdit) {
-            const kind = String(event?.kind || "").toLowerCase();
-            return kind === "appointment" || kind === "appointment_exception"
-                ? "Appointment"
-                : "Event";
+            return isAppointmentLikeEvent ? "Appointment" : "Event";
         }
         const s = combineDateTime(startDateStr, startTimeStr);
         const e = combineDateTime(endDateStr, endTimeStr);
@@ -386,7 +396,7 @@ const buildRecurringPattern = ({
         return createAsEvent ? "Event" : "Appointment";
     }, [
         isEdit,
-        event?.kind,
+        isAppointmentLikeEvent,
         allDayDefault,
         startDateStr,
         startTimeStr,
@@ -746,7 +756,7 @@ const buildRecurringPattern = ({
                     // the wrong updater can produce a 400 from the API.
                     const looksLikeGeneratedOccurrence = typeof event?.id === 'string' && event.id.includes('_');
                     const isAppointmentUpdate =
-                        event?.kind === "appointment" || looksLikeGeneratedOccurrence;
+                        isAppointmentLikeEvent || looksLikeGeneratedOccurrence;
 
                     // Build endpoint-specific payloads (DTO whitelist is strict)
                     const payload = isAppointmentUpdate
@@ -946,7 +956,7 @@ const buildRecurringPattern = ({
                 return;
             }
 
-            if (event?.kind === "appointment") {
+            if (isAppointmentLikeEvent) {
                 await calendarService.deleteAppointment(event.id);
             } else {
                 await calendarService.deleteEvent(event.id);
@@ -1698,7 +1708,7 @@ const buildRecurringPattern = ({
                                                                     opts.editScope = 'series';
                                                                 }
 
-                                                                if (event?.kind === 'appointment') {
+                                                                if (isAppointmentLikeEvent) {
                                                                     await calendarService.deleteAppointment(event.id, opts);
                                                                 } else {
                                                                     await calendarService.deleteEvent(event.id);

@@ -840,7 +840,29 @@ const CalendarContainer = () => {
         }
     };
 
-    // Event modal logic
+    const isAppointmentLikeEvent = (ev) => {
+        const kind = String(ev?.kind || "").toLowerCase();
+        if (kind === "appointment" || kind === "appointment_exception") return true;
+        if (kind.includes("appointment")) return true;
+        if (kind === "task.activity" || kind === "task_activity" || kind === "task-activity") return true;
+        const sourceType = String(ev?.sourceType || ev?.source_type || "").toLowerCase();
+        if (sourceType === "task" || sourceType === "activity" || sourceType === "manual") return true;
+        if (ev?.appointmentId || ev?.appointment_id) return true;
+        return false;
+    };
+
+    const handleCalendarEventClick = (ev, action) => {
+        if (isAppointmentLikeEvent(ev)) {
+            openModal(ev, action);
+            return;
+        }
+        if (ev?.taskId) {
+            openEditTask(ev.taskId);
+            return;
+        }
+        openModal(ev, action);
+    };
+
     // Event modal logic
     const openModal = (event = null, action = null, meta = null) => {
         if (import.meta.env.DEV) {
@@ -931,7 +953,7 @@ const CalendarContainer = () => {
         if (!event || !event.id) return;
         try {
             setSimpleDeleting(true);
-            if (event.kind === 'appointment') {
+            if (isAppointmentLikeEvent(event)) {
                 await calendarService.deleteAppointment(event.id);
             } else {
                 await calendarService.deleteEvent(event.id);
@@ -967,7 +989,7 @@ const CalendarContainer = () => {
         if (!event || !event.id) return;
         try {
             setDeleting(true);
-            if (event.kind === 'appointment') {
+            if (isAppointmentLikeEvent(event)) {
                 const opts = {};
                 if (deleteScopeChoice === 'occurrence') {
                     opts.editScope = 'occurrence';
@@ -1085,6 +1107,14 @@ const CalendarContainer = () => {
     };
 
     const [addDefaultTab, setAddDefaultTab] = useState("task");
+    const toLocalYmd = (value) => {
+        const d = value instanceof Date ? value : new Date(value);
+        if (Number.isNaN(d.getTime())) return "";
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return `${y}-${m}-${day}`;
+    };
     const openAddModal = (date, options = {}) => {
         setAddDate(date instanceof Date ? date : new Date(date));
         setAddDefaultTab(options.defaultTab === "activity" ? "activity" : "task");
@@ -1480,7 +1510,7 @@ const CalendarContainer = () => {
                 lastEventMoveRef.current = { key: moveKey, at: now };
             } catch (_) {}
 
-            const isAppointment = current?.kind === "appointment";
+            const isAppointment = isAppointmentLikeEvent(current);
 
             // If this is a recurring appointment, prompt for edit scope (occurrence/future/series)
             const isRecurring = Boolean(current?.recurringPattern || current?.recurrence || current?.seriesId);
@@ -1738,7 +1768,7 @@ const CalendarContainer = () => {
                         categories={EVENT_CATEGORIES}
                         onDayClick={(date) => openAddModal(date, { defaultTab: "task" })}
                         onQuickCreate={handleQuickCreate}
-                        onEventClick={(ev, action) => (ev?.taskId ? openEditTask(ev.taskId) : openModal(ev, action))}
+                        onEventClick={handleCalendarEventClick}
                         onTaskClick={openEditTask}
                         slotSizeMinutes={slotSizeMinutes}
                         onToggleSlotSize={() => setSlotSizeMinutes((prev) => (prev === 15 ? 30 : 15))}
@@ -1814,7 +1844,7 @@ const CalendarContainer = () => {
                         onTaskDrop={handleTaskDrop}
                         onActivityDrop={handleActivityDrop}
                         onEventMove={handleEventMove}
-                        onEventClick={(ev, action) => (ev?.taskId ? openEditTask(ev.taskId) : openModal(ev, action))}
+                        onEventClick={handleCalendarEventClick}
                         onDeleteRequest={(ev, mouseEvent) => handleDeleteRequest(ev, mouseEvent)}
                         onTaskClick={openEditTask}
                         onTaskComplete={handleTaskComplete}
@@ -1865,7 +1895,7 @@ const CalendarContainer = () => {
                         onTaskDrop={handleTaskDrop}
                         onActivityDrop={handleActivityDrop}
                         onEventMove={handleEventMove}
-                        onEventClick={(ev, action) => (ev?.taskId ? openEditTask(ev.taskId) : openModal(ev, action))}
+                        onEventClick={handleCalendarEventClick}
                         onDeleteRequest={(ev, mouseEvent) => handleDeleteRequest(ev, mouseEvent)}
                         onTaskClick={openEditTask}
                         onActivityClick={openEditActivity}
@@ -1903,6 +1933,8 @@ const CalendarContainer = () => {
                             onCancel={() => setAddModalOpen(false)}
                             initialData={{
                                 text: "",
+                                startDate: toLocalYmd(addDate || new Date()),
+                                endDate: toLocalYmd(addDate || new Date()),
                                 // Do NOT auto-fill key area or task when creating from calendar; user should choose explicitly.
                                 key_area_id: null,
                                 taskId: null,
@@ -1979,7 +2011,7 @@ const CalendarContainer = () => {
                             initialData={{
                                 date: (() => {
                                     const d = addDate || new Date();
-                                    return d.toISOString().slice(0, 10);
+                                    return toLocalYmd(d);
                                 })(),
                                 time: (() => {
                                     try {

@@ -102,7 +102,13 @@ export default function TaskActivityModal({ item, onClose, onSave, onDelete }) {
 
     const handleTaskChange = (e) => {
         const { name, value } = e.target;
-        setTaskForm((s) => ({ ...s, [name]: value }));
+        setTaskForm((s) => {
+            const next = { ...s, [name]: value };
+            if (name === "endDate" && value && s.date && value < s.date) {
+                next.date = value;
+            }
+            return next;
+        });
     };
     const handleActivityChange = (e) => {
         const { name, value } = e.target;
