@@ -34,11 +34,9 @@ const EventOverlayItem = React.memo(function EventOverlayItem({
         ka = keyAreaMap?.[String(parent.keyAreaId || parent.key_area_id || "")];
       }
     }
-    const appointmentColor = categories?.appointment?.color || categories?.[ev.kind]?.color || "#4DC3D8";
-    const color =
-      kindLower === "appointment"
-        ? appointmentColor
-        : (ka?.color || categories?.[ev.kind]?.color || "#4DC3D8");
+    const appointmentColor = categories?.appointment?.color || null;
+    const categoryColor = categories?.[ev.kind]?.color || (kindLower === "appointment" ? appointmentColor : null);
+    const color = ka?.color || categoryColor || "#4DC3D8";
     const isTailwind = typeof color === "string" && color.startsWith("bg-");
     const resolvedTailwind = isTailwind ? tailwindColorCache[color] : null;
     const resolved = !isTailwind ? color : resolvedTailwind;
@@ -277,9 +275,9 @@ export default function MonthView({
     isWorkingTime,
   } = useCalendarPreferences(slotSizeMinutes);
 
-  const NON_WORK_BG = "#f8fafc";
+  const NON_WORK_BG = "#f1f5f9";
   const GRID_LINE_STRONG = "rgb(203, 213, 225)";
-  const GRID_LINE_SOFT = "rgba(148, 163, 184, 0.3)";
+  const GRID_LINE_SOFT = "rgb(148, 163, 184)";
   const WEEK_ROW_LINE = "rgba(100, 116, 139, 0.65)";
 
   const ALL_HOURS = useMemo(
@@ -302,8 +300,10 @@ export default function MonthView({
     [SLOTS]
   );
 
+  const DATE_COL_WIDTH = 76;
   const ALL_DAY_COL_WIDTH = 120;
-  const HOUR_COL_WIDTH = 180;
+  const ROW_HEIGHT = 30;
+  const HOUR_COL_WIDTH = 125;
   const rightTableMinWidth = Math.max(800, HOUR_SLOTS.length * HOUR_COL_WIDTH);
 
   const BOTTOM_RADAR_HEIGHT = 0;
@@ -786,6 +786,7 @@ export default function MonthView({
   const allDayRefs = useRef([]);
 
   const redLineRef = useRef(null);
+  const redLineLabelRef = useRef(null);
 
   const [overlayMetrics, setOverlayMetrics] = useState({ colLeft: 0, colWidth: 0, rows: [] });
   const [eventOverlays, setEventOverlays] = useState([]);
@@ -897,9 +898,7 @@ export default function MonthView({
         rightRow.querySelectorAll("td,th").forEach((c) => (c.style.height = ""));
       } catch (e) {}
 
-      const leftRect = leftRow.getBoundingClientRect();
-      const rightRect = rightRow.getBoundingClientRect();
-      const finalH = Math.max(leftRect.height, rightRect.height, 25);
+      const finalH = ROW_HEIGHT;
 
       try {
         leftRow.style.height = finalH + "px";
@@ -959,7 +958,7 @@ export default function MonthView({
         tr.style.pointerEvents = "none";
         const tdDate = document.createElement("td");
         tdDate.className = "px-2 py-2 text-sm font-semibold";
-        tdDate.style.width = "96px";
+        tdDate.style.width = `${DATE_COL_WIDTH}px`;
         const tdAllDay = document.createElement("td");
         tdAllDay.className = "px-1 py-0 text-left align-top";
         tdAllDay.style.width = `${ALL_DAY_COL_WIDTH}px`;
@@ -1232,6 +1231,7 @@ export default function MonthView({
             redLineRef.current.style.top = "0px";
             redLineRef.current.style.height = "0px";
           }
+          if (redLineLabelRef.current) redLineLabelRef.current.textContent = "";
           return;
         }
 
@@ -1241,6 +1241,10 @@ export default function MonthView({
         });
         if (hourIdx === -1) {
           if (redLineRef.current) redLineRef.current.style.left = "-9999px";
+          if (redLineLabelRef.current) {
+            redLineLabelRef.current.textContent = "";
+            redLineLabelRef.current.style.left = "-9999px";
+          }
           return;
         }
 
@@ -1267,6 +1271,13 @@ export default function MonthView({
         el.style.top = `${Math.max(0, topInTable)}px`;
         el.style.height = `${height}px`;
         el.style.transform = "translateX(-50%)";
+
+        if (redLineLabelRef.current) {
+          const nowTimeValue = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+          const nowTimeLabel = formatTime ? formatTime(nowTimeValue) : nowTimeValue;
+          redLineLabelRef.current.textContent = nowTimeLabel;
+          redLineLabelRef.current.style.left = `${leftWithinTable}px`;
+        }
       } catch (_) {}
     };
 
@@ -1299,7 +1310,7 @@ export default function MonthView({
       bodyWrap.removeEventListener("scroll", scheduleCompute);
       if (rafId) cancelAnimationFrame(rafId);
     };
-  }, [month, year, HOUR_SLOTS]);
+  }, [month, year, HOUR_SLOTS, formatTime]);
 
   // today blink overlay
   useEffect(() => {
@@ -1584,20 +1595,42 @@ export default function MonthView({
         </div>
       </CalendarViewTopSection>
 
-      <div className="overflow-hidden bg-white flex-1 min-h-0 mt-1 ml-2">
+      <div className="overflow-hidden bg-white flex-1 min-h-0 mt-1">
       <div className="relative mv-shell bg-white border border-blue-50 rounded-lg shadow-sm p-0 overflow-hidden h-full min-h-0 flex flex-col">
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 rounded-lg z-[305]"
           style={{ border: `1px solid ${WEEK_ROW_LINE}` }}
         />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute z-[420]"
+          style={{
+            left: `${DATE_COL_WIDTH}px`,
+            top: 0,
+            bottom: 0,
+            width: "1px",
+            backgroundColor: GRID_LINE_STRONG,
+          }}
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute z-[420]"
+          style={{
+            left: `${DATE_COL_WIDTH + ALL_DAY_COL_WIDTH}px`,
+            top: 0,
+            bottom: 0,
+            width: "1px",
+            backgroundColor: GRID_LINE_STRONG,
+          }}
+        />
         {/* Fixed header row (outside vertical scroll) */}
         <div className="flex" style={{ position: "relative" }}>
           <div
             className="relative"
             style={{
-              width: 96 + ALL_DAY_COL_WIDTH,
-              minWidth: 96 + ALL_DAY_COL_WIDTH,
+              width: DATE_COL_WIDTH + ALL_DAY_COL_WIDTH,
+              minWidth: DATE_COL_WIDTH + ALL_DAY_COL_WIDTH,
               flexShrink: 0,
               zIndex: 302,
             }}
@@ -1607,7 +1640,7 @@ export default function MonthView({
               style={{
                 borderCollapse: "separate",
                 borderSpacing: 0,
-                width: 96 + ALL_DAY_COL_WIDTH,
+                width: DATE_COL_WIDTH + ALL_DAY_COL_WIDTH,
                 tableLayout: "fixed",
                 backgroundColor: "white",
                 borderColor: GRID_LINE_STRONG,
@@ -1618,9 +1651,9 @@ export default function MonthView({
                   <th
                     className="text-left px-2 py-2 text-xs font-semibold text-gray-400"
                     style={{
-                      width: "96px",
+                      width: `${DATE_COL_WIDTH}px`,
                       height: "44px",
-                      borderRight: `2px solid ${GRID_LINE_STRONG}`,
+                      borderRight: "none",
                       backgroundColor: "white",
                     }}
                   >
@@ -1631,8 +1664,8 @@ export default function MonthView({
                     style={{
                       width: `${ALL_DAY_COL_WIDTH}px`,
                       height: "44px",
-                      borderLeft: `2px solid ${GRID_LINE_STRONG}`,
-                      borderRight: `2px solid ${GRID_LINE_STRONG}`,
+                      borderLeft: "none",
+                      borderRight: "none",
                       backgroundColor: "white",
                     }}
                   >
@@ -1661,10 +1694,22 @@ export default function MonthView({
                 ref={headerTrackRef}
                 style={{
                   width: rightTableMinWidth,
+                  position: "relative",
                   transform: "translateX(0px)",
                   willChange: "transform",
                 }}
               >
+                <span
+                  ref={redLineLabelRef}
+                  className="absolute bg-red-500 text-white text-[10px] leading-none px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                  style={{
+                    left: "-9999px",
+                    top: "calc(100% - 5px)",
+                    transform: "translate(-50%, -100%)",
+                    zIndex: 240,
+                    pointerEvents: "none",
+                  }}
+                />
                 <table
                   ref={rightHeaderTableRef}
                   className="border"
@@ -1696,8 +1741,8 @@ export default function MonthView({
                               minWidth: 40,
                               height: "44px",
                               backgroundColor: slotIsWorking ? "white" : NON_WORK_BG,
-                              borderLeft: `1px solid ${GRID_LINE_SOFT}`,
-                              borderRight: `1px solid ${GRID_LINE_SOFT}`,
+                              borderLeft: idx === 0 ? "none" : `1px solid ${GRID_LINE_SOFT}`,
+                              borderRight: "none",
                             }}
                           >
                             {showLabel ? (formatTime ? formatTime(h) : h) : ""}
@@ -1739,8 +1784,8 @@ export default function MonthView({
             ref={gridRef}
             className="relative"
             style={{
-              width: 96 + ALL_DAY_COL_WIDTH,
-              minWidth: 96 + ALL_DAY_COL_WIDTH,
+              width: DATE_COL_WIDTH + ALL_DAY_COL_WIDTH,
+              minWidth: DATE_COL_WIDTH + ALL_DAY_COL_WIDTH,
               flexShrink: 0,
               position: "sticky",
               left: 0,
@@ -1752,7 +1797,7 @@ export default function MonthView({
               style={{
                 borderCollapse: "separate",
                 borderSpacing: 0,
-                width: 96 + ALL_DAY_COL_WIDTH,
+                width: DATE_COL_WIDTH + ALL_DAY_COL_WIDTH,
                 tableLayout: "fixed",
                 borderColor: GRID_LINE_STRONG,
               }}
@@ -1762,9 +1807,9 @@ export default function MonthView({
                   <th
                     className="text-left px-2 py-2 text-xs font-semibold text-gray-400"
                     style={{
-                      width: "96px",
+                      width: `${DATE_COL_WIDTH}px`,
                       height: "44px",
-                      borderRight: `2px solid ${GRID_LINE_STRONG}`,
+                      borderRight: "none",
                       backgroundColor: "white",
                     }}
                   >
@@ -1775,8 +1820,8 @@ export default function MonthView({
                     style={{
                       width: `${ALL_DAY_COL_WIDTH}px`,
                       height: "44px",
-                      borderLeft: `2px solid ${GRID_LINE_STRONG}`,
-                      borderRight: `2px solid ${GRID_LINE_STRONG}`,
+                      borderLeft: "none",
+                      borderRight: "none",
                       backgroundColor: "white",
                     }}
                   >
@@ -1791,6 +1836,12 @@ export default function MonthView({
                   const dayKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
                     date.getDate()
                   ).padStart(2, "0")}`;
+                  const weekdayLabel = new Intl.DateTimeFormat(undefined, {
+                    weekday: "short",
+                    timeZone: userTimeZone,
+                  })
+                    .format(date)
+                    .toLowerCase();
                   const isWeekend = date.getDay() === 0 || date.getDay() === 6;
                   const isToday =
                     date.getDate() === today.getDate() &&
@@ -1802,10 +1853,10 @@ export default function MonthView({
                       key={idx}
                       className="bg-white mv-left-row"
                       style={{
-                        height: "25px",
+                        height: `${ROW_HEIGHT}px`,
                         backgroundColor: isToday
                           ? "rgba(59,130,246,0.10)"
-                          : (isWeekend ? NON_WORK_BG : undefined),
+                          : (isWeekend ? NON_WORK_BG : "#ffffff"),
                       }}
                     >
                       <td
@@ -1813,11 +1864,11 @@ export default function MonthView({
                           isWeekend ? "text-red-500" : "text-gray-700"
                         } ${isToday ? "text-blue-600" : ""}`}
                         style={{
-                          width: "96px",
-                          height: "25px",
+                          width: `${DATE_COL_WIDTH}px`,
+                          height: `${ROW_HEIGHT}px`,
                           borderTop: `1px solid ${GRID_LINE_STRONG}`,
                           borderBottom: `1px solid ${GRID_LINE_STRONG}`,
-                          borderRight: `2px solid ${GRID_LINE_STRONG}`,
+                          borderRight: "none",
                           backgroundColor: isToday
                             ? "rgba(59,130,246,0.10)"
                             : (isWeekend ? NON_WORK_BG : "white"),
@@ -1825,18 +1876,12 @@ export default function MonthView({
                           alignItems: "center",
                         }}
                       >
-                        <div className="flex items-center justify-between text-xs w-full">
-                          <div>
-                            {new Intl.DateTimeFormat(undefined, {
-                              weekday: "short",
-                              day: "numeric",
-                              timeZone: userTimeZone,
-                            }).format(date)}
-                          </div>
+                        <div className="flex items-center gap-1 text-xs w-full whitespace-nowrap">
+                          <span className="min-w-0">{`${date.getDate()} ${weekdayLabel}`}</span>
                           {weekCells[idx] && weekCells[idx].weekNumber ? (
-                            <div className="text-[10px] text-slate-500 ml-1">
+                            <sup className="text-[9px] text-slate-500 shrink-0 align-super">
                               {weekCells[idx].weekNumber}
-                            </div>
+                            </sup>
                           ) : null}
                         </div>
                       </td>
@@ -1846,17 +1891,17 @@ export default function MonthView({
                         className="px-1 py-0 text-left align-top"
                         style={{
                           width: `${ALL_DAY_COL_WIDTH}px`,
-                          height: "25px",
+                          height: `${ROW_HEIGHT}px`,
                           borderTop: `1px solid ${GRID_LINE_STRONG}`,
                           borderBottom: `1px solid ${GRID_LINE_STRONG}`,
-                          borderLeft: `2px solid ${GRID_LINE_STRONG}`,
-                          borderRight: `2px solid ${GRID_LINE_STRONG}`,
+                          borderLeft: "none",
+                          borderRight: "none",
                           backgroundColor:
                             selectedSlot &&
                             selectedSlot.type === "allDay" &&
                             selectedSlot.dayKey === dayKey
                               ? "rgba(59, 130, 246, 0.12)"
-                              : (isToday ? "rgba(59,130,246,0.10)" : (isWeekend ? NON_WORK_BG : undefined)),
+                              : (isToday ? "rgba(59,130,246,0.10)" : (isWeekend ? NON_WORK_BG : "#ffffff")),
                         }}
                         onClick={(e) => {
                           try {
@@ -2173,10 +2218,10 @@ export default function MonthView({
                           className="bg-white mv-right-row"
                           style={{
                             position: "relative",
-                            height: "25px",
+                            height: `${ROW_HEIGHT}px`,
                             backgroundColor: isToday
                               ? "rgba(59,130,246,0.10)"
-                              : (isWeekend ? NON_WORK_BG : undefined),
+                              : (isWeekend ? NON_WORK_BG : "#ffffff"),
                           }}
                           tabIndex={-1}
                         >
@@ -2196,16 +2241,16 @@ export default function MonthView({
                                 }`}
                                 style={{
                                   ...(isWeekend ? { cursor: canQuickCreate ? "pointer" : undefined } : {}),
-                                  height: "25px",
+                                  height: `${ROW_HEIGHT}px`,
                                   width: `${HOUR_COL_WIDTH}px`,
                                   boxSizing: "border-box",
-                                  borderLeft: `1px solid ${GRID_LINE_SOFT}`,
-                                  borderRight: `1px solid ${GRID_LINE_SOFT}`,
+                                  borderLeft: hIdx === 0 ? "none" : `1px solid ${GRID_LINE_SOFT}`,
+                                  borderRight: "none",
                                   borderTop: `1px solid ${GRID_LINE_STRONG}`,
                                   borderBottom: `1px solid ${GRID_LINE_STRONG}`,
                                   backgroundColor: (isWeekend || !isWorking)
                                     ? (isToday ? "rgba(59,130,246,0.12)" : NON_WORK_BG)
-                                    : (isToday ? "rgba(59,130,246,0.10)" : undefined),
+                                    : (isToday ? "rgba(59,130,246,0.10)" : "#ffffff"),
                                   boxShadow:
                                     selectedSlot &&
                                     selectedSlot.type === "timed" &&
@@ -2277,11 +2322,12 @@ export default function MonthView({
                     left: "-9999px",
                     top: 0,
                     height: "0px",
-                    width: "2px",
-                    background: "red",
+                    width: "1px",
+                    backgroundColor: "rgb(248, 113, 113)",
                     willChange: "left, top, height, transform",
                     transform: "translateX(-50%)",
-                    zIndex: 80,
+                    zIndex: 220,
+                    overflow: "visible",
                     pointerEvents: "none",
                   }}
                 />

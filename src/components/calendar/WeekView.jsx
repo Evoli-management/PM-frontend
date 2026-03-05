@@ -80,8 +80,8 @@ const WeekView = ({
   } = useCalendarPreferences(slotSize);
 
   // Visual constants for non-working hour styling — keep consistent with MonthView
-  const NON_WORK_BG = "#f8fafc";
-  const NON_WORK_OPACITY = 0.75;
+  const NON_WORK_BG = "#f1f5f9";
+  const NON_WORK_OPACITY = 1;
 
   const [elephantTask, setElephantTask] = useState("");
   const [showViewMenu, setShowViewMenu] = useState(false);
@@ -91,7 +91,7 @@ const WeekView = ({
   const [hoveredQuickCreateCell, setHoveredQuickCreateCell] = useState(null);
 
   // Fixed time column width; day columns will flex to fill available space
-  const TIME_COL_PX = 80; // matches w-20
+  const TIME_COL_PX = 48;
 
   const containerRef = useRef(null);
   const headerBlockRef = useRef(null);
@@ -374,9 +374,12 @@ const WeekView = ({
     if (!el) return;
     const measure = () => {
       try {
-        const w = el.getBoundingClientRect().width || el.clientWidth || 0;
+        const headerDayCell = headerBlockRef.current?.querySelector?.("thead th:nth-child(2)");
+        const headerCellWidth = headerDayCell?.getBoundingClientRect?.().width || 0;
         const cols = workWeek ? 5 : 7;
-        const cw = Math.max(0, (w - TIME_COL_PX) / cols);
+        const w = el.getBoundingClientRect().width || el.clientWidth || 0;
+        const fallbackWidth = Math.max(0, (w - TIME_COL_PX) / cols);
+        const cw = headerCellWidth > 0 ? headerCellWidth : fallbackWidth;
         setColumnWidth(cw);
       } catch (e) {}
     };
@@ -798,15 +801,6 @@ const WeekView = ({
         }
         .week-time-grid-scroll::-webkit-scrollbar { width: 0; height: 0; }
 
-        .week-time-grid-wrap:hover .week-time-grid-scroll {
-          scrollbar-width: thin;
-          width: calc(100% + 8px);
-          margin-right: -8px;
-        }
-        .week-time-grid-wrap:hover .week-time-grid-scroll::-webkit-scrollbar { width: 8px; }
-        .week-time-grid-wrap:hover .week-time-grid-scroll::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.45); border-radius: 8px; }
-        .week-time-grid-wrap:hover .week-time-grid-scroll::-webkit-scrollbar-track { background: transparent; }
-
         .week-bottom-list-scroll {
           scrollbar-width: none;
           scrollbar-color: rgba(100, 116, 139, 0.45) transparent;
@@ -814,13 +808,7 @@ const WeekView = ({
           overflow-x: hidden;
           width: 100%;
         }
-        .week-bottom-list-cell:hover .week-bottom-list-scroll {
-          scrollbar-width: thin;
-          width: calc(100% + 8px);
-          margin-right: -8px;
-        }
         .week-bottom-list-scroll::-webkit-scrollbar { width: 0; }
-        .week-bottom-list-cell:hover .week-bottom-list-scroll::-webkit-scrollbar { width: 8px; }
         .week-bottom-list-scroll::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.45); border-radius: 8px; }
         .week-bottom-list-scroll::-webkit-scrollbar-track { background: transparent; }
 
@@ -1089,7 +1077,7 @@ const WeekView = ({
         </CalendarViewTopSection>
 
         {/* Calendar grid */}
-        <div className="overflow-hidden bg-white flex-1 min-h-0 mt-1 ml-2">
+        <div className="overflow-hidden bg-white flex-1 min-h-0 mt-1">
         <div
           ref={containerRef}
           className="day-timeslots-wrap relative bg-white border border-blue-50 rounded-lg shadow-sm p-0 overflow-visible h-full min-h-0 flex flex-col"
@@ -1119,7 +1107,9 @@ const WeekView = ({
                 aria-hidden="true"
                 className="pointer-events-none absolute top-0 bottom-0 z-20"
                 style={{
-                  left: `calc(${TIME_COL_PX}px + ((100% - ${TIME_COL_PX}px) * ${((idx + 1) / daysCount).toFixed(6)}))`,
+                  left: columnWidth
+                    ? `${TIME_COL_PX + columnWidth * (idx + 1)}px`
+                    : `calc(${TIME_COL_PX}px + ((100% - ${TIME_COL_PX}px) * ${((idx + 1) / daysCount).toFixed(6)}))`,
                   borderLeft: "1px solid rgb(203, 213, 225)",
                 }}
               />
@@ -1137,6 +1127,9 @@ const WeekView = ({
                       className="text-left px-2 py-1 text-xs text-blue-500 font-semibold rounded-tl-lg"
                       style={{
                         width: TIME_COL_PX + "px",
+                        minWidth: TIME_COL_PX + "px",
+                        maxWidth: TIME_COL_PX + "px",
+                        boxSizing: "border-box",
                         borderBottomWidth: "1px",
                         borderBottomStyle: "solid",
                         borderBottomColor: "rgb(203, 213, 225)",
@@ -1173,13 +1166,17 @@ const WeekView = ({
                       className="px-2 py-1 text-xs text-gray-500 text-center"
                       style={{
                         width: TIME_COL_PX + "px",
+                        minWidth: TIME_COL_PX + "px",
+                        maxWidth: TIME_COL_PX + "px",
+                        boxSizing: "border-box",
                         borderBottomWidth: "1px",
                         borderBottomStyle: "solid",
                         borderBottomColor: "rgba(100, 116, 139, 0.65)",
                       }}
                     >
-                      <span className="ml-2 px-2 py-1 rounded bg-emerald-500 text-white text-[11px] font-semibold">
-                        All-Day
+                      <span className="inline-flex flex-col items-center justify-center rounded bg-emerald-500 text-white text-[9px] leading-none font-semibold px-1 py-0.5">
+                        <span>All</span>
+                        <span>Day</span>
                       </span>
                     </td>
 
@@ -1461,13 +1458,17 @@ const WeekView = ({
 
                                     const kindKey = t.kind || t.type || t.kindName || null;
                                     const cat = kindKey && categories && categories[kindKey] ? categories[kindKey] : null;
-                                    const bgClass = cat?.color || null;
+                                    const categoryColor = cat?.color || null;
+                                    const categoryIsTailwind = typeof categoryColor === "string" && categoryColor.startsWith("bg-");
                                     const ka = t.keyAreaId || t.key_area_id ? keyAreaMap[String(t.keyAreaId || t.key_area_id)] : null;
                                     const DEFAULT_BAR_COLOR = "#4DC3D8";
                                     const kaColor = ka && ka.color ? ka.color : null;
-                                    const finalBg = bgClass ? null : kaColor || DEFAULT_BAR_COLOR;
+                                    const useTailwindClass = !kaColor && categoryIsTailwind;
+                                    const finalBg = useTailwindClass
+                                      ? null
+                                      : (kaColor || (!categoryIsTailwind ? categoryColor : null) || DEFAULT_BAR_COLOR);
                                     const textColor = finalBg ? getContrastTextColor(finalBg) : "#ffffff";
-                                    const style = bgClass ? undefined : { backgroundColor: finalBg, borderColor: finalBg, color: textColor };
+                                    const style = useTailwindClass ? undefined : { backgroundColor: finalBg, borderColor: finalBg, color: textColor };
 
                                     const topPx = BAR_TOP + entry.lane * (BAR_HEIGHT + BAR_GAP);
                                     const barStyle = {
@@ -1488,7 +1489,7 @@ const WeekView = ({
                                         onClick={() => {
                                           if (onEventClick) onEventClick(t);
                                         }}
-                                        className={`group absolute left-0 rounded px-2 pr-3 text-xs overflow-visible cursor-pointer ${bgClass || ""}`}
+                                        className={`group absolute left-0 rounded px-2 pr-3 text-xs overflow-visible cursor-pointer ${useTailwindClass ? categoryColor : ""}`}
                                         style={barStyle}
                                         title={t.title || t.name}
                                       >
@@ -1722,6 +1723,7 @@ const WeekView = ({
                             origStart,
                             origEnd: origEnd || new Date(origStart.getTime() + durationMs),
                             startY: ev.clientY,
+                            startScrollTop: (listOuterRef.current && listOuterRef.current.scrollTop) || 0,
                             pxPerMinute,
                             startMinutes,
                             colIndex: days.findIndex((d) => {
@@ -1731,46 +1733,106 @@ const WeekView = ({
                           };
                           setResizing(state);
 
-                          const onPointerMove = (mv) => {
+                          const computeResizePreview = (curr, clientY) => {
+                            const currentScrollTop = (listOuterRef.current && listOuterRef.current.scrollTop) || curr.startScrollTop || 0;
+                            const scrollDelta = currentScrollTop - (curr.startScrollTop || 0);
+                            const deltaY = (clientY - curr.startY) + scrollDelta;
+                            const deltaMinutes = deltaY / Math.max(0.0001, curr.pxPerMinute);
+
+                            let newStart = new Date(curr.origStart.getTime());
+                            let newEnd = new Date(curr.origEnd.getTime());
+
+                            if (curr.side === "top") {
+                              newStart = new Date(curr.origStart.getTime() + Math.round(deltaMinutes * 60000));
+                              const minStartTime = newEnd.getTime() - minDurationMinutes * 60000;
+                              if (newStart.getTime() > minStartTime) newStart = new Date(minStartTime);
+                            } else {
+                              newEnd = new Date(curr.origEnd.getTime() + Math.round(deltaMinutes * 60000));
+                              const minEndTime = newStart.getTime() + minDurationMinutes * 60000;
+                              if (newEnd.getTime() < minEndTime) newEnd = new Date(minEndTime);
+                            }
+
+                            const minDurationMs = minDurationMinutes * 60000;
+                            if ((newEnd.getTime() - newStart.getTime()) < minDurationMs) {
+                              if (curr.side === "top") {
+                                newStart = new Date(newEnd.getTime() - minDurationMs);
+                              } else {
+                                newEnd = new Date(newStart.getTime() + minDurationMs);
+                              }
+                            }
+
+                            const newStartMins =
+                              newStart.getHours() * 60 + newStart.getMinutes() + newStart.getSeconds() / 60;
+                            const newEndMins =
+                              newEnd.getHours() * 60 + newEnd.getMinutes() + newEnd.getSeconds() / 60;
+
+                            const topPx = (newStartMins - curr.startMinutes) * curr.pxPerMinute;
+                            const heightPx = Math.max(18, (newEndMins - newStartMins) * curr.pxPerMinute);
+
+                            return { newStart, newEnd, topPx, heightPx };
+                          };
+
+                          let rafId = null;
+                          let latestClientY = ev.clientY;
+
+                          const applyPreviewAt = (clientY) => {
                             try {
+                              const scroller = listOuterRef.current;
+                              if (scroller && scroller.getBoundingClientRect) {
+                                const rect = scroller.getBoundingClientRect();
+                                const edgePx = 28;
+                                let scrollStep = 0;
+                                if (clientY < rect.top + edgePx) {
+                                  scrollStep = -Math.max(4, Math.round((rect.top + edgePx - clientY) / 2));
+                                } else if (clientY > rect.bottom - edgePx) {
+                                  scrollStep = Math.max(4, Math.round((clientY - (rect.bottom - edgePx)) / 2));
+                                }
+                                if (scrollStep !== 0) {
+                                  scroller.scrollTop = Math.max(0, scroller.scrollTop + scrollStep);
+                                }
+                              }
+
                               setResizing((curr) => {
                                 if (!curr || curr.id !== state.id) return curr;
-                                const deltaY = mv.clientY - curr.startY;
-                                const deltaMinutes = deltaY / Math.max(0.0001, curr.pxPerMinute);
-
-                                let newStart = new Date(curr.origStart.getTime());
-                                let newEnd = new Date(curr.origEnd.getTime());
-
-                                if (curr.side === "top") {
-                                  newStart = new Date(curr.origStart.getTime() + Math.round(deltaMinutes * 60000));
-                                  const minStartTime = newEnd.getTime() - minDurationMinutes * 60000;
-                                  if (newStart.getTime() > minStartTime) newStart = new Date(minStartTime);
-                                } else {
-                                  newEnd = new Date(curr.origEnd.getTime() + Math.round(deltaMinutes * 60000));
-                                  const minEndTime = newStart.getTime() + minDurationMinutes * 60000;
-                                  if (newEnd.getTime() < minEndTime) newEnd = new Date(minEndTime);
-                                }
-
-                                const newStartMins =
-                                  newStart.getHours() * 60 + newStart.getMinutes() + newStart.getSeconds() / 60;
-                                const newEndMins =
-                                  newEnd.getHours() * 60 + newEnd.getMinutes() + newEnd.getSeconds() / 60;
-
-                                const topPx = (newStartMins - curr.startMinutes) * curr.pxPerMinute;
-                                const heightPx = Math.max(18, (newEndMins - newStartMins) * curr.pxPerMinute);
-
-                                return { ...curr, previewStart: newStart, previewEnd: newEnd, previewTop: topPx, previewHeight: heightPx };
+                                const preview = computeResizePreview(curr, clientY);
+                                return {
+                                  ...curr,
+                                  previewStart: preview.newStart,
+                                  previewEnd: preview.newEnd,
+                                  previewTop: preview.topPx,
+                                  previewHeight: preview.heightPx,
+                                };
                               });
                             } catch {}
                           };
 
-                          const onPointerUp = () => {
+                          const onPointerMove = (mv) => {
+                            try {
+                              latestClientY = mv.clientY;
+                              if (rafId != null) return;
+                              rafId = window.requestAnimationFrame(() => {
+                                rafId = null;
+                                applyPreviewAt(latestClientY);
+                              });
+                            } catch {}
+                          };
+
+                          const onPointerUp = (up) => {
                             try {
                               cleanupPointerListeners.current();
                               setResizing((curr) => {
                                 if (!curr || curr.id !== state.id) return null;
-                                const finalStart = curr.previewStart || curr.origStart;
-                                const finalEnd = curr.previewEnd || curr.origEnd;
+                                const preview = computeResizePreview(curr, up?.clientY ?? latestClientY);
+                                let finalStart = preview.newStart || curr.origStart;
+                                let finalEnd = preview.newEnd || curr.origEnd;
+                                const minDurationMs = minDurationMinutes * 60000;
+                                if ((finalEnd.getTime() - finalStart.getTime()) < minDurationMs) {
+                                  if (curr.side === "top") {
+                                    finalStart = new Date(finalEnd.getTime() - minDurationMs);
+                                  } else {
+                                    finalEnd = new Date(finalStart.getTime() + minDurationMs);
+                                  }
+                                }
                                 try {
                                   if (typeof onEventMove === "function") onEventMove(curr.id, finalStart, finalEnd);
                                 } catch {}
@@ -1782,6 +1844,12 @@ const WeekView = ({
                           window.addEventListener("pointermove", onPointerMove);
                           window.addEventListener("pointerup", onPointerUp, { once: true });
                           cleanupPointerListeners.current = () => {
+                            if (rafId != null) {
+                              try {
+                                window.cancelAnimationFrame(rafId);
+                              } catch {}
+                              rafId = null;
+                            }
                             try {
                               window.removeEventListener("pointermove", onPointerMove);
                             } catch {}
@@ -1952,20 +2020,19 @@ const WeekView = ({
 
                                   const kindColor = (() => {
                                     const kindLower = String(ev?.kind || "").toLowerCase();
-                                    if (kindLower === "appointment") {
-                                      return categories?.appointment?.color || categories?.[ev.kind]?.color || "#3b82f6";
-                                    }
-                                    let ka = null;
-                                    if (ev.taskId || ev.task_id) {
+                                    const explicitKeyAreaId = ev.keyAreaId || ev.key_area_id || ev.sourceKeyAreaId || ev.source_key_area_id;
+                                    let ka = explicitKeyAreaId ? keyAreaMap[String(explicitKeyAreaId)] : null;
+                                    if (!ka && (ev.taskId || ev.task_id || ev.sourceTaskId || ev.source_task_id)) {
+                                      const linkedTaskId = ev.taskId || ev.task_id || ev.sourceTaskId || ev.source_task_id;
                                       const parent = (Array.isArray(todos) ? todos : []).find(
-                                        (t) => String(t.id) === String(ev.taskId || ev.task_id)
+                                        (t) => String(t.id) === String(linkedTaskId)
                                       );
                                       if (parent) ka = keyAreaMap[String(parent.keyAreaId || parent.key_area_id)];
                                     }
-                                    if (!ka && (ev.keyAreaId || ev.key_area_id)) {
-                                      ka = keyAreaMap[String(ev.keyAreaId || ev.key_area_id)];
-                                    }
-                                    return ka?.color || categories?.[ev.kind]?.color || "#4DC3D8";
+                                    const keyAreaColor = ka?.color || null;
+                                    const categoryColor = categories?.[ev.kind]?.color || (kindLower === "appointment" ? categories?.appointment?.color : null);
+                                    const fallbackColor = kindLower === "appointment" ? "#3b82f6" : "#4DC3D8";
+                                    return keyAreaColor || categoryColor || fallbackColor;
                                   })();
                                   const sourceTypeLower = String(ev?.sourceType || ev?.source_type || "").toLowerCase();
                                   const isActivityCopy =
@@ -2217,45 +2284,6 @@ const WeekView = ({
                                         className="absolute left-0 right-0 h-2 -bottom-1 cursor-ns-resize"
                                         style={{ zIndex: 30 }}
                                       />
-
-                                      {isResizingThis && resizing.previewTop != null && (
-                                        <div
-                                          className="absolute rounded pointer-events-none border-2 border-dashed border-slate-400 bg-slate-200/30"
-                                          style={{
-                                            top: resizing.previewTop + "px",
-                                            left: 0,
-                                            width: "100%",
-                                            height: resizing.previewHeight + "px",
-                                            zIndex: 40,
-                                          }}
-                                        >
-                                          <div className="absolute -top-6 left-2 bg-black text-white text-[11px] px-2 py-0.5 rounded">
-                                            {resizing.previewStart
-                                              ? formatTime
-                                                ? formatTime(
-                                                    `${String(resizing.previewStart.getHours()).padStart(2, "0")}:${String(
-                                                      resizing.previewStart.getMinutes()
-                                                    ).padStart(2, "0")}`
-                                                  )
-                                                : `${String(resizing.previewStart.getHours()).padStart(2, "0")}:${String(
-                                                    resizing.previewStart.getMinutes()
-                                                  ).padStart(2, "0")}`
-                                              : ""}
-                                            {" — "}
-                                            {resizing.previewEnd
-                                              ? formatTime
-                                                ? formatTime(
-                                                    `${String(resizing.previewEnd.getHours()).padStart(2, "0")}:${String(
-                                                      resizing.previewEnd.getMinutes()
-                                                    ).padStart(2, "0")}`
-                                                  )
-                                                : `${String(resizing.previewEnd.getHours()).padStart(2, "0")}:${String(
-                                                    resizing.previewEnd.getMinutes()
-                                                  ).padStart(2, "0")}`
-                                              : ""}
-                                          </div>
-                                        </div>
-                                      )}
                                     </div>
                                   );
                                 } catch {
@@ -2263,6 +2291,33 @@ const WeekView = ({
                                 }
                               });
                           })}
+
+                          {resizing && resizing.previewTop != null && resizing.colIndex >= 0 && (
+                            <div
+                              className="absolute rounded pointer-events-none border-2 border-dashed border-slate-400 bg-slate-200/30"
+                              style={{
+                                top: resizing.previewTop + "px",
+                                left: `${TIME_COL_PX + (resizing.colIndex * colW) + 6}px`,
+                                width: `${Math.max(24, colW - 12)}px`,
+                                height: resizing.previewHeight + "px",
+                                zIndex: 40,
+                              }}
+                            >
+                              <div className="absolute -top-6 left-2 bg-black text-white text-[11px] px-2 py-0.5 rounded">
+                                {resizing.previewStart
+                                  ? (formatTime
+                                      ? formatTime(`${String(resizing.previewStart.getHours()).padStart(2, "0")}:${String(resizing.previewStart.getMinutes()).padStart(2, "0")}`)
+                                      : `${String(resizing.previewStart.getHours()).padStart(2, "0")}:${String(resizing.previewStart.getMinutes()).padStart(2, "0")}`)
+                                  : ""}
+                                {" — "}
+                                {resizing.previewEnd
+                                  ? (formatTime
+                                      ? formatTime(`${String(resizing.previewEnd.getHours()).padStart(2, "0")}:${String(resizing.previewEnd.getMinutes()).padStart(2, "0")}`)
+                                      : `${String(resizing.previewEnd.getHours()).padStart(2, "0")}:${String(resizing.previewEnd.getMinutes()).padStart(2, "0")}`)
+                                  : ""}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       );
                     } catch (e) {
@@ -2283,9 +2338,13 @@ const WeekView = ({
                     const isQuarterHourBoundary = slotMinute % 15 === 0 && slotMinute % 30 !== 0;
                     const shouldShowSlotLabel = slotSize === 15 ? slotMinute % 15 === 0 : slotMinute % 30 === 0;
 
-                    const rowBorderClass = isHourBoundary ? "border-t border-slate-300" : "";
-
                     const slotIsWorking = isWorkingTime ? isWorkingTime(slot) : true;
+
+                    const hourLabelClass = isHourBoundary
+                      ? (slotIsWorking ? "text-[12px] font-semibold text-slate-700" : "text-[12px] font-semibold text-slate-500")
+                      : (slotIsWorking ? "text-[11px] text-gray-500" : "text-[11px] text-gray-400");
+
+                    const rowBorderClass = isHourBoundary ? "border-t border-slate-400" : "";
 
                     return (
                       <div
@@ -2294,33 +2353,28 @@ const WeekView = ({
                         style={{ ...style, overflow: "visible", boxSizing: "border-box" }}
                         className={`relative flex w-full bg-white ${rowBorderClass}`}
                       >
-                        {!isHourBoundary && (isHalfHourBoundary || isQuarterHourBoundary) && (
-                          <div
-                            aria-hidden="true"
-                            style={{
-                              position: "absolute",
-                              left: 0,
-                              right: 0,
-                              top: 0,
-                              height: 0,
-                              borderTopStyle: isHalfHourBoundary ? "solid" : "dotted",
-                              borderTopWidth: "1px",
-                              borderTopColor: "rgba(148,163,184,0.3)",
-                              pointerEvents: "none",
-                              zIndex: 0,
-                            }}
-                          />
-                        )}
                         {/* LEFT: hour labels */}
                         <div
                           className="px-2 text-xs text-gray-500 flex-shrink-0 flex items-center justify-center relative"
                           style={{
                             width: TIME_COL_PX + "px",
+                            minWidth: TIME_COL_PX + "px",
+                            maxWidth: TIME_COL_PX + "px",
+                            boxSizing: "border-box",
                             height: ITEM_SIZE,
-                            backgroundColor: slotIsWorking ? undefined : NON_WORK_BG,
+                            backgroundColor: slotIsWorking ? "#ffffff" : NON_WORK_BG,
+                            borderTopStyle: !isHourBoundary && (isHalfHourBoundary || isQuarterHourBoundary)
+                              ? (isHalfHourBoundary ? "solid" : "dotted")
+                              : undefined,
+                            borderTopWidth: !isHourBoundary && (isHalfHourBoundary || isQuarterHourBoundary)
+                              ? "1px"
+                              : undefined,
+                            borderTopColor: !isHourBoundary && (isHalfHourBoundary || isQuarterHourBoundary)
+                              ? (isHalfHourBoundary ? "rgba(148,163,184,0.3)" : "rgba(148,163,184,0.2)")
+                              : undefined,
                           }}
                         >
-                          <span className="pl-2">{shouldShowSlotLabel ? (formatTime ? formatTime(slot) : slot) : ""}</span>
+                          <span className={`pl-2 ${hourLabelClass}`}>{shouldShowSlotLabel ? (formatTime ? formatTime(slot) : slot) : ""}</span>
                         </div>
 
                         {/* RIGHT: grid cells */}
@@ -2342,8 +2396,17 @@ const WeekView = ({
                                 height: ITEM_SIZE,
                                 boxSizing: "border-box",
                                 cursor: "pointer",
-                                backgroundColor: isHoverPreview ? "rgba(191, 219, 254, 0.65)" : (slotIsWorking ? undefined : NON_WORK_BG),
+                                backgroundColor: isHoverPreview ? "rgba(191, 219, 254, 0.65)" : (slotIsWorking ? "#ffffff" : NON_WORK_BG),
                                 opacity: slotIsWorking ? 1 : NON_WORK_OPACITY,
+                                borderTopStyle: !isHourBoundary && (isHalfHourBoundary || isQuarterHourBoundary)
+                                  ? (isHalfHourBoundary ? "solid" : "dotted")
+                                  : undefined,
+                                borderTopWidth: !isHourBoundary && (isHalfHourBoundary || isQuarterHourBoundary)
+                                  ? "1px"
+                                  : undefined,
+                                borderTopColor: !isHourBoundary && (isHalfHourBoundary || isQuarterHourBoundary)
+                                  ? (isHalfHourBoundary ? "rgba(148,163,184,0.3)" : "rgba(148,163,184,0.2)")
+                                  : undefined,
                               }}
                               onDragOver={(e) => {
                                 e.preventDefault();
@@ -2470,6 +2533,7 @@ const WeekView = ({
                         width: TIME_COL_PX + "px",
                         minWidth: TIME_COL_PX + "px",
                         maxWidth: TIME_COL_PX + "px",
+                        boxSizing: "border-box",
                         padding: "8px 8px 8px 4px",
                         backgroundColor: "white",
                         verticalAlign: "top",
