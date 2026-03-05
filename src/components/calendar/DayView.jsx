@@ -704,7 +704,7 @@ export default function DayView({
                     style={{ backgroundColor: accentColor }}
                     aria-hidden="true"
                   />
-                  <div className="truncate flex-1 text-[15px] text-[#4DC3D8]">
+                  <div className="truncate flex-1 text-xs text-[#4DC3D8]">
                     {t.title || t.name || 'Untitled'}
                   </div>
                   {keyAreaListLabel ? (
@@ -830,7 +830,7 @@ export default function DayView({
                     title={`Drag to calendar to create appointment • ${a.text || a.desc || a.note || 'Activity'}`}
                   >
                     <FaBars className="w-4 h-4 shrink-0" style={{ color: accentColor }} aria-hidden="true" />
-                    <div className="truncate flex-1 text-[15px] text-[#4DC3D8]">{a.text || a.desc || a.note || "Activity"}</div>
+                    <div className="truncate flex-1 text-xs text-[#4DC3D8]">{a.text || a.desc || a.note || "Activity"}</div>
                     <div className="flex items-center gap-1 shrink-0">
                       {onActivityComplete && (
                         <button
@@ -1741,8 +1741,8 @@ export default function DayView({
                             }}
                             title={title}
                           >
-                            <div className="relative h-full flex items-center gap-1 w-full min-w-0 pr-10">
-                              <span className="shrink-0">
+                            <div className="relative h-full flex items-center gap-1.5 w-full min-w-0 pr-10">
+                              <span className="shrink-0 inline-flex items-center leading-none">
                                 {isActivityCopy ? (
                                   <FaBars className="w-3 h-3" style={{ color: copyIconColor || undefined }} />
                                 ) : isTaskCopy ? (
