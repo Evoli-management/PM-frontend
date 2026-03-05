@@ -1065,7 +1065,7 @@ export default function DayView({
             />
             <div className="w-full bg-white flex flex-col text-sm text-gray-700" style={{ height: "100%" }}>
               <div className="w-full flex h-10 border-y border-slate-300 bg-slate-100/80">
-                <div className="w-16 h-full border-l border-slate-300" />
+                <div className="w-12 h-full border-l border-slate-300" />
                 <div className="flex-1 h-full flex items-center justify-center text-[13px] md:text-[14px] font-semibold text-slate-700">
                   {headerWeekday}
                 </div>
@@ -1080,7 +1080,7 @@ export default function DayView({
                 }}
                 onClick={handleCreateAllDayEvent}
               >
-                <div className="w-16 bg-white text-xs text-gray-500 flex border-l border-slate-300 border-r border-gray-200">
+                <div className="w-12 bg-white text-xs text-gray-500 flex border-l border-slate-300 border-r border-gray-200">
                   <div
                     className="h-full flex items-start py-1"
                   >
@@ -1149,10 +1149,11 @@ export default function DayView({
                               if (t.keyAreaId || t.key_area_id) ka = keyAreaMap[String(t.keyAreaId || t.key_area_id)];
                               else if (t.taskId || t.task_id) ka = keyAreaMap[String(t.taskId || t.task_id)];
                               const kaColor = ka && ka.color ? ka.color : null;
+                              const useCategoryClass = !kaColor && !!bgClass;
                               const DEFAULT_BAR_COLOR = '#4DC3D8';
-                              const finalBg = bgClass ? null : (kaColor || DEFAULT_BAR_COLOR);
+                              const finalBg = kaColor || (useCategoryClass ? null : DEFAULT_BAR_COLOR);
                               const textColor = finalBg ? getContrastTextColor(finalBg) : '#ffffff';
-                              const styleBar = bgClass ? undefined : { backgroundColor: finalBg, borderColor: finalBg, color: textColor };
+                              const styleBar = useCategoryClass ? undefined : { backgroundColor: finalBg, borderColor: finalBg, color: textColor };
 
                               return (
                                 <div key={`allday-${t.id || title}`} className="w-full">
@@ -1162,7 +1163,7 @@ export default function DayView({
                                       try { e.stopPropagation(); } catch (_) {}
                                       if (onEventClick) onEventClick(t);
                                     }}
-                                    className={`w-full group flex items-center gap-2 px-3 py-2 rounded text-xs overflow-hidden ${bgClass || ''}`}
+                                    className={`w-full group flex items-center gap-2 px-3 py-2 rounded text-xs overflow-hidden ${useCategoryClass ? bgClass : ''}`}
                                     style={{ ...(styleBar || {}), width: '100%' }}
                                     title={title}
                                   >
@@ -1320,7 +1321,7 @@ export default function DayView({
                 style={{ overflowX: "hidden", overflowY: "auto" }}
               >
                 {/* LEFT TIME COLUMN – clearer hourly rows */}
-                <div className="w-16 bg-white text-xs text-gray-500 min-h-0">
+                <div className="w-12 bg-white text-xs text-gray-500 min-h-0">
                   <div
                     className="relative border-l border-slate-300 border-r border-slate-300"
                     style={{ height: HOUR_HEIGHT * hours.length }}
@@ -1638,8 +1639,9 @@ export default function DayView({
                           }
                           return iconKa?.color || '#4DC3D8';
                         })();
+                        const useCategoryClass = !kaColor && !!bgClass;
                         const DEFAULT_BAR_COLOR = '#4DC3D8';
-                        const finalBg = bgClass ? null : (kaColor || DEFAULT_BAR_COLOR);
+                        const finalBg = kaColor || (useCategoryClass ? null : DEFAULT_BAR_COLOR);
                         const textColor = finalBg ? getContrastTextColor(finalBg) : '#ffffff';
 
                         const laneAwareStyle = (() => {
@@ -1658,7 +1660,7 @@ export default function DayView({
                           };
                         })();
 
-                        const style = bgClass
+                        const style = useCategoryClass
                           ? undefined
                           : {
                               top: renderedTopPx + 'px',
@@ -1674,8 +1676,8 @@ export default function DayView({
                         return (
                           <div
                             key={`appt-${appt.id || originalIndex}-${title}`}
-                            className={`absolute rounded px-1.5 py-1 pr-2 text-xs overflow-hidden group ${bgClass || ''}`}
-                            style={bgClass ? { top: renderedTopPx + 'px', height: renderedHeightPx + 'px', ...laneAwareStyle, zIndex: 5 } : { ...style, zIndex: 5 }}
+                            className={`absolute rounded px-1.5 py-1 pr-2 text-xs overflow-hidden group ${useCategoryClass ? bgClass : ''}`}
+                            style={useCategoryClass ? { top: renderedTopPx + 'px', height: renderedHeightPx + 'px', ...laneAwareStyle, zIndex: 5 } : { ...style, zIndex: 5 }}
                             draggable
                             onDragStart={(e) => {
                               try {

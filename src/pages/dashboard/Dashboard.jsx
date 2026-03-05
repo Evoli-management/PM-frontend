@@ -197,10 +197,19 @@ function EChart({ data = [], labels = [] }) {
 }
 
 // SortableWidget wrapper component for drag functionality
-const BASE_WIDGET_WIDTH = 320;
-const MAX_WIDGET_WIDTH = BASE_WIDGET_WIDTH * 2;
 
-function SortableWidget({ id, children, onClose, widthScale = 1, onResizeWidth = null }) {
+const MIN_WIDGET_SCALE = 1;
+const MAX_WIDGET_SCALE = 4;
+
+function SortableWidget({
+    id,
+    children,
+    onClose,
+    widthScale = 1,
+    heightScale = 1,
+    onResizeWidth = null,
+    onResizeHeight = null,
+}) {
     const {
         attributes,
         listeners,
@@ -210,13 +219,14 @@ function SortableWidget({ id, children, onClose, widthScale = 1, onResizeWidth =
         isDragging,
     } = useSortable({ id });
 
+    const normalizedScale = Math.max(MIN_WIDGET_SCALE, Math.min(MAX_WIDGET_SCALE, Number(widthScale) || MIN_WIDGET_SCALE));
+    const normalizedHeightScale = Math.max(MIN_WIDGET_SCALE, Math.min(MAX_WIDGET_SCALE, Number(heightScale) || MIN_WIDGET_SCALE));
     const style = {
         transform: CSS.Transform.toString(transform),
         transition,
         opacity: isDragging ? 0.5 : 1,
-        width: `${Math.round(BASE_WIDGET_WIDTH * widthScale)}px`,
-        minWidth: `${BASE_WIDGET_WIDTH}px`,
-        maxWidth: `${MAX_WIDGET_WIDTH}px`,
+        '--widget-width': `calc((((100% - 1.5rem) / 4) * ${normalizedScale}) - 2px)`,
+        '--widget-height': `calc(24rem * ${normalizedHeightScale})`,
     };
 
     const widgetRef = useRef(null);
@@ -230,9 +240,9 @@ function SortableWidget({ id, children, onClose, widthScale = 1, onResizeWidth =
         const state = resizeStartRef.current;
         if (!state || !onResizeWidth) return;
         const delta = event.clientX - state.startX;
-        const nextWidth = Math.max(BASE_WIDGET_WIDTH, Math.min(MAX_WIDGET_WIDTH, state.startWidth + delta));
-        const nextScale = Math.max(1, Math.min(2, nextWidth / BASE_WIDGET_WIDTH));
-        if (Math.abs(nextScale - state.lastSent) > 0.01) {
+        const scaleDelta = delta / 720;
+        const nextScale = Math.max(MIN_WIDGET_SCALE, Math.min(MAX_WIDGET_SCALE, state.startScale + scaleDelta));
+        if (Math.abs(nextScale - state.lastSent) > 0.02) {
             resizeStartRef.current = { ...state, lastSent: nextScale };
             onResizeWidth(nextScale);
         }
@@ -246,19 +256,49 @@ function SortableWidget({ id, children, onClose, widthScale = 1, onResizeWidth =
         if (!onResizeWidth) return;
         event.preventDefault();
         event.stopPropagation();
-        const measuredWidth = widgetRef.current?.getBoundingClientRect?.().width || BASE_WIDGET_WIDTH;
-        const startWidth = Math.max(BASE_WIDGET_WIDTH, Math.min(MAX_WIDGET_WIDTH, measuredWidth));
+        const startScale = Math.max(MIN_WIDGET_SCALE, Math.min(MAX_WIDGET_SCALE, Number(widthScale) || 1));
         resizeStartRef.current = {
             startX: event.clientX,
-            startWidth,
-            lastSent: widthScale,
+            startScale,
+            lastSent: startScale,
         };
         window.addEventListener("pointermove", handleResizeMove);
         window.addEventListener("pointerup", handleResizeEnd);
     };
 
+    const resizeHeightStartRef = useRef(null);
+    const handleResizeHeightMove = (event) => {
+        const state = resizeHeightStartRef.current;
+        if (!state || !onResizeHeight) return;
+        const delta = event.clientY - state.startY;
+        const scaleDelta = delta / 720;
+        const nextScale = Math.max(MIN_WIDGET_SCALE, Math.min(MAX_WIDGET_SCALE, state.startScale + scaleDelta));
+        if (Math.abs(nextScale - state.lastSent) > 0.02) {
+            resizeHeightStartRef.current = { ...state, lastSent: nextScale };
+            onResizeHeight(nextScale);
+        }
+    };
+    const handleResizeHeightEnd = () => {
+        window.removeEventListener("pointermove", handleResizeHeightMove);
+        window.removeEventListener("pointerup", handleResizeHeightEnd);
+        resizeHeightStartRef.current = null;
+    };
+    const handleResizeHeightStart = (event) => {
+        if (!onResizeHeight) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const startScale = Math.max(MIN_WIDGET_SCALE, Math.min(MAX_WIDGET_SCALE, Number(heightScale) || MIN_WIDGET_SCALE));
+        resizeHeightStartRef.current = {
+            startY: event.clientY,
+            startScale,
+            lastSent: startScale,
+        };
+        window.addEventListener("pointermove", handleResizeHeightMove);
+        window.addEventListener("pointerup", handleResizeHeightEnd);
+    };
+
     return (
-        <div ref={setRefs} style={style} className="group relative w-full md:w-auto shrink-0">
+        <div ref={setRefs} style={style} className="group relative w-full sm:w-[calc(50%-0.25rem)] lg:w-[var(--widget-width)] shrink-0 self-start">
             {/* Drag handle - Full width title area */}
             <div 
                 {...attributes} 
@@ -274,6 +314,16 @@ function SortableWidget({ id, children, onClose, widthScale = 1, onResizeWidth =
                     title="Drag to resize width"
                     onPointerDown={handleResizeStart}
                     className="absolute top-0 right-0 w-1 h-full cursor-e-resize hover:bg-blue-500/20 transition-colors z-20 touch-none"
+                />
+            )}
+            {onResizeHeight && (
+                <div
+                    role="separator"
+                    aria-orientation="horizontal"
+                    aria-label="Resize widget height"
+                    title="Drag to resize height"
+                    onPointerDown={handleResizeHeightStart}
+                    className="absolute bottom-0 left-0 right-0 h-1 cursor-ns-resize hover:bg-blue-500/20 transition-colors z-20 touch-none"
                 />
             )}
             {/* Close button */}
@@ -355,6 +405,14 @@ export default function Dashboard() {
             calendarPreview: 1,
             activity: 1,
         },
+        widgetHeights: {
+            myDay: 1,
+            goals: 1,
+            keyAreas: 1,
+            enps: 1,
+            calendarPreview: 1,
+            activity: 1,
+        },
         // explicit order for all widgets — will be kept in localStorage (quickAdd removed to avoid duplication with navbar)
         widgetOrder: ["myDay", "goals", "keyAreas", "enps", "calendarPreview", "activity"],
         theme: "light", // or 'dark'
@@ -368,6 +426,7 @@ export default function Dashboard() {
             // merge widgets
             const widgets = { ...defaultPrefs.widgets, ...(stored.widgets || {}) };
             const widgetSizes = { ...defaultPrefs.widgetSizes, ...(stored.widgetSizes || {}) };
+            const widgetHeights = { ...defaultPrefs.widgetHeights, ...(stored.widgetHeights || {}) };
 
             // normalize widgetOrder: prefer stored.widgetOrder; else use stored.lastSelected ordering; else fall back to defaults
             const knownKeys = Object.keys(defaultPrefs.widgets);
@@ -389,7 +448,12 @@ export default function Dashboard() {
             widgetOrder = [...presentKeys, ...missingKeys];
             const normalizedSizes = knownKeys.reduce((acc, key) => {
                 const rawSize = Number(widgetSizes[key]);
-                acc[key] = Math.max(1, Math.min(2, Number.isFinite(rawSize) ? rawSize : 1));
+                acc[key] = Math.max(MIN_WIDGET_SCALE, Math.min(MAX_WIDGET_SCALE, Number.isFinite(rawSize) ? rawSize : MIN_WIDGET_SCALE));
+                return acc;
+            }, {});
+            const normalizedHeights = knownKeys.reduce((acc, key) => {
+                const rawHeight = Number(widgetHeights[key]);
+                acc[key] = Math.max(MIN_WIDGET_SCALE, Math.min(MAX_WIDGET_SCALE, Number.isFinite(rawHeight) ? rawHeight : MIN_WIDGET_SCALE));
                 return acc;
             }, {});
 
@@ -398,6 +462,7 @@ export default function Dashboard() {
                 ...stored,
                 widgets,
                 widgetSizes: normalizedSizes,
+                widgetHeights: normalizedHeights,
                 widgetOrder,
                 // Force light mode regardless of stored value
                 theme: "light",
@@ -426,7 +491,12 @@ export default function Dashboard() {
             const currentSize = Number(p.widgetSizes?.[key]);
             const widgetSizes = {
                 ...(p.widgetSizes || {}),
-                [key]: Math.max(1, Math.min(2, Number.isFinite(currentSize) ? currentSize : 1)),
+                [key]: Math.max(MIN_WIDGET_SCALE, Math.min(MAX_WIDGET_SCALE, Number.isFinite(currentSize) ? currentSize : MIN_WIDGET_SCALE)),
+            };
+            const currentHeight = Number(p.widgetHeights?.[key]);
+            const widgetHeights = {
+                ...(p.widgetHeights || {}),
+                [key]: Math.max(MIN_WIDGET_SCALE, Math.min(MAX_WIDGET_SCALE, Number.isFinite(currentHeight) ? currentHeight : MIN_WIDGET_SCALE)),
             };
             let widgetOrder = Array.isArray(p.widgetOrder) ? p.widgetOrder.slice() : [];
 
@@ -441,7 +511,7 @@ export default function Dashboard() {
                 delete lastSelected[key];
             }
 
-            const newPrefs = { ...p, widgets, widgetSizes, widgetOrder, lastSelected };
+            const newPrefs = { ...p, widgets, widgetSizes, widgetHeights, widgetOrder, lastSelected };
             
             // Dispatch event so Navbar updates its widget menu immediately
             setTimeout(() => {
@@ -845,23 +915,34 @@ export default function Dashboard() {
         // Make all widgets the same size with proper content accommodation
         // Flexible height to fit content but maintain consistency
         const widgetClass = 'w-full h-96 min-h-96';
-        const widthScale = Math.max(1, Math.min(2, Number(prefs.widgetSizes?.[key]) || 1));
+        const widthScale = Math.max(MIN_WIDGET_SCALE, Math.min(MAX_WIDGET_SCALE, Number(prefs.widgetSizes?.[key]) || MIN_WIDGET_SCALE));
+        const heightScale = Math.max(MIN_WIDGET_SCALE, Math.min(MAX_WIDGET_SCALE, Number(prefs.widgetHeights?.[key]) || MIN_WIDGET_SCALE));
         const setWidgetWidthScale = (scale) => {
             setPrefs((p) => ({
                 ...p,
                 widgetSizes: {
                     ...(p.widgetSizes || {}),
-                    [key]: Math.max(1, Math.min(2, Number(scale) || 1)),
+                    [key]: Math.max(MIN_WIDGET_SCALE, Math.min(MAX_WIDGET_SCALE, Number(scale) || MIN_WIDGET_SCALE)),
                 },
             }));
         };
+        const setWidgetHeightScale = (scale) => {
+            setPrefs((p) => ({
+                ...p,
+                widgetHeights: {
+                    ...(p.widgetHeights || {}),
+                    [key]: Math.max(MIN_WIDGET_SCALE, Math.min(MAX_WIDGET_SCALE, Number(scale) || MIN_WIDGET_SCALE)),
+                },
+            }));
+        };
+        const widgetStyle = { height: 'var(--widget-height)', minHeight: 'var(--widget-height)' };
 
 
 
         if (key === "myDay") {
             return (
-                <SortableWidget key={key} id={key} widthScale={widthScale} onResizeWidth={setWidgetWidthScale} onClose={() => toggleWidget(key)}>
-                    <div className={widgetClass}>
+                <SortableWidget key={key} id={key} widthScale={widthScale} heightScale={heightScale} onResizeWidth={setWidgetWidthScale} onResizeHeight={setWidgetHeightScale} onClose={() => toggleWidget(key)}>
+                    <div className={widgetClass} style={widgetStyle}>
                         <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
                             <div className="flex items-start justify-between mb-3">
                                 <h3 className="font-semibold text-blue-700">My Day</h3>
@@ -883,8 +964,8 @@ export default function Dashboard() {
 
         if (key === "goals") {
             return (
-                <SortableWidget key={key} id={key} widthScale={widthScale} onResizeWidth={setWidgetWidthScale} onClose={() => toggleWidget(key)}>
-                    <div className={widgetClass}>
+                <SortableWidget key={key} id={key} widthScale={widthScale} heightScale={heightScale} onResizeWidth={setWidgetWidthScale} onResizeHeight={setWidgetHeightScale} onClose={() => toggleWidget(key)}>
+                    <div className={widgetClass} style={widgetStyle}>
                     <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
                         <h3 className="font-semibold text-blue-700 mb-3">Your active goals</h3>
                         <div className="flex items-center justify-between mb-2">
@@ -961,8 +1042,8 @@ export default function Dashboard() {
 
         if (key === "keyAreas") {
             return (
-                <SortableWidget key={key} id={key} widthScale={widthScale} onResizeWidth={setWidgetWidthScale} onClose={() => toggleWidget(key)}>
-                    <div className={widgetClass}>
+                <SortableWidget key={key} id={key} widthScale={widthScale} heightScale={heightScale} onResizeWidth={setWidgetWidthScale} onResizeHeight={setWidgetHeightScale} onClose={() => toggleWidget(key)}>
+                    <div className={widgetClass} style={widgetStyle}>
                         <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
                             <h3 className="font-semibold text-blue-700 mb-3">Key Areas Summary</h3>
                             <KeyAreasWidget 
@@ -978,8 +1059,8 @@ export default function Dashboard() {
 
         if (key === "enps") {
             return (
-                <SortableWidget key={key} id={key} widthScale={widthScale} onResizeWidth={setWidgetWidthScale} onClose={() => toggleWidget(key)}>
-                    <div className={widgetClass}>
+                <SortableWidget key={key} id={key} widthScale={widthScale} heightScale={heightScale} onResizeWidth={setWidgetWidthScale} onResizeHeight={setWidgetHeightScale} onClose={() => toggleWidget(key)}>
+                    <div className={widgetClass} style={widgetStyle}>
                     <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
                         <h3 className="font-semibold text-blue-700 mb-3">eNPS Snapshot</h3>
                         <div className="flex items-start justify-between">
@@ -1004,8 +1085,8 @@ export default function Dashboard() {
 
         if (key === "calendarPreview") {
             return (
-                <SortableWidget key={key} id={key} widthScale={widthScale} onResizeWidth={setWidgetWidthScale} onClose={() => toggleWidget(key)}>
-                    <div className={widgetClass}>
+                <SortableWidget key={key} id={key} widthScale={widthScale} heightScale={heightScale} onResizeWidth={setWidgetWidthScale} onResizeHeight={setWidgetHeightScale} onClose={() => toggleWidget(key)}>
+                    <div className={widgetClass} style={widgetStyle}>
                     <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
                         <h3 className="font-semibold text-blue-700 mb-3">Calendar Preview (Today)</h3>
                         <div className="flex items-center justify-between mb-2">
@@ -1046,8 +1127,8 @@ export default function Dashboard() {
 
         if (key === "activity") {
             return (
-                <SortableWidget key={key} id={key} widthScale={widthScale} onResizeWidth={setWidgetWidthScale} onClose={() => toggleWidget(key)}>
-                    <div className={widgetClass}>
+                <SortableWidget key={key} id={key} widthScale={widthScale} heightScale={heightScale} onResizeWidth={setWidgetWidthScale} onResizeHeight={setWidgetHeightScale} onClose={() => toggleWidget(key)}>
+                    <div className={widgetClass} style={widgetStyle}>
                     <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
                         <h3 className="font-semibold text-blue-700 mb-3">What's New</h3>
                         <div className="flex items-center justify-between mb-2">
@@ -1182,7 +1263,7 @@ export default function Dashboard() {
                                             items={visibleWidgetKeys} 
                                             strategy={rectSortingStrategy}
                                         >
-                                            <div className="flex flex-wrap items-stretch gap-1 md:gap-2">
+                                            <div className="flex flex-wrap items-start gap-1 md:gap-2">
                                                 {visibleWidgetKeys.map((key, index) => renderWidget(key, index))}
                                             </div>
                                         </SortableContext>
