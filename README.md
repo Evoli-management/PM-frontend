@@ -1,67 +1,45 @@
 # PM-Frontend
 
----
+React SPA for Practical Manager. Deployed on GitHub Pages (`evoli-management.github.io/PM-frontend`).
 
-## Requirements:
+## Stack
 
-- Node | Bun
-- Text Editor | IDE
+- **Framework**: React 18 + Vite
+- **Routing**: React Router (hash-based)
+- **Styling**: Tailwind CSS
+- **Package manager**: pnpm
 
-## Tech Stack
+## Local Development
 
-- **React (with Vite)** - UI library
-- **JavaScript** - Programming Language
-- **CSS | TailwindCSS** - for styling
-- **React Router** - for routing
-- **Lucide React** - for icons
-- **Prettier** - for formating
-- **Zod** - Schema Validation
-- **Axios** - for promise-based HTTP
-
-## Setup Info:
-
-1. Clone Repo
-   `git clone https://github.com/Evoli-management/PM-frontend.git -b <branch_name>`
-
-2. Navigate to the repo
-   `cd <PM-frontend>`
-
-3. Install dependencies
-
-```sh
-  pnpm install
+```bash
+pnpm install
+pnpm dev
 ```
 
-4. Start dev server
+## Build & Deploy
 
-```sh
-  pnpm run dev
+```bash
+pnpm build
+# GitHub Actions auto-deploys main branch to gh-pages
 ```
 
-## Testing:
+## Key Pages & Components
 
-```sh
-  pnpm run test
-```
+| Path | Description |
+|------|-------------|
+| `src/pages/KeyAreas.jsx` | Main key areas view — task lists, tabs, delegations |
+| `src/pages/DontForget.jsx` | Don't Forget key area with imported tasks filter |
+| `src/pages/Tasks.jsx` | All tasks view |
+| `src/components/key-areas/PendingDelegationsSection.jsx` | Accept/reject incoming task delegations |
+| `src/components/key-areas/CreateTaskModal.jsx` | Create task modal with list selector |
+| `src/services/` | API client wrappers (keyAreaService, taskService, etc.) |
 
-## To check production
+## Sync Integration
 
-1. Build the app
+The frontend triggers sync via PM-backend API endpoints. Calendar and task sync status is reflected in real time after sync completes.
 
-```sh
-  pnpm run build
-```
+## Environment Variables
 
-2. Preview the build
-
-```sh
-  npm run preview # pnpm run preview | bun run preview
-```
-
-## License
-
-- None
-
----
-
-Made with ❤️ by **Code Craft Crew (CCC)**
+| Variable | Description |
+|----------|-------------|
+| `VITE_API_BASE_URL` | PM-backend API base URL |
