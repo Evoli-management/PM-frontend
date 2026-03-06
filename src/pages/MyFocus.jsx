@@ -213,7 +213,7 @@ export default function MyFocus() {
                                         <div className="text-center font-semibold text-sm md:text-base whitespace-nowrap">Not urgent</div>
                                     </div>
 
-                                    <div className="grid flex-1 min-h-0 grid-rows-2 grid-cols-[auto_1fr_1fr] gap-3 [grid-template-rows:minmax(0,1fr)_minmax(0,1fr)]">
+                                    <div className="grid flex-1 min-h-0 grid-rows-2 grid-cols-[20px_1fr_1fr] gap-3 [grid-template-rows:minmax(0,1fr)_minmax(0,1fr)]">
                                         {/* Row 1, Col 1: Important label (rotated) */}
                                         <div className="flex items-center justify-center">
                                             <div className="transform -rotate-90 origin-center text-sm md:text-base font-semibold whitespace-nowrap">Important</div>

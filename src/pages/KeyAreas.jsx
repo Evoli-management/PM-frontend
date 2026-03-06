@@ -26,7 +26,7 @@ import ResizablePanels from '../components/key-areas/ResizablePanels';
 import KeyAreasTripleView from '../components/key-areas/KeyAreasTripleView';
 import taskDelegationService from '../services/taskDelegationService';
 import activityDelegationService from '../services/activityDelegationService';
-import { FaTimes, FaSave, FaTag, FaTrash, FaAngleDoubleLeft, FaChevronLeft, FaStop, FaEllipsisV, FaEdit, FaSearch, FaPlus, FaBars, FaLock, FaExclamationCircle } from 'react-icons/fa';
+import { FaTimes, FaSave, FaTag, FaTrash, FaAngleDoubleLeft, FaChevronLeft, FaChevronDown, FaStop, FaEllipsisV, FaEdit, FaSearch, FaPlus, FaBars, FaLock, FaExclamationCircle } from 'react-icons/fa';
 import '../styles/triple-view.css';
 import {
     safeParseDate,
@@ -606,9 +606,21 @@ export default function KeyAreas() {
     const [taskFullInitialTab, setTaskFullInitialTab] = useState("activities");
     // Triple view left panel selected task
     const [selectedTaskInPanel, setSelectedTaskInPanel] = useState(null);
+    const [panelViewMode, setPanelViewMode] = useState(() => {
+        try {
+            return window.localStorage.getItem("keyareas.panelViewMode") || "triple";
+        } catch {
+            return "triple";
+        }
+    });
+    const [showPanelViewMenu, setShowPanelViewMenu] = useState(false);
+    const panelViewMenuRef = useRef(null);
     // Inline Activities popover state
     const [openActivitiesMenu, setOpenActivitiesMenu] = useState(null); // task id or null
     const [activitiesMenuPos, setActivitiesMenuPos] = useState({ top: 0, left: 0 });
+    const prevViewTabRef = useRef(initialViewTab);
+    const openingKaIdRef = useRef(null);
+    const suppressKaParamOpenRef = useRef(false);
     const ActivityRowMenu = ({ activity, taskId }) => {
         const [open, setOpen] = useState(false);
         const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
@@ -696,7 +708,7 @@ export default function KeyAreas() {
         };
 
         return (
-            <div className="inline-block mr-1 relative">
+            <div className="inline-block relative">
                 <button
                     type="button"
                     ref={btnRef}
@@ -732,6 +744,61 @@ export default function KeyAreas() {
             </div>
         );
     };
+
+    useEffect(() => {
+        try {
+            window.localStorage.setItem("keyareas.panelViewMode", panelViewMode);
+        } catch {}
+    }, [panelViewMode]);
+
+    useEffect(() => {
+        if (panelViewMode === "simple") {
+            setSelectedTaskInPanel(null);
+        }
+    }, [panelViewMode]);
+
+    useEffect(() => {
+        // Never keep a locally-open task row while on global tabs
+        // (delegated / todo / activity-trap).
+        if (isGlobalTasksView) {
+            setSelectedTaskInPanel(null);
+        }
+    }, [isGlobalTasksView, viewTab]);
+
+    useEffect(() => {
+        // Keep inline task-open state only for Active Tasks view.
+        if (viewTab !== "active-tasks") {
+            setSelectedTaskInPanel(null);
+        }
+    }, [viewTab]);
+
+    useEffect(() => {
+        // When returning from global tabs to Active Tasks, force KA selection first.
+        const prev = prevViewTabRef.current;
+        const wasGlobal = prev === "delegated" || prev === "todo" || prev === "activity-trap";
+        if (viewTab === "active-tasks" && wasGlobal) {
+            setSelectedKA(null);
+            setAllTasks([]);
+        }
+        prevViewTabRef.current = viewTab;
+    }, [viewTab]);
+
+    useEffect(() => {
+        if (!showPanelViewMenu) return;
+        const handleClick = (e) => {
+            if (!panelViewMenuRef.current) return;
+            if (!panelViewMenuRef.current.contains(e.target)) setShowPanelViewMenu(false);
+        };
+        const handleKey = (e) => {
+            if (e.key === "Escape") setShowPanelViewMenu(false);
+        };
+        document.addEventListener("mousedown", handleClick);
+        document.addEventListener("keydown", handleKey);
+        return () => {
+            document.removeEventListener("mousedown", handleClick);
+            document.removeEventListener("keydown", handleKey);
+        };
+    }, [showPanelViewMenu]);
 
     const saveActivityName = async (activity, taskId, value) => {
         const trimmed = String(value || '').trim();
@@ -1127,11 +1194,15 @@ export default function KeyAreas() {
                         
                         // Set all items for the bottom section (with filters)
                         setAllTasks(allDelegated);
+                        // Stop showing pending-loading UI as soon as delegated lists are ready.
+                        // Activity hydration can continue silently in the background.
+                        setPendingDelegationsLoading(false);
                     } catch (err) {
                         console.error('❌ ERROR: getDelegatedToMe() failed:', err);
                         delegatedToMe = [];
                         delegatedActivities = [];
                         setPendingDelegations([]);
+                        setPendingDelegationsLoading(false);
                     }
 
                     // Load activities for delegated tasks
@@ -1158,8 +1229,6 @@ export default function KeyAreas() {
                 } catch (e) {
                     console.error('Failed to load delegated tasks', e);
                     setPendingDelegations([]);
-                } finally {
-                    setPendingDelegationsLoading(false);
                 }
             })();
             return;
@@ -2168,6 +2237,7 @@ export default function KeyAreas() {
     // React to sidebar clicks and query params: show all key areas or select Ideas
     useEffect(() => {
         const showAll = () => {
+            suppressKaParamOpenRef.current = true;
             setSelectedKA(null);
             setAllTasks([]);
             setFilter("");
@@ -2478,6 +2548,12 @@ export default function KeyAreas() {
         const params = new URLSearchParams(location.search);
         const kaParam = params.get("ka");
         const taskParam = params.get("task");
+        // Back/show-all can briefly leave stale ?ka in URL while selectedKA is already cleared.
+        // Suppress auto-open until the query is cleared.
+        if (suppressKaParamOpenRef.current) {
+            if (!kaParam) suppressKaParamOpenRef.current = false;
+            return;
+        }
         if (kaParam && keyAreas.length) {
             const found = keyAreas.find((k) => String(k.id) === String(kaParam));
             // Only (re)open if it's a different KA than the current selection
@@ -2494,46 +2570,57 @@ export default function KeyAreas() {
     }, [location.search, keyAreas, selectedKA, allTasks]);
 
     const openKA = async (ka) => {
+        if (!ka?.id) return;
+        const nextId = String(ka.id);
+        // Ignore duplicate open requests for the same KA while it is opening.
+        if (openingKaIdRef.current === nextId) return;
+        // Avoid reopening the already-open KA (prevents UI bounce from duplicate triggers).
+        if (selectedKA && String(selectedKA.id) === nextId) return;
+        openingKaIdRef.current = nextId;
         // Close any open task full view when switching Key Areas
-        setSelectedTaskFull(null);
-        setSelectedKA(ka);
-        // Load tasks based on the view mode (all vs activity-trap)
-        const opts = {};
-        if (viewTab === 'activity-trap') {
-            opts.withoutGoal = true;
-        }
-        const t = await api.listTasks(ka.id, opts);
-        try { console.info('KeyAreas.openKA loaded tasks', { kaId: String(ka.id), count: Array.isArray(t) ? t.length : 0, viewTab }); } catch (__) {}
-        setAllTasks(t);
-        // refresh activities for these tasks
         try {
-            const svc = await getActivityService();
-            const entries = await Promise.all(
-                (t || []).map(async (row) => {
-                    try {
-                        const list = await svc.list({ taskId: row.id });
-                        return [String(row.id), Array.isArray(list) ? list.map(normalizeActivity) : []];
-                    } catch {
-                        return [String(row.id), []];
-                    }
-                }),
-            );
-            setActivitiesByTask(Object.fromEntries(entries));
-        } catch (e) {
-            // ignore activity load failures; UI will show zeroes
+            setSelectedTaskFull(null);
+            setSelectedKA(ka);
+            // Load tasks based on the view mode (all vs activity-trap)
+            const opts = {};
+            if (viewTab === 'activity-trap') {
+                opts.withoutGoal = true;
+            }
+            const t = await api.listTasks(ka.id, opts);
+            try { console.info('KeyAreas.openKA loaded tasks', { kaId: String(ka.id), count: Array.isArray(t) ? t.length : 0, viewTab }); } catch (__) {}
+            setAllTasks(t);
+            // refresh activities for these tasks
+            try {
+                const svc = await getActivityService();
+                const entries = await Promise.all(
+                    (t || []).map(async (row) => {
+                        try {
+                            const list = await svc.list({ taskId: row.id });
+                            return [String(row.id), Array.isArray(list) ? list.map(normalizeActivity) : []];
+                        } catch {
+                            return [String(row.id), []];
+                        }
+                    }),
+                );
+                setActivitiesByTask(Object.fromEntries(entries));
+            } catch (e) {
+                // ignore activity load failures; UI will show zeroes
+            }
+            setTaskTab(1);
+            // Opening a Key Area should always land in Active Tasks context.
+            setViewTab('active-tasks');
+            setSearchTerm("");
+            setSiteSearch("");
+            setQuadrant("all");
+            setView("list");
+            setShowTaskComposer(false);
+            setEditingActivityViaTaskModal(null);
+            setExpandedActivityRows(new Set());
+            setOpenActivityDetails(new Set());
+            setEditingActivity(null);
+        } finally {
+            openingKaIdRef.current = null;
         }
-        setTaskTab(1);
-        // Reset view tab to 'all' when opening a new key area
-        setViewTab('all');
-    setSearchTerm("");
-    setSiteSearch("");
-        setQuadrant("all");
-        setView("list");
-    setShowTaskComposer(false);
-    setEditingActivityViaTaskModal(null);
-        setExpandedActivityRows(new Set());
-        setOpenActivityDetails(new Set());
-        setEditingActivity(null);
     };
 
     const tabNumbers = useMemo(() => {
@@ -3435,34 +3522,36 @@ export default function KeyAreas() {
                                 style={{ display: selectedTaskFull ? "none" : undefined }}
                             >
                             {!selectedKA && !isGlobalTasksView ? (
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-3 w-full">
                                     <h1 className="text-2xl font-bold text-slate-900">Key Areas</h1>
-                                    {!showOnlyIdeas && (
-                                        <>
-                                            <button
-                                                className={`flex items-center gap-2 rounded-lg font-semibold shadow px-2 py-1 text-sm border border-slate-200 ${
-                                                    canAdd
-                                                        ? "bg-blue-600 hover:bg-blue-700 text-white"
-                                                        : "bg-gray-300 text-gray-600 cursor-not-allowed"
-                                                }`}
-                                                onClick={() => canAdd && (setShowForm(true), setEditing(null))}
-                                                disabled={!canAdd}
-                                                title={
-                                                    canAdd
-                                                        ? undefined
-                                                        : "Limit reached: You can have up to 9 custom Key Areas (Ideas is fixed as the 10th)."
-                                                }
-                                            >
-                                               New Key Area
-                                            </button>
-                                            {!canAdd && (
-                                                <span className="text-xs text-slate-500">Max 10 Key Areas reached.</span>
-                                            )}
-                                        </>
-                                    )}
+                                    <div className="ml-auto flex items-center gap-2">
+                                        {!showOnlyIdeas && (
+                                            <>
+                                                <button
+                                                    className={`flex items-center gap-2 rounded-lg font-semibold shadow px-2 py-1 text-sm border border-slate-200 ${
+                                                        canAdd
+                                                            ? "bg-blue-600 hover:bg-blue-700 text-white"
+                                                            : "bg-gray-300 text-gray-600 cursor-not-allowed"
+                                                    }`}
+                                                    onClick={() => canAdd && (setShowForm(true), setEditing(null))}
+                                                    disabled={!canAdd}
+                                                    title={
+                                                        canAdd
+                                                            ? undefined
+                                                            : "Limit reached: You can have up to 9 custom Key Areas (Ideas is fixed as the 10th)."
+                                                    }
+                                                >
+                                                   New Key Area
+                                                </button>
+                                                {!canAdd && (
+                                                    <span className="text-xs text-slate-500">Max 10 Key Areas reached.</span>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
                             ) : (
-                                <div className="flex items-center gap-2 w-full">
+                                <div className="flex flex-wrap items-center gap-2 w-full">
                                     {/* mobile sidebar toggle */}
                                     <button
                                         className="md:hidden p-2 rounded-lg bg-white border border-slate-200 mr-2"
@@ -3471,12 +3560,13 @@ export default function KeyAreas() {
                                     >
                                         <FaBars />
                                     </button>
-                                    {selectedKA && (
+                                    {selectedKA && !(panelViewMode === "simple" && selectedTaskInPanel) && (
                                         <button
                                             className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
                                             aria-label="Back"
                                             style={{ minWidth: 36, minHeight: 36 }}
                                             onClick={() => {
+                                                suppressKaParamOpenRef.current = true;
                                                 setSelectedKA(null);
                                                 setAllTasks([]);
                                                 // Clear any URL params (like ?select=ideas) to show full list
@@ -3510,7 +3600,97 @@ export default function KeyAreas() {
                                         </div>
                                     )}
 
-                                    <div className="ml-auto flex items-center gap-1.5">
+                                    <div className="ml-auto flex flex-wrap items-center justify-end gap-1.5">
+                                        {selectedKA && viewTab !== 'delegated' && viewTab !== 'todo' && viewTab !== 'activity-trap' && (
+                                            <div className="flex flex-wrap items-center gap-3 text-sm">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-slate-600">Sort by:</span>
+                                                    <select
+                                                        value={sortBy}
+                                                        onChange={(e) => setSortBy(e.target.value)}
+                                                        className="border border-slate-200 rounded px-2 py-0.5 text-sm bg-white w-[100px]"
+                                                    >
+                                                        <option value="manual">Manual</option>
+                                                        <option value="date">Due Date</option>
+                                                        <option value="priority">Priority</option>
+                                                        <option value="status">Status</option>
+                                                    </select>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-slate-600">Status:</span>
+                                                    <select
+                                                        value={filterStatus}
+                                                        onChange={(e) => setFilterStatus(e.target.value)}
+                                                        className="border border-slate-200 rounded px-2 py-0.5 text-sm bg-white w-[100px]"
+                                                    >
+                                                        <option value="all">All</option>
+                                                        <option value="open">Open</option>
+                                                        <option value="in_progress">In Progress</option>
+                                                        <option value="done">Done</option>
+                                                    </select>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-slate-600">Owner:</span>
+                                                    <select
+                                                        value={filterAssignee}
+                                                        onChange={(e) => setFilterAssignee(e.target.value)}
+                                                        className="border border-slate-200 rounded px-2 py-0.5 text-sm bg-white w-[100px]"
+                                                    >
+                                                        <option value="">All</option>
+                                                        {(users || []).map((u) => (
+                                                            <option key={u.id} value={u.name}>{u.name}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-slate-600">Tag:</span>
+                                                    <input
+                                                        value={filterTag}
+                                                        onChange={(e) => setFilterTag(e.target.value)}
+                                                        className="border border-slate-200 rounded px-2 py-0.5 text-sm bg-white w-16"
+                                                        placeholder="Tag"
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
+                                        {selectedKA && viewTab !== 'delegated' && viewTab !== 'todo' && viewTab !== 'activity-trap' && (
+                                            <div className="relative" ref={panelViewMenuRef}>
+                                                <button
+                                                    type="button"
+                                                    className="day-header-btn px-2 py-0 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center gap-2 focus:outline-none focus:ring-0 focus:border-slate-300"
+                                                    style={{ minWidth: 32, minHeight: 30, outline: 'none', boxShadow: 'none' }}
+                                                    onClick={() => setShowPanelViewMenu((s) => !s)}
+                                                    aria-haspopup="menu"
+                                                    aria-expanded={showPanelViewMenu ? "true" : "false"}
+                                                >
+                                                    <span>View</span>
+                                                    <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
+                                                        {panelViewMode === "triple" ? "Triple" : "Simple"}
+                                                    </span>
+                                                    <FaChevronDown className={`${showPanelViewMenu ? "rotate-180" : "rotate-0"} transition-transform`} />
+                                                </button>
+                                                {showPanelViewMenu && (
+                                                    <div role="menu" className="absolute right-0 z-50 mt-2 w-40 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden">
+                                                        {["triple", "simple"].map((mode) => (
+                                                            <button
+                                                                key={mode}
+                                                                role="menuitemradio"
+                                                                aria-checked={panelViewMode === mode}
+                                                                className={`w-full text-left px-3 py-2 text-sm ${
+                                                                    panelViewMode === mode ? "bg-blue-50 text-blue-700 font-semibold" : "text-slate-700 hover:bg-slate-50"
+                                                                }`}
+                                                                onClick={() => {
+                                                                    setPanelViewMode(mode);
+                                                                    setShowPanelViewMenu(false);
+                                                                }}
+                                                            >
+                                                                {mode === "triple" ? "Triple View" : "Simple View"}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
                                         {/* Columns (gear) placed beside View in header */}
                                         <div className="relative ml-1" ref={columnsMenuRef}>
                                             <button
@@ -3553,6 +3733,38 @@ export default function KeyAreas() {
                                 </div>
                             )}
                             </div>
+                            {panelViewMode === "simple" && viewTab === "active-tasks" && selectedTaskInPanel && selectedKA && !isGlobalTasksView && (
+                                <div className="mt-2 mb-1 flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 py-1.5">
+                                    <button
+                                        type="button"
+                                        className="px-2 py-1 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+                                        aria-label="Back to task list"
+                                        onClick={() => setSelectedTaskInPanel(null)}
+                                    >
+                                        <FaChevronLeft />
+                                    </button>
+                                    <span
+                                        className="inline-block w-4 h-4 rounded-[3px]"
+                                        style={{ backgroundColor: (selectedKA && selectedKA.color) || '#10b981' }}
+                                        aria-hidden="true"
+                                    />
+                                    {(() => {
+                                        const lvl = getPriorityLevel ? getPriorityLevel(selectedTaskInPanel?.priority) : 2;
+                                        if (lvl === 2) return null;
+                                        if (lvl === 3) {
+                                            return (
+                                                <img src="/high-priority.svg" alt="High priority" className="inline-block w-2 h-4" title="Priority: High" />
+                                            );
+                                        }
+                                        return (
+                                            <img src="/low-priority-down.svg" alt="Low priority" className="inline-block w-2 h-4" title="Priority: Low" />
+                                        );
+                                    })()}
+                                    <span className="text-sm font-semibold text-slate-900 truncate">
+                                        {selectedTaskInPanel?.title || selectedTaskInPanel?.name || "Untitled Task"}
+                                    </span>
+                                </div>
+                            )}
                         </div>
                         {/* Title block removed; title now shown inline with Back */}
                         {selectedTaskFull && (
@@ -3646,14 +3858,20 @@ export default function KeyAreas() {
                         {(selectedKA || viewTab === 'delegated' || viewTab === 'todo') && (viewTab !== 'delegated' && viewTab !== 'todo' && viewTab !== 'activity-trap') && (
                             <div className="flex-1 min-h-0 overflow-hidden">
                                 <ResizablePanels
+                                    mode={panelViewMode}
+                                    simpleActivePanel={panelViewMode === "simple" && selectedTaskInPanel ? "activity" : "task"}
                                     taskPanel={
                                     <div className="flex flex-col h-full bg-white">
                                         {/* Task Panel Content */}
-                                        <div className="flex-1 min-h-0 overflow-hidden px-3 pt-3 pb-0">
-                                            <div className="space-y-6 flex flex-col min-h-0">
-                                <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 space-y-6">
+                                        <div
+                                            className={`flex-1 min-h-0 overflow-hidden pt-3 pb-0 ${
+                                                panelViewMode === "simple" ? "px-3" : "pl-3 pr-px"
+                                            }`}
+                                        >
+                                            <div className="space-y-6 flex flex-col min-h-0 h-full">
+                                <div className="bg-white border border-blue-300 rounded-lg shadow-sm overflow-hidden p-3 space-y-2 flex flex-col flex-1 min-h-0">
                                         {/* Header Row: Task Lists Label + Mass Edit Control */}
-                                        <div className="flex items-center justify-between border-b pb-2">
+                                        <div className="flex items-center justify-between border-b border-black pb-2">
                                             <div className="flex items-center gap-2">
                                                 <span className="font-medium text-slate-700">
                                                     {viewTab === 'delegated' ? 'Delegated Tasks:' :
@@ -3673,68 +3891,50 @@ export default function KeyAreas() {
                                                         if (selectedIds.size === 0) return;
                                                         setShowMassEditModal(true);
                                                     }}
-                                                    className="px-4 py-2 rounded-md text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+                                                    className="px-4 py-1 rounded-md text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
                                                     aria-label="mass edit"
                                                     title={selectedIds.size === 0 ? "Select tasks to enable mass edit" : "Mass edit selected tasks"}
                                                 >
                                                     Mass Edit
                                                 </button>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex flex-wrap items-center gap-3 text-sm">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-slate-600">Sort by:</span>
-                                                <select
-                                                    value={sortBy}
-                                                    onChange={(e) => setSortBy(e.target.value)}
-                                                    className="border rounded px-2 py-1 text-sm bg-white"
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setTaskForm({
+                                                            title: "",
+                                                            description: "",
+                                                            list_index: taskTab || 1,
+                                                            category: "Key Areas",
+                                                            goal_id: "",
+                                                            start_date: "",
+                                                            deadline: "",
+                                                            end_date: "",
+                                                            status: "open",
+                                                            priority: "normal",
+                                                            tags: "",
+                                                            recurrence: "",
+                                                            attachments: "",
+                                                            attachmentsFiles: [],
+                                                            assignee: "",
+                                                            duration: "",
+                                                            // Prefill key area with the currently selected Key Area for new task creation.
+                                                            key_area_id: selectedKA?.id || null,
+                                                            list: "",
+                                                            finish_date: "",
+                                                            _endAuto: true,
+                                                        });
+                                                        setShowTaskComposer(true);
+                                                    }}
+                                                    className="inline-flex items-center gap-2 px-4 py-1 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    aria-label="Add task"
                                                 >
-                                                    <option value="manual">Manual</option>
-                                                    <option value="date">Due Date</option>
-                                                    <option value="priority">Priority</option>
-                                                    <option value="status">Status</option>
-                                                </select>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-slate-600">Status:</span>
-                                                <select
-                                                    value={filterStatus}
-                                                    onChange={(e) => setFilterStatus(e.target.value)}
-                                                    className="border rounded px-2 py-1 text-sm bg-white"
-                                                >
-                                                    <option value="all">All</option>
-                                                    <option value="open">Open</option>
-                                                    <option value="in_progress">In Progress</option>
-                                                    <option value="done">Done</option>
-                                                </select>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-slate-600">Owner:</span>
-                                                <select
-                                                    value={filterAssignee}
-                                                    onChange={(e) => setFilterAssignee(e.target.value)}
-                                                    className="border rounded px-2 py-1 text-sm bg-white"
-                                                >
-                                                    <option value="">All</option>
-                                                    {(users || []).map((u) => (
-                                                        <option key={u.id} value={u.name}>{u.name}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-slate-600">Tag:</span>
-                                                <input
-                                                    value={filterTag}
-                                                    onChange={(e) => setFilterTag(e.target.value)}
-                                                    className="border rounded px-2 py-1 text-sm bg-white max-w-20"
-                                                    placeholder="Tag"
-                                                />
+                                                    Add Task
+                                                </button>
                                             </div>
                                         </div>
 
                                         {/* List Tabs Section (left sidebar lists within the view) */}
-                                        <div className="pt-3">
+                                        <div className="pt-0">
                                             <div
                                                 ref={tabsRef}
                                                 className="flex items-center gap-1 overflow-x-auto bg-slate-100 border border-slate-200 rounded-lg px-1 py-0.5"
@@ -3882,7 +4082,7 @@ export default function KeyAreas() {
                                         </div>
 
                                         {/* Bottom Row: Tasks Display (full width) */}
-                                        <div ref={tasksDisplayRef} className="flex flex-col min-h-0">
+                                        <div ref={tasksDisplayRef} className="flex flex-col flex-1 min-h-0">
                                             {view === "list" ? (
                                                 sortedTasks.length === 0 ? (
                                                     <EmptyState
@@ -3890,7 +4090,7 @@ export default function KeyAreas() {
                                                         hint="Use the 'Add Task' button below to create your first task."
                                                     />
                                                 ) : (
-                                                    <div className="min-h-0 max-h-[calc(100vh-520px)] overflow-x-auto overflow-y-auto hover-scrollbar-y">
+                                                    <div className="flex-1 min-h-0 overflow-x-auto overflow-y-auto hover-scrollbar-y">
                                                         <table className="min-w-[1400px] w-full text-sm table-fixed">
                                                             <thead className="bg-slate-50 border border-slate-200 text-slate-700 block">
                                                                 <tr className="table w-full table-fixed">
@@ -4082,7 +4282,10 @@ export default function KeyAreas() {
                                                                                 }}
                                                                                 onDeleteClick={() => handleDeleteTask(t)}
                                                                                 onRowClick={(task) => {
-                                                                                    console.log('Task clicked:', task);
+                                                                                    if (panelViewMode === "simple") {
+                                                                                        setSelectedTaskInPanel(task);
+                                                                                        return;
+                                                                                    }
                                                                                     setSelectedTaskInPanel(task);
                                                                                 }}
                                                                                 rowClassName="table w-full table-fixed"
@@ -4142,80 +4345,53 @@ export default function KeyAreas() {
                                         </div>
                                     </div>
                                         
-                                    {/* Add Task Footer */}
-                                    <div className="shrink-0 flex justify-end pr-10 pt-2 pb-2 bg-white border-t border-slate-100">
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setTaskForm({
-                                                        title: "",
-                                                        description: "",
-                                                        list_index: taskTab || 1,
-                                                        category: "Key Areas",
-                                                        goal_id: "",
-                                                        start_date: "",
-                                                        deadline: "",
-                                                        end_date: "",
-                                                        status: "open",
-                                                        priority: "normal",
-                                                        tags: "",
-                                                        recurrence: "",
-                                                        attachments: "",
-                                                        attachmentsFiles: [],
-                                                        assignee: "",
-                                                        duration: "",
-                                                        // Prefill key area with the currently selected Key Area for new task creation.
-                                                        key_area_id: selectedKA?.id || null,
-                                                        list: "",
-                                                        finish_date: "",
-                                                        _endAuto: true,
-                                                    });
-                                                    setShowTaskComposer(true);
-                                                }}
-                                                className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                aria-label="Add task"
-                                            >
-                                                Add Task
-                                            </button>
-                                        </div>
                                         </div>
                                         </div>
                                     </div>
                                 }
                                 activityPanel={
                                     selectedTaskInPanel ? (
-                                        <div className="flex flex-col h-full bg-slate-50">
-                                            {/* Activity Panel Header */}
-                                            <div className="px-4 py-3 border-b border-slate-200 bg-white flex items-center justify-between">
-                                                <div className="flex items-center gap-2 min-w-0">
-                                                    {(() => {
-                                                        const lvl = getPriorityLevel ? getPriorityLevel(selectedTaskInPanel?.priority) : 2;
-                                                        if (lvl === 2) return null;
-                                                        if (lvl === 3) {
+                                        <div className="flex flex-col h-full bg-white">
+                                            <div
+                                                className={`flex-1 min-h-0 overflow-hidden pt-3 pb-0 ${
+                                                    panelViewMode === "simple" ? "px-3" : "pl-px pr-3"
+                                                }`}
+                                            >
+                                                <div className="space-y-6 flex flex-col min-h-0 h-full">
+                                                    <div className="bg-white border border-blue-300 rounded-lg shadow-sm overflow-hidden flex flex-col flex-1 min-h-0">
+                                            {/* Activity Panel Header (hidden in simple view; top secondary row already contains back + task info) */}
+                                            {panelViewMode !== "simple" && (
+                                                <div className="px-4 pt-3 pb-2 border-b border-black bg-white flex items-center justify-between">
+                                                    <div className="flex items-center gap-2 min-w-0">
+                                                        {(() => {
+                                                            const lvl = getPriorityLevel ? getPriorityLevel(selectedTaskInPanel?.priority) : 2;
+                                                            if (lvl === 2) return null;
+                                                            if (lvl === 3) {
+                                                                return (
+                                                                    <img src="/high-priority.svg" alt="High priority" className="inline-block w-2 h-4" title="Priority: High" />
+                                                                );
+                                                            }
                                                             return (
-                                                                <img src="/high-priority.svg" alt="High priority" className="inline-block w-2 h-4" title="Priority: High" />
+                                                                <img src="/low-priority-down.svg" alt="Low priority" className="inline-block w-2 h-4" title="Priority: Low" />
                                                             );
-                                                        }
-                                                        return (
-                                                            <img src="/low-priority-down.svg" alt="Low priority" className="inline-block w-2 h-4" title="Priority: Low" />
-                                                        );
-                                                    })()}
-                                                    <h3 className="text-sm font-semibold text-slate-900 truncate">{selectedTaskInPanel.title || 'Untitled Task'}</h3>
+                                                        })()}
+                                                        <h3 className="text-sm font-semibold text-slate-900 truncate">{selectedTaskInPanel.title || 'Untitled Task'}</h3>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setSelectedTaskInPanel(null)}
+                                                        className="ml-2 p-1.5 rounded-md text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                                                        aria-label="Close activity panel"
+                                                    >
+                                                        <FaTimes className="w-4 h-4" />
+                                                    </button>
                                                 </div>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setSelectedTaskInPanel(null)}
-                                                    className="ml-2 p-1.5 rounded-md text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-                                                    aria-label="Close activity panel"
-                                                >
-                                                    <FaTimes className="w-4 h-4" />
-                                                </button>
-                                            </div>
+                                            )}
 
                                             {/* Activity Panel Content */}
-                                            <div className="flex-1 overflow-y-auto">
+                                            <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
                                                 {/* Activities Tab Header */}
-                                                <div className="px-2 pt-2 bg-white">
+                                                <div className="px-2 pt-2 bg-white flex items-center gap-2">
                                                     <div className="inline-flex items-center gap-1 bg-slate-100 rounded-lg p-1">
                                                         <div className="px-3 py-1 rounded-md text-sm font-semibold bg-white text-slate-900 shadow" aria-label="Activities">
                                                             <span className="inline-flex items-center gap-1">
@@ -4226,11 +4402,18 @@ export default function KeyAreas() {
                                                             </span>
                                                         </div>
                                                     </div>
+                                                    <button
+                                                        type="button"
+                                                        className="px-3 py-1 rounded-md text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 ml-auto"
+                                                        onClick={() => window.dispatchEvent(new CustomEvent("ka-open-activity-composer", { detail: { taskId: selectedTaskInPanel?.id } }))}
+                                                    >
+                                                        Add Activity
+                                                    </button>
                                                 </div>
 
                                                 {/* Activities Table */}
-                                                <div className="p-4">
-                                                    <div className="mb-3">
+                                                <div className="flex-1 min-h-0 p-4 flex flex-col">
+                                                    <div className="mb-3 flex-1 min-h-0 flex flex-col">
                                                         {(() => {
                                                             const taskKey = String(selectedTaskInPanel.id);
                                                             let list = (activitiesByTask[taskKey] || []).slice();
@@ -4299,19 +4482,19 @@ export default function KeyAreas() {
                                                             }
                                                             
                                                             return Array.isArray(list) && list.length > 0 ? (
-                                                                <div className="overflow-x-auto">
-                                                                    <table className="min-w-full text-sm">
+                                                                <div className="flex-1 min-h-0 overflow-x-auto overflow-y-auto hover-scrollbar-y">
+                                                                    <table className="min-w-[1400px] w-full text-sm table-fixed border-collapse">
                                                                         <thead className="bg-slate-50 border border-slate-200 text-slate-700">
                                                                             <tr>
                                                                                 <th 
-                                                                                    className="px-3 py-2 text-left font-semibold w-[160px] sm:w-[220px] cursor-pointer hover:bg-slate-100"
+                                                                                    className="px-3 py-2 text-left font-semibold w-[240px] cursor-pointer hover:bg-slate-100"
                                                                                     onClick={() => handleActivitySort('name')}
                                                                                 >
                                                                                     Activity {activitySortField === 'name' && (activitySortDirection === 'asc' ? '↑' : '↓')}
                                                                                 </th>
                                                                                 {visibleColumns.responsible && (
                                                                                     <th 
-                                                                                        className="px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                                                                        className="px-3 py-2 text-left font-semibold w-[140px] cursor-pointer hover:bg-slate-100"
                                                                                         onClick={() => handleActivitySort('responsible')}
                                                                                     >
                                                                                         Responsible {activitySortField === 'responsible' && (activitySortDirection === 'asc' ? '↑' : '↓')}
@@ -4319,7 +4502,7 @@ export default function KeyAreas() {
                                                                                 )}
                                                                                 {visibleColumns.status !== false && (
                                                                                     <th 
-                                                                                        className="px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                                                                        className="px-3 py-2 text-left font-semibold w-[120px] cursor-pointer hover:bg-slate-100"
                                                                                         onClick={() => handleActivitySort('status')}
                                                                                     >
                                                                                         Status {activitySortField === 'status' && (activitySortDirection === 'asc' ? '↑' : '↓')}
@@ -4327,7 +4510,7 @@ export default function KeyAreas() {
                                                                                 )}
                                                                                 {visibleColumns.priority && (
                                                                                     <th 
-                                                                                        className="px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                                                                        className="px-3 py-2 text-left font-semibold w-[100px] cursor-pointer hover:bg-slate-100"
                                                                                         onClick={() => handleActivitySort('priority')}
                                                                                     >
                                                                                         Priority {activitySortField === 'priority' && (activitySortDirection === 'asc' ? '↑' : '↓')}
@@ -4335,7 +4518,7 @@ export default function KeyAreas() {
                                                                                 )}
                                                                                 {visibleColumns.start_date && (
                                                                                     <th 
-                                                                                        className="px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                                                                        className="px-3 py-2 text-left font-semibold w-[120px] cursor-pointer hover:bg-slate-100"
                                                                                         onClick={() => handleActivitySort('start_date')}
                                                                                     >
                                                                                         Start date {activitySortField === 'start_date' && (activitySortDirection === 'asc' ? '↑' : '↓')}
@@ -4343,7 +4526,7 @@ export default function KeyAreas() {
                                                                                 )}
                                                                                 {visibleColumns.end_date && (
                                                                                     <th 
-                                                                                        className="px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                                                                        className="px-3 py-2 text-left font-semibold w-[120px] cursor-pointer hover:bg-slate-100"
                                                                                         onClick={() => handleActivitySort('end_date')}
                                                                                     >
                                                                                         End date {activitySortField === 'end_date' && (activitySortDirection === 'asc' ? '↑' : '↓')}
@@ -4351,7 +4534,7 @@ export default function KeyAreas() {
                                                                                 )}
                                                                                 {visibleColumns.deadline && (
                                                                                     <th 
-                                                                                        className="px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                                                                        className="px-3 py-2 text-left font-semibold w-[120px] cursor-pointer hover:bg-slate-100"
                                                                                         onClick={() => handleActivitySort('deadline')}
                                                                                     >
                                                                                         Deadline {activitySortField === 'deadline' && (activitySortDirection === 'asc' ? '↑' : '↓')}
@@ -4359,7 +4542,7 @@ export default function KeyAreas() {
                                                                                 )}
                                                                                 {visibleColumns.duration && (
                                                                                     <th 
-                                                                                        className="px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                                                                        className="px-3 py-2 text-left font-semibold w-[90px] cursor-pointer hover:bg-slate-100"
                                                                                         onClick={() => handleActivitySort('duration')}
                                                                                     >
                                                                                         Duration {activitySortField === 'duration' && (activitySortDirection === 'asc' ? '↑' : '↓')}
@@ -4367,7 +4550,7 @@ export default function KeyAreas() {
                                                                                 )}
                                                                                 {visibleColumns.completed && (
                                                                                     <th 
-                                                                                        className="px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                                                                        className="px-3 py-2 text-left font-semibold w-[120px] cursor-pointer hover:bg-slate-100"
                                                                                         onClick={() => handleActivitySort('completed')}
                                                                                     >
                                                                                         Completed {activitySortField === 'completed' && (activitySortDirection === 'asc' ? '↑' : '↓')}
@@ -4378,10 +4561,10 @@ export default function KeyAreas() {
                                                                         <tbody>
                                                                             {list.map((a) => (
                                                                                 <tr key={a.id} className="bg-white border-b border-slate-100">
-                                                                                    <td className="px-3 py-2 align-top">
-                                                                                        <div className="flex items-center gap-3">
+                                                                                    <td className="px-3 py-2 align-top w-[240px] overflow-hidden">
+                                                                                        <div className="flex items-center gap-2">
                                                                                             <ActivityRowMenu activity={a} taskId={selectedTaskInPanel?.id} />
-                                                                                            <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" className="w-4 h-4" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg" style={{ color: selectedKA?.color || 'rgb(16, 185, 129)' }}>
+                                                                                            <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" className="w-4 h-4 shrink-0" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg" style={{ color: selectedKA?.color || 'rgb(16, 185, 129)' }}>
                                                                                                 <path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z"></path>
                                                                                             </svg>
                                                                                             <div className="flex flex-col">
@@ -4419,7 +4602,7 @@ export default function KeyAreas() {
                                                                                         </div>
                                                                                     </td>
                                                                                     {visibleColumns.responsible && (
-                                                                                        <td className="px-3 py-2 align-top text-slate-800">
+                                                                                        <td className="px-3 py-2 align-top text-slate-800 w-[140px]">
                                                                                             {Array.isArray(users) && users.length ? (
                                                                                                 <select
                                                                                                     className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-sm w-20"
@@ -4435,8 +4618,8 @@ export default function KeyAreas() {
                                                                                             )}
                                                                                         </td>
                                                                                     )}
-                                                                                    {visibleColumns.status && (
-                                                                                        <td className="px-3 py-2 align-top">
+                                                                                    {visibleColumns.status !== false && (
+                                                                                        <td className="px-3 py-2 align-top w-[120px]">
                                                                                             <div className="flex items-center gap-2">
                                                                                                 <span className={`inline-block w-2.5 h-2.5 rounded-full ${String(a.status || '').toLowerCase() === 'done' ? 'bg-emerald-500' : String(a.status || '').toLowerCase() === 'in_progress' ? 'bg-blue-500' : 'bg-slate-400'}`} aria-hidden="true" />
                                                                                                 <div>
@@ -4456,7 +4639,7 @@ export default function KeyAreas() {
                                                                                         </td>
                                                                                     )}
                                                                                     {visibleColumns.priority && (
-                                                                                        <td className="px-3 py-2 align-top">
+                                                                                        <td className="px-3 py-2 align-top w-[100px]">
                                                                                             {(() => {
                                                                                                 const priorityValue = (function() {
                                                                                                     const raw = a.priority ?? selectedTaskInPanel.priority;
@@ -4480,7 +4663,7 @@ export default function KeyAreas() {
                                                                                         </td>
                                                                                     )}
                                                                                     {visibleColumns.start_date && (
-                                                                                        <td className="px-3 py-2 align-top text-slate-800">
+                                                                                        <td className="px-3 py-2 align-top text-slate-800 w-[120px]">
                                                                                             <div className="relative inline-block">
                                                                                                 <button
                                                                                                     type="button"
@@ -4514,7 +4697,7 @@ export default function KeyAreas() {
                                                                                         </td>
                                                                                     )}
                                                                                     {visibleColumns.end_date && (
-                                                                                        <td className="px-3 py-2 align-top text-slate-800">
+                                                                                        <td className="px-3 py-2 align-top text-slate-800 w-[120px]">
                                                                                             <div className="relative inline-block">
                                                                                                 <button
                                                                                                     type="button"
@@ -4548,7 +4731,7 @@ export default function KeyAreas() {
                                                                                         </td>
                                                                                     )}
                                                                                     {visibleColumns.deadline && (
-                                                                                        <td className="px-3 py-2 align-top text-slate-800">
+                                                                                        <td className="px-3 py-2 align-top text-slate-800 w-[120px]">
                                                                                             <div className="relative inline-block">
                                                                                                 <button
                                                                                                     type="button"
@@ -4582,10 +4765,10 @@ export default function KeyAreas() {
                                                                                         </td>
                                                                                     )}
                                                                                     {visibleColumns.duration && (
-                                                                                        <td className="px-3 py-2 align-top">{a.duration || '0d'}</td>
+                                                                                        <td className="px-3 py-2 align-top text-slate-800 w-[90px]">{a.duration || '0d'}</td>
                                                                                     )}
                                                                                     {visibleColumns.completed && (
-                                                                                        <td className="px-3 py-2 align-top text-slate-800">
+                                                                                        <td className="px-3 py-2 align-top text-slate-800 w-[120px]">
                                                                                             {(() => {
                                                                                                 const date = a.completionDate || a.completion_date;
                                                                                                 if (!date) return '';
@@ -4606,40 +4789,40 @@ export default function KeyAreas() {
                                                             );
                                                         })()}
                                                     </div>
-                                                    <div className="mt-3 flex items-center gap-2">
-                                                        <button 
-                                                            type="button" 
-                                                            className="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 ml-auto"
-                                                            onClick={() => window.dispatchEvent(new CustomEvent("ka-open-activity-composer", { detail: { taskId: selectedTaskInPanel?.id } }))}
-                                                        >
-                                                            Add Activity
-                                                        </button>
+                                                </div>
+                                            </div>
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
                                     ) : (
-                                        <div className="flex flex-col h-full">
-                                            {/* Activities Tab Header */}
-                                            <div className="px-2 pt-2 bg-white">
-                                                <div className="inline-flex items-center gap-1 bg-slate-100 rounded-lg p-1">
-                                                    <div className="px-3 py-1 rounded-md text-sm font-semibold bg-white text-slate-900 shadow" aria-label="Activities">
-                                                        <span className="inline-flex items-center gap-1">
-                                                            <svg className="w-4 h-4" viewBox="0 0 448 512" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" fill="currentColor" style={{ color: 'rgb(16, 185, 129)' }}>
-                                                                <path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z"></path>
-                                                            </svg>
-                                                            Activities
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            
-                                            {/* Activities Table */}
-                                            <div className="flex-1 overflow-auto p-4">
-                                                <div className="flex items-center justify-center h-full text-slate-500 text-center">
-                                                    <div>
-                                                        <p className="text-lg font-medium mb-2">Select a task</p>
-                                                        <p className="text-sm">Choose a task from the left panel to view its activities</p>
+                                        <div className="flex flex-col h-full bg-white">
+                                            <div className="flex-1 min-h-0 overflow-hidden pl-px pr-3 pt-3 pb-0">
+                                                <div className="space-y-6 flex flex-col min-h-0 h-full">
+                                                    <div className="bg-white border border-blue-300 rounded-lg shadow-sm overflow-hidden p-3 space-y-2 flex flex-col flex-1 min-h-0">
+                                                        {/* Activities Tab Header */}
+                                                        <div className="pt-0">
+                                                            <div className="inline-flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+                                                                <div className="px-3 py-1 rounded-md text-sm font-semibold bg-white text-slate-900 shadow" aria-label="Activities">
+                                                                    <span className="inline-flex items-center gap-1">
+                                                                        <svg className="w-4 h-4" viewBox="0 0 448 512" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" fill="currentColor" style={{ color: 'rgb(16, 185, 129)' }}>
+                                                                            <path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z"></path>
+                                                                        </svg>
+                                                                        Activities
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Empty Activities State */}
+                                                        <div className="flex-1 min-h-0 overflow-auto p-4">
+                                                            <div className="flex items-center justify-center h-full text-slate-500 text-center">
+                                                                <div>
+                                                                    <p className="text-lg font-medium mb-2">Select a task</p>
+                                                                    <p className="text-sm">Choose a task from the left panel to view its activities</p>
+                                                                </div>
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -4655,7 +4838,7 @@ export default function KeyAreas() {
 
                         {/* DELEGATED TAB: Two-section layout - pending at top, all delegated below */}
                         {viewTab === 'delegated' && (
-                            <div className="flex-1 h-[calc(100vh-200px)] min-h-0 overflow-hidden flex flex-col gap-4 px-1 md:px-2" style={{ display: selectedTaskFull ? "none" : undefined }}>
+                            <div className="flex-1 h-[calc(100vh-200px)] min-h-0 overflow-hidden flex flex-col gap-4" style={{ display: selectedTaskFull ? "none" : undefined }}>
                                 {/* Section 1: Pending Delegations */}
                                 <PendingDelegationsSection
                                     pendingTasks={pendingDelegations}
@@ -4730,13 +4913,13 @@ export default function KeyAreas() {
                                             currentUserId={currentUserId}
                                             onTaskClick={(task) => {
                                                 setSelectedTaskFull(task);
-                                                setTaskFullInitialTab("activities");
+                                                setTaskFullInitialTab("details");
                                             }}
                                             onActivityClick={(activity) => {
                                                 const task = allTasks.find(t => String(t.id) === String(activity.taskId || activity.task_id));
                                                 if (task) {
                                                     setSelectedTaskFull(task);
-                                                    setTaskFullInitialTab("activities");
+                                                    setTaskFullInitialTab("details");
                                                 }
                                             }}
                                             onTaskUpdate={async (id, updatedTask) => {
@@ -4761,6 +4944,36 @@ export default function KeyAreas() {
                                                     console.error('Failed to delete task:', error);
                                                 }
                                             }}
+                                            onActivityUpdate={async (id, updatedActivity) => {
+                                                try {
+                                                    const activityService = await getActivityService();
+                                                    const result = await activityService.update(id, updatedActivity);
+                                                    setActivitiesByTask(prev => {
+                                                        const updated = { ...prev };
+                                                        for (let key in updated) {
+                                                            updated[key] = updated[key].map(a => a.id === id ? result : a);
+                                                        }
+                                                        return updated;
+                                                    });
+                                                } catch (error) {
+                                                    console.error('Failed to update activity:', error);
+                                                }
+                                            }}
+                                            onActivityDelete={async (id) => {
+                                                try {
+                                                    const activityService = await getActivityService();
+                                                    await activityService.remove(id);
+                                                    setActivitiesByTask(prev => {
+                                                        const updated = { ...prev };
+                                                        for (let key in updated) {
+                                                            updated[key] = updated[key].filter(a => a.id !== id);
+                                                        }
+                                                        return updated;
+                                                    });
+                                                } catch (error) {
+                                                    console.error('Failed to delete activity:', error);
+                                                }
+                                            }}
                                         />
                                     </div>
                                 </div>
@@ -4769,7 +4982,7 @@ export default function KeyAreas() {
 
                         {/* Unified Table View for TODO, ACTIVITY TRAP tabs */}
                         {(viewTab === 'todo' || viewTab === 'activity-trap') && (
-                            <div className="flex-1 h-[calc(100vh-200px)] min-h-0 overflow-hidden flex flex-col px-1 md:px-2" style={{ display: selectedTaskFull ? "none" : undefined }}>
+                            <div className="flex-1 h-[calc(100vh-200px)] min-h-0 overflow-hidden flex flex-col" style={{ display: selectedTaskFull ? "none" : undefined }}>
                                 <div className="flex-1 min-h-0">
                                     <UnifiedTaskActivityTable
                                         viewTab={viewTab}
@@ -4963,19 +5176,21 @@ export default function KeyAreas() {
                                         ))}
                                     </div>
                                 )}
-                                <KeyAreasList
-                                    loading={loading}
-                                    showOnlyIdeas={showOnlyIdeas}
-                                    ideaForShow={ideaForShow}
-                                    filteredKAs={filteredKAs}
-                                    dragKAId={dragKAId}
-                                    openKA={openKA}
-                                    reorderByDrop={reorderByDrop}
-                                    setDragKAId={setDragKAId}
-                                    setEditing={setEditing}
-                                    setShowForm={setShowForm}
-                                    onDeleteKA={onDeleteKA}
-                                />
+                                <div className="flex-1 min-h-0">
+                                    <KeyAreasList
+                                        loading={loading}
+                                        showOnlyIdeas={showOnlyIdeas}
+                                        ideaForShow={ideaForShow}
+                                        filteredKAs={filteredKAs}
+                                        dragKAId={dragKAId}
+                                        openKA={openKA}
+                                        reorderByDrop={reorderByDrop}
+                                        setDragKAId={setDragKAId}
+                                        setEditing={setEditing}
+                                        setShowForm={setShowForm}
+                                        onDeleteKA={onDeleteKA}
+                                    />
+                                </div>
                             </>
                         )}
                         {/* DETAIL: Tabs */}

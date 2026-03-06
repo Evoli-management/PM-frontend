@@ -198,11 +198,8 @@ export default function PendingDelegationsSection({
   };
 
   if (pendingLoading) {
-    return (
-      <div className="mb-8 p-6 bg-blue-50 border border-blue-200 rounded-lg text-center">
-        <p className="text-blue-800 font-medium">Loading pending delegations...</p>
-      </div>
-    );
+    // Load silently; avoid showing a blocking/loading box in the UI.
+    return null;
   }
   if (!pendingTasks || pendingTasks.length === 0) {
     return null;

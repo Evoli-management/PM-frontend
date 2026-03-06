@@ -1484,7 +1484,7 @@ export default function DontForget() {
     };
 
     return (
-        <div className="flex min-h-screen overflow-x-hidden">
+        <div className="flex h-[calc(100vh-72px)] max-h-[calc(100vh-72px)] min-h-0 overflow-x-hidden">
             <Sidebar
                 user={{ name: "Hussein" }}
                 mobileOpen={mobileSidebarOpen}
@@ -1499,7 +1499,7 @@ export default function DontForget() {
                 />
             )}
 
-            <main className="flex-1 min-w-0 w-full min-h-screen transition-all overflow-y-auto">
+            <main className="flex-1 min-w-0 w-full h-full min-h-0 transition-all overflow-hidden">
                 {/* Mobile menu button */}
                 <button
                     className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-white shadow-lg border border-gray-200"
@@ -1620,10 +1620,10 @@ export default function DontForget() {
                         </div>
                     </div>
                 ) : (
-                    <div className="max-w-full overflow-x-hidden pb-1 min-h-full px-1 md:px-2">
+                    <div className="max-w-full overflow-x-hidden min-h-0 h-full px-1 md:px-2 flex flex-col">
                         {viewMode === "dont-forget" ? (
-                            <div className="max-w-full overflow-x-hidden">
-                                <div className="flex items-center justify-between gap-3 mb-4 mt-4 md:mt-6">
+                            <div className="max-w-full overflow-x-hidden flex flex-col min-h-0 flex-1">
+                                <div className="flex items-center justify-between gap-3 mb-3 mt-3 md:mt-4">
                                     <div className="flex items-center gap-2 w-full">
                                         {/* mobile sidebar toggle */}
                                         <button
@@ -1752,10 +1752,10 @@ export default function DontForget() {
                                     </div>
                                 </div>
 
-                                <div className="mb-4">
-                                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 space-y-6">
+                                <div className="mb-0 flex-1 min-h-0">
+                                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 space-y-3 flex flex-col h-full min-h-0">
                                         {/* Header area */}
-                                        <div className="grid grid-cols-3 gap-4">
+                                        <div className="grid grid-cols-3 gap-4 items-center border-b border-black pb-2">
                                             <div className="col-span-3 md:col-span-2">
                                                 <div className="flex items-center gap-2 min-w-0">
                                                     <div className="text-sm font-semibold whitespace-nowrap mr-1">
@@ -1876,7 +1876,7 @@ export default function DontForget() {
                                                 <button
                                                     type="button"
                                                     disabled={selectedIds.size === 0}
-                                                    className="px-4 py-2 rounded-md text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+                                                    className="px-4 py-1 rounded-md text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
                                                     aria-label="Open mass edit"
                                                     title="Select tasks to enable mass edit"
                                                     onClick={() => {
@@ -1890,15 +1890,25 @@ export default function DontForget() {
                                                 >
                                                     Mass Edit
                                                 </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setShowComposer(true);
+                                                    }}
+                                                    className="inline-flex items-center gap-2 px-4 py-1 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    aria-label="Add task"
+                                                >
+                                                    Add Task
+                                                </button>
                                             </div>
                                         </div>
                                         {/* Mass edit now uses the shared EditTaskModal component. Click "Mass Edit" to open it pre-filled from the first selected task. */}
-                                        <div className="overflow-x-auto -mx-2 sm:mx-0">
-                                            <table className="min-w-full text-sm whitespace-nowrap sm:whitespace-normal">
+                                        <div className="flex-1 min-h-0 overflow-x-auto overflow-y-auto hover-scrollbar-y">
+                                            <table className="min-w-[1400px] w-full text-sm table-fixed whitespace-nowrap sm:whitespace-normal">
                                                 {dontForgetTasks.length > 0 && (
                                                     <thead key={headerKey} className="bg-slate-50 border border-slate-200 text-slate-700">
                                                         <tr>
-                                                            <th className="px-2 sm:px-3 py-2 text-left w-8">
+                                                            <th className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left w-12">
                                                                 <input
                                                                     aria-label="Select all visible"
                                                                     type="checkbox"
@@ -1910,28 +1920,28 @@ export default function DontForget() {
                                                                 />
                                                             </th>
                                                             <th
-                                                                className="px-2 sm:px-3 py-2 text-left font-semibold w-40 sm:w-[220px] cursor-pointer hover:bg-slate-100"
+                                                                className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[240px] cursor-pointer hover:bg-slate-100"
                                                                 onClick={() => handleDfSort('title')}
                                                             >
                                                                 Task {dfSortField === 'title' && (dfSortDirection === 'asc' ? '↑' : '↓')}
                                                             </th>
                                                             {visibleColumns.responsible && (
                                                                 <th
-                                                                    className="px-2 sm:px-3 py-2 text-left font-semibold hidden sm:table-cell cursor-pointer hover:bg-slate-100"
+                                                                    className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[140px] cursor-pointer hover:bg-slate-100"
                                                                     onClick={() => handleDfSort('responsible')}
                                                                 >
                                                                     Responsible {dfSortField === 'responsible' && (dfSortDirection === 'asc' ? '↑' : '↓')}
                                                                 </th>
                                                             )}
                                                             <th
-                                                                className="px-2 sm:px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                                                className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[120px] cursor-pointer hover:bg-slate-100"
                                                                 onClick={() => handleDfSort('status')}
                                                             >
                                                                 Status {dfSortField === 'status' && (dfSortDirection === 'asc' ? '↑' : '↓')}
                                                             </th>
                                                             {visibleColumns.priority && (
                                                                 <th
-                                                                    className="px-2 sm:px-3 py-2 text-left font-semibold hidden md:table-cell cursor-pointer hover:bg-slate-100"
+                                                                    className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[100px] cursor-pointer hover:bg-slate-100"
                                                                     onClick={() => handleDfSort('priority')}
                                                                 >
                                                                     Priority {dfSortField === 'priority' && (dfSortDirection === 'asc' ? '↑' : '↓')}
@@ -1939,7 +1949,7 @@ export default function DontForget() {
                                                             )}
                                                             {visibleColumns.quadrant && (
                                                                 <th
-                                                                    className="px-2 sm:px-3 py-2 text-left font-semibold hidden lg:table-cell cursor-pointer hover:bg-slate-100"
+                                                                    className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[90px] cursor-pointer hover:bg-slate-100"
                                                                     onClick={() => handleDfSort('quadrant')}
                                                                 >
                                                                     Quadrant {dfSortField === 'quadrant' && (dfSortDirection === 'asc' ? '↑' : '↓')}
@@ -1947,7 +1957,7 @@ export default function DontForget() {
                                                             )}
                                                             {visibleColumns.start_date && (
                                                                 <th
-                                                                    className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell cursor-pointer hover:bg-slate-100"
+                                                                    className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[120px] cursor-pointer hover:bg-slate-100"
                                                                     onClick={() => handleDfSort('start_date')}
                                                                 >
                                                                     Start Date {dfSortField === 'start_date' && (dfSortDirection === 'asc' ? '↑' : '↓')}
@@ -1955,7 +1965,7 @@ export default function DontForget() {
                                                             )}
                                                             {visibleColumns.end_date && (
                                                                 <th
-                                                                    className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell cursor-pointer hover:bg-slate-100"
+                                                                    className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[120px] cursor-pointer hover:bg-slate-100"
                                                                     onClick={() => handleDfSort('end_date')}
                                                                 >
                                                                     End date {dfSortField === 'end_date' && (dfSortDirection === 'asc' ? '↑' : '↓')}
@@ -1963,7 +1973,7 @@ export default function DontForget() {
                                                             )}
                                                             {visibleColumns.deadline && (
                                                                 <th
-                                                                    className="px-2 sm:px-3 py-2 text-left font-semibold hidden lg:table-cell cursor-pointer hover:bg-slate-100"
+                                                                    className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[120px] cursor-pointer hover:bg-slate-100"
                                                                     onClick={() => handleDfSort('deadline')}
                                                                 >
                                                                     Deadline {dfSortField === 'deadline' && (dfSortDirection === 'asc' ? '↑' : '↓')}
@@ -1971,7 +1981,7 @@ export default function DontForget() {
                                                             )}
                                                             {visibleColumns.duration && (
                                                                 <th
-                                                                    className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell cursor-pointer hover:bg-slate-100"
+                                                                    className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[90px] cursor-pointer hover:bg-slate-100"
                                                                     onClick={() => handleDfSort('duration')}
                                                                 >
                                                                     Duration {dfSortField === 'duration' && (dfSortDirection === 'asc' ? '↑' : '↓')}
@@ -1979,7 +1989,7 @@ export default function DontForget() {
                                                             )}
                                                             {visibleColumns.completed && (
                                                                 <th
-                                                                    className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell cursor-pointer hover:bg-slate-100"
+                                                                    className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[120px] cursor-pointer hover:bg-slate-100"
                                                                     onClick={() => handleDfSort('completed')}
                                                                 >
                                                                     Completed {dfSortField === 'completed' && (dfSortDirection === 'asc' ? '↑' : '↓')}
@@ -2010,7 +2020,7 @@ export default function DontForget() {
                                                                 onStatusChange={(s) => setStatus(task.id, s)}
                                                                 onToggleActivitiesRow={() => { }}
                                                                 activityCount={0}
-                                                                getPriorityLevel={null}
+                                                                getPriorityLevel={getPriorityLevel}
                                                                 toDateOnly={toDateOnly}
                                                                 formatDuration={formatDurationDays}
                                                                 onMouseEnter={() => { }}
@@ -2060,20 +2070,6 @@ export default function DontForget() {
                                                     )}
                                                 </tbody>
                                             </table>
-                                        </div>
-
-                                        <div className="flex justify-end pr-10 pt-3">
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    // ensure composer defaults to selected DF list
-                                                    setShowComposer(true);
-                                                }}
-                                                className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                aria-label="Add task"
-                                            >
-                                                Add Task
-                                            </button>
                                         </div>
 
                                         <CreateTaskModal
