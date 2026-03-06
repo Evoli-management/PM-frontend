@@ -1656,15 +1656,6 @@ export default function DontForget() {
                                     </div>
 
                                     <div className="ml-auto flex items-center gap-2">
-                                        <div className="flex items-center bg-white rounded-lg px-2 py-1 shadow border border-slate-200">
-                                            <FaSearch className="text-slate-700 mr-2" />
-                                            <input
-                                                placeholder={`Search tasks in "Don't Forget"…`}
-                                                className="bg-transparent outline-none text-sm w-40 sm:w-56"
-                                                value={siteSearch}
-                                                onChange={(e) => setSiteSearch(e.target.value)}
-                                            />
-                                        </div>
                                         {/* ...existing code... */}
                                         <button
                                             type="button"

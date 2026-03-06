@@ -15,7 +15,6 @@ import ListView from "../components/goals/views/ListView";
 import TimelineView from "../components/goals/views/TimelineView";
 import {
     FaExclamationCircle,
-    FaSearch,
     FaFilter,
     FaSortAmountDown,
     FaRocket,
@@ -573,17 +572,6 @@ const Goals = () => {
 
                                             {/* Filters */}
                                             <div className="flex flex-1 gap-2">
-                                                <div className="flex-1 relative">
-                                                    <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm" />
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Search goals..."
-                                                        value={searchTerm}
-                                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                                        className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-slate-50 focus:bg-white transition-colors"
-                                                    />
-                                                </div>
-
                                                 <div className="relative">
                                                     <FaFilter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm" />
                                                     <select
