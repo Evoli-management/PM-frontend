@@ -3436,24 +3436,6 @@ export default function KeyAreas() {
                                     <h1 className="text-2xl font-bold text-slate-900">Key Areas</h1>
                                     {!showOnlyIdeas && (
                                         <>
-                                            <div className="flex items-center bg-white rounded-lg px-2 py-1 shadow border border-slate-200">
-                                                <FaSearch className="text-slate-700 mr-2" />
-                                                <input
-                                                    placeholder="Search key areas..."
-                                                    className="bg-transparent outline-none text-sm w-56"
-                                                    value={filter}
-                                                    onChange={(e) => setFilter(e.target.value)}
-                                                />
-                                            </div>
-                                            <div className="flex items-center bg-white rounded-lg px-2 py-1 shadow border border-slate-200">
-                                                <FaSearch className="text-slate-700 mr-2" />
-                                                <input
-                                                    placeholder="Search tasks across all key areas..."
-                                                    className="bg-transparent outline-none text-sm w-64"
-                                                    value={siteSearch}
-                                                    onChange={(e) => setSiteSearch(e.target.value)}
-                                                />
-                                            </div>
                                             <button
                                                 className={`flex items-center gap-2 rounded-lg font-semibold shadow px-2 py-1 text-sm border border-slate-200 ${
                                                     canAdd
