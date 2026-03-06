@@ -10,7 +10,7 @@ const LoginPage = () => {
     const [searchParams] = useSearchParams();
     const invitationToken = searchParams.get("invitationToken");
     const prefilledEmail = searchParams.get("email");
-    
+
     const [formData, setFormData] = useState({
         email: prefilledEmail || "",
         password: "",
@@ -18,6 +18,12 @@ const LoginPage = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const navigate = useNavigate();
+
+    // MFA state
+    const [mfaRequired, setMfaRequired] = useState(false);
+    const [mfaPendingToken, setMfaPendingToken] = useState("");
+    const [mfaCode, setMfaCode] = useState("");
+    const [trustDevice, setTrustDevice] = useState(false);
 
     const handleForgotPassword = () => {
         navigate("/PasswordPageForget");
@@ -47,6 +53,14 @@ const LoginPage = () => {
             const { email, password } = formData;
             const authService = await import("../services/authService").then((m) => m.default);
             const res = await authService.login({ email, password });
+
+            // MFA required — show code input screen
+            if (res.mfaRequired) {
+                setMfaPendingToken(res.mfaPendingToken);
+                setMfaRequired(true);
+                setLoading(false);
+                return;
+            }
 
             // Try to get token from response
             let token = res.token || (res.user && res.user.token);
@@ -128,6 +142,37 @@ const LoginPage = () => {
         }
     };
 
+    const handleMfaSubmit = async (e) => {
+        e.preventDefault();
+        if (!mfaCode.trim()) return;
+        setError("");
+        setLoading(true);
+        try {
+            const authService = await import("../services/authService").then((m) => m.default);
+            const res = await authService.completeMfaLogin({
+                mfaPendingToken,
+                code: mfaCode.trim(),
+                trustDevice,
+            });
+            const token = res.token;
+            if (token) {
+                localStorage.setItem("access_token", token);
+                window.dispatchEvent(new Event("authChanged"));
+                try {
+                    await authService.verifyToken();
+                    navigate(invitationToken ? `/join?token=${invitationToken}` : "/dashboard");
+                } catch {
+                    setError("Authentication failed. Please try again.");
+                }
+            }
+        } catch (err) {
+            const msg = err.response?.data?.message || err.message || "Invalid code";
+            setError(Array.isArray(msg) ? msg[0] : msg);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleSocialLogin = (provider) => {
         setLoading(true);
         setError("");
@@ -140,6 +185,66 @@ const LoginPage = () => {
             }
         }, 1200);
     };
+
+    // MFA verification screen
+    if (mfaRequired) {
+        return (
+            <div className="min-h-screen flex items-center justify-center w-full max-w-6xl mx-auto px-4">
+                <div className="w-full max-w-sm bg-white rounded-xl shadow-[0_-6px_20px_rgba(2,6,23,0.06)] p-8">
+                    <div className="text-center mb-6">
+                        <div className="text-4xl mb-3">🔐</div>
+                        <h2 className="text-2xl font-bold mb-1">Two-Factor Authentication</h2>
+                        <p className="text-gray-500 text-sm">Enter the 6-digit code from your authenticator app (Google Authenticator, Microsoft Authenticator, Authy, etc.)</p>
+                    </div>
+                    {error && (
+                        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm mb-4">
+                            {error}
+                        </div>
+                    )}
+                    <form onSubmit={handleMfaSubmit} className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Verification Code</label>
+                            <input
+                                type="text"
+                                inputMode="numeric"
+                                maxLength={8}
+                                value={mfaCode}
+                                onChange={(e) => { setMfaCode(e.target.value.replace(/\s/g, "")); setError(""); }}
+                                placeholder="123456"
+                                className="w-full border border-gray-300 rounded-lg px-4 py-2 text-center text-2xl tracking-widest font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                autoFocus
+                                autoComplete="one-time-code"
+                            />
+                            <p className="text-xs text-gray-400 mt-1 text-center">Or enter an 8-character backup code</p>
+                        </div>
+                        <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={trustDevice}
+                                onChange={(e) => setTrustDevice(e.target.checked)}
+                                className="rounded"
+                            />
+                            Trust this device for 30 days
+                        </label>
+                        <button
+                            type="submit"
+                            disabled={loading || !mfaCode.trim()}
+                            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-2 rounded-lg transition"
+                        >
+                            {loading ? "Verifying..." : "Verify"}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => { setMfaRequired(false); setMfaCode(""); setError(""); }}
+                            className="w-full text-sm text-gray-500 hover:text-gray-700 underline"
+                        >
+                            Back to login
+                        </button>
+                    </form>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen flex items-center justify-center w-full max-w-6xl mx-auto px-4">
