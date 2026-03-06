@@ -22,26 +22,39 @@ export const minutesToTime = (minutes) => {
     return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
 };
 
+// Map i18n language code to BCP-47 locale for Intl APIs
+const langToLocale = (lang) => {
+    const map = { en: 'en-US', sl: 'sl-SI' };
+    return map[lang] || lang || 'en-US';
+};
+
+// Get active locale from localStorage preferred_language
+const getActiveLocale = () => {
+    try {
+        return langToLocale(localStorage.getItem('preferred_language') || 'en');
+    } catch {
+        return 'en-US';
+    }
+};
+
 /**
  * Format date for display according to user preference
  * @param {Date|string} date - Date object or date string
  * @param {string} format - Date format preference ('MM/dd/yyyy', 'dd/MM/yyyy', 'yyyy-MM-dd', 'MMM dd, yyyy')
+ * @param {string} [locale] - Optional BCP-47 locale override (e.g. 'sl-SI')
  * @returns {string} - Formatted date string
  */
-export const formatDateForDisplay = (date, format = 'MM/dd/yyyy') => {
+export const formatDateForDisplay = (date, format = 'MM/dd/yyyy', locale) => {
     if (!date) return '';
-    
+
     const dateObj = date instanceof Date ? date : new Date(date);
     if (isNaN(dateObj.getTime())) return '';
-    
+
     const year = dateObj.getFullYear();
-    const month = dateObj.getMonth() + 1; // getMonth() returns 0-11
+    const month = dateObj.getMonth() + 1;
     const day = dateObj.getDate();
-    
-    // Month names for MMM format
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
-                       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    
+    const activeLocale = locale || getActiveLocale();
+
     switch (format) {
         case 'MM/dd/yyyy':
             return `${month.toString().padStart(2, '0')}/${day.toString().padStart(2, '0')}/${year}`;
@@ -50,9 +63,9 @@ export const formatDateForDisplay = (date, format = 'MM/dd/yyyy') => {
         case 'yyyy-MM-dd':
             return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
         case 'MMM dd, yyyy':
-            return `${monthNames[month - 1]} ${day}, ${year}`;
+            return new Intl.DateTimeFormat(activeLocale, { month: 'short', day: 'numeric', year: 'numeric' }).format(dateObj);
         default:
-            return dateObj.toLocaleDateString();
+            return dateObj.toLocaleDateString(activeLocale);
     }
 };
 
@@ -80,15 +93,17 @@ export const formatDateWithOptions = (date, dateFormat = 'MM/dd/yyyy', options =
     
     let formattedDate = formatDateForDisplay(dateObj, dateFormat);
     
+    const locale = getActiveLocale();
+
     if (includeWeekday) {
         const weekdayOptions = { weekday: shortWeekday ? 'short' : 'long' };
-        const weekday = dateObj.toLocaleDateString('en-US', weekdayOptions);
+        const weekday = dateObj.toLocaleDateString(locale, weekdayOptions);
         formattedDate = `${weekday}, ${formattedDate}`;
     }
-    
+
     // For MMM format, optionally use long month names
     if (dateFormat === 'MMM dd, yyyy' && longMonth) {
-        const longMonthName = dateObj.toLocaleDateString('en-US', { month: 'long' });
+        const longMonthName = dateObj.toLocaleDateString(locale, { month: 'long' });
         const day = dateObj.getDate();
         const year = dateObj.getFullYear();
         formattedDate = `${longMonthName} ${day}, ${year}`;
