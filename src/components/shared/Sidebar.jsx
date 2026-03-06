@@ -7,6 +7,7 @@ import {
     FaChevronDown,
     FaGripVertical,
 } from "react-icons/fa";
+import { useTranslation } from "react-i18next";
 import { isFeatureEnabled } from "../../utils/flags.js";
 import { formatKeyAreaLabel } from "../../utils/keyAreaDisplay.js";
 
@@ -20,10 +21,10 @@ const getKeyAreaService = async () => {
 };
 
 const navItems = [
-    { label: "Dashboard", icon: <FaHome />, to: "/dashboard", section: "Main" },
-    { label: "Calendar", icon: <FaCalendarAlt className="text-green-600" />, to: "/calendar", section: "Main" },
+    { labelKey: "nav.dashboard", label: "Dashboard", icon: <FaHome />, to: "/dashboard", section: "Main" },
+    { labelKey: "nav.calendar", label: "Calendar", icon: <FaCalendarAlt className="text-green-600" />, to: "/calendar", section: "Main" },
     {
-        label: "Don't Forget",
+        labelKey: "nav.dontForget", label: "Don't Forget",
         icon: (
             <img
                 src={`${import.meta.env.BASE_URL}dont-forget.png`}
@@ -36,13 +37,13 @@ const navItems = [
         section: "Main",
     },
     {
-        label: "Goals & Tracking",
+        labelKey: "nav.goals", label: "Goals & Tracking",
         icon: <img src={`${import.meta.env.BASE_URL}goals.png`} alt="Goals" className="w-6 h-6 object-contain" />,
         to: "/goals",
         section: "Main",
     },
     {
-        label: "Key Areas",
+        labelKey: "nav.keyAreas", label: "Key Areas",
         icon: (
             <img src={`${import.meta.env.BASE_URL}key-area.png`} alt="Key Areas" className="w-6 h-6 object-contain" />
         ),
@@ -59,7 +60,7 @@ const navItems = [
         ],
     },
     {
-        label: "Give Strokes",
+        labelKey: "nav.giveStrokes", label: "Give Strokes",
         icon: (
             <img
                 src={`${import.meta.env.BASE_URL}strokes.png`}
@@ -71,7 +72,7 @@ const navItems = [
         section: "Main",
     },
     {
-        label: "Team",
+        labelKey: "nav.team", label: "Team",
         icon: <img src={`${import.meta.env.BASE_URL}team.png`} alt="Team" className="w-6 h-6 object-contain" />,
         to: "/teams",
         section: "Main",
@@ -85,6 +86,7 @@ export default function Sidebar({
     mobileOpen = false,
     onMobileClose,
 }) {
+    const { t } = useTranslation();
     const location = useLocation();
     const [keyAreasList, setKeyAreasList] = useState([]);
     // Initialize from localStorage to persist across page navigation
@@ -433,10 +435,10 @@ export default function Sidebar({
                                                     aria-expanded={keyAreasOpen}
                                                     className={`relative flex items-center w-full py-2 rounded transition group focus:outline-none ${collapsed ? 'justify-center px-1' : 'gap-3 px-3'} ${isActive ? `bg-white ${colorClass} shadow-inner font-semibold` : `text-gray-800 hover:bg-white ${hoverColor}`}`}
                                                 >
-                                                    <span className="text-xl flex items-center justify-center" title={item.label}>
+                                                    <span className="text-xl flex items-center justify-center" title={t(item.labelKey || item.label)}>
                                                         {renderedIcon}
                                                     </span>
-                                                    {!collapsed && <span>{item.label}</span>}
+                                                    {!collapsed && <span>{t(item.labelKey || item.label)}</span>}
                                                     {!collapsed && item.badge && (
                                                         <span className="absolute right-3 bg-red-500 text-white text-xs rounded-full px-2 py-0.5 font-bold group-hover:bg-red-600">
                                                             {item.badge}
@@ -533,10 +535,10 @@ export default function Sidebar({
                                         to={item.to}
                                         className={`relative flex items-center py-2 rounded transition group ${collapsed ? 'justify-center px-1' : 'gap-3 px-3'} ${isActive ? `bg-white ${colorClass} shadow-inner font-semibold` : `text-gray-800 hover:bg-white ${hoverColor}`}`}
                                     >
-                                                <span className="text-xl flex items-center justify-center" title={item.label}>
+                                                <span className="text-xl flex items-center justify-center" title={t(item.labelKey || item.label)}>
                                                     {renderedIcon}
                                                 </span>
-                                                {!collapsed && <span>{item.label}</span>}
+                                                {!collapsed && <span>{t(item.labelKey || item.label)}</span>}
                                                 {!collapsed && item.badge && (
                                                     <span className="absolute right-3 bg-red-500 text-white text-xs rounded-full px-2 py-0.5 font-bold group-hover:bg-red-600">
                                                         {item.badge}

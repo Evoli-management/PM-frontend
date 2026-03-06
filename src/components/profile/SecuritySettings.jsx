@@ -23,17 +23,18 @@ export const SecuritySettings = ({ showToast }) => {
     const [twoFAEnabled, setTwoFAEnabled] = useState(false);
     const [twoFASetupMode, setTwoFASetupMode] = useState(null); // 'start' | 'verify' | 'done' | null
     const [twoFASecret, setTwoFASecret] = useState(null);
+    const [twoFAQrCodeUrl, setTwoFAQrCodeUrl] = useState(null);
     const [twoFACodeInput, setTwoFACodeInput] = useState("");
     const [backupCodes, setBackupCodes] = useState([]);
+    const [backupCodesRemaining, setBackupCodesRemaining] = useState(0);
     const [twoFADisableMode, setTwoFADisableMode] = useState(false);
     const [codeDigits, setCodeDigits] = useState(Array(6).fill(""));
     const [twoFADisableDigits, setTwoFADisableDigits] = useState(Array(6).fill(""));
-    
+    const [regenCodeInput, setRegenCodeInput] = useState("");
+    const [showRegenPrompt, setShowRegenPrompt] = useState(false);
+
     const twoFAInputsRef = useRef([]);
     const twoFADisableInputsRef = useRef([]);
-
-    // Feature toggle: hide 2FA UI until backend support is ready
-    const enable2FAFeature = false;
 
     // Login history - will be loaded from API
     const [loginHistory, setLoginHistory] = useState([]);
@@ -53,6 +54,7 @@ export const SecuritySettings = ({ showToast }) => {
             // Load 2FA status
             const twoFAStatus = await securityService.get2FAStatus();
             setTwoFAEnabled(twoFAStatus.enabled);
+            setBackupCodesRemaining(twoFAStatus.backupCodesRemaining || 0);
 
             // Load login history
             const historyData = await securityService.getLoginHistory(20);
@@ -150,9 +152,10 @@ export const SecuritySettings = ({ showToast }) => {
         try {
             setIsLoading(true);
             const response = await securityService.start2FASetup();
-            setTwoFASecret(response.secret);
+            setTwoFASecret(response.manualEntryKey || response.secret);
+            setTwoFAQrCodeUrl(response.qrCodeUrl || null);
             setTwoFASetupMode("verify");
-            showToast('2FA setup started. Scan the QR code with your authenticator app.');
+            showToast('Scan the QR code with your authenticator app, then enter the code.');
         } catch (error) {
             console.error('Failed to start 2FA setup:', error);
             showToast('Failed to start 2FA setup', 'error');
@@ -214,15 +217,23 @@ export const SecuritySettings = ({ showToast }) => {
     };
 
     const generateBackupCodes = async () => {
+        if (!regenCodeInput.trim()) {
+            showToast('Please enter your current 2FA code to regenerate backup codes', 'error');
+            return;
+        }
         try {
-            // For generating new backup codes, we need a TOTP verification
-            // This should be called from a separate flow with TOTP input
-            const response = await securityService.generateBackupCodes("000000"); // This needs proper TOTP
+            setIsLoading(true);
+            const response = await securityService.generateBackupCodes(regenCodeInput.trim());
             setBackupCodes(response.backupCodes || []);
-            showToast('New backup codes generated successfully');
+            setBackupCodesRemaining(response.backupCodes?.length || 0);
+            setRegenCodeInput("");
+            setShowRegenPrompt(false);
+            showToast('New backup codes generated. Save them somewhere safe!');
         } catch (error) {
             console.error('Failed to generate backup codes:', error);
-            showToast('Failed to generate new backup codes', 'error');
+            showToast('Invalid code. Please try again.', 'error');
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -399,19 +410,185 @@ export const SecuritySettings = ({ showToast }) => {
 
     return (
         <div className="space-y-6">
-            {/* Two-Factor Authentication (hidden until backend support is implemented) */}
-            {enable2FAFeature ? (
-                <Section 
-                    title="Two-Factor Authentication" 
-                    description="Add an extra layer of security to your account"
-                >
-                    {/* full 2FA UI preserved here for future enablement */}
-                </Section>
-            ) : (
-                // When 2FA is not implemented, don't show the interactive UI to users.
-                // Keeping a short informational comment in place for developers.
-                <div className="sr-only">Two-Factor Authentication\nAdd an extra layer of security to your account\n\nEnable 2FA\nSecure your account with time-based one-time passwords</div>
-            )}
+            {/* Two-Factor Authentication */}
+            <Section
+                title="Two-Factor Authentication"
+                description="Add an extra layer of security using Google Authenticator, Microsoft Authenticator, or any TOTP app"
+            >
+                {twoFAEnabled ? (
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2 text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm">
+                            <span className="text-base">✅</span>
+                            <span className="font-medium">Two-factor authentication is enabled</span>
+                        </div>
+
+                        {/* Backup codes info */}
+                        <div className="text-sm text-gray-600">
+                            Backup codes remaining: <span className={backupCodesRemaining <= 2 ? "text-red-600 font-semibold" : "font-medium"}>{backupCodesRemaining}</span>
+                            {backupCodesRemaining <= 2 && <span className="text-red-600"> — generate new codes soon</span>}
+                        </div>
+
+                        {/* Show newly generated backup codes */}
+                        {backupCodes.length > 0 && (
+                            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                                <p className="text-sm font-semibold text-yellow-800 mb-2">Save these backup codes — they won't be shown again:</p>
+                                <div className="grid grid-cols-3 gap-2 mb-3">
+                                    {backupCodes.map((code, i) => (
+                                        <code key={i} className="bg-white border border-yellow-300 rounded px-2 py-1 text-xs font-mono text-center tracking-widest">{code}</code>
+                                    ))}
+                                </div>
+                                <div className="flex gap-2">
+                                    <button onClick={copyBackupCodes} className="text-xs px-3 py-1.5 bg-yellow-100 hover:bg-yellow-200 border border-yellow-300 rounded">Copy</button>
+                                    <button onClick={downloadBackupCodes} className="text-xs px-3 py-1.5 bg-yellow-100 hover:bg-yellow-200 border border-yellow-300 rounded">Download</button>
+                                    <button onClick={() => setBackupCodes([])} className="text-xs px-3 py-1.5 text-gray-500 hover:text-gray-700 underline ml-auto">Dismiss</button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Regenerate backup codes */}
+                        {!showRegenPrompt ? (
+                            <button
+                                onClick={() => setShowRegenPrompt(true)}
+                                className="text-sm text-blue-600 hover:underline"
+                            >
+                                Regenerate backup codes
+                            </button>
+                        ) : (
+                            <div className="space-y-2">
+                                <p className="text-sm text-gray-600">Enter your current 2FA code to generate new backup codes:</p>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        maxLength={8}
+                                        value={regenCodeInput}
+                                        onChange={(e) => setRegenCodeInput(e.target.value.replace(/\s/g, ""))}
+                                        placeholder="123456"
+                                        className="w-32 border border-gray-300 rounded px-3 py-1.5 text-sm font-mono text-center tracking-widest"
+                                        autoFocus
+                                    />
+                                    <LoadingButton onClick={generateBackupCodes} loading={isLoading} variant="primary">Generate</LoadingButton>
+                                    <button onClick={() => { setShowRegenPrompt(false); setRegenCodeInput(""); }} className="text-sm text-gray-500 hover:text-gray-700 underline">Cancel</button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Disable 2FA */}
+                        {!twoFADisableMode ? (
+                            <button
+                                onClick={() => setTwoFADisableMode(true)}
+                                className="text-sm text-red-600 hover:underline"
+                            >
+                                Disable two-factor authentication
+                            </button>
+                        ) : (
+                            <div className="space-y-3 border border-red-200 bg-red-50 rounded-lg p-4">
+                                <p className="text-sm font-medium text-red-800">Enter your 2FA code to confirm disabling:</p>
+                                <div className="flex gap-1">
+                                    {twoFADisableDigits.map((d, i) => (
+                                        <input
+                                            key={i}
+                                            ref={(el) => (twoFADisableInputsRef.current[i] = el)}
+                                            type="text"
+                                            inputMode="numeric"
+                                            maxLength={1}
+                                            value={d}
+                                            onChange={(e) => {
+                                                const val = e.target.value.replace(/\D/g, "");
+                                                const next = [...twoFADisableDigits];
+                                                next[i] = val;
+                                                setTwoFADisableDigits(next);
+                                                if (val && i < 5) focusNoScroll(twoFADisableInputsRef.current[i + 1]);
+                                            }}
+                                            onKeyDown={(e) => {
+                                                if (e.key === "Backspace" && !twoFADisableDigits[i] && i > 0) {
+                                                    focusNoScroll(twoFADisableInputsRef.current[i - 1]);
+                                                }
+                                            }}
+                                            className="w-10 h-10 border border-red-300 rounded text-center text-lg font-mono focus:outline-none focus:ring-2 focus:ring-red-400"
+                                        />
+                                    ))}
+                                </div>
+                                <div className="flex gap-2">
+                                    <LoadingButton onClick={disableTwoFA} loading={isLoading} variant="danger">Disable 2FA</LoadingButton>
+                                    <button onClick={() => { setTwoFADisableMode(false); setTwoFADisableDigits(Array(6).fill("")); }} className="text-sm text-gray-500 hover:text-gray-700 underline">Cancel</button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                ) : twoFASetupMode === "verify" ? (
+                    <div className="space-y-4">
+                        <p className="text-sm text-gray-600">
+                            Scan this QR code with <strong>Google Authenticator</strong>, <strong>Microsoft Authenticator</strong>, <strong>Authy</strong>, or any TOTP app:
+                        </p>
+                        {twoFAQrCodeUrl && (
+                            <img src={twoFAQrCodeUrl} alt="2FA QR Code" className="w-48 h-48 border border-gray-200 rounded-lg p-2 bg-white" />
+                        )}
+                        <div className="text-xs text-gray-500">
+                            <p>Can't scan? Enter this key manually:</p>
+                            <code className="block mt-1 bg-gray-100 px-3 py-2 rounded font-mono tracking-widest break-all">{twoFASecret}</code>
+                        </div>
+                        <div>
+                            <p className="text-sm font-medium text-gray-700 mb-2">Enter the 6-digit code from your app to confirm setup:</p>
+                            <div className="flex gap-1 mb-3">
+                                {codeDigits.map((d, i) => (
+                                    <input
+                                        key={i}
+                                        ref={(el) => (twoFAInputsRef.current[i] = el)}
+                                        type="text"
+                                        inputMode="numeric"
+                                        maxLength={1}
+                                        value={d}
+                                        onChange={(e) => {
+                                            const val = e.target.value.replace(/\D/g, "");
+                                            const next = [...codeDigits];
+                                            next[i] = val;
+                                            setCodeDigits(next);
+                                            setTwoFACodeInput(next.join(""));
+                                            if (val && i < 5) focusNoScroll(twoFAInputsRef.current[i + 1]);
+                                        }}
+                                        onKeyDown={(e) => {
+                                            if (e.key === "Backspace" && !codeDigits[i] && i > 0) {
+                                                focusNoScroll(twoFAInputsRef.current[i - 1]);
+                                            }
+                                        }}
+                                        className="w-10 h-10 border border-gray-300 rounded text-center text-lg font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                ))}
+                            </div>
+                            <div className="flex gap-2">
+                                <LoadingButton onClick={verifyTwoFACode} loading={isLoading} variant="primary">Verify & Enable</LoadingButton>
+                                <button onClick={() => { setTwoFASetupMode(null); setCodeDigits(Array(6).fill("")); setTwoFACodeInput(""); }} className="text-sm text-gray-500 hover:text-gray-700 underline">Cancel</button>
+                            </div>
+                        </div>
+                    </div>
+                ) : twoFASetupMode === "done" ? (
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2 text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm">
+                            <span className="text-base">✅</span>
+                            <span className="font-medium">Two-factor authentication enabled successfully!</span>
+                        </div>
+                        <p className="text-sm font-semibold text-gray-800">Save these backup codes — they won't be shown again:</p>
+                        <div className="grid grid-cols-3 gap-2">
+                            {backupCodes.map((code, i) => (
+                                <code key={i} className="bg-gray-100 border border-gray-200 rounded px-2 py-1 text-xs font-mono text-center tracking-widest">{code}</code>
+                            ))}
+                        </div>
+                        <div className="flex gap-2">
+                            <button onClick={copyBackupCodes} className="text-sm px-3 py-1.5 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded">Copy codes</button>
+                            <button onClick={downloadBackupCodes} className="text-sm px-3 py-1.5 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded">Download</button>
+                            <button onClick={() => { setTwoFASetupMode(null); setBackupCodes([]); }} className="text-sm px-3 py-1.5 bg-blue-600 text-white hover:bg-blue-700 rounded ml-auto">Done</button>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="space-y-3">
+                        <p className="text-sm text-gray-600">Protect your account with a time-based one-time password from your phone. Works with Google Authenticator, Microsoft Authenticator, Authy, 1Password, and more.</p>
+                        <LoadingButton onClick={startTwoFASetup} loading={isLoading} variant="primary">
+                            Enable Two-Factor Authentication
+                        </LoadingButton>
+                    </div>
+                )}
+            </Section>
 
             {/* Password Change */}
             <Section 

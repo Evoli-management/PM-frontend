@@ -1,13 +1,15 @@
 import React, { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 
 const ProfileLayout = ({ children, activeTab, setActiveTab }) => {
+    const { t } = useTranslation();
     const tabs = [
-        "My Profile",
-        "Security",
-        "Preferences",
-        "Privacy",
-        "Integrations",
-        "Organization",
+        { key: "My Profile", labelKey: "profile.myProfile" },
+        { key: "Security", labelKey: "profile.security" },
+        { key: "Preferences", labelKey: "profile.preferences" },
+        { key: "Privacy", labelKey: "profile.privacy" },
+        { key: "Integrations", labelKey: "profile.integrations" },
+        { key: "Organization", labelKey: "profile.organization" },
     ];
 
     // Allow deep-linking: #/profile-settings?tab=preferences selects the Preferences tab
@@ -53,7 +55,7 @@ const ProfileLayout = ({ children, activeTab, setActiveTab }) => {
                     <div className="rounded-lg bg-white p-1 shadow-sm sm:p-2">
                         <div className="space-y-4">
                             <div className="flex items-center justify-between mb-3">
-                                <h1 className="text-lg font-semibold text-gray-600 sm:text-xl">Profile Settings</h1>
+                                <h1 className="text-lg font-semibold text-gray-600 sm:text-xl">{t('profile.settings')}</h1>
                                 <div className="flex gap-2">
                                     {/* action buttons can go here if needed */}
                                 </div>
@@ -66,15 +68,15 @@ const ProfileLayout = ({ children, activeTab, setActiveTab }) => {
                                         <div className="space-y-1">
                                             {tabs.map((tab) => (
                                                 <button
-                                                    key={tab}
-                                                    onClick={() => setActiveTab(tab)}
+                                                    key={tab.key}
+                                                    onClick={() => setActiveTab(tab.key)}
                                                     className={`w-full rounded px-3 py-2 text-left text-sm transition-colors ${
-                                                        activeTab === tab
+                                                        activeTab === tab.key
                                                             ? "bg-blue-600 text-white shadow-sm"
                                                             : "hover:bg-gray-100 text-gray-700"
                                                     }`}
                                                 >
-                                                    {tab}
+                                                    {t(tab.labelKey)}
                                                 </button>
                                             ))}
                                         </div>
