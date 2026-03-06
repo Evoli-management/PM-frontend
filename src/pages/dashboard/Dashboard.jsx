@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import Sidebar from "../../components/shared/Sidebar";
 import { FaGripVertical, FaBars, FaExternalLinkAlt } from "react-icons/fa";
 import {
@@ -358,6 +359,7 @@ function SortableWidget({
 }
 
 export default function Dashboard() {
+    const { t } = useTranslation();
     const [loading, setLoading] = useState(true);
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
         const [enpsData, setEnpsData] = useState([]);
@@ -969,12 +971,12 @@ export default function Dashboard() {
                     <div className={widgetClass} style={widgetStyle}>
                         <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
                             <div className="flex items-start justify-between mb-3">
-                                <h3 className="font-semibold text-blue-700 pr-16">My Day</h3>
+                                <h3 className="font-semibold text-blue-700 pr-16">{t('dashboard.myDay')}</h3>
                             </div>
                             <div className="flex-1 flex flex-col justify-center items-center">
                                 <div className="text-lg font-extrabold text-blue-700 dark:text-blue-400">{myDayStats.tasksDueToday}</div>
-                                <div className="text-xs font-medium opacity-80">tasks</div>
-                                <div className="text-[10px] text-[CanvasText] opacity-70 mt-1">{myDayStats.overdue} overdue • {myDayStats.appointments} appointments</div>
+                                <div className="text-xs font-medium opacity-80">{t('dashboard.tasks')}</div>
+                                <div className="text-[10px] text-[CanvasText] opacity-70 mt-1">{t('dashboard.overdueAppointments', { overdue: myDayStats.overdue, appointments: myDayStats.appointments })}</div>
                             </div>
                         </div>
                     </div>
@@ -996,13 +998,13 @@ export default function Dashboard() {
                 >
                     <div className={widgetClass} style={widgetStyle}>
                     <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
-                        <h3 className="font-semibold text-blue-700 mb-3 pr-16">Your active goals</h3>
+                        <h3 className="font-semibold text-blue-700 mb-3 pr-16">{t('dashboard.activeGoals')}</h3>
                         <div className="flex items-start justify-between mb-2">
                             <div />
                             <div className="text-xs text-[CanvasText] opacity-60 flex items-center gap-2">
                                 <button 
                                     className="px-2 py-1 border rounded text-[CanvasText]" 
-                                    title="Export goals"
+                                    title={t('dashboard.export')}
                                     onClick={() => {
                                         const header = ["Title", "Progress (%)", "Status", "Due Date"];
                                         const rows = [
@@ -1011,31 +1013,31 @@ export default function Dashboard() {
                                                 g.title,
                                                 g.progress || 0,
                                                 g.status || "active",
-                                                g.dueDate ? new Date(g.dueDate).toLocaleDateString() : "No due date",
+                                                g.dueDate ? new Date(g.dueDate).toLocaleDateString() : t('dashboard.noDueDate'),
                                             ]),
                                         ];
                                         exportCsv("dashboard-goals.csv", rows);
                                     }}
                                 >
-                                    Export
+                                    {t('dashboard.export')}
                                 </button>
                             </div>
                         </div>
 
                         {dataLoading.goals ? (
                             <div className="flex items-center justify-center py-8">
-                                <div className="text-sm text-[CanvasText] opacity-70">Loading goals...</div>
+                                <div className="text-sm text-[CanvasText] opacity-70">{t('dashboard.loadingGoals')}</div>
                             </div>
                         ) : dataErrors.goals ? (
                             <div className="text-sm text-red-600 bg-red-50 p-3 rounded border">
-                                Failed to load goals: {dataErrors.goals}
-                                <div className="mt-2 text-xs">Using fallback data</div>
+                                {t('dashboard.loadGoalsFailed')} {dataErrors.goals}
+                                <div className="mt-2 text-xs">{t('dashboard.usingFallback')}</div>
                             </div>
                         ) : (
                             <div className="flex-1 overflow-y-auto">
                                 {activeGoals.length === 0 ? (
                                     <div className="text-[CanvasText] opacity-70">
-                                        No active goals yet. <a href="#/goals" className="text-blue-600">Create your first goal</a>!
+                                        {t('dashboard.noGoalsYet')} <a href="#/goals" className="text-blue-600">{t('dashboard.createFirstGoal')}</a>!
                                     </div>
                                 ) : (
                                     <ul className="space-y-4">
@@ -1082,7 +1084,7 @@ export default function Dashboard() {
                 >
                     <div className={widgetClass} style={widgetStyle}>
                         <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
-                            <h3 className="font-semibold text-blue-700 mb-3 pr-16">Key Areas Summary</h3>
+                            <h3 className="font-semibold text-blue-700 mb-3 pr-16">{t('dashboard.keyAreasSummary')}</h3>
                             <KeyAreasWidget 
                                 keyAreas={keyAreas}
                                 loading={dataLoading.keyAreas}
@@ -1108,11 +1110,11 @@ export default function Dashboard() {
                 >
                     <div className={widgetClass} style={widgetStyle}>
                     <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
-                        <h3 className="font-semibold text-blue-700 mb-3 pr-16">eNPS Snapshot</h3>
+                        <h3 className="font-semibold text-blue-700 mb-3 pr-16">{t('dashboard.enpsSnapshot')}</h3>
                         <div className="flex items-start justify-between">
                             <div />
                             <div className="text-xs text-[CanvasText] opacity-60 flex items-center gap-2">
-                                <button className="px-2 py-1 border rounded text-[CanvasText]" title="Export eNPS report">Export</button>
+                                <button className="px-2 py-1 border rounded text-[CanvasText]" title={t('dashboard.export')}>{t('dashboard.export')}</button>
                             </div>
                         </div>
                         <a href="#/enps">
@@ -1142,21 +1144,21 @@ export default function Dashboard() {
                 >
                     <div className={widgetClass} style={widgetStyle}>
                     <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
-                        <h3 className="font-semibold text-blue-700 mb-3 pr-16">Calendar Preview (Today)</h3>
+                        <h3 className="font-semibold text-blue-700 mb-3 pr-16">{t('dashboard.calendarPreview')}</h3>
 
                         <div className="flex-1 min-h-0 overflow-y-auto pr-1">
                             {dataLoading.calendar ? (
                                 <div className="flex items-center justify-center py-8">
-                                    <div className="text-sm text-[CanvasText] opacity-70">Loading calendar...</div>
+                                    <div className="text-sm text-[CanvasText] opacity-70">{t('dashboard.loadingCalendar')}</div>
                                 </div>
                             ) : dataErrors.calendar ? (
                                 <div className="text-sm text-red-600 bg-red-50 p-3 rounded border mb-3">
-                                    Failed to load calendar: {dataErrors.calendar}
-                                    <div className="text-xs mt-1">Using fallback data</div>
+                                    {t('dashboard.loadCalendarFailed')} {dataErrors.calendar}
+                                    <div className="text-xs mt-1">{t('dashboard.usingFallback')}</div>
                                 </div>
                             ) : calendarToday.length === 0 ? (
                                 <div className="text-[CanvasText] opacity-70">
-                                    No appointments today. <a href="#/calendar" className="text-blue-600">Add appointment</a>.
+                                    {t('dashboard.noAppointmentsToday')} <a href="#/calendar" className="text-blue-600">{t('dashboard.addAppointment')}</a>.
                                 </div>
                             ) : (
                                 <CalendarPreview 
@@ -1191,27 +1193,27 @@ export default function Dashboard() {
                 >
                     <div className={widgetClass} style={widgetStyle}>
                     <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
-                        <h3 className="font-semibold text-blue-700 mb-3 pr-16">What's New</h3>
+                        <h3 className="font-semibold text-blue-700 mb-3 pr-16">{t('dashboard.whatsNew')}</h3>
                         <div className="flex items-center justify-between mb-2">
                             <div />
                             <div className="flex items-center gap-2">
                                 <select className="border rounded text-sm bg-[Canvas]" value={activityFilter} onChange={(e) => setActivityFilter(e.target.value)} title="Filter feed">
-                                    <option value="all">All</option>
-                                    <option value="tasks">Tasks</option>
-                                    <option value="goals">Goals</option>
-                                    <option value="recognitions">Recognitions</option>
+                                    <option value="all">{t('dashboard.all')}</option>
+                                    <option value="tasks">{t('dashboard.tasksFilter')}</option>
+                                    <option value="goals">{t('dashboard.goalsFilter')}</option>
+                                    <option value="recognitions">{t('dashboard.recognitionsFilter')}</option>
                                 </select>
                             </div>
                         </div>
 
                         {dataLoading.activity ? (
                             <div className="flex items-center justify-center py-8">
-                                <div className="text-sm text-[CanvasText] opacity-70">Loading activities...</div>
+                                <div className="text-sm text-[CanvasText] opacity-70">{t('dashboard.loadingActivities')}</div>
                             </div>
                         ) : dataErrors.activity ? (
                             <div className="text-sm text-red-600 bg-red-50 p-3 rounded border mb-3">
-                                Failed to load activities: {dataErrors.activity}
-                                <div className="text-xs mt-1">Using fallback data</div>
+                                {t('dashboard.loadActivitiesFailed')} {dataErrors.activity}
+                                <div className="text-xs mt-1">{t('dashboard.usingFallback')}</div>
                             </div>
                         ) : null}
                         
@@ -1229,7 +1231,7 @@ export default function Dashboard() {
 
                             {!dataLoading.activity && recentActivity.length === 0 && (
                                 <div className="text-[CanvasText] opacity-70 text-center py-4">
-                                    No recent activity. Start working on your goals to see updates here!
+                                    {t('dashboard.noActivity')}
                                 </div>
                             )}
                         </div>
@@ -1346,14 +1348,14 @@ export default function Dashboard() {
                     <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
                         <div className="bg-[Canvas] text-[CanvasText] border rounded shadow p-4 w-[28rem]">
                             <div className="flex items-center justify-between mb-2">
-                                <div className="font-semibold">Activity details</div>
+                                <div className="font-semibold">{t('dashboard.activityDetails')}</div>
                                 <button className="text-sm opacity-60" onClick={() => setDrillItem(null)}>
-                                    Close
+                                    {t('common.close')}
                                 </button>
                             </div>
                             <div className="text-sm">
                                 <div className="font-medium mb-1">{drillItem.desc}</div>
-                                <div className="opacity-70">When: {drillItem.time} • Source: system</div>
+                                <div className="opacity-70">{t('dashboard.when')} {drillItem.time} • {t('dashboard.sourceSystem')}</div>
                             </div>
                         </div>
                     </div>

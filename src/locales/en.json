@@ -93,10 +93,6 @@
     "required": "This field is required",
     "back": "Back"
   },
-  "dashboard": {
-    "title": "Dashboard",
-    "welcome": "Welcome back"
-  },
   "tasks": {
     "title": "Tasks",
     "addTask": "Add Task",
@@ -184,6 +180,52 @@
       "emailInvalidDetailed": "Please enter a valid email address.",
       "registrationFailed": "Registration failed. Please try again."
     }
+  },
+  "verifyEmail": {
+    "verifying": "Verifying…",
+    "missingToken": "Missing token",
+    "verifiedRedirecting": "Email verified successfully. Redirecting…",
+    "resendLabel": "Didn't get the email? Resend verification",
+    "typoCorrectionHint": "You can change your email if you made a typo.",
+    "sending": "Sending…",
+    "waitSeconds": "Wait {{seconds}}s",
+    "resendBtn": "Resend verification email",
+    "emailRequired": "Enter your email to resend.",
+    "resentSuccess": "If the account exists, we sent a new email.",
+    "resentFailed": "Failed to resend email"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "welcome": "Welcome back",
+    "myDay": "My Day",
+    "tasks": "tasks",
+    "overdueAppointments": "{{overdue}} overdue • {{appointments}} appointments",
+    "activeGoals": "Your active goals",
+    "noGoalsYet": "No active goals yet.",
+    "createFirstGoal": "Create your first goal",
+    "loadingGoals": "Loading goals...",
+    "loadGoalsFailed": "Failed to load goals:",
+    "usingFallback": "Using fallback data",
+    "noDueDate": "No due date",
+    "export": "Export",
+    "keyAreasSummary": "Key Areas Summary",
+    "enpsSnapshot": "eNPS Snapshot",
+    "calendarPreview": "Calendar Preview (Today)",
+    "loadingCalendar": "Loading calendar...",
+    "loadCalendarFailed": "Failed to load calendar:",
+    "noAppointmentsToday": "No appointments today.",
+    "addAppointment": "Add appointment",
+    "whatsNew": "What's New",
+    "all": "All",
+    "tasksFilter": "Tasks",
+    "goalsFilter": "Goals",
+    "recognitionsFilter": "Recognitions",
+    "loadingActivities": "Loading activities...",
+    "loadActivitiesFailed": "Failed to load activities:",
+    "noActivity": "No recent activity. Start working on your goals to see updates here!",
+    "activityDetails": "Activity details",
+    "when": "When:",
+    "sourceSystem": "Source: system"
   },
   "goals": {
     "title": "Goals",

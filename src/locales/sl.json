@@ -92,10 +92,6 @@
     "required": "To polje je obvezno",
     "back": "Nazaj"
   },
-  "dashboard": {
-    "title": "Nadzorna plošča",
-    "welcome": "Dobrodošli nazaj"
-  },
   "tasks": {
     "title": "Naloge",
     "addTask": "Dodaj nalogo",
@@ -183,6 +179,52 @@
       "emailInvalidDetailed": "Vnesite veljaven e-poštni naslov.",
       "registrationFailed": "Registracija ni uspela. Poskusite znova."
     }
+  },
+  "verifyEmail": {
+    "verifying": "Preverjanje…",
+    "missingToken": "Manjkajoči žeton",
+    "verifiedRedirecting": "E-pošta uspešno potrjena. Preusmerjanje…",
+    "resendLabel": "Niste prejeli e-pošte? Znova pošlji potrditev",
+    "typoCorrectionHint": "E-poštni naslov lahko popravite, če ste se zatipkali.",
+    "sending": "Pošiljanje…",
+    "waitSeconds": "Počakajte {{seconds}}s",
+    "resendBtn": "Znova pošlji potrditveno e-pošto",
+    "emailRequired": "Vnesite e-poštni naslov za ponoven vpis.",
+    "resentSuccess": "Če račun obstaja, smo poslali novo e-pošto.",
+    "resentFailed": "Pošiljanje e-pošte ni uspelo"
+  },
+  "dashboard": {
+    "title": "Nadzorna plošča",
+    "welcome": "Dobrodošli nazaj",
+    "myDay": "Moj dan",
+    "tasks": "naloge",
+    "overdueAppointments": "{{overdue}} zamujenih • {{appointments}} srečanj",
+    "activeGoals": "Vaši aktivni cilji",
+    "noGoalsYet": "Še ni aktivnih ciljev.",
+    "createFirstGoal": "Ustvarite prvi cilj",
+    "loadingGoals": "Nalaganje ciljev...",
+    "loadGoalsFailed": "Nalaganje ciljev ni uspelo:",
+    "usingFallback": "Prikazujem rezervne podatke",
+    "noDueDate": "Brez roka",
+    "export": "Izvozi",
+    "keyAreasSummary": "Povzetek ključnih področij",
+    "enpsSnapshot": "eNPS pregled",
+    "calendarPreview": "Pregled koledarja (danes)",
+    "loadingCalendar": "Nalaganje koledarja...",
+    "loadCalendarFailed": "Nalaganje koledarja ni uspelo:",
+    "noAppointmentsToday": "Danes ni srečanj.",
+    "addAppointment": "Dodaj srečanje",
+    "whatsNew": "Novosti",
+    "all": "Vse",
+    "tasksFilter": "Naloge",
+    "goalsFilter": "Cilji",
+    "recognitionsFilter": "Pohvale",
+    "loadingActivities": "Nalaganje aktivnosti...",
+    "loadActivitiesFailed": "Nalaganje aktivnosti ni uspelo:",
+    "noActivity": "Ni nedavnih aktivnosti. Začnite delati na svojih ciljih!",
+    "activityDetails": "Podrobnosti aktivnosti",
+    "when": "Kdaj:",
+    "sourceSystem": "Vir: sistem"
   },
   "goals": {
     "title": "Cilji",
