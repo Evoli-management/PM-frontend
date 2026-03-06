@@ -86,7 +86,7 @@ export default function OrganizationSwitcher() {
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-[160] py-1">
+        <div className="absolute left-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-[5010] py-1">
           {/* Header */}
           <div className="px-3 py-2 border-b border-gray-200">
             <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">

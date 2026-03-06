@@ -21,7 +21,7 @@ export default function CalendarPreview({ events = [], onReorder, getCountdownBa
         return <div className="opacity-60 text-[CanvasText]">No appointments today.</div>;
     }
     return (
-        <ul className="divide-y text-[CanvasText]">
+        <ul className="divide-y text-[CanvasText] h-full min-h-0 overflow-y-auto">
             {events.map((ev, i) => (
                 <li
                     key={ev.id}

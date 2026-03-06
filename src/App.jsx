@@ -52,6 +52,7 @@ import OnboardingWizard from "./pages/OnboardingWizard.jsx";
 import CalendarSyncStatus from "./pages/CalendarSyncStatus.jsx";
 import TermsOfService from "./pages/TermsOfService.jsx";
 import PrivacyPolicy from "./pages/PrivacyPolicy.jsx";
+import SearchResults from "./pages/SearchResults.jsx";
 export default function App() {
     const navigate = useNavigate();
     const calendarEnabled = isFeatureEnabled("calendar");
@@ -184,6 +185,7 @@ export default function App() {
                             <Route path="/member/:userId" element={<MemberProfile />} />
                             <Route path="/key-areas" element={<KeyAreas />} />
                             <Route path="/connection-test" element={<ConnectionTest />} />
+                            <Route path="/search" element={<SearchResults />} />
                             {/* Private routes below */}
                             <Route path="/profile-settings" element={<PrivateRoute><ProfileSetting /></PrivateRoute>} />
                             <Route path="/profile" element={<PrivateRoute><ProfileSetting /></PrivateRoute>} />
@@ -206,6 +208,7 @@ export default function App() {
                             <Route path="/view-strokes" element={<PrivateRoute><ViewStrokes /></PrivateRoute>} />
                             <Route path="/reminders" element={<PrivateRoute><Reminders /></PrivateRoute>} />
                             <Route path="/calendar-sync" element={<PrivateRoute><CalendarSyncStatus /></PrivateRoute>} />
+                            <Route path="/search" element={<PrivateRoute><SearchResults /></PrivateRoute>} />
                         </Routes>
                     </Suspense>
                 </main>
