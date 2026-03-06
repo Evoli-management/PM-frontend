@@ -1,0 +1,132 @@
+{
+  "nav": {
+    "dashboard": "Nadzorna plošča",
+    "calendar": "Koledar",
+    "dontForget": "Ne pozabi",
+    "goals": "Cilji in sledenje",
+    "keyAreas": "Ključna področja",
+    "giveStrokes": "Pohvali",
+    "team": "Ekipa"
+  },
+  "login": {
+    "title": "Prijava",
+    "subtitle": "Prijavite se in prevzemite nadzor nad svojim delovnim tokom.",
+    "email": "E-pošta",
+    "password": "Geslo",
+    "forgotPassword": "Ste pozabili geslo?",
+    "submit": "Prijava",
+    "loading": "Prijavljanje...",
+    "noAccount": "Nimate računa?",
+    "register": "Registracija",
+    "rememberMe": "Zapomni si me"
+  },
+  "mfa": {
+    "title": "Dvostopenjska avtentikacija",
+    "subtitle": "Vnesite 6-mestno kodo iz aplikacije za avtentikacijo (Google Authenticator, Microsoft Authenticator, Authy itd.)",
+    "codeLabel": "Koda za preverjanje",
+    "codePlaceholder": "123456",
+    "backupHint": "Ali vnesite 8-mestno rezervno kodo",
+    "trustDevice": "Zaupaj tej napravi za 30 dni",
+    "verify": "Preveri",
+    "verifying": "Preverjanje...",
+    "backToLogin": "Nazaj na prijavo"
+  },
+  "security": {
+    "title": "Dvostopenjska avtentikacija",
+    "description": "Dodajte dodatno plast varnosti z Google Authenticatorjem, Microsoft Authenticatorjem ali katero koli aplikacijo TOTP",
+    "enabled": "Dvostopenjska avtentikacija je omogočena",
+    "backupCodesRemaining": "Preostale rezervne kode",
+    "regenerateCodes": "Ustvari nove rezervne kode",
+    "enterCodeToRegen": "Vnesite trenutno kodo 2FA za ustvarjanje novih rezervnih kod:",
+    "generate": "Ustvari",
+    "cancel": "Prekliči",
+    "disable": "Onemogoči dvostopenjsko avtentikacijo",
+    "confirmDisable": "Vnesite kodo 2FA za potrditev onemogočanja:",
+    "disableBtn": "Onemogoči 2FA",
+    "scanInstructions": "Skenirajte to kodo QR z Google Authenticatorjem, Microsoft Authenticatorjem, Authy ali katero koli aplikacijo TOTP:",
+    "cantScan": "Ne morete skenirati? Vnesite ključ ročno:",
+    "confirmSetup": "Vnesite 6-mestno kodo iz aplikacije za potrditev nastavitve:",
+    "verifyEnable": "Preveri in omogoči",
+    "setupDone": "Dvostopenjska avtentikacija uspešno omogočena!",
+    "saveBackupCodes": "Shranite te rezervne kode — ne bodo prikazane znova:",
+    "copyCodes": "Kopiraj kode",
+    "download": "Prenesi",
+    "done": "Končano",
+    "enableBtn": "Omogoči dvostopenjsko avtentikacijo",
+    "enableDescription": "Zavarujte račun z enkratnim geslom, ki temelji na času, iz vašega telefona. Deluje z Google Authenticatorjem, Microsoft Authenticatorjem, Authy, 1Password in še več."
+  },
+  "profile": {
+    "settings": "Nastavitve profila",
+    "myProfile": "Moj profil",
+    "security": "Varnost",
+    "preferences": "Nastavitve",
+    "privacy": "Zasebnost",
+    "integrations": "Integracije",
+    "organization": "Organizacija"
+  },
+  "preferences": {
+    "language": "Jezik",
+    "languageRegion": "Jezik in regija",
+    "languageRegionDesc": "Nastavite jezik, časovni pas in format datuma",
+    "timezone": "Časovni pas",
+    "dateFormat": "Format datuma",
+    "timeFormat": "Format časa",
+    "theme": "Tema",
+    "save": "Shrani nastavitve",
+    "saving": "Shranjevanje..."
+  },
+  "common": {
+    "save": "Shrani",
+    "cancel": "Prekliči",
+    "delete": "Izbriši",
+    "edit": "Uredi",
+    "add": "Dodaj",
+    "close": "Zapri",
+    "confirm": "Potrdi",
+    "loading": "Nalaganje...",
+    "error": "Prišlo je do napake",
+    "success": "Uspešno",
+    "logout": "Odjava",
+    "search": "Iskanje",
+    "noResults": "Ni rezultatov",
+    "required": "To polje je obvezno",
+    "back": "Nazaj"
+  },
+  "dashboard": {
+    "title": "Nadzorna plošča",
+    "welcome": "Dobrodošli nazaj"
+  },
+  "tasks": {
+    "title": "Naloge",
+    "addTask": "Dodaj nalogo",
+    "noTasks": "Še ni nalog",
+    "completed": "Dokončano",
+    "inProgress": "V teku",
+    "todo": "Za narediti",
+    "dueDate": "Rok",
+    "priority": "Prioriteta",
+    "high": "Visoka",
+    "medium": "Srednja",
+    "low": "Nizka"
+  },
+  "keyAreas": {
+    "title": "Ključna področja",
+    "addList": "Dodaj seznam",
+    "newTask": "Nova naloga",
+    "importedTasks": "Uvožene naloge"
+  },
+  "calendar": {
+    "title": "Koledar",
+    "today": "Danes",
+    "newEvent": "Nov dogodek",
+    "month": "Mesec",
+    "week": "Teden",
+    "day": "Dan"
+  },
+  "errors": {
+    "invalidCredentials": "Napačen e-poštni naslov ali geslo",
+    "emailNotVerified": "Pred prijavo potrdite e-poštni naslov",
+    "serverError": "Napaka strežnika. Poskusite znova pozneje.",
+    "networkError": "Napaka omrežja. Preverite svojo povezavo."
+  }
+}

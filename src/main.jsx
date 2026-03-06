@@ -2,6 +2,7 @@ import React, { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { HashRouter as Router } from "react-router-dom";
 import "./index.css";
+import "./i18n";
 import App from "./App";
 import ToastProvider from "./components/shared/ToastProvider.jsx";
 import { preloadTzLib } from "./utils/time";

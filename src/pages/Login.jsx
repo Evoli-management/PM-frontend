@@ -3,9 +3,11 @@ import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEnvelope, faLock, faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
 import { getFriendlyErrorMessage, getErrorSuggestion } from "../utils/errorMessages";
+import { useTranslation } from "react-i18next";
 // authService is imported dynamically at call sites to allow code-splitting
 
 const LoginPage = () => {
+    const { t } = useTranslation();
     const [showPassword, setShowPassword] = useState(false);
     const [searchParams] = useSearchParams();
     const invitationToken = searchParams.get("invitationToken");
@@ -193,8 +195,8 @@ const LoginPage = () => {
                 <div className="w-full max-w-sm bg-white rounded-xl shadow-[0_-6px_20px_rgba(2,6,23,0.06)] p-8">
                     <div className="text-center mb-6">
                         <div className="text-4xl mb-3">🔐</div>
-                        <h2 className="text-2xl font-bold mb-1">Two-Factor Authentication</h2>
-                        <p className="text-gray-500 text-sm">Enter the 6-digit code from your authenticator app (Google Authenticator, Microsoft Authenticator, Authy, etc.)</p>
+                        <h2 className="text-2xl font-bold mb-1">{t('mfa.title')}</h2>
+                        <p className="text-gray-500 text-sm">{t('mfa.subtitle')}</p>
                     </div>
                     {error && (
                         <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm mb-4">
@@ -203,19 +205,19 @@ const LoginPage = () => {
                     )}
                     <form onSubmit={handleMfaSubmit} className="space-y-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Verification Code</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">{t('mfa.codeLabel')}</label>
                             <input
                                 type="text"
                                 inputMode="numeric"
                                 maxLength={8}
                                 value={mfaCode}
                                 onChange={(e) => { setMfaCode(e.target.value.replace(/\s/g, "")); setError(""); }}
-                                placeholder="123456"
+                                placeholder={t('mfa.codePlaceholder')}
                                 className="w-full border border-gray-300 rounded-lg px-4 py-2 text-center text-2xl tracking-widest font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 autoFocus
                                 autoComplete="one-time-code"
                             />
-                            <p className="text-xs text-gray-400 mt-1 text-center">Or enter an 8-character backup code</p>
+                            <p className="text-xs text-gray-400 mt-1 text-center">{t('mfa.backupHint')}</p>
                         </div>
                         <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
                             <input
@@ -224,21 +226,21 @@ const LoginPage = () => {
                                 onChange={(e) => setTrustDevice(e.target.checked)}
                                 className="rounded"
                             />
-                            Trust this device for 30 days
+                            {t('mfa.trustDevice')}
                         </label>
                         <button
                             type="submit"
                             disabled={loading || !mfaCode.trim()}
                             className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-2 rounded-lg transition"
                         >
-                            {loading ? "Verifying..." : "Verify"}
+                            {loading ? t('mfa.verifying') : t('mfa.verify')}
                         </button>
                         <button
                             type="button"
                             onClick={() => { setMfaRequired(false); setMfaCode(""); setError(""); }}
                             className="w-full text-sm text-gray-500 hover:text-gray-700 underline"
                         >
-                            Back to login
+                            {t('mfa.backToLogin')}
                         </button>
                     </form>
                 </div>
@@ -253,8 +255,8 @@ const LoginPage = () => {
                 {/* Left: form pane */}
                 <div className="p-8 flex flex-col justify-center">
                     <div className="py-2">
-                        <h2 className="text-2xl font-bold mb-2 text-center">Login</h2>
-                        <p className=" mb-4 text-center">Login and Take Control of Your Workflow.</p>
+                        <h2 className="text-2xl font-bold mb-2 text-center">{t('login.title')}</h2>
+                        <p className=" mb-4 text-center">{t('login.subtitle')}</p>
                     </div>
                     {/* Debug info for troubleshooting (opt-in via VITE_SHOW_DEBUG=true) */}
                     {import.meta.env.VITE_SHOW_DEBUG === "true" && (
@@ -267,7 +269,7 @@ const LoginPage = () => {
                                 name="email"
                                 value={formData.email}
                                 onChange={handleInputChange}
-                                placeholder="Enter your Email"
+                                placeholder={t('login.email')}
                                 className="w-full p-3 pl-10 rounded-lg border border-gray-300 text-base"
                                 required
                                 aria-label="Email"
@@ -283,7 +285,7 @@ const LoginPage = () => {
                                 name="password"
                                 value={formData.password}
                                 onChange={handleInputChange}
-                                placeholder="Enter Password"
+                                placeholder={t('login.password')}
                                 className="w-full p-3 pl-10 pr-10 rounded-lg border border-gray-300 text-base"
                                 required
                                 aria-label="Password"
@@ -308,7 +310,7 @@ const LoginPage = () => {
                                 className="text-sm text-blue-700 underline font-semibold bg-transparent border-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400"
                                 aria-label="Forgot password"
                             >
-                                Forget password?
+                                {t('login.forgotPassword')}
                             </Link>
                         </div>
                         {error && (
@@ -322,7 +324,7 @@ const LoginPage = () => {
                             disabled={loading}
                             aria-busy={loading}
                         >
-                            {loading ? "Logging in..." : "Login"}
+                            {loading ? t('login.loading') : t('login.submit')}
                         </button>
                         <div className="w-full flex items-center justify-center gap-4 my-6 text-sm text-black font-semibold">
                             <span className="flex-1 h-[1px] bg-black"></span>
