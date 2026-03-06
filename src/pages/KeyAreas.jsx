@@ -2538,9 +2538,12 @@ export default function KeyAreas() {
 
     const tabNumbers = useMemo(() => {
         const s = new Set([1]);
-        allTasks.forEach((t) => s.add(t.list_index || 1));
+        const kaId = selectedKA?.id;
+        allTasks
+            .filter((t) => !kaId || String(t.key_area_id || t.keyAreaId) === String(kaId))
+            .forEach((t) => s.add(t.list_index || 1));
         return Array.from(s).sort((a, b) => a - b);
-    }, [allTasks]);
+    }, [allTasks, selectedKA]);
 
     // Determine how many lists to show in the left card for the selected KA.
     const leftListCount = useMemo(() => {
