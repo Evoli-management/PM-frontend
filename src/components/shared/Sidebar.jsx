@@ -218,7 +218,7 @@ export default function Sidebar({
                     navigate({ pathname: item.to, search: "?openKA=1" });
                 }
             } else {
-                navigate({ pathname: item.to, search: "?view=all" });
+                navigate({ pathname: item.to, search: "" });
             }
         } catch (err) {
             if (nextOpen) {
@@ -231,7 +231,7 @@ export default function Sidebar({
                     window.location.href = `${item.to}?openKA=1`;
                 }
             } else {
-                window.location.href = `${item.to}?view=all`;
+                window.location.href = `${item.to}`;
             }
         }
         setKeyAreasOpen(nextOpen);
@@ -499,13 +499,6 @@ export default function Sidebar({
                                                                                     e.preventDefault();
                                                                                     return;
                                                                                 }
-                                                                                try {
-                                                                                    window.dispatchEvent(
-                                                                                        new CustomEvent("sidebar-open-ka", {
-                                                                                            detail: { id: ka.id },
-                                                                                        }),
-                                                                                    );
-                                                                                } catch (err) {}
                                                                             }}
                                                                             className={`${itemClasses} group`}
                                                                         >

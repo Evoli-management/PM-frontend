@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { format } from 'date-fns';
-import { FaCheck, FaTimes, FaTrash, FaLock, FaLockOpen, FaExternalLinkAlt, FaStop, FaAlignJustify, FaBan, FaSquare, FaListUl, FaEllipsisV } from 'react-icons/fa';
+import { FaCheck, FaTimes, FaTrash, FaLock, FaLockOpen, FaExternalLinkAlt, FaStop, FaAlignJustify, FaBan, FaSquare, FaListUl, FaEllipsisV, FaEdit } from 'react-icons/fa';
 import { toDateOnly } from '../../utils/keyareasHelpers';
 import taskDelegationService from '../../services/taskDelegationService';
 import activityDelegationService from '../../services/activityDelegationService';
@@ -61,8 +61,10 @@ export default function UnifiedTaskActivityTable({
     useEffect(() => {
         if (!openRowMenuId) return;
         const onDown = (e) => {
-            if (e.target.closest('[data-row-actions-menu]')) return;
-            if (e.target.closest('[data-row-actions-btn]')) return;
+            const target = e.target;
+            if (!(target instanceof Element)) return;
+            if (target.closest('[data-row-actions-menu]')) return;
+            if (target.closest('[data-row-actions-btn]')) return;
             setOpenRowMenuId(null);
         };
         document.addEventListener('mousedown', onDown);
@@ -965,11 +967,16 @@ export default function UnifiedTaskActivityTable({
                                                     aria-expanded={openRowMenuId === item.itemId ? 'true' : 'false'}
                                                     className="p-1 rounded hover:bg-slate-100 text-slate-600"
                                                     title="More actions"
+                                                    onMouseDown={(e) => e.stopPropagation()}
                                                     onClick={(e) => {
                                                         e.stopPropagation();
+                                                        const btnEl = e.currentTarget;
                                                         setOpenRowMenuId((prev) => {
                                                             if (prev === item.itemId) return null;
-                                                            const rect = e.currentTarget.getBoundingClientRect();
+                                                            if (!btnEl || typeof btnEl.getBoundingClientRect !== 'function') {
+                                                                return item.itemId;
+                                                            }
+                                                            const rect = btnEl.getBoundingClientRect();
                                                             const menuHeight = 220;
                                                             const menuWidth = 170;
                                                             const spaceBelow = window.innerHeight - rect.bottom;
@@ -992,8 +999,9 @@ export default function UnifiedTaskActivityTable({
                                                 {openRowMenuId === item.itemId && createPortal(
                                                     <div
                                                         data-row-actions-menu="true"
-                                                        style={{ position: 'fixed', top: rowMenuPos.top, left: rowMenuPos.left, zIndex: 1000, minWidth: 170 }}
+                                                        style={{ position: 'fixed', top: rowMenuPos.top, left: rowMenuPos.left, zIndex: 6000, minWidth: 170 }}
                                                         className="rounded-md border border-slate-200 bg-white shadow-lg"
+                                                        onMouseDown={(e) => e.stopPropagation()}
                                                     >
                                                         <button
                                                             type="button"
@@ -1006,7 +1014,32 @@ export default function UnifiedTaskActivityTable({
                                                             }}
                                                         >
                                                             <FaExternalLinkAlt size={12} />
-                                                            Open details
+                                                            Open in details
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setOpenRowMenuId(null);
+                                                                if (item.type === 'task' && onTaskClick) onTaskClick(item);
+                                                                if (item.type === 'activity' && onActivityClick) onActivityClick(item);
+                                                            }}
+                                                        >
+                                                            <FaEdit size={12} />
+                                                            Edit
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleDelete(item, e);
+                                                                setOpenRowMenuId(null);
+                                                            }}
+                                                        >
+                                                            <FaTrash size={12} />
+                                                            Delete
                                                         </button>
                                                         {viewTab !== 'delegated' && (
                                                             <>
@@ -1033,18 +1066,6 @@ export default function UnifiedTaskActivityTable({
                                                                 >
                                                                     {isPrivate ? <FaLockOpen size={12} /> : <FaLock size={12} />}
                                                                     {isPrivate ? 'Mark as public' : 'Mark as private'}
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        handleDelete(item, e);
-                                                                        setOpenRowMenuId(null);
-                                                                    }}
-                                                                >
-                                                                    <FaTrash size={12} />
-                                                                    Delete
                                                                 </button>
                                                             </>
                                                         )}

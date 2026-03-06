@@ -11,6 +11,8 @@ import React, { useRef, useState, useEffect } from 'react';
 export default function ResizablePanels({
     taskPanel,
     activityPanel,
+    mode = 'triple',
+    simpleActivePanel = 'task',
     initialTaskWidth = 50,
     minTaskWidth = 25,
     minActivityWidth = 25,
@@ -52,59 +54,62 @@ export default function ResizablePanels({
     }, [isDragging, minTaskWidth, minActivityWidth]);
 
     const activityWidth = 100 - taskWidth;
+    const isSimpleMode = mode === 'simple';
 
     return (
         <div
             ref={containerRef}
-            className="flex w-full h-full gap-0"
+            className="flex w-full h-full gap-0 rounded-xl overflow-hidden bg-white"
             style={{ position: 'relative' }}
         >
             {/* Left Panel - Tasks */}
             <div
-                className={`${leftPanelScrollable ? 'overflow-y-auto overflow-x-hidden' : 'overflow-hidden'} bg-white h-full min-h-0`}
+                className={`${leftPanelScrollable ? 'overflow-y-auto overflow-x-hidden' : 'overflow-hidden'} ${isSimpleMode && simpleActivePanel === 'activity' ? 'bg-slate-50' : 'bg-white'} h-full min-h-0`}
                 style={{
-                    width: `${taskWidth}%`,
+                    width: isSimpleMode ? '100%' : `${taskWidth}%`,
                     transition: isDragging ? 'none' : 'width 0.2s ease',
                 }}
             >
-                {taskPanel}
+                {isSimpleMode && simpleActivePanel === 'activity' ? activityPanel : taskPanel}
             </div>
 
-            {/* Divider */}
-            <div
-                className="relative w-0 flex-shrink-0 mx-px"
-                aria-label="Resize divider"
-                role="separator"
-                style={{
-                    userSelect: 'none',
-                    WebkitUserSelect: 'none',
-                }}
-            >
-                <div
-                    className={`absolute left-0 top-0 h-full w-px transition-colors ${
-                        isDragging ? 'bg-blue-500' : 'bg-slate-300'
-                    }`}
-                    aria-hidden="true"
-                />
-                <div
-                    className={`absolute -left-1.5 top-0 h-full w-3 cursor-col-resize transition-colors ${
-                        isDragging ? 'bg-blue-200/40' : 'hover:bg-sky-100/50'
-                    }`}
-                    onMouseDown={() => setIsDragging(true)}
-                    aria-hidden="true"
-                />
-            </div>
+            {!isSimpleMode && (
+                <>
+                    {/* Divider */}
+                    <div
+                        className="group relative w-0 flex-shrink-0 mx-0"
+                        aria-label="Resize divider"
+                        role="separator"
+                        style={{
+                            userSelect: 'none',
+                            WebkitUserSelect: 'none',
+                        }}
+                    >
+                        <div
+                            className={`absolute left-0 top-[13px] bottom-3 w-px transition-colors ${
+                                isDragging ? 'bg-blue-400/80' : 'bg-transparent group-hover:bg-blue-400/80'
+                            }`}
+                            aria-hidden="true"
+                        />
+                        <div
+                            className="absolute -left-1.5 top-[13px] bottom-3 w-3 cursor-col-resize"
+                            onMouseDown={() => setIsDragging(true)}
+                            aria-hidden="true"
+                        />
+                    </div>
 
-            {/* Right Panel - Activities */}
-            <div
-                className={`${rightPanelScrollable ? 'overflow-y-auto overflow-x-hidden' : 'overflow-hidden'} bg-slate-50 h-full min-h-0`}
-                style={{
-                    width: `${activityWidth}%`,
-                    transition: isDragging ? 'none' : 'width 0.2s ease',
-                }}
-            >
-                {activityPanel}
-            </div>
+                    {/* Right Panel - Activities */}
+                    <div
+                        className={`${rightPanelScrollable ? 'overflow-y-auto overflow-x-hidden' : 'overflow-hidden'} bg-slate-50 h-full min-h-0`}
+                        style={{
+                            width: `${activityWidth}%`,
+                            transition: isDragging ? 'none' : 'width 0.2s ease',
+                        }}
+                    >
+                        {activityPanel}
+                    </div>
+                </>
+            )}
         </div>
     );
 }

@@ -17,7 +17,7 @@ export default function KeyAreasList({
   return (
     <>
       {/* LIST: Key Areas (extracted) */}
-      <div>
+      <div className="h-full min-h-0 flex flex-col">
         {loading ? (
           <div className="text-slate-700">Loading…</div>
         ) : showOnlyIdeas ? (
@@ -49,7 +49,7 @@ export default function KeyAreasList({
             </div>
           </div>
         ) : (
-          <div className="bg-white border border-slate-200 rounded-xl">
+          <div className="bg-white border border-slate-200 rounded-xl h-full min-h-0 overflow-y-auto">
             <ol className="divide-y divide-slate-200">
               {filteredKAs
                 .slice()
