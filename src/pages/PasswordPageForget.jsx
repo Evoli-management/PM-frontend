@@ -3,8 +3,10 @@ import { Link } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEnvelope } from "@fortawesome/free-solid-svg-icons";
 import { getFriendlyErrorMessage } from "../utils/errorMessages";
+import { useTranslation } from "react-i18next";
 
 const ForgotPasswordPage = () => {
+    const { t } = useTranslation();
     const [email, setEmail] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [submitted, setSubmitted] = useState(false);
@@ -21,11 +23,11 @@ const ForgotPasswordPage = () => {
         setError("");
         setSuccessMsg("");
         if (!email) {
-            setError("Please enter your email address");
+            setError(t("forgotPassword.emailRequired"));
             return;
         }
         if (!email.includes("@") || !email.includes(".")) {
-            setError("Email must be an email.");
+            setError(t("forgotPassword.emailInvalid"));
             return;
         }
         if (cooldown > 0) return;
@@ -34,11 +36,11 @@ const ForgotPasswordPage = () => {
             authService.forgotPassword(email)
                 .then((res) => {
                     setSubmitted(true);
-                    setSuccessMsg(res?.message || "If your email exists, you’ll receive a reset link.");
+                    setSuccessMsg(res?.message || t("forgotPassword.successFallback", { email }));
                     setCooldown(30); // 30s cooldown
                 })
                 .catch((err) => {
-                    const msg = err?.response?.data?.message || "Failed to send reset email.";
+                    const msg = err?.response?.data?.message || t("forgotPassword.sendFailed");
                     setError(getFriendlyErrorMessage(msg));
                 })
                 .finally(() => setIsLoading(false));
@@ -62,10 +64,10 @@ const ForgotPasswordPage = () => {
                     {!submitted ? (
                         <>
                             <h2 className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 text-gray-900 text-center">
-                                Forgot password?
+                                {t("forgotPassword.title")}
                             </h2>
                             <p className="text-gray-600 font-medium mb-4 text-base text-center">
-                                Enter your email to receive reset password instructions
+                                {t("forgotPassword.subtitle")}
                             </p>
                             <form onSubmit={handleSubmit} className="w-full">
                                 <div className="relative w-full mb-4">
@@ -73,7 +75,7 @@ const ForgotPasswordPage = () => {
                                         type="email"
                                         value={email}
                                         onChange={handleEmailChange}
-                                        placeholder="Email"
+                                        placeholder={t("forgotPassword.emailPlaceholder")}
                                         className="w-full p-3 pl-10 rounded-lg border border-gray-300 text-base"
                                         required
                                     />
@@ -87,15 +89,15 @@ const ForgotPasswordPage = () => {
                                     disabled={isLoading || cooldown > 0}
                                     className="w-full rounded-lg bg-green-500 text-white font-bold py-3 text-lg transition hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    {isLoading ? "SENDING..." : cooldown > 0 ? `Wait ${cooldown}s` : "Submit"}
+                                    {isLoading ? t("forgotPassword.sending") : cooldown > 0 ? t("forgotPassword.waitSeconds", { seconds: cooldown }) : t("forgotPassword.submit")}
                                 </button>
                                 <div className="w-full flex flex-col items-center mt-6 gap-2">
-                                    <span className="text-gray-500 text-sm mb-2">Remembered your password?</span>
+                                    <span className="text-gray-500 text-sm mb-2">{t("forgotPassword.rememberedPassword")}</span>
                                     <Link
                                         to="/login"
                                         className="inline-flex items-center justify-center border border-slate-200 text-slate-700 rounded-lg px-8 py-2 text-lg font-medium hover:bg-slate-50 w-full"
                                     >
-                                        Back to Login
+                                        {t("forgotPassword.backToLogin")}
                                     </Link>
                                     {/* <Link
                                         to="/register"
@@ -115,31 +117,31 @@ const ForgotPasswordPage = () => {
                     ) : (
                         <div className="flex flex-col items-center justify-center h-full">
                             <h2 className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 text-green-700 text-center">
-                                Check your email
+                                {t("forgotPassword.checkEmail")}
                             </h2>
                             <p className="text-gray-600 font-medium mb-4 text-base text-center">
-                                {successMsg || `If an account exists for ${email}, you will receive a password reset link. Please check your inbox and spam folder.`}
+                                {successMsg || t("forgotPassword.successFallback", { email })}
                                 <br />
-                                <span className="text-sm text-gray-500">If you don’t see the email, check your spam or junk folder.</span>
+                                <span className="text-sm text-gray-500">{t("forgotPassword.spamHint")}</span>
                             </p>
                             <div className="w-full flex flex-col items-center gap-2">
                                 <Link
                                     to="/login"
                                     className="w-full rounded-lg bg-blue-700 text-white font-bold py-3 text-lg transition hover:bg-blue-800 text-center"
                                 >
-                                    Back to Login
+                                    {t("forgotPassword.backToLogin")}
                                 </Link>
                                 <Link
                                     to="/register"
                                     className="w-full rounded-lg bg-green-600 text-white font-bold py-3 text-lg transition hover:bg-green-700 text-center"
                                 >
-                                    Go to Registration
+                                    {t("forgotPassword.goToRegistration")}
                                 </Link>
                                 <Link
                                     to="/verify-email"
                                     className="w-full rounded-lg bg-blue-500 text-white font-bold py-3 text-lg transition hover:bg-blue-600 text-center"
                                 >
-                                    Go to Email Verification
+                                    {t("forgotPassword.goToEmailVerification")}
                                 </Link>
                             </div>
                         </div>
@@ -155,9 +157,9 @@ const ForgotPasswordPage = () => {
                         />
                     </div>
                     <p className="text-sm font-semibold leading-6 text-center">
-                        Your tasks won’t even notice you left.
-                        <br />
-                        Secure password, powered by Practical Manager.
+                        {t("forgotPassword.illustration").split("\n").map((line, i) => (
+                            <span key={i}>{line}{i === 0 && <br />}</span>
+                        ))}
                     </p>
                 </div>
             </div>
