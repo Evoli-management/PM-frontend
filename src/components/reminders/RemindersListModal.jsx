@@ -126,7 +126,7 @@ export default function RemindersListModal({ isOpen, onClose, inline = false }) 
   // Render inline dropdown (no page-covering backdrop) when requested
   if (inline) {
     return (
-      <div ref={containerRef} className="fixed inset-0 z-[150] flex items-center justify-center">
+      <div ref={containerRef} className="fixed inset-0 z-[5010] flex items-center justify-center">
   {/* Use same overlay as main page modals: semi-transparent black */}
   <div className="absolute inset-0 bg-black/40" onClick={onClose} />
 
@@ -269,12 +269,12 @@ export default function RemindersListModal({ isOpen, onClose, inline = false }) 
     <>
       {/* Backdrop - semi-transparent overlay that shows the page behind */}
       <div
-        className="fixed inset-0 bg-black bg-opacity-30 z-40"
+        className="fixed inset-0 bg-black bg-opacity-30 z-[5010]"
         onClick={onClose}
       />
 
       {/* Modal */}
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+    <div className="fixed inset-0 z-[5011] flex items-center justify-center p-4 pointer-events-none">
   <div className="bg-white rounded-lg shadow-2xl max-w-2xl w-full overflow-visible flex flex-col pointer-events-auto">
           {/* Header */}
           <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Sidebar from "../../components/shared/Sidebar";
-import { FaGripVertical, FaBars } from "react-icons/fa";
+import { FaGripVertical, FaBars, FaExternalLinkAlt } from "react-icons/fa";
 import {
     DndContext,
     closestCenter,
@@ -205,6 +205,7 @@ function SortableWidget({
     id,
     children,
     onClose,
+    quickLink = null,
     widthScale = 1,
     heightScale = 1,
     onResizeWidth = null,
@@ -327,15 +328,29 @@ function SortableWidget({
                 />
             )}
             {/* Close button */}
-            {onClose && (
-                <button
-                    onClick={onClose}
-                    className="absolute top-2 right-2 p-2 rounded-full text-gray-600 hover:bg-gray-100 hover:text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 z-20"
-                    title="Remove widget"
-                    aria-label="Close widget"
-                >
-                    ✕
-                </button>
+            {(quickLink?.href || onClose) && (
+                <div className="absolute top-0 right-2 h-12 w-14 flex items-center justify-end gap-1 z-20">
+                    {quickLink?.href && (
+                        <a
+                            href={quickLink.href}
+                            className="p-1.5 rounded-full text-gray-600 hover:bg-gray-100 hover:text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                            title={quickLink.title || "Open"}
+                            aria-label={quickLink.ariaLabel || quickLink.title || "Open"}
+                        >
+                            <FaExternalLinkAlt className="w-3 h-3" />
+                        </a>
+                    )}
+                    {onClose && (
+                        <button
+                            onClick={onClose}
+                            className="p-1.5 rounded-full text-gray-600 hover:bg-gray-100 hover:text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                            title="Remove widget"
+                            aria-label="Close widget"
+                        >
+                            ✕
+                        </button>
+                    )}
+                </div>
             )}
             {children}
         </div>
@@ -941,20 +956,25 @@ export default function Dashboard() {
 
         if (key === "myDay") {
             return (
-                <SortableWidget key={key} id={key} widthScale={widthScale} heightScale={heightScale} onResizeWidth={setWidgetWidthScale} onResizeHeight={setWidgetHeightScale} onClose={() => toggleWidget(key)}>
+                <SortableWidget
+                    key={key}
+                    id={key}
+                    widthScale={widthScale}
+                    heightScale={heightScale}
+                    onResizeWidth={setWidgetWidthScale}
+                    onResizeHeight={setWidgetHeightScale}
+                    onClose={() => toggleWidget(key)}
+                    quickLink={{ href: "#/calendar", title: "Open calendar" }}
+                >
                     <div className={widgetClass} style={widgetStyle}>
                         <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
                             <div className="flex items-start justify-between mb-3">
-                                <h3 className="font-semibold text-blue-700">My Day</h3>
-                                <span className="text-xs text-[CanvasText] opacity-60 mt-12" title="Your daily schedule: appointments and tasks">ℹ️</span>
+                                <h3 className="font-semibold text-blue-700 pr-16">My Day</h3>
                             </div>
                             <div className="flex-1 flex flex-col justify-center items-center">
                                 <div className="text-lg font-extrabold text-blue-700 dark:text-blue-400">{myDayStats.tasksDueToday}</div>
                                 <div className="text-xs font-medium opacity-80">tasks</div>
                                 <div className="text-[10px] text-[CanvasText] opacity-70 mt-1">{myDayStats.overdue} overdue • {myDayStats.appointments} appointments</div>
-                            </div>
-                            <div className="mt-3">
-                                <a href="#/calendar" className="text-sm text-blue-600 hover:text-blue-800">View Calendar</a>
                             </div>
                         </div>
                     </div>
@@ -964,15 +984,24 @@ export default function Dashboard() {
 
         if (key === "goals") {
             return (
-                <SortableWidget key={key} id={key} widthScale={widthScale} heightScale={heightScale} onResizeWidth={setWidgetWidthScale} onResizeHeight={setWidgetHeightScale} onClose={() => toggleWidget(key)}>
+                <SortableWidget
+                    key={key}
+                    id={key}
+                    widthScale={widthScale}
+                    heightScale={heightScale}
+                    onResizeWidth={setWidgetWidthScale}
+                    onResizeHeight={setWidgetHeightScale}
+                    onClose={() => toggleWidget(key)}
+                    quickLink={{ href: "#/goals", title: "Open goals" }}
+                >
                     <div className={widgetClass} style={widgetStyle}>
                     <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
-                        <h3 className="font-semibold text-blue-700 mb-3">Your active goals</h3>
-                        <div className="flex items-center justify-between mb-2">
+                        <h3 className="font-semibold text-blue-700 mb-3 pr-16">Your active goals</h3>
+                        <div className="flex items-start justify-between mb-2">
                             <div />
-                            <div className="flex items-center gap-2">
+                            <div className="text-xs text-[CanvasText] opacity-60 flex items-center gap-2">
                                 <button 
-                                    className="px-2 py-1 border rounded text-sm" 
+                                    className="px-2 py-1 border rounded text-[CanvasText]" 
                                     title="Export goals"
                                     onClick={() => {
                                         const header = ["Title", "Progress (%)", "Status", "Due Date"];
@@ -990,7 +1019,6 @@ export default function Dashboard() {
                                 >
                                     Export
                                 </button>
-                                <a href="#/goals" className="text-sm text-blue-600">View all</a>
                             </div>
                         </div>
 
@@ -1042,10 +1070,19 @@ export default function Dashboard() {
 
         if (key === "keyAreas") {
             return (
-                <SortableWidget key={key} id={key} widthScale={widthScale} heightScale={heightScale} onResizeWidth={setWidgetWidthScale} onResizeHeight={setWidgetHeightScale} onClose={() => toggleWidget(key)}>
+                <SortableWidget
+                    key={key}
+                    id={key}
+                    widthScale={widthScale}
+                    heightScale={heightScale}
+                    onResizeWidth={setWidgetWidthScale}
+                    onResizeHeight={setWidgetHeightScale}
+                    onClose={() => toggleWidget(key)}
+                    quickLink={{ href: "#/key-areas", title: "Open key areas" }}
+                >
                     <div className={widgetClass} style={widgetStyle}>
                         <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
-                            <h3 className="font-semibold text-blue-700 mb-3">Key Areas Summary</h3>
+                            <h3 className="font-semibold text-blue-700 mb-3 pr-16">Key Areas Summary</h3>
                             <KeyAreasWidget 
                                 keyAreas={keyAreas}
                                 loading={dataLoading.keyAreas}
@@ -1059,14 +1096,22 @@ export default function Dashboard() {
 
         if (key === "enps") {
             return (
-                <SortableWidget key={key} id={key} widthScale={widthScale} heightScale={heightScale} onResizeWidth={setWidgetWidthScale} onResizeHeight={setWidgetHeightScale} onClose={() => toggleWidget(key)}>
+                <SortableWidget
+                    key={key}
+                    id={key}
+                    widthScale={widthScale}
+                    heightScale={heightScale}
+                    onResizeWidth={setWidgetWidthScale}
+                    onResizeHeight={setWidgetHeightScale}
+                    onClose={() => toggleWidget(key)}
+                    quickLink={{ href: "#/enps", title: "Open eNPS" }}
+                >
                     <div className={widgetClass} style={widgetStyle}>
                     <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
-                        <h3 className="font-semibold text-blue-700 mb-3">eNPS Snapshot</h3>
+                        <h3 className="font-semibold text-blue-700 mb-3 pr-16">eNPS Snapshot</h3>
                         <div className="flex items-start justify-between">
                             <div />
                             <div className="text-xs text-[CanvasText] opacity-60 flex items-center gap-2">
-                                <span title="eNPS measures employee net promoter score; range -100 to +100">ℹ️</span>
                                 <button className="px-2 py-1 border rounded text-[CanvasText]" title="Export eNPS report">Export</button>
                             </div>
                         </div>
@@ -1085,40 +1130,47 @@ export default function Dashboard() {
 
         if (key === "calendarPreview") {
             return (
-                <SortableWidget key={key} id={key} widthScale={widthScale} heightScale={heightScale} onResizeWidth={setWidgetWidthScale} onResizeHeight={setWidgetHeightScale} onClose={() => toggleWidget(key)}>
+                <SortableWidget
+                    key={key}
+                    id={key}
+                    widthScale={widthScale}
+                    heightScale={heightScale}
+                    onResizeWidth={setWidgetWidthScale}
+                    onResizeHeight={setWidgetHeightScale}
+                    onClose={() => toggleWidget(key)}
+                    quickLink={{ href: "#/calendar", title: "Open calendar" }}
+                >
                     <div className={widgetClass} style={widgetStyle}>
                     <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
-                        <h3 className="font-semibold text-blue-700 mb-3">Calendar Preview (Today)</h3>
-                        <div className="flex items-center justify-between mb-2">
-                            <div />
-                            <a href="#/calendar" className="text-sm text-blue-600">Open Calendar</a>
-                        </div>
+                        <h3 className="font-semibold text-blue-700 mb-3 pr-16">Calendar Preview (Today)</h3>
 
-                        {dataLoading.calendar ? (
-                            <div className="flex items-center justify-center py-8">
-                                <div className="text-sm text-[CanvasText] opacity-70">Loading calendar...</div>
-                            </div>
-                        ) : dataErrors.calendar ? (
-                            <div className="text-sm text-red-600 bg-red-50 p-3 rounded border mb-3">
-                                Failed to load calendar: {dataErrors.calendar}
-                                <div className="text-xs mt-1">Using fallback data</div>
-                            </div>
-                        ) : calendarToday.length === 0 ? (
-                            <div className="text-[CanvasText] opacity-70">
-                                No appointments today. <a href="#/calendar" className="text-blue-600">Add appointment</a>.
-                            </div>
-                        ) : (
-                            <CalendarPreview 
-                                events={calendarToday} 
-                                onReorder={(next) => { 
-                                    setCalendarToday(next); 
-                                    try { 
-                                        localStorage.setItem("pm:calendarPreviewOrder", JSON.stringify(next.map((e) => e.id))); 
-                                    } catch {} 
-                                }} 
-                                getCountdownBadge={getCountdownBadge} 
-                            />
-                        )}
+                        <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+                            {dataLoading.calendar ? (
+                                <div className="flex items-center justify-center py-8">
+                                    <div className="text-sm text-[CanvasText] opacity-70">Loading calendar...</div>
+                                </div>
+                            ) : dataErrors.calendar ? (
+                                <div className="text-sm text-red-600 bg-red-50 p-3 rounded border mb-3">
+                                    Failed to load calendar: {dataErrors.calendar}
+                                    <div className="text-xs mt-1">Using fallback data</div>
+                                </div>
+                            ) : calendarToday.length === 0 ? (
+                                <div className="text-[CanvasText] opacity-70">
+                                    No appointments today. <a href="#/calendar" className="text-blue-600">Add appointment</a>.
+                                </div>
+                            ) : (
+                                <CalendarPreview 
+                                    events={calendarToday} 
+                                    onReorder={(next) => { 
+                                        setCalendarToday(next); 
+                                        try { 
+                                            localStorage.setItem("pm:calendarPreviewOrder", JSON.stringify(next.map((e) => e.id))); 
+                                        } catch {} 
+                                    }} 
+                                    getCountdownBadge={getCountdownBadge} 
+                                />
+                            )}
+                        </div>
                     </div>
                 </div>
                 </SortableWidget>
@@ -1127,10 +1179,19 @@ export default function Dashboard() {
 
         if (key === "activity") {
             return (
-                <SortableWidget key={key} id={key} widthScale={widthScale} heightScale={heightScale} onResizeWidth={setWidgetWidthScale} onResizeHeight={setWidgetHeightScale} onClose={() => toggleWidget(key)}>
+                <SortableWidget
+                    key={key}
+                    id={key}
+                    widthScale={widthScale}
+                    heightScale={heightScale}
+                    onResizeWidth={setWidgetWidthScale}
+                    onResizeHeight={setWidgetHeightScale}
+                    onClose={() => toggleWidget(key)}
+                    quickLink={{ href: "#/notifications", title: "Open feed" }}
+                >
                     <div className={widgetClass} style={widgetStyle}>
                     <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
-                        <h3 className="font-semibold text-blue-700 mb-3">What's New</h3>
+                        <h3 className="font-semibold text-blue-700 mb-3 pr-16">What's New</h3>
                         <div className="flex items-center justify-between mb-2">
                             <div />
                             <div className="flex items-center gap-2">
@@ -1140,7 +1201,6 @@ export default function Dashboard() {
                                     <option value="goals">Goals</option>
                                     <option value="recognitions">Recognitions</option>
                                 </select>
-                                <a href="#/notifications" className="text-sm text-blue-600">Open Feed</a>
                             </div>
                         </div>
 

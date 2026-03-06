@@ -84,16 +84,6 @@ export default function KeyAreasWidget({ keyAreas = [], loading = false, error =
                     </ul>
                 </div>
             )}
-
-            {/* Quick action */}
-            <div className="mt-4 pt-3 border-t">
-                <Link 
-                    to="/key-areas" 
-                    className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-                >
-                    View all Key Areas →
-                </Link>
-            </div>
         </div>
     );
 }

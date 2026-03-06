@@ -10,6 +10,7 @@ import activityService from "../../services/activityService";
 import * as goalService from "../../services/goalService";
 import keyAreaService from "../../services/keyAreaService";
 import calendarService from "../../services/calendarService";
+import usersService from "../../services/usersService";
 import ReminderBell from "./ReminderBell";
 import NotificationBell from "./NotificationBell";
 import ReminderModal from "../reminders/ReminderModal";
@@ -65,12 +66,26 @@ export default function Navbar() {
     const showGiveStrokesTabs = location.pathname.startsWith('/give-strokes');
     const showGoalsTabs = location.pathname.startsWith('/goals');
     const widgetsRef = useRef(null);
+    const leftBrandRef = useRef(null);
+    const rightActionsRef = useRef(null);
+    const [rightActionsWidth, setRightActionsWidth] = useState(280);
+    const [leftBrandWidth, setLeftBrandWidth] = useState(0);
     const [searchResults, setSearchResults] = useState([]);
     const [showSearchResults, setShowSearchResults] = useState(false);
     const [searchLoading, setSearchLoading] = useState(false);
-    const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
-    const searchRef = useRef(null);
+    const searchInputRef = useRef(null);
+    const searchInlineRef = useRef(null);
+    const searchResultsPanelRef = useRef(null);
     const [openSearch, setOpenSearch] = useState(false);
+    const [searchHistory, setSearchHistory] = useState(() => {
+        try {
+            const raw = localStorage.getItem("pm:search:history");
+            const parsed = raw ? JSON.parse(raw) : [];
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            return [];
+        }
+    });
     const [widgetsPrefs, setWidgetsPrefs] = useState(() => {
         try {
             const raw = localStorage.getItem('pm:dashboard:prefs');
@@ -95,17 +110,88 @@ export default function Navbar() {
         return () => window.removeEventListener('pm-dontforget-filter', handler);
     }, []);
 
+    const normalize = (v) => String(v ?? "").toLowerCase();
+    const includesQuery = (v, q) => normalize(v).includes(q);
+    const startsWithQuery = (v, q) => normalize(v).startsWith(q);
+    const wordsStartWithQuery = (v, q) =>
+        normalize(v)
+            .split(/[\s,.;:!?()[\]{}"'-]+/)
+            .filter(Boolean)
+            .some((w) => w.startsWith(q));
+
+    const scoreStringMatch = (value, query, { shortQuery = false } = {}) => {
+        const text = normalize(value).trim();
+        if (!text || !query) return 0;
+        if (text === query) return 120;
+        if (startsWithQuery(text, query)) return 90;
+        if (wordsStartWithQuery(text, query)) return 70;
+        if (!shortQuery && includesQuery(text, query)) return 40;
+        return 0;
+    };
+
+    // Category-aware deep match with optional ignored key patterns.
+    const deepMatchScore = (source, query, { maxDepth = 4, ignoreKeyPatterns = [] } = {}) => {
+        if (!source || !query) return 0;
+        const seen = new WeakSet();
+        const stack = [{ value: source, depth: 0 }];
+        let best = 0;
+        const shouldIgnoreKey = (k) => ignoreKeyPatterns.some((re) => re.test(String(k || "")));
+
+        while (stack.length > 0) {
+            const { value, depth } = stack.pop();
+            if (value == null) continue;
+
+            const t = typeof value;
+            if (t === "string" || t === "number" || t === "boolean") {
+                best = Math.max(best, scoreStringMatch(value, query));
+                continue;
+            }
+
+            if (depth >= maxDepth) continue;
+
+            if (Array.isArray(value)) {
+                for (const item of value) stack.push({ value: item, depth: depth + 1 });
+                continue;
+            }
+
+            if (t === "object") {
+                if (seen.has(value)) continue;
+                seen.add(value);
+                for (const [k, v] of Object.entries(value)) {
+                    if (shouldIgnoreKey(k)) continue;
+                    stack.push({ value: v, depth: depth + 1 });
+                }
+            }
+        }
+
+        return best;
+    };
+
+    const getPrimaryScore = (item, fields, query, { shortQuery = false } = {}) => {
+        const values = fields.map((field) => item?.[field]).filter((v) => v !== undefined && v !== null);
+        return values.reduce((max, v) => Math.max(max, scoreStringMatch(v, query, { shortQuery })), 0);
+    };
 
     // Handle global search functionality across entire system
     const handleSearch = async (searchTerm) => {
         if (!searchTerm.trim()) {
             setSearchResults([]);
             setShowSearchResults(false);
-            return;
+            setSearchLoading(false);
+            return [];
         }
 
-        const searchLower = searchTerm.toLowerCase();
+        const searchLower = normalize(searchTerm).trim();
+        const shortQuery = searchLower.length < 3;
         const results = [];
+        const seen = new Set();
+        const pushResult = (item) => {
+            if (!item?.title || !item?.route) return;
+            const key = `${item.type || "other"}::${item.route}::${item.title}`;
+            if (seen.has(key)) return;
+            seen.add(key);
+            results.push(item);
+        };
 
         // Search pages/navigation (immediate results)
         const pageItems = [
@@ -121,144 +207,183 @@ export default function Navbar() {
         ];
 
         const matchingPages = pageItems.filter(item =>
-            item.title.toLowerCase().includes(searchLower) ||
-            item.description.toLowerCase().includes(searchLower)
+            scoreStringMatch(item.title, searchLower, { shortQuery }) > 0 ||
+            scoreStringMatch(item.description, searchLower, { shortQuery }) > 0
         );
-        results.push(...matchingPages);
+        matchingPages.forEach(pushResult);
 
         // Show immediate page results first
         setSearchResults([...results]);
-        updateDropdownPosition();
         setShowSearchResults(true);
         setSearchLoading(true);
 
         try {
+            const [tasks, activities, goals, keyAreas, appointments, users] = await Promise.all([
+                taskService.list().catch(() => []),
+                activityService.list().catch(() => []),
+                goalService.getGoals().catch(() => []),
+                keyAreaService.list().catch(() => []),
+                calendarService.listAppointments().catch(() => []),
+                usersService.list().catch(() => []),
+            ]);
 
-            // Search tasks globally
-            try {
-                const tasks = await taskService.getTasks();
-                const matchingTasks = tasks.filter(task =>
-                    task.title?.toLowerCase().includes(searchLower) ||
-                    task.description?.toLowerCase().includes(searchLower) ||
-                    task.name?.toLowerCase().includes(searchLower)
-                ).slice(0, 5); // Limit results
+            const nonUserFieldExcludes = [/assignee/i, /assigned/i, /user/i, /member/i, /owner/i, /email/i, /avatar/i, /delegat/i];
+            const rankAndLimit = (items, scorer) =>
+                (items || [])
+                    .map((item) => ({ item, score: scorer(item) }))
+                    .filter((x) => x.score > 0)
+                    .sort((a, b) => {
+                        if (b.score !== a.score) return b.score - a.score;
+                        const aTitle = normalize(a?.item?.title || a?.item?.name || a?.item?.text || "");
+                        const bTitle = normalize(b?.item?.title || b?.item?.name || b?.item?.text || "");
+                        return aTitle.localeCompare(bTitle);
+                    })
+                    .map((x) => x.item);
 
-                matchingTasks.forEach(task => {
-                    results.push({
+            rankAndLimit(tasks, (task) => {
+                const primaryFields = shortQuery ? ["title", "name"] : ["title", "name", "description", "tags"];
+                const primary = getPrimaryScore(task, primaryFields, searchLower, { shortQuery });
+                if (primary > 0) return primary + 200;
+                if (shortQuery) return 0;
+                return deepMatchScore(task, searchLower, { ignoreKeyPatterns: nonUserFieldExcludes });
+            })
+                .forEach((task) => {
+                    pushResult({
                         title: task.title || task.name || 'Untitled Task',
-                        route: `/tasks?id=${task.id}`,
+                        route: `/tasks?dontforget=1&task=${task.id}`,
                         type: "task",
-                        description: task.description || 'Task'
+                        description: task.description || task.assignee || 'Task',
                     });
                 });
 
-                // Update results with tasks
-                setSearchResults([...results]);
-            } catch (e) {
-                console.warn('Task search failed:', e);
-            }
-
-            // Search activities globally
-            try {
-                const activities = await activityService.getActivities();
-                const matchingActivities = activities.filter(activity =>
-                    activity.title?.toLowerCase().includes(searchLower) ||
-                    activity.description?.toLowerCase().includes(searchLower) ||
-                    activity.name?.toLowerCase().includes(searchLower)
-                ).slice(0, 5);
-
-                matchingActivities.forEach(activity => {
-                    results.push({
-                        title: activity.title || activity.name || 'Untitled Activity',
-                        route: `/activities?id=${activity.id}`,
+            rankAndLimit(activities, (activity) => {
+                const primaryFields = shortQuery ? ["title", "name", "text"] : ["title", "name", "text", "description"];
+                const primary = getPrimaryScore(activity, primaryFields, searchLower, { shortQuery });
+                if (primary > 0) return primary + 200;
+                if (shortQuery) return 0;
+                return deepMatchScore(activity, searchLower, { ignoreKeyPatterns: nonUserFieldExcludes });
+            })
+                .forEach((activity) => {
+                    pushResult({
+                        title: activity.title || activity.name || activity.text || 'Untitled Activity',
+                        route: `/key-areas?view=activity-trap&activity=${activity.id}`,
                         type: "activity",
-                        description: activity.description || 'Activity'
+                        description: activity.description || activity.text || 'Activity',
                     });
                 });
-            } catch (e) {
-                console.warn('Activity search failed:', e);
-            }
 
-            // Search goals globally
-            try {
-                const goals = await goalService.getGoals();
-                const matchingGoals = goals.filter(goal =>
-                    goal.title?.toLowerCase().includes(searchLower) ||
-                    goal.description?.toLowerCase().includes(searchLower) ||
-                    goal.name?.toLowerCase().includes(searchLower)
-                ).slice(0, 5);
-
-                matchingGoals.forEach(goal => {
-                    results.push({
+            rankAndLimit(goals, (goal) => {
+                const primaryFields = shortQuery ? ["title", "name"] : ["title", "name", "description"];
+                const primary = getPrimaryScore(goal, primaryFields, searchLower, { shortQuery });
+                if (primary > 0) return primary + 200;
+                if (shortQuery) return 0;
+                return deepMatchScore(goal, searchLower, { ignoreKeyPatterns: nonUserFieldExcludes });
+            })
+                .forEach((goal) => {
+                    pushResult({
                         title: goal.title || goal.name || 'Untitled Goal',
                         route: `/goals?id=${goal.id}`,
                         type: "goal",
-                        description: goal.description || 'Goal'
+                        description: goal.description || 'Goal',
                     });
                 });
-            } catch (e) {
-                console.warn('Goal search failed:', e);
-            }
 
-            // Search key areas globally
-            try {
-                const keyAreas = await keyAreaService.getKeyAreas();
-                const matchingKeyAreas = keyAreas.filter(area =>
-                    area.name?.toLowerCase().includes(searchLower) ||
-                    area.description?.toLowerCase().includes(searchLower)
-                ).slice(0, 5);
-
-                matchingKeyAreas.forEach(area => {
-                    results.push({
-                        title: area.name || 'Untitled Key Area',
+            rankAndLimit(keyAreas, (area) => {
+                const primaryFields = shortQuery ? ["title", "name"] : ["title", "name", "description"];
+                const primary = getPrimaryScore(area, primaryFields, searchLower, { shortQuery });
+                if (primary > 0) return primary + 200;
+                if (shortQuery) return 0;
+                return deepMatchScore(area, searchLower, { ignoreKeyPatterns: nonUserFieldExcludes });
+            })
+                .forEach((area) => {
+                    pushResult({
+                        title: area.title || area.name || 'Untitled Key Area',
                         route: `/key-areas?id=${area.id}`,
                         type: "key-area",
-                        description: area.description || 'Key Area'
+                        description: area.description || 'Key Area',
                     });
                 });
-            } catch (e) {
-                console.warn('Key Area search failed:', e);
-            }
 
-            // Search calendar appointments globally
-            try {
-                const appointments = await calendarService.getAppointments();
-                const matchingAppointments = appointments.filter(appointment =>
-                    appointment.title?.toLowerCase().includes(searchLower) ||
-                    appointment.description?.toLowerCase().includes(searchLower) ||
-                    appointment.summary?.toLowerCase().includes(searchLower)
-                ).slice(0, 5);
-
-                matchingAppointments.forEach(appointment => {
-                    results.push({
+            rankAndLimit(appointments, (appointment) => {
+                const primaryFields = shortQuery ? ["title", "summary"] : ["title", "summary", "description", "notes"];
+                const primary = getPrimaryScore(appointment, primaryFields, searchLower, { shortQuery });
+                if (primary > 0) return primary + 200;
+                if (shortQuery) return 0;
+                return deepMatchScore(appointment, searchLower, { ignoreKeyPatterns: nonUserFieldExcludes });
+            })
+                .forEach((appointment) => {
+                    pushResult({
                         title: appointment.title || appointment.summary || 'Untitled Appointment',
                         route: `/calendar?id=${appointment.id}`,
                         type: "appointment",
-                        description: appointment.description || 'Calendar Appointment'
+                        description: appointment.description || appointment.notes || 'Calendar Appointment',
                     });
                 });
-            } catch (e) {
-                console.warn('Calendar search failed:', e);
-            }
+
+            rankAndLimit(users, (user) => {
+                const primary = getPrimaryScore(user, ["name", "email", "firstName", "lastName"], searchLower, { shortQuery });
+                if (primary > 0) return primary + 200;
+                if (shortQuery) return 0;
+                return deepMatchScore(user, searchLower);
+            })
+                .forEach((user) => {
+                    pushResult({
+                        title: user.name || user.email || 'User',
+                        route: `/teams`,
+                        type: "user",
+                        description: user.email || 'Team member',
+                    });
+                });
 
         } catch (error) {
             console.error('Global search error:', error);
         }
 
-        setSearchResults(results.slice(0, 10)); // Limit total results to 10
+        setSearchResults(results);
         setShowSearchResults(true);
         setSearchLoading(false);
+        return results;
     };
 
-    // Update dropdown position based on search input position
-    const updateDropdownPosition = () => {
-        if (!searchRef.current) return;
+    const persistSearchHistory = (items) => {
+        try {
+            localStorage.setItem("pm:search:history", JSON.stringify(items));
+        } catch (e) {
+            // Ignore persistence failures (e.g. private mode quota issues)
+        }
+    };
 
-        const rect = searchRef.current.getBoundingClientRect();
-        setDropdownPosition({
-            top: rect.bottom + window.scrollY,
-            left: rect.left + window.scrollX,
-            width: rect.width
+    const pushSearchHistory = (item) => {
+        if (!item?.route || !item?.title) return;
+        setSearchHistory((prev) => {
+            const next = [
+                {
+                    title: item.title,
+                    route: item.route,
+                    type: item.type || "other",
+                    description: item.description || "",
+                    searchedAt: new Date().toISOString(),
+                },
+                ...prev.filter((h) => !(h.route === item.route && h.title === item.title)),
+            ].slice(0, 30);
+            persistSearchHistory(next);
+            return next;
+        });
+    };
+
+    const closeSearchOverlay = () => {
+        if (window.searchTimeout) clearTimeout(window.searchTimeout);
+        setOpenSearch(false);
+        setSearch("");
+        setSearchResults([]);
+        setShowSearchResults(false);
+        setSearchLoading(false);
+    };
+    const focusSearchInput = () => {
+        requestAnimationFrame(() => {
+            if (searchInputRef.current) {
+                searchInputRef.current.focus({ preventScroll: true });
+            }
         });
     };
 
@@ -280,46 +405,82 @@ export default function Navbar() {
 
     // Handle search result click
     const handleSearchResultClick = (route) => {
+        const selected = searchResults.find((r) => r.route === route);
+        if (selected) pushSearchHistory(selected);
         navigate(route);
-        setSearch("");
-        setSearchResults([]);
-        setShowSearchResults(false);
+        closeSearchOverlay();
     };
 
     // Handle Enter key for search
     const handleSearchKeyPress = (e) => {
-        if (e.key === 'Enter' && searchResults.length > 0) {
-            handleSearchResultClick(searchResults[0].route);
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (window.searchTimeout) clearTimeout(window.searchTimeout);
+            const q = (search || "").trim();
+            if (!q) return;
+            Promise.resolve(handleSearch(q)).then((results) => {
+                const payload = Array.isArray(results) ? results : [];
+                try {
+                    sessionStorage.setItem(
+                        "pm:last-search-results",
+                        JSON.stringify({ q, results: payload, ts: Date.now() })
+                    );
+                } catch (_) {}
+                navigate(`/search?q=${encodeURIComponent(q)}`, { state: { q, results: payload } });
+                closeSearchOverlay();
+            });
+            return;
         }
         if (e.key === 'Escape') {
-            setSearch("");
-            setSearchResults([]);
-            setShowSearchResults(false);
+            closeSearchOverlay();
         }
     };
 
-    // Handle window resize to update dropdown position
+    // Focus search input and support escape-to-close while overlay is open
     useEffect(() => {
-        const handleResize = () => {
-            if (showSearchResults) {
-                updateDropdownPosition();
+        if (!openSearch) return;
+        const focusInput = setTimeout(() => {
+            focusSearchInput();
+        }, 0);
+        const onKeyDown = (e) => {
+            if (e.key === "Escape") {
+                closeSearchOverlay();
             }
         };
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, [showSearchResults]);
+        document.addEventListener("keydown", onKeyDown);
+        return () => {
+            clearTimeout(focusInput);
+            document.removeEventListener("keydown", onKeyDown);
+        };
+    }, [openSearch]);
 
-    // Close search results when clicking outside
     useEffect(() => {
-        const handleClickOutside = (e) => {
-            if (searchRef.current && !searchRef.current.contains(e.target)) {
-                setShowSearchResults(false);
-                setOpenSearch(false);
+        if (!openSearch) return;
+        const onDocMouseDown = (e) => {
+            const target = e.target;
+            if (searchInlineRef.current?.contains(target)) return;
+            if (searchResultsPanelRef.current?.contains(target)) return;
+            closeSearchOverlay();
+        };
+        document.addEventListener("mousedown", onDocMouseDown);
+        return () => document.removeEventListener("mousedown", onDocMouseDown);
+    }, [openSearch]);
+
+    useEffect(() => {
+        const measureRightActions = () => {
+            const w = rightActionsRef.current?.getBoundingClientRect?.().width;
+            if (w && Number.isFinite(w)) {
+                setRightActionsWidth(Math.max(220, Math.round(w)));
+            }
+            const lw = leftBrandRef.current?.getBoundingClientRect?.().width;
+            if (lw && Number.isFinite(lw)) {
+                setLeftBrandWidth(Math.round(lw));
             }
         };
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
+        measureRightActions();
+        window.addEventListener("resize", measureRightActions);
+        return () => window.removeEventListener("resize", measureRightActions);
+    }, [openSearch, location.pathname, location.search]);
 
     // List of public routes where navbar should not be shown
     const publicRoutes = ["/", "/login", "/registration", "/get-started", "/PasswordPageForget", "/reset-password", "/verify-email"];
@@ -576,29 +737,92 @@ export default function Navbar() {
         const params = new URLSearchParams(location.search || '');
         return params.get('tab') || 'give';
     })();
+    const NAVBAR_Z_INDEX = 'z-[5000]';
+    const NAVBAR_POPUP_Z_INDEX = 'z-[5010]';
+    const SEARCH_OVERLAY_Z_INDEX = 'z-[5020]';
+    const searchCategoryLabels = {
+        page: "Pages",
+        task: "Tasks",
+        activity: "Activities",
+        goal: "Goals",
+        "key-area": "Key Areas",
+        appointment: "Appointments",
+        user: "Users",
+        other: "Other",
+    };
+    const groupedHistory = (searchHistory || []).reduce((acc, item) => {
+        if (!item?.title || !item?.route) return acc;
+        const key = item.type || "other";
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(item);
+        return acc;
+    }, {});
+    const groupedSearchResults = (searchResults || []).reduce((acc, item) => {
+        if (!item?.title || !item?.route) return acc;
+        const key = item.type || "other";
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(item);
+        return acc;
+    }, {});
+    const getSearchColumnCount = (count) => {
+        if (count > 10) return 3;
+        if (count > 5) return 2;
+        return 1;
+    };
+    const getSearchColumnsClass = () => "grid grid-cols-3";
+    const splitItemsAcrossColumns = (items, columns) => {
+        if (!Array.isArray(items) || items.length === 0) return [];
+        if (columns <= 1) return [items];
+
+        const out = [];
+        const total = items.length;
+        const base = Math.floor(total / columns);
+        const remainder = total % columns;
+        let cursor = 0;
+
+        for (let i = 0; i < columns; i += 1) {
+            const size = base + (i < remainder ? 1 : 0);
+            out.push(items.slice(cursor, cursor + size));
+            cursor += size;
+        }
+        return out.filter((col) => col.length > 0);
+    };
+    const resultCategoryOrder = ["task", "activity", "goal", "key-area", "appointment", "user", "page", "other"];
+    const visibleResultCategories = resultCategoryOrder.filter(
+        (type) => Array.isArray(groupedSearchResults[type]) && groupedSearchResults[type].length > 0
+    );
 
     return (
         <header
-            className="bg-gray-50 text-slate-800 z-[100] border-b border-gray-200 fixed top-0 left-0 right-0 h-16"
+            className={`bg-gray-50 text-slate-800 ${NAVBAR_Z_INDEX} border-b border-gray-200 fixed top-0 left-0 right-0 h-16`}
         // style={{
         //     background: 'linear-gradient(90deg, #dff7f9 0%, #a7eaf0 50%, #59d2df 100%)',
         // }}
         >
             <div className="w-full px-2 md:px-4 h-16 flex items-center gap-4">
-                <Link to="/dashboard" className="font-bold tracking-wide flex items-center gap-2 flex-shrink-0">
-                    <img
-                        src={`${import.meta.env.BASE_URL}logo.png`}
-                        alt="Practical Manager"
-                        className="hidden md:block h-7 object-contain"
-                        style={{ maxHeight: '32px' }}
-                    />
-                    <span className="sr-only">Practical Manager</span>
-                </Link>
+                <div className="flex items-center flex-shrink-0">
+                    <Link ref={leftBrandRef} to="/dashboard" className="font-bold tracking-wide flex items-center gap-2 flex-shrink-0">
+                        <img
+                            src={`${import.meta.env.BASE_URL}logo.png`}
+                            alt="Practical Manager"
+                            className="hidden md:block h-7 object-contain"
+                            style={{ maxHeight: '32px' }}
+                        />
+                        <span className="sr-only">Practical Manager</span>
+                    </Link>
+                    {openSearch && (
+                        <div
+                            className="hidden md:block"
+                            style={{ width: `${Math.max(0, rightActionsWidth - leftBrandWidth)}px` }}
+                            aria-hidden="true"
+                        />
+                    )}
+                </div>
 
                 {/* Compact search icon (replaces large centered search bar) */}
                 {/* Placed visually with other header actions for a cleaner layout */}
 
-                {showKeyAreaTabs && (
+                {showKeyAreaTabs && !openSearch && (
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-4 text-xs font-semibold overflow-x-auto overflow-y-visible whitespace-nowrap navbar-keyarea-tabs">
                             <div className="relative" ref={activeMenuRef}>
@@ -620,7 +844,7 @@ export default function Navbar() {
                                 {openActiveMenu && createPortal(
                                     <div
                                         ref={activeMenuPopupRef}
-                                        className="fixed w-44 rounded-md border border-slate-300 bg-white shadow-md z-[220] overflow-hidden"
+                                        className={`fixed w-44 rounded-md border border-slate-300 bg-white shadow-md ${NAVBAR_POPUP_Z_INDEX} overflow-hidden`}
                                         style={{ top: `${activeMenuPosition.top}px`, left: `${activeMenuPosition.left}px` }}
                                     >
                                         <button
@@ -696,7 +920,7 @@ export default function Navbar() {
                         </div>
                     </div>
                 )}
-                {showTeamsTabs && !showKeyAreaTabs && (
+                {showTeamsTabs && !showKeyAreaTabs && !openSearch && (
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-4 text-xs font-semibold overflow-x-auto whitespace-nowrap navbar-keyarea-tabs">
                             <button
@@ -744,7 +968,7 @@ export default function Navbar() {
                         </div>
                     </div>
                 )}
-                {showGiveStrokesTabs && !showKeyAreaTabs && !showTeamsTabs && (
+                {showGiveStrokesTabs && !showKeyAreaTabs && !showTeamsTabs && !openSearch && (
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-4 text-xs font-semibold overflow-x-auto whitespace-nowrap navbar-keyarea-tabs">
                             <button
@@ -771,7 +995,7 @@ export default function Navbar() {
                     </div>
                 )}
                 {/* Don't Forget Tab Group: Active Tasks | All Tasks | Completed | Imported Tasks */}
-                {location.search.includes('dontforget=1') && location.pathname.startsWith('/tasks') && (
+                {location.search.includes('dontforget=1') && location.pathname.startsWith('/tasks') && !openSearch && (
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-4 text-xs font-semibold overflow-x-auto whitespace-nowrap navbar-keyarea-tabs">
                             {/* ACTIVE TASKS */}
@@ -822,7 +1046,7 @@ export default function Navbar() {
                     </div>
                 )}
                 {/* Goals Tab Group: My Goals | Quick Goals | Reports */}
-                {showGoalsTabs && !showKeyAreaTabs && !showTeamsTabs && !showGiveStrokesTabs && (() => {
+                {showGoalsTabs && !showKeyAreaTabs && !showTeamsTabs && !showGiveStrokesTabs && !openSearch && (() => {
                     const params = new URLSearchParams(location.search || '');
                     const goalsTab = params.get('tab') || 'goals';
                     return (
@@ -853,73 +1077,49 @@ export default function Navbar() {
                         </div>
                     );
                 })()}
-                <div className="relative flex items-center gap-3 ml-auto flex-shrink-0">
+                {openSearch && (
+                    <div
+                        className="flex-1 min-w-0 px-1 md:px-3"
+                        ref={searchInlineRef}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="w-full">
+                            <div className="relative w-full">
+                                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 md:w-5 md:h-5 pointer-events-none" />
+                                <input
+                                    ref={searchInputRef}
+                                    type="text"
+                                    placeholder="Search across pages, tasks, activities, goals, key areas, and appointments..."
+                                    value={search}
+                                    onChange={handleSearchChange}
+                                    onKeyDown={handleSearchKeyPress}
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="w-full h-10 pl-10 pr-3 text-sm border rounded-xl bg-white focus:outline-none"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                )}
+                <div ref={rightActionsRef} className="relative flex items-center gap-3 ml-auto flex-shrink-0">
                     <div className="relative">
                         <button
                             className="text-black hover:text-gray-700 px-1 py-0.5 rounded-full"
                             aria-label="Search"
                             title="Search"
                             onClick={() => {
+                                if (window.searchTimeout) clearTimeout(window.searchTimeout);
+                                setSearch("");
+                                setSearchResults([]);
+                                setShowSearchResults(false);
+                                setSearchLoading(false);
                                 setOpenSearch(true);
-                                setShowSearchResults(true);
-                                // focus input after opening
-                                setTimeout(() => {
-                                    try {
-                                        if (searchRef.current) {
-                                            const el = searchRef.current.querySelector('input');
-                                            if (el) el.focus();
-                                            updateDropdownPosition();
-                                        }
-                                    } catch (e) { }
-                                }, 0);
+                                focusSearchInput();
                             }}
                         >
                             <FaSearch className="w-4 h-4" />
                         </button>
-
-                        {/* Inline compact search input and results */}
-                        {openSearch && (
-                            <div ref={searchRef} className="absolute right-0 mt-2 w-80 z-[220]">
-                                <div className="bg-white rounded-md shadow-lg border border-gray-200 p-2">
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            type="text"
-                                            placeholder="Search across site..."
-                                            value={search}
-                                            onChange={handleSearchChange}
-                                            onKeyDown={handleSearchKeyPress}
-                                            className="w-full px-3 py-1.5 text-sm border rounded bg-gray-50 focus:bg-white focus:outline-none"
-                                        />
-                                        <button
-                                            onClick={() => { setSearch(''); setSearchResults([]); setShowSearchResults(false); setOpenSearch(false); }}
-                                            className="text-sm text-gray-500 px-2"
-                                            title="Close"
-                                        >
-                                            ×
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Results dropdown (positioned under input) */}
-                                {showSearchResults && searchResults && searchResults.length > 0 && (
-                                    <div className="mt-1 bg-white rounded-md shadow-lg border border-gray-200 max-h-64 overflow-auto">
-                                        {searchResults.map((r, idx) => (
-                                            <div
-                                                key={idx}
-                                                onClick={() => handleSearchResultClick(r.route)}
-                                                className="px-3 py-2 hover:bg-slate-50 cursor-pointer"
-                                            >
-                                                <div className="text-sm font-medium">{r.title}</div>
-                                                <div className="text-xs text-slate-500">{r.description}</div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                                {showSearchResults && !searchLoading && searchResults.length === 0 && (
-                                    <div className="mt-1 px-3 py-2 text-sm text-gray-600">No results</div>
-                                )}
-                            </div>
-                        )}
                     </div>
                     {/* Widgets control: only show on Dashboard route */}
                     {location.pathname === '/dashboard' && (
@@ -935,7 +1135,7 @@ export default function Navbar() {
                             </button>
 
                             {openWidgets && (
-                                <div className="absolute right-2 mt-2 w-64 rounded-md bg-white text-slate-800 shadow-lg z-[150] p-2">
+                                <div className={`absolute right-2 mt-2 w-64 rounded-md bg-white text-slate-800 shadow-lg ${NAVBAR_POPUP_Z_INDEX} p-2`}>
                                     <div className="px-2 py-1 text-xs text-slate-500 border-b flex items-center justify-between">
                                         <span>Widgets</span>
                                         <button
@@ -985,7 +1185,7 @@ export default function Navbar() {
                         </button>
 
                         {openQuick && (
-                            <div id="quick-actions-menu" role="menu" className="absolute right-20 mt-2 w-56 rounded-md bg-white text-slate-800 shadow-lg z-[150]">
+                            <div id="quick-actions-menu" role="menu" className={`absolute right-20 mt-2 w-56 rounded-md bg-white text-slate-800 shadow-lg ${NAVBAR_POPUP_Z_INDEX}`}>
                                 <div className="px-3 py-2 text-xs text-slate-500 border-b">Quick Actions</div>
                                 <button
                                     role="menuitem"
@@ -1111,7 +1311,7 @@ export default function Navbar() {
                             </svg>
                         </button>
                         {open && (
-                            <div className="absolute right-0 mt-2 w-48 rounded-md bg-white text-slate-800 shadow-lg z-[150]">
+                            <div className={`absolute right-0 mt-2 w-48 rounded-md bg-white text-slate-800 shadow-lg ${NAVBAR_POPUP_Z_INDEX}`}>
                                 <Link
                                     to="/profile"
                                     className="block px-3 py-2 text-sm hover:bg-slate-50"
@@ -1140,6 +1340,94 @@ export default function Navbar() {
                     </div>
                 </div>
             </div>
+            {openSearch && createPortal(
+                <div className={`fixed left-0 right-0 top-16 bottom-0 ${SEARCH_OVERLAY_Z_INDEX}`}>
+                    <div className="absolute inset-0 bg-black/40" onClick={closeSearchOverlay} />
+                    <div className="absolute top-0 left-0 right-0 z-10 px-4 pt-2 flex justify-center">
+                        <div
+                            ref={searchResultsPanelRef}
+                            className="w-full max-w-[860px]"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="bg-white rounded-xl shadow-xl border border-gray-200 max-h-[calc(100vh-82px)] overflow-y-auto">
+                                {searchLoading && (
+                                    <div className="px-4 py-3 text-sm text-slate-600">Searching...</div>
+                                )}
+
+                                {showSearchResults && !searchLoading && searchResults.length > 0 && (
+                                    <div className="py-1">
+                                        <div className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 border-b">
+                                            Search Results
+                                        </div>
+                                        {visibleResultCategories.map((type) => (
+                                                <div key={type} className="px-4 py-1.5">
+                                                    <div className="px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400 bg-slate-50">
+                                                        {searchCategoryLabels[type] || "Other"}
+                                                    </div>
+                                                    <div className={`mt-1 px-4 gap-x-8 gap-y-0 ${getSearchColumnsClass()}`}>
+                                                        {splitItemsAcrossColumns(
+                                                            groupedSearchResults[type],
+                                                            getSearchColumnCount(groupedSearchResults[type].length)
+                                                        ).map((col, colIdx) => (
+                                                            <div key={`${type}-col-${colIdx}`} className="space-y-1">
+                                                                {col.map((r, idx) => (
+                                                                    <Link
+                                                                        key={`${type}-${r.route}-${colIdx}-${idx}`}
+                                                                        to={r.route}
+                                                                        onClick={() => handleSearchResultClick(r.route)}
+                                                                        className="block text-sm font-medium text-slate-600 leading-5 tracking-[0.01em] hover:text-blue-600"
+                                                                    >
+                                                                        {r.title}
+                                                                    </Link>
+                                                                ))}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                    </div>
+                                )}
+
+                                {showSearchResults && !searchLoading && searchResults.length === 0 && search.trim() && (
+                                    <div className="px-4 py-3 text-sm text-gray-600 border-b border-gray-100">
+                                        No results
+                                    </div>
+                                )}
+
+                                {searchHistory.length > 0 && !search.trim() && (
+                                    <div className="py-1">
+                                        <div className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 border-b">
+                                            Recent Searches
+                                        </div>
+                                        {Object.entries(groupedHistory).map(([type, items]) => (
+                                            <div key={type} className="border-b border-gray-100 last:border-b-0">
+                                                <div className="px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400 bg-slate-50">
+                                                    {searchCategoryLabels[type] || "Other"}
+                                                </div>
+                                                {(items || []).slice(0, 5).map((item, idx) => (
+                                                    <button
+                                                        key={`${type}-${item.route}-${idx}`}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            navigate(item.route);
+                                                            closeSearchOverlay();
+                                                        }}
+                                                        className="w-full text-left px-4 py-2.5 hover:bg-slate-50"
+                                                    >
+                                                        <div className="text-sm font-medium text-slate-800">{item.title}</div>
+                                                        {item.description && <div className="text-xs text-slate-500">{item.description}</div>}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
         </header>
     );
 }

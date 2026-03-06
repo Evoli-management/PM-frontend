@@ -120,7 +120,7 @@ export default function ReminderModal({
   // Inline mode: render centered inside parent without a dark backdrop
   if (inline) {
     return (
-      <div className="fixed inset-0 z-[250] flex items-center justify-center pointer-events-none">
+      <div className="fixed inset-0 z-[5012] flex items-center justify-center pointer-events-none">
   {/* Use same overlay as main page modals: semi-transparent black */}
   <div className="absolute inset-0 bg-black/40" onClick={onClose} />
         <div className="bg-white rounded-lg shadow-lg max-w-md w-[min(720px,90%)] overflow-visible pointer-events-auto z-10">
@@ -284,7 +284,7 @@ export default function ReminderModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[5012]">
   <div className="bg-white rounded-lg shadow-lg max-w-md w-full overflow-visible">
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
