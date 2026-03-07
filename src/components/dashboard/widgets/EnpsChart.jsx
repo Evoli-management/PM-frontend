@@ -1,6 +1,8 @@
 import React, { useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 export default function EnpsChart({ data = [], labels = [] }) {
+    const { t } = useTranslation();
     const svgRef = useRef(null);
     const [tooltip, setTooltip] = useState(null);
     const margin = { top: 8, right: 12, bottom: 26, left: 36 };
@@ -11,7 +13,7 @@ export default function EnpsChart({ data = [], labels = [] }) {
     if (!data || data.length === 0) {
         return (
             <div className="relative w-full h-32 flex items-center justify-center text-sm text-gray-500">
-                No trend data available
+                {t("enpsChart.noData")}
             </div>
         );
     }
@@ -109,7 +111,7 @@ export default function EnpsChart({ data = [], labels = [] }) {
                     }}
                 >
                     <div className="font-semibold">{tooltip.label}</div>
-                    <div className="text-xs opacity-70">Value: {tooltip.value}</div>
+                    <div className="text-xs opacity-70">{t("enpsChart.value", { n: tooltip.value })}</div>
                 </div>
             )}
         </div>

@@ -1,5 +1,6 @@
 // src/components/goals/GoalsStatsCards.jsx
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { FaBullseye, FaClock, FaCheckCircle, FaExclamationTriangle } from "react-icons/fa";
 
 const StatCard = ({ title, value, icon: Icon, bgColor, textColor }) => (
@@ -17,10 +18,11 @@ const StatCard = ({ title, value, icon: Icon, bgColor, textColor }) => (
 );
 
 const GoalsStatsCards = ({ stats }) => {
+    const { t } = useTranslation();
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <StatCard
-                title="Total Goals"
+                title={t("goalsStatsCards.totalGoals")}
                 value={stats.total}
                 icon={FaBullseye}
                 bgColor="bg-blue-50"
@@ -28,7 +30,7 @@ const GoalsStatsCards = ({ stats }) => {
             />
 
             <StatCard
-                title="Active Goals"
+                title={t("goalsStatsCards.activeGoals")}
                 value={stats.active}
                 icon={FaClock}
                 bgColor="bg-blue-50"
@@ -36,7 +38,7 @@ const GoalsStatsCards = ({ stats }) => {
             />
 
             <StatCard
-                title="Completed"
+                title={t("goalsStatsCards.completed")}
                 value={stats.completed}
                 icon={FaCheckCircle}
                 bgColor="bg-green-50"
@@ -44,7 +46,7 @@ const GoalsStatsCards = ({ stats }) => {
             />
 
             <StatCard
-                title="Overdue"
+                title={t("goalsStatsCards.overdue")}
                 value={stats.overdue}
                 icon={FaExclamationTriangle}
                 bgColor="bg-red-50"

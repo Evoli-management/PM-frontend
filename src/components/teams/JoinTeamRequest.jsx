@@ -1,9 +1,11 @@
 // src/components/teams/JoinTeamRequest.jsx
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useTeamJoinRequests } from '../../hooks/useTeamJoinRequests';
 import styles from './JoinTeamRequest.module.css';
 
 export const JoinTeamRequest = ({ teamId, teamName, onSuccess }) => {
+  const { t } = useTranslation();
   const [message, setMessage] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const { requestJoinTeam, loading, error, setError } = useTeamJoinRequests();
@@ -31,24 +33,24 @@ export const JoinTeamRequest = ({ teamId, teamName, onSuccess }) => {
   if (submitted) {
     return (
       <div className={styles.successMessage}>
-        <h4>Request Sent</h4>
-        <p>Your request to join {teamName} has been sent to the team lead for approval.</p>
+        <h4>{t("joinTeamRequest.successTitle")}</h4>
+        <p>{t("joinTeamRequest.successText", { name: teamName })}</p>
       </div>
     );
   }
 
   return (
     <div className={styles.requestForm}>
-      <h4>Request to Join {teamName}</h4>
+      <h4>{t("joinTeamRequest.requestTitle", { name: teamName })}</h4>
 
       <form onSubmit={handleSubmit}>
         <div className={styles.formGroup}>
-          <label htmlFor="message">Message (optional)</label>
+          <label htmlFor="message">{t("joinTeamRequest.messageLabel")}</label>
           <textarea
             id="message"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            placeholder="Tell the team lead why you'd like to join..."
+            placeholder={t("joinTeamRequest.messagePlaceholder")}
             maxLength={500}
             rows={4}
             className={styles.textarea}
@@ -64,7 +66,7 @@ export const JoinTeamRequest = ({ teamId, teamName, onSuccess }) => {
             disabled={loading}
             className={styles.submitBtn}
           >
-            {loading ? 'Sending...' : 'Send Request'}
+            {loading ? t("joinTeamRequest.sending") : t("joinTeamRequest.send")}
           </button>
         </div>
       </form>

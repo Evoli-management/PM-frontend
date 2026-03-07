@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 
 /**
  * SyncSourceBadge
@@ -6,10 +7,11 @@ import React from "react";
  * Pass googleId or outlookId to determine which badge to show.
  */
 export default function SyncSourceBadge({ googleId, outlookId, style = {} }) {
+    const { t } = useTranslation();
     if (googleId) {
         return (
             <span
-                title="Imported from Google Tasks"
+                title={t("syncSourceBadge.googleTitle")}
                 style={{
                     display: "inline-flex",
                     alignItems: "center",
@@ -40,7 +42,7 @@ export default function SyncSourceBadge({ googleId, outlookId, style = {} }) {
     if (outlookId) {
         return (
             <span
-                title="Imported from Microsoft To Do"
+                title={t("syncSourceBadge.outlookTitle")}
                 style={{
                     display: "inline-flex",
                     alignItems: "center",

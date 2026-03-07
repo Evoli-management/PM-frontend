@@ -1,4 +1,5 @@
 import React, { useState, Suspense } from "react";
+import { useTranslation } from "react-i18next";
 const CreateTaskModal = React.lazy(() => import("../key-areas/CreateTaskModal.jsx"));
 const CreateActivityModal = React.lazy(() => import("./CreateActivityFormModal.jsx"));
 
@@ -11,6 +12,7 @@ export default function CalendarCreateModal({
     preselectedKeyArea = null,
     preselectedTask = null
 }) {
+    const { t } = useTranslation();
     const [activeType, setActiveType] = useState(defaultType);
 
     const handleSave = (result) => {
@@ -26,7 +28,7 @@ export default function CalendarCreateModal({
                 <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
                     <div className="flex items-center justify-between mb-3">
                         <h2 className="text-lg font-semibold text-slate-800">
-                            Add to Calendar
+                            {t("calendarCreateModal.title")}
                         </h2>
                         <button 
                             type="button" 
@@ -48,18 +50,18 @@ export default function CalendarCreateModal({
                             }`}
                             onClick={() => setActiveType("task")}
                         >
-                            📋 Task
+                            📋 {t("calendarCreateModal.taskTab")}
                         </button>
                         <button
                             type="button"
                             className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                                activeType === "activity" 
-                                    ? "bg-green-600 text-white" 
+                                activeType === "activity"
+                                    ? "bg-green-600 text-white"
                                     : "bg-white text-slate-700 border border-slate-300 hover:bg-slate-50"
                             }`}
                             onClick={() => setActiveType("activity")}
                         >
-                            ⚡ Activity
+                            ⚡ {t("calendarCreateModal.activityTab")}
                         </button>
                     </div>
                 </div>
@@ -107,13 +109,9 @@ export default function CalendarCreateModal({
                 <div className="px-6 py-3 bg-slate-50 border-t border-slate-200">
                     <div className="text-xs text-slate-600">
                         {activeType === "task" ? (
-                            <>
-                                📋 <strong>Tasks</strong> are structured work items with deadlines, priorities, and assignments.
-                            </>
+                            <>📋 {t("calendarCreateModal.taskDesc")}</>
                         ) : (
-                            <>
-                                ⚡ <strong>Activities</strong> are quick notes about what you did or what happened.
-                            </>
+                            <>⚡ {t("calendarCreateModal.activityDesc")}</>
                         )}
                     </div>
                 </div>

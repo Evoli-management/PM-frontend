@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { FaClock } from 'react-icons/fa';
 import remindersService from '../../services/remindersService';
 import RemindersListModal from '../reminders/RemindersListModal';
+import { useTranslation } from 'react-i18next';
 
 export default function ReminderBell() {
+  const { t } = useTranslation();
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -41,7 +43,7 @@ export default function ReminderBell() {
       <button
         onClick={handleClick}
         className="relative p-2 text-orange-500 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
-        title={count > 0 ? `${count} pending reminder(s)` : 'Reminders'}
+        title={count > 0 ? t('reminderBell.countTitle', { n: count }) : t('reminderBell.noReminders')}
         aria-label="Reminders"
       >
         <FaClock size={20} />

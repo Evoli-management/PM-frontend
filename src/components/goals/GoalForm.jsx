@@ -1,10 +1,12 @@
 import React, { useState, useRef, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Plus, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import { useDraggable } from "../../hooks/useDraggable";
 import { useResizable } from "../../hooks/useResizable";
 import { formatKeyAreaLabel } from "../../utils/keyAreaDisplay";
 
 const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = false }) => {
+  const { t } = useTranslation();
   // default new-goal dates to today. The validation allows deadline to be
   // today or in the future for new goals, so prefill to today's date which
   // feels more natural to users.
@@ -582,7 +584,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
                   type="text"
                   value={Array.isArray(formData.tags) ? formData.tags.join(", ") : ""}
                   onChange={(e) => {
-                    const tags = e.target.value.split(",").map((t) => t.trim()).filter((t) => t);
+                    const tags = e.target.value.split(",").map((tag) => tag.trim()).filter((tag) => tag);
                     handleInputChange("tags", tags);
                   }}
                   className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 mt-0"

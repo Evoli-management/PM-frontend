@@ -77,6 +77,7 @@
 // }
 
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -86,38 +87,39 @@ function makeCaptcha(len = 6) {
     return Array.from({ length: len }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
 }
 
-const buildSchema = (captchaCode) =>
-    z.object({
-        firstName: z.string().trim().min(1, "First name is required"),
-        lastName: z.string().trim().min(1, "Last name is required"),
-        phone: z
-            .string()
-            .trim()
-            .optional()
-            .or(z.literal(""))
-            .refine((v) => !v || /^[+()\d\s-]{7,20}$/.test(v), "Enter a valid phone number"),
-        email: z.string().trim().min(1, "Email is required").email("Enter a valid email"),
-        company: z.string().trim().min(2, "Company is required"),
-        employees: z
-            .union([
-                z
-                    .number({ invalid_type_error: "Enter a number" })
-                    .int("Must be a whole number")
-                    .positive("Must be greater than 0")
-                    .max(1_000_000, "That seems too large"),
-                z.nan().transform(() => undefined), // allow empty -> undefined when valueAsNumber is used
-            ])
-            .optional(),
-        terms: z.literal(true, { errorMap: () => ({ message: "You must agree to continue" }) }),
-        captcha: z
-            .string()
-            .trim()
-            .min(1, "Enter the captcha")
-            .refine((v) => v.toLowerCase() === String(captchaCode || "").toLowerCase(), "Captcha does not match"),
-    });
-
 export default function ContactForm() {
+    const { t } = useTranslation();
     const [captchaCode, setCaptchaCode] = React.useState(() => makeCaptcha());
+
+    const buildSchema = (captchaCode) =>
+        z.object({
+            firstName: z.string().trim().min(1, t("contactForm.errFirstNameRequired")),
+            lastName: z.string().trim().min(1, t("contactForm.errLastNameRequired")),
+            phone: z
+                .string()
+                .trim()
+                .optional()
+                .or(z.literal(""))
+                .refine((v) => !v || /^[+()\d\s-]{7,20}$/.test(v), t("contactForm.errPhoneInvalid")),
+            email: z.string().trim().min(1, t("contactForm.errEmailRequired")).email(t("contactForm.errEmailInvalid")),
+            company: z.string().trim().min(2, t("contactForm.errCompanyRequired")),
+            employees: z
+                .union([
+                    z
+                        .number({ invalid_type_error: t("contactForm.errEmployeesNumber") })
+                        .int(t("contactForm.errEmployeesWhole"))
+                        .positive(t("contactForm.errEmployeesPositive"))
+                        .max(1_000_000, t("contactForm.errEmployeesTooLarge")),
+                    z.nan().transform(() => undefined),
+                ])
+                .optional(),
+            terms: z.literal(true, { errorMap: () => ({ message: t("contactForm.errTermsRequired") }) }),
+            captcha: z
+                .string()
+                .trim()
+                .min(1, t("contactForm.errCaptchaRequired"))
+                .refine((v) => v.toLowerCase() === String(captchaCode || "").toLowerCase(), t("contactForm.errCaptchaMismatch")),
+        });
 
     const {
         register,
@@ -152,13 +154,13 @@ export default function ContactForm() {
         console.log("Submit payload:", data);
         reset({ ...data, terms: false, captcha: "" }); // keep text fields but clear checkbox & captcha
         onReloadCaptcha();
-        alert("Thanks! We'll be in touch soon.");
+        alert(t("contactForm.alertSuccess"));
     };
 
     return (
         <section id="contact" className="py-12 flex items-center justify-center w-full max-w-6xl mx-auto">
             <div className="rounded-3xl shadow-xl p-8">
-                <h2 className="text-3xl font-bold mb-2 md:mb-4">Contact us for a Demo</h2>
+                <h2 className="text-3xl font-bold mb-2 md:mb-4">{t("contactForm.title")}</h2>
 
                 <form
                     className="w-full grid grid-cols-1 md:grid-cols-2 gap-4"
@@ -168,12 +170,12 @@ export default function ContactForm() {
                     {/* First Name */}
                     <div className="flex flex-col">
                         <label htmlFor="firstName" className="sr-only">
-                            First Name
+                            {t("contactForm.firstName")}
                         </label>
                         <input
                             id="firstName"
                             type="text"
-                            placeholder="First Name"
+                            placeholder={t("contactForm.firstName")}
                             className={`p-3 rounded-xl border ${errors.firstName ? "border-red-500" : "border-gray-400"} focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow`}
                             aria-invalid={!!errors.firstName}
                             aria-describedby={errors.firstName ? "firstName-error" : undefined}
@@ -189,12 +191,12 @@ export default function ContactForm() {
                     {/* Last Name */}
                     <div className="flex flex-col">
                         <label htmlFor="lastName" className="sr-only">
-                            Last Name
+                            {t("contactForm.lastName")}
                         </label>
                         <input
                             id="lastName"
                             type="text"
-                            placeholder="Last Name"
+                            placeholder={t("contactForm.lastName")}
                             className={`p-3 rounded-xl border ${errors.lastName ? "border-red-500" : "border-gray-400"} focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow`}
                             aria-invalid={!!errors.lastName}
                             aria-describedby={errors.lastName ? "lastName-error" : undefined}
@@ -210,13 +212,13 @@ export default function ContactForm() {
                     {/* Phone */}
                     <div className="flex flex-col">
                         <label htmlFor="phone" className="sr-only">
-                            Phone
+                            {t("contactForm.phone")}
                         </label>
                         <input
                             id="phone"
                             type="tel"
                             inputMode="tel"
-                            placeholder="Phone"
+                            placeholder={t("contactForm.phone")}
                             className={`p-3 rounded-xl border ${errors.phone ? "border-red-500" : "border-gray-400"} focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow`}
                             aria-invalid={!!errors.phone}
                             aria-describedby={errors.phone ? "phone-error" : undefined}
@@ -232,12 +234,12 @@ export default function ContactForm() {
                     {/* Email */}
                     <div className="flex flex-col">
                         <label htmlFor="email" className="sr-only">
-                            Email
+                            {t("contactForm.email")}
                         </label>
                         <input
                             id="email"
                             type="email"
-                            placeholder="Email"
+                            placeholder={t("contactForm.email")}
                             className={`p-3 rounded-xl border ${errors.email ? "border-red-500" : "border-gray-400"} focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow`}
                             aria-invalid={!!errors.email}
                             aria-describedby={errors.email ? "email-error" : undefined}
@@ -253,12 +255,12 @@ export default function ContactForm() {
                     {/* Company */}
                     <div className="flex flex-col col-span-1 md:col-span-2">
                         <label htmlFor="company" className="sr-only">
-                            Company
+                            {t("contactForm.company")}
                         </label>
                         <input
                             id="company"
                             type="text"
-                            placeholder="Company"
+                            placeholder={t("contactForm.company")}
                             className={`p-3 rounded-xl border ${errors.company ? "border-red-500" : "border-gray-400"} focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow`}
                             aria-invalid={!!errors.company}
                             aria-describedby={errors.company ? "company-error" : undefined}
@@ -274,12 +276,12 @@ export default function ContactForm() {
                     {/* Employees */}
                     <div className="flex flex-col col-span-1 md:col-span-2">
                         <label htmlFor="employees" className="sr-only">
-                            No. of Employees
+                            {t("contactForm.employees")}
                         </label>
                         <input
                             id="employees"
                             type="number"
-                            placeholder="No. of Employees"
+                            placeholder={t("contactForm.employees")}
                             className={`p-3 rounded-xl border ${errors.employees ? "border-red-500" : "border-gray-400"} focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow`}
                             aria-invalid={!!errors.employees}
                             aria-describedby={errors.employees ? "employees-error" : "employees-help"}
@@ -289,7 +291,7 @@ export default function ContactForm() {
                         />
                         {!errors.employees && (
                             <p id="employees-help" className="text-gray-500 text-xs mt-1">
-                                Optional
+                                {t("contactForm.optional")}
                             </p>
                         )}
                         {errors.employees && (
@@ -310,13 +312,13 @@ export default function ContactForm() {
                             {...register("terms")}
                         />
                         <label htmlFor="terms" className="text-sm">
-                            I agree with{" "}
+                            {t("contactForm.termsAgree")}{" "}
                             <a href="#" className="underline">
-                                terms and conditions
+                                {t("contactForm.termsLink")}
                             </a>{" "}
-                            and{" "}
+                            {t("contactForm.and")}{" "}
                             <a href="#" className="underline">
-                                privacy policy
+                                {t("contactForm.privacyLink")}
                             </a>
                             .
                         </label>
@@ -330,12 +332,12 @@ export default function ContactForm() {
                     {/* Captcha */}
                     <div className="col-span-1 md:col-span-2">
                         <label htmlFor="captcha" className="sr-only">
-                            Enter the Captcha
+                            {t("contactForm.captchaLabel")}
                         </label>
                         <input
                             id="captcha"
                             type="text"
-                            placeholder="Enter the Captcha"
+                            placeholder={t("contactForm.captchaLabel")}
                             className={`w-full p-3 mb-2 rounded-xl border ${errors.captcha ? "border-red-500" : "border-gray-400"} focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow`}
                             aria-invalid={!!errors.captcha}
                             aria-describedby={errors.captcha ? "captcha-error" : "captcha-help"}
@@ -349,12 +351,12 @@ export default function ContactForm() {
                                 className="ml-3 underline"
                                 aria-label="Reload captcha"
                             >
-                                Reload
+                                {t("contactForm.reload")}
                             </button>
                         </div>
                         {!errors.captcha && (
                             <p id="captcha-help" className="text-gray-500 text-xs">
-                                Type the characters above (not case sensitive)
+                                {t("contactForm.captchaHint")}
                             </p>
                         )}
                         {errors.captcha && (
@@ -371,13 +373,13 @@ export default function ContactForm() {
                             disabled={isSubmitting}
                             className="w-full rounded-full btn-gradient btn-glow text-white font-semibold py-4 text-lg shadow-xl disabled:opacity-60"
                         >
-                            {isSubmitting ? "Submitting…" : "Submit"}
+                            {isSubmitting ? t("contactForm.submitting") : t("contactForm.submit")}
                         </button>
                     </div>
 
                     {isSubmitSuccessful && (
                         <p className="col-span-1 md:col-span-2 text-green-700 text-sm mt-2">
-                            Form submitted successfully.
+                            {t("contactForm.successMsg")}
                         </p>
                     )}
                 </form>

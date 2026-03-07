@@ -1,13 +1,15 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 export function SelectionPane({ title, items, selectedItems, onSelect, canSelect }) {
+    const { t } = useTranslation();
     return (
         <div className="bg-white rounded-lg border border-gray-200 p-4">
             <h3 className="text-sm font-semibold mb-3 text-gray-800">{title}</h3>
             
             <div className="space-y-2 max-h-64 overflow-y-auto">
                 {items.length === 0 ? (
-                    <p className="text-xs text-gray-500">No items to display</p>
+                    <p className="text-xs text-gray-500">{t("selectionPane.noItems")}</p>
                 ) : (
                     items.map((item) => {
                         const isSelected = selectedItems.includes(item.id);
@@ -31,7 +33,7 @@ export function SelectionPane({ title, items, selectedItems, onSelect, canSelect
                                 </div>
                                 {item.score !== undefined && (
                                     <span className="text-xs text-gray-600">
-                                        Score: {item.score.toFixed(1)}
+                                        {t("selectionPane.score", { n: item.score.toFixed(1) })}
                                     </span>
                                 )}
                             </div>

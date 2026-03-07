@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 
 /**
  * Organization Summary Widget for Admin Dashboard
  * Shows key organization settings and provides quick access to admin settings
  */
 const OrgSummaryWidget = ({ showQuickAccess = true }) => {
+    const { t } = useTranslation();
     const [orgSettings, setOrgSettings] = useState(null);
     const [loading, setLoading] = useState(true);
 
@@ -54,7 +56,7 @@ const OrgSummaryWidget = ({ showQuickAccess = true }) => {
             <div className="bg-white rounded-lg shadow p-6">
                 <div className="text-center text-gray-500">
                     <div className="text-4xl mb-2">⚙️</div>
-                    <p className="text-sm">Organization settings not configured</p>
+                    <p className="text-sm">{t("orgSummaryWidget.notConfigured")}</p>
                     {/* Admin Settings quick access removed */}
                 </div>
             </div>
@@ -101,30 +103,30 @@ const OrgSummaryWidget = ({ showQuickAccess = true }) => {
         <div className="bg-white rounded-lg shadow p-6">
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-800">Organization Overview</h3>
+                <h3 className="text-lg font-semibold text-gray-800">{t("orgSummaryWidget.title")}</h3>
                 <span className="text-2xl">{getIndustryIcon(orgSettings.industry)}</span>
             </div>
 
             {/* Organization Info */}
             <div className="space-y-3 mb-6">
                 <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Name:</span>
+                    <span className="text-sm text-gray-600">{t("orgSummaryWidget.nameLabel")}</span>
                     <span className="text-sm font-medium text-gray-800">{orgSettings.organizationName}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Code:</span>
+                    <span className="text-sm text-gray-600">{t("orgSummaryWidget.codeLabel")}</span>
                     <span className="text-sm font-medium text-gray-800">{orgSettings.organizationCode}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Industry:</span>
+                    <span className="text-sm text-gray-600">{t("orgSummaryWidget.industryLabel")}</span>
                     <span className="text-sm font-medium text-gray-800 capitalize">{orgSettings.industry}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Timezone:</span>
+                    <span className="text-sm text-gray-600">{t("orgSummaryWidget.timezoneLabel")}</span>
                     <span className="text-sm font-medium text-gray-800">{orgSettings.timezone?.replace("_", " ")}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Currency:</span>
+                    <span className="text-sm text-gray-600">{t("orgSummaryWidget.currencyLabel")}</span>
                     <span className="text-sm font-medium text-gray-800">{orgSettings.currency}</span>
                 </div>
             </div>
@@ -132,7 +134,7 @@ const OrgSummaryWidget = ({ showQuickAccess = true }) => {
             {/* Security Status */}
             <div className="border-t pt-4 mb-6">
                 <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-medium text-gray-700">Security Score</span>
+                    <span className="text-sm font-medium text-gray-700">{t("orgSummaryWidget.securityScore")}</span>
                     <span className={`text-lg font-bold ${getSecurityColor(securityScore)}`}>{securityScore}%</span>
                 </div>
 
@@ -150,25 +152,25 @@ const OrgSummaryWidget = ({ showQuickAccess = true }) => {
                         className={`flex items-center gap-1 ${orgSettings.security?.enforceSecurePasswords ? "text-green-600" : "text-red-600"}`}
                     >
                         <span>{orgSettings.security?.enforceSecurePasswords ? "✅" : "❌"}</span>
-                        <span>Secure Passwords</span>
+                        <span>{t("orgSummaryWidget.securePasswords")}</span>
                     </div>
                     <div
                         className={`flex items-center gap-1 ${orgSettings.security?.enable2FAForAdmins ? "text-green-600" : "text-red-600"}`}
                     >
                         <span>{orgSettings.security?.enable2FAForAdmins ? "✅" : "❌"}</span>
-                        <span>Admin 2FA</span>
+                        <span>{t("orgSummaryWidget.admin2fa")}</span>
                     </div>
                     <div
                         className={`flex items-center gap-1 ${orgSettings.security?.enableLoginAttemptLimits ? "text-green-600" : "text-red-600"}`}
                     >
                         <span>{orgSettings.security?.enableLoginAttemptLimits ? "✅" : "❌"}</span>
-                        <span>Login Limits</span>
+                        <span>{t("orgSummaryWidget.loginLimits")}</span>
                     </div>
                     <div
                         className={`flex items-center gap-1 ${!orgSettings.security?.allowPublicRegistration ? "text-green-600" : "text-yellow-600"}`}
                     >
                         <span>{!orgSettings.security?.allowPublicRegistration ? "✅" : "⚠️"}</span>
-                        <span>Registration Control</span>
+                        <span>{t("orgSummaryWidget.registrationControl")}</span>
                     </div>
                 </div>
             </div>
@@ -178,7 +180,7 @@ const OrgSummaryWidget = ({ showQuickAccess = true }) => {
 
             {/* Status Footer */}
             <div className="mt-4 pt-3 border-t text-center">
-                <p className="text-xs text-gray-500">Last updated: {new Date().toLocaleDateString()}</p>
+                <p className="text-xs text-gray-500">{t("orgSummaryWidget.lastUpdated", { date: new Date().toLocaleDateString() })}</p>
             </div>
         </div>
     );

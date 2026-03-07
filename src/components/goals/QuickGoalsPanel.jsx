@@ -1,8 +1,10 @@
 // src/components/goals/QuickGoalsPanel.jsx
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { FaTimes, FaLink, FaUnlink, FaArrowRight } from "react-icons/fa";
 
 const QuickGoalsPanel = ({ goals, onClose }) => {
+    const { t } = useTranslation();
     // Build hierarchy from goals
     const buildHierarchy = (goals) => {
         const goalMap = {};
@@ -89,8 +91,8 @@ const QuickGoalsPanel = ({ goals, onClose }) => {
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
                     <div>
-                        <h2 className="text-2xl font-bold">Goals Hierarchy</h2>
-                        <p className="text-blue-100">Visualize how your goals are connected</p>
+                        <h2 className="text-2xl font-bold">{t("quickGoalsPanel.title")}</h2>
+                        <p className="text-blue-100">{t("quickGoalsPanel.subtitle")}</p>
                     </div>
                     <button
                         onClick={onClose}
@@ -109,9 +111,9 @@ const QuickGoalsPanel = ({ goals, onClose }) => {
                             <div className="w-16 h-16 mx-auto mb-4 bg-slate-100 rounded-full flex items-center justify-center">
                                 <FaUnlink className="w-8 h-8 text-slate-400" />
                             </div>
-                            <h3 className="text-lg font-medium text-slate-900 mb-2">No goal hierarchy yet</h3>
+                            <h3 className="text-lg font-medium text-slate-900 mb-2">{t("quickGoalsPanel.noHierarchy")}</h3>
                             <p className="text-slate-600">
-                                Create parent-child relationships between goals to visualize them here.
+                                {t("quickGoalsPanel.noHierarchyText")}
                             </p>
                         </div>
                     )}
@@ -120,13 +122,13 @@ const QuickGoalsPanel = ({ goals, onClose }) => {
                 {/* Footer */}
                 <div className="flex justify-between items-center p-6 bg-slate-50 border-t border-slate-200">
                     <p className="text-sm text-slate-600">
-                        {hierarchy.length} top-level goals with {goals.filter((g) => g.parentGoalId).length} sub-goals
+                        {t("quickGoalsPanel.footer", { top: hierarchy.length, sub: goals.filter((g) => g.parentGoalId).length })}
                     </p>
                     <button
                         onClick={onClose}
                         className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                     >
-                        Close
+                        {t("quickGoalsPanel.close")}
                     </button>
                 </div>
             </div>

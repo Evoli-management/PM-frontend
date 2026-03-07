@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChevronDown, Building2, Plus, Check } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export default function OrganizationSwitcher() {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [organizations, setOrganizations] = useState([]);
   const [currentOrg, setCurrentOrg] = useState(null);
@@ -76,11 +78,11 @@ export default function OrganizationSwitcher() {
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-md hover:bg-gray-100 transition-colors border border-gray-200"
-        title="Switch organization"
+        title={t("organizationSwitcher.switchTitle")}
       >
         <Building2 className="w-4 h-4 text-gray-600" />
         <span className="text-gray-700 font-medium truncate max-w-[120px]">
-          {currentOrg?.name || 'Organization'}
+          {currentOrg?.name || t("organizationSwitcher.defaultName")}
         </span>
         <ChevronDown className="w-4 h-4 text-gray-500" />
       </button>
@@ -90,7 +92,7 @@ export default function OrganizationSwitcher() {
           {/* Header */}
           <div className="px-3 py-2 border-b border-gray-200">
             <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
-              Organizations
+              {t("organizationSwitcher.headerTitle")}
             </p>
           </div>
 
@@ -98,7 +100,7 @@ export default function OrganizationSwitcher() {
           <div className="max-h-64 overflow-y-auto">
             {loading ? (
               <div className="px-3 py-4 text-center text-sm text-gray-500">
-                Loading organizations...
+                {t("organizationSwitcher.loading")}
               </div>
             ) : error ? (
               <div className="px-3 py-4 text-center text-sm text-red-600">
@@ -106,7 +108,7 @@ export default function OrganizationSwitcher() {
               </div>
             ) : organizations.length === 0 ? (
               <div className="px-3 py-4 text-center text-sm text-gray-500">
-                No organizations found
+                {t("organizationSwitcher.noOrganizations")}
               </div>
             ) : (
               organizations.map((org) => (
@@ -140,7 +142,7 @@ export default function OrganizationSwitcher() {
             className="w-full text-left px-3 py-2.5 text-sm text-blue-600 hover:bg-gray-50 border-t border-gray-200 flex items-center gap-2 font-medium transition-colors"
           >
             <Plus className="w-4 h-4" />
-            Create Organization
+            {t("organizationSwitcher.create")}
           </button>
         </div>
       )}

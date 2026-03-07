@@ -1,5 +1,6 @@
 // src/components/goals/GoalCard.jsx
 import React, { useState, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { calculateGoalProgress } from "../../utils/goalUtils";
 import {
     Eye,
@@ -17,6 +18,7 @@ import { getStatusStyle, getProgressColorCard } from "../../utils/goalCardStyles
 import { getGoalById, prefetchGoal } from "../../services/goalService";
 
 const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onUnarchive, onToggleVisibility, isSelected, onToggleSelection }) => {
+    const { t } = useTranslation();
     const [showActions, setShowActions] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [localMilestones, setLocalMilestones] = useState(null);
@@ -105,30 +107,30 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onUna
             const completedDate = goal.completedAt ? new Date(goal.completedAt) : null;
             if (completedDate && completedDate < dueDate) {
                 const daysEarly = Math.ceil((dueDate - completedDate) / (1000 * 60 * 60 * 24));
-                return { text: `Completed ${daysEarly} days early`, color: "text-green-600 font-medium" };
+                return { text: t("goalCard.completedEarly", { n: daysEarly }), color: "text-green-600 font-medium" };
             } else if (completedDate && completedDate > dueDate) {
                 const daysLate = Math.ceil((completedDate - dueDate) / (1000 * 60 * 60 * 24));
-                return { text: `Completed ${daysLate} days late`, color: "text-orange-600 font-medium" };
+                return { text: t("goalCard.completedLate", { n: daysLate }), color: "text-orange-600 font-medium" };
             }
-            return { text: "Completed on time", color: "text-green-600 font-medium" };
+            return { text: t("goalCard.completedOnTime"), color: "text-green-600 font-medium" };
         }
 
         if (goal.status === "archived") {
-            return { text: `Archived (was due ${formatDate(dueDate)})`, color: "text-gray-600" };
+            return { text: t("goalCard.archived", { date: formatDate(dueDate) }), color: "text-gray-600" };
         }
 
         // Active goals
         if (isOverdue) {
             const daysOverdue = Math.abs(dueInDays);
-            return { text: `${daysOverdue} days overdue`, color: "text-red-600 font-medium" };
+            return { text: t("goalCard.overdue", { n: daysOverdue }), color: "text-red-600 font-medium" };
         } else if (dueInDays === 0) {
-            return { text: "Due today", color: "text-red-600 font-medium" };
+            return { text: t("goalCard.dueToday"), color: "text-red-600 font-medium" };
         } else if (dueInDays === 1) {
-            return { text: "Due tomorrow", color: "text-amber-600 font-medium" };
+            return { text: t("goalCard.dueTomorrow"), color: "text-amber-600 font-medium" };
         } else if (dueInDays <= 7) {
-            return { text: `${dueInDays} days left`, color: "text-amber-600 font-medium" };
+            return { text: t("goalCard.daysLeft", { n: dueInDays }), color: "text-amber-600 font-medium" };
         } else {
-            return { text: `${dueInDays} days left`, color: "text-gray-600" };
+            return { text: t("goalCard.daysLeft", { n: dueInDays }), color: "text-gray-600" };
         }
     };
 
@@ -224,7 +226,7 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onUna
                             }}
                             disabled={isLoading}
                             className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors disabled:opacity-50"
-                            title="Edit goal"
+                            title={t("goalCard.editGoal")}
                         >
                             <svg
                                 stroke="currentColor"
@@ -291,7 +293,7 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onUna
                                             ) : (
                                                 <Eye className="w-4 h-4" />
                                             )}
-                                            {goal.visibility === "private" ? "Make Public" : "Make Private"}
+                                            {goal.visibility === "private" ? t("goalCard.makePublic") : t("goalCard.makePrivate")}
                                         </button>
                                         {goal.status !== "archived" ? (
                                             <button
@@ -302,7 +304,7 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onUna
                                                 className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-3 text-sm"
                                             >
                                                 <Archive className="w-4 h-4" />
-                                                Archive
+                                                {t("goalCard.archive")}
                                             </button>
                                         ) : (
                                             <button
@@ -313,7 +315,7 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onUna
                                                 className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-3 text-sm"
                                             >
                                                 <Archive className="w-4 h-4" />
-                                                Unarchive
+                                                {t("goalCard.unarchive")}
                                             </button>
                                         )}
 
@@ -326,7 +328,7 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onUna
                                             className="w-full px-4 py-2 text-left text-red-600 hover:bg-red-50 flex items-center gap-3 text-sm"
                                         >
                                             <Trash2 className="w-4 h-4" />
-                                            Delete
+                                            {t("goalCard.delete")}
                                         </button>
                                     </div>
                                 </>
@@ -355,7 +357,7 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onUna
                         <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                             <path fillRule="evenodd" d="M12.293 3.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 9H7a3 3 0 000 6h1a1 1 0 110 2H7A5 5 0 017 7h7.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
                         </svg>
-                        Sub-goal{goal.parentGoalTitle ? `: ${goal.parentGoalTitle}` : ''}
+                        {t("goalCard.subGoal")}{goal.parentGoalTitle ? `: ${goal.parentGoalTitle}` : ''}
                     </div>
                 )}
 
@@ -364,7 +366,7 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onUna
                     <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
                             <span className="text-sm font-medium text-gray-700">
-                                {displayCompletedMilestones}/{displayTotalMilestones} milestones completed
+                                {t("goalCard.milestonesCompleted", { done: displayCompletedMilestones, total: displayTotalMilestones })}
                             </span>
                         </div>
                         <span className="text-sm font-semibold text-gray-900">{progressPercent}%</span>
@@ -399,8 +401,7 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onUna
                 {/* Progress insights */}
                 {goal.status === "active" && totalDuration && daysPassed !== null && (
                     <div className="mt-3 text-xs text-gray-500">
-                        Day {Math.max(1, daysPassed)} of {totalDuration} •{" "}
-                        {Math.round((daysPassed / totalDuration) * 100)}% time elapsed
+                        {t("goalCard.dayOf", { current: Math.max(1, daysPassed), total: totalDuration })} • {t("goalCard.timeElapsed", { pct: Math.round((daysPassed / totalDuration) * 100) })}
                     </div>
                 )}
 
@@ -408,7 +409,7 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onUna
                 {isOverdue && goal.status === "active" && (
                     <div className="mt-4 flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg">
                         <Clock className="w-4 h-4 text-red-500" />
-                        <span className="text-red-700 text-sm font-medium">Goal is overdue - needs attention</span>
+                        <span className="text-red-700 text-sm font-medium">{t("goalCard.overdueWarning")}</span>
                     </div>
                 )}
             </div>

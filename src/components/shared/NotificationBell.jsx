@@ -2,8 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { FaBell, FaTimes } from 'react-icons/fa';
 import notificationsService from '../../services/notificationsService';
 import recognitionsService from '../../services/recognitionsService';
+import { useTranslation } from 'react-i18next';
 
 export default function NotificationBell() {
+  const { t } = useTranslation();
   const [unreadCount, setUnreadCount] = useState(0);
   const [showDropdown, setShowDropdown] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -134,11 +136,11 @@ export default function NotificationBell() {
   const getStrokeTypeLabel = (type) => {
     switch (type) {
       case 'employeeship':
-        return 'Employeeship';
+        return t('notificationBell.strokeType_employeeship');
       case 'performance':
-        return 'Performance';
+        return t('notificationBell.strokeType_performance');
       case 'achievement':
-        return 'Achievement';
+        return t('notificationBell.strokeType_achievement');
       default:
         return type.charAt(0).toUpperCase() + type.slice(1);
     }
@@ -151,32 +153,32 @@ export default function NotificationBell() {
       <div className="mt-2 p-3 bg-gradient-to-br from-purple-50 to-blue-50 rounded border border-purple-200">
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs font-semibold text-purple-700 uppercase tracking-wide">
-            {getStrokeTypeLabel(stroke.type)} Recognition
+            {getStrokeTypeLabel(stroke.type)} {t("notificationBell.recognitionLabel")}
           </span>
           <span className="text-xs text-gray-500">+{stroke.recipientPoints || 2} pts</span>
         </div>
         
         {stroke.cultureValue && (
           <div className="text-xs text-gray-700 mb-1">
-            <span className="font-semibold">Value:</span> {stroke.cultureValue.heading}
+            <span className="font-semibold">{t("notificationBell.valueLabel")}</span> {stroke.cultureValue.heading}
           </div>
         )}
-        
+
         {stroke.keyArea && (
           <div className="text-xs text-gray-700 mb-1">
-            <span className="font-semibold">Area:</span> {stroke.keyArea.name}
+            <span className="font-semibold">{t("notificationBell.areaLabel")}</span> {stroke.keyArea.name}
           </div>
         )}
-        
+
         {stroke.goal && (
           <div className="text-xs text-gray-700 mb-1">
-            <span className="font-semibold">Goal:</span> {stroke.goal.title}
+            <span className="font-semibold">{t("notificationBell.goalLabel")}</span> {stroke.goal.title}
           </div>
         )}
-        
+
         {stroke.milestone && (
           <div className="text-xs text-gray-700 mb-1">
-            <span className="font-semibold">Milestone:</span> {stroke.milestone.title}
+            <span className="font-semibold">{t("notificationBell.milestoneLabel")}</span> {stroke.milestone.title}
           </div>
         )}
         
@@ -211,10 +213,10 @@ export default function NotificationBell() {
     const diffHours = Math.floor(diffMins / 60);
     const diffDays = Math.floor(diffHours / 24);
 
-    if (diffMins < 1) return 'just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
+    if (diffMins < 1) return t('notificationBell.justNow');
+    if (diffMins < 60) return t('notificationBell.minutesAgo', { n: diffMins });
+    if (diffHours < 24) return t('notificationBell.hoursAgo', { n: diffHours });
+    if (diffDays < 7) return t('notificationBell.daysAgo', { n: diffDays });
     return date.toLocaleDateString();
   };
 
@@ -223,7 +225,7 @@ export default function NotificationBell() {
       <button
         onClick={handleBellClick}
         className="relative p-2 text-blue-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-        title={unreadCount > 0 ? `${unreadCount} new notification(s)` : 'No new notifications'}
+        title={unreadCount > 0 ? t('notificationBell.countAttr', { n: unreadCount }) : t('notificationBell.noNewAttr')}
         aria-label="Notifications"
       >
         <FaBell size={20} />
@@ -239,13 +241,13 @@ export default function NotificationBell() {
         <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-lg z-[5010] border border-gray-200">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200">
-            <h3 className="font-semibold text-gray-800">Notifications</h3>
+            <h3 className="font-semibold text-gray-800">{t("notificationBell.title")}</h3>
             {unreadCount > 0 && (
               <button
                 onClick={handleMarkAllAsRead}
                 className="text-xs text-blue-500 hover:text-blue-600 font-medium"
               >
-                Mark all as read
+                {t("notificationBell.markAllRead")}
               </button>
             )}
           </div>
@@ -254,15 +256,15 @@ export default function NotificationBell() {
           <div className="max-h-96 overflow-y-auto">
             {loading ? (
               <div className="p-4 text-center text-gray-500 text-sm">
-                Loading notifications...
+                {t("notificationBell.loading")}
               </div>
             ) : error ? (
               <div className="p-4 text-center text-red-500 text-sm">
-                Failed to load notifications
+                {t("notificationBell.error")}
               </div>
             ) : notifications.length === 0 ? (
               <div className="p-4 text-center text-gray-500 text-sm">
-                No notifications yet
+                {t("notificationBell.empty")}
               </div>
             ) : (
               <div className="divide-y divide-gray-100">
@@ -351,7 +353,7 @@ export default function NotificationBell() {
                 }}
                 className="text-sm text-blue-500 hover:text-blue-600 font-medium"
               >
-                View all notifications
+                {t("notificationBell.viewAll")}
               </button>
             </div>
           )}

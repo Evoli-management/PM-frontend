@@ -1,6 +1,7 @@
 import React from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import apiClient from "../../services/apiClient";
+import { useTranslation } from "react-i18next";
 
 // Simple auth check: look for a cookie or localStorage token
 function isAuthenticated() {
@@ -10,6 +11,7 @@ function isAuthenticated() {
 }
 
 const PrivateRoute = ({ children }) => {
+    const { t } = useTranslation();
     const location = useLocation();
     const [authChecked, setAuthChecked] = React.useState(false);
     const [isAuth, setIsAuth] = React.useState(false);
@@ -41,7 +43,7 @@ const PrivateRoute = ({ children }) => {
     }, []);
 
     if (!authChecked) {
-        return <div className="w-full py-10 flex items-center justify-center text-gray-600">Checking authentication...</div>;
+        return <div className="w-full py-10 flex items-center justify-center text-gray-600">{t("privateRoute.checking")}</div>;
     }
     if (!isAuth) {
         return <Navigate to="/login" state={{ from: location }} replace />;

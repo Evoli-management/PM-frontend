@@ -1,7 +1,9 @@
 import React from 'react';
 import { X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const PrivacyPolicyModal = ({ isOpen, onClose }) => {
+  const { t } = useTranslation();
   if (!isOpen) return null;
 
   return (
@@ -9,7 +11,7 @@ const PrivacyPolicyModal = ({ isOpen, onClose }) => {
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h1 className="text-2xl font-bold text-gray-900">Privacy Policy</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{t("privacyPolicyModal.title")}</h1>
           <button
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700 transition"
@@ -168,7 +170,7 @@ const PrivacyPolicyModal = ({ isOpen, onClose }) => {
             onClick={onClose}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition"
           >
-            Close
+            {t("privacyPolicyModal.close")}
           </button>
         </div>
       </div>

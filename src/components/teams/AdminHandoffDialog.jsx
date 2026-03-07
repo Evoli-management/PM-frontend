@@ -1,9 +1,11 @@
 // src/components/teams/AdminHandoffDialog.jsx
 import { useState, useEffect } from 'react';
 import { useAdminHandoff } from '../../hooks/useAdminHandoff';
+import { useTranslation } from 'react-i18next';
 import styles from './AdminHandoffDialog.module.css';
 
 export const AdminHandoffDialog = ({ isOpen, onClose, onSuccess }) => {
+  const { t } = useTranslation();
   const [selectedMemberId, setSelectedMemberId] = useState('');
   const [step, setStep] = useState('select'); // 'select' or 'confirm'
   const { loadMembers, promoteToAdmin, leaveOrganization, members, loading, error, setError } =
@@ -51,7 +53,7 @@ export const AdminHandoffDialog = ({ isOpen, onClose, onSuccess }) => {
     <div className={styles.overlay}>
       <div className={styles.dialog}>
         <div className={styles.header}>
-          <h3>Leave Organization</h3>
+          <h3>{t("adminHandoff.title")}</h3>
           <button className={styles.closeBtn} onClick={handleClose}>
             ✕
           </button>
@@ -62,19 +64,18 @@ export const AdminHandoffDialog = ({ isOpen, onClose, onSuccess }) => {
         {step === 'select' ? (
           <div className={styles.content}>
             <p className={styles.description}>
-              You are the sole admin of this organization. Before you can leave, you must promote
-              another member to admin.
+              {t("adminHandoff.description")}
             </p>
 
             <div className={styles.formGroup}>
-              <label htmlFor="member-select">Select a member to promote to admin:</label>
+              <label htmlFor="member-select">{t("adminHandoff.selectLabel")}</label>
               <select
                 id="member-select"
                 value={selectedMemberId}
                 onChange={(e) => setSelectedMemberId(e.target.value)}
                 className={styles.select}
               >
-                <option value="">-- Select a member --</option>
+                <option value="">{t("adminHandoff.selectPlaceholder")}</option>
                 {nonAdminMembers.map((member) => (
                   <option key={member.id} value={member.id}>
                     {member.firstName} {member.lastName} ({member.email})
@@ -85,40 +86,39 @@ export const AdminHandoffDialog = ({ isOpen, onClose, onSuccess }) => {
 
             <div className={styles.actions}>
               <button className={styles.cancelBtn} onClick={handleClose}>
-                Cancel
+                {t("adminHandoff.cancel")}
               </button>
               <button
                 className={styles.nextBtn}
                 onClick={() => setStep('confirm')}
                 disabled={!selectedMemberId || loading}
               >
-                {loading ? 'Promoting...' : 'Next'}
+                {loading ? t("adminHandoff.promoting") : t("adminHandoff.next")}
               </button>
             </div>
           </div>
         ) : (
           <div className={styles.content}>
             <div className={styles.confirmBox}>
-              <h4>Confirm Admin Handoff</h4>
+              <h4>{t("adminHandoff.confirmTitle")}</h4>
               <p>
-                You are about to promote <strong>{selectedMember?.firstName} {selectedMember?.lastName}</strong> to admin and leave the organization.
+                {t("adminHandoff.confirmText", { name: `${selectedMember?.firstName} ${selectedMember?.lastName}` })}
               </p>
               <p className={styles.warning}>
-                ⚠️ This action cannot be undone. The new admin will have full control over the
-                organization.
+                {t("adminHandoff.warning")}
               </p>
             </div>
 
             <div className={styles.actions}>
               <button className={styles.cancelBtn} onClick={() => setStep('select')}>
-                Back
+                {t("adminHandoff.back")}
               </button>
               <button
                 className={styles.leaveBtn}
                 onClick={handlePromoteAndLeave}
                 disabled={loading}
               >
-                {loading ? 'Processing...' : 'Confirm and Leave'}
+                {loading ? t("adminHandoff.processing") : t("adminHandoff.confirmLeave")}
               </button>
             </div>
           </div>

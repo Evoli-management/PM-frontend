@@ -1,9 +1,11 @@
 // src/components/goals/EditGoalModal.jsx
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { updateGoal } from "../../services/goalService";
 import { FaTimes, FaSave } from "react-icons/fa";
 
 const EditGoalModal = ({ goal, onClose, onUpdate }) => {
+    const { t } = useTranslation();
     const [formData, setFormData] = useState({
         title: goal.title || "",
         description: goal.description || "",
@@ -24,7 +26,7 @@ const EditGoalModal = ({ goal, onClose, onUpdate }) => {
             await updateGoal(goal.id, formData);
             onUpdate();
         } catch (err) {
-            setError(err.message || "Failed to update goal");
+            setError(err.message || t("editGoalModal.errUpdate"));
         } finally {
             setIsSubmitting(false);
         }
@@ -38,7 +40,7 @@ const EditGoalModal = ({ goal, onClose, onUpdate }) => {
             <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl" onClick={(e) => e.stopPropagation()}>
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-slate-200">
-                    <h2 className="text-xl font-bold text-slate-900">Edit Goal</h2>
+                    <h2 className="text-xl font-bold text-slate-900">{t("editGoalModal.title")}</h2>
                     <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 rounded-lg">
                         <FaTimes className="w-4 h-4" />
                     </button>
@@ -52,7 +54,7 @@ const EditGoalModal = ({ goal, onClose, onUpdate }) => {
                     )}
 
                     <div>
-                        <label className="block text-sm font-semibold text-slate-900 mb-2">Title *</label>
+                        <label className="block text-sm font-semibold text-slate-900 mb-2">{t("editGoalModal.titleLabel")} *</label>
                         <input
                             type="text"
                             value={formData.title}
@@ -63,7 +65,7 @@ const EditGoalModal = ({ goal, onClose, onUpdate }) => {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-semibold text-slate-900 mb-2">Description</label>
+                        <label className="block text-sm font-semibold text-slate-900 mb-2">{t("editGoalModal.descLabel")}</label>
                         <textarea
                             value={formData.description}
                             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -74,7 +76,7 @@ const EditGoalModal = ({ goal, onClose, onUpdate }) => {
 
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-semibold text-slate-900 mb-2">Start Date</label>
+                            <label className="block text-sm font-semibold text-slate-900 mb-2">{t("editGoalModal.startDateLabel")}</label>
                             <input
                                 type="date"
                                 value={formData.startDate}
@@ -83,7 +85,7 @@ const EditGoalModal = ({ goal, onClose, onUpdate }) => {
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-semibold text-slate-900 mb-2">Due Date *</label>
+                            <label className="block text-sm font-semibold text-slate-900 mb-2">{t("editGoalModal.dueDateLabel")} *</label>
                             <input
                                 type="date"
                                 value={formData.dueDate}
@@ -96,26 +98,26 @@ const EditGoalModal = ({ goal, onClose, onUpdate }) => {
 
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-semibold text-slate-900 mb-2">Status</label>
+                            <label className="block text-sm font-semibold text-slate-900 mb-2">{t("editGoalModal.statusLabel")}</label>
                             <select
                                 value={formData.status}
                                 onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                                 className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             >
-                                <option value="active">Active</option>
-                                <option value="completed">Completed</option>
-                                <option value="archived">Archived</option>
+                                <option value="active">{t("editGoalModal.activeOpt")}</option>
+                                <option value="completed">{t("editGoalModal.completedOpt")}</option>
+                                <option value="archived">{t("editGoalModal.archivedOpt")}</option>
                             </select>
                         </div>
                         <div>
-                            <label className="block text-sm font-semibold text-slate-900 mb-2">Visibility</label>
+                            <label className="block text-sm font-semibold text-slate-900 mb-2">{t("editGoalModal.visibilityLabel")}</label>
                             <select
                                 value={formData.visibility}
                                 onChange={(e) => setFormData({ ...formData, visibility: e.target.value })}
                                 className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             >
-                                <option value="public">Public</option>
-                                <option value="private">Private</option>
+                                <option value="public">{t("editGoalModal.publicOpt")}</option>
+                                <option value="private">{t("editGoalModal.privateOpt")}</option>
                             </select>
                         </div>
                     </div>
@@ -126,7 +128,7 @@ const EditGoalModal = ({ goal, onClose, onUpdate }) => {
                             onClick={onClose}
                             className="px-6 py-2 text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
                         >
-                            Cancel
+                            {t("editGoalModal.cancel")}
                         </button>
                         <button
                             type="submit"
@@ -134,7 +136,7 @@ const EditGoalModal = ({ goal, onClose, onUpdate }) => {
                             className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
                         >
                             <FaSave className="w-4 h-4" />
-                            {isSubmitting ? "Saving..." : "Save Changes"}
+                            {isSubmitting ? t("editGoalModal.saving") : t("editGoalModal.saveChanges")}
                         </button>
                     </div>
                 </form>

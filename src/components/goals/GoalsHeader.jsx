@@ -1,21 +1,23 @@
 // src/components/goals/GoalsHeader.jsx
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { Plus, LayoutGrid, List, Columns, TrendingUp } from "lucide-react";
 
 const GoalsHeader = ({ onAddGoal, currentView = "grid", onViewChange }) => {
+    const { t } = useTranslation();
     const views = [
-        { id: "grid", icon: LayoutGrid, label: "Grid" },
-        { id: "list", icon: List, label: "List" },
-        { id: "kanban", icon: Columns, label: "Kanban" },
-        { id: "timeline", icon: TrendingUp, label: "Timeline" },
+        { id: "grid", icon: LayoutGrid, label: t("goalsHeader.grid") },
+        { id: "list", icon: List, label: t("goalsHeader.list") },
+        { id: "kanban", icon: Columns, label: t("goalsHeader.kanban") },
+        { id: "timeline", icon: TrendingUp, label: t("goalsHeader.timeline") },
     ];
 
     return (
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
             {/* Title Section */}
             <div>
-                <h1 className="text-2xl font-bold text-slate-900">Goals</h1>
-                <p className="text-sm text-slate-600">Track and achieve your objectives</p>
+                <h1 className="text-2xl font-bold text-slate-900">{t("goalsHeader.title")}</h1>
+                <p className="text-sm text-slate-600">{t("goalsHeader.subtitle")}</p>
             </div>
 
             {/* Actions Section */}
@@ -49,7 +51,7 @@ const GoalsHeader = ({ onAddGoal, currentView = "grid", onViewChange }) => {
                     className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-sm hover:shadow-md"
                 >
                     <Plus className="w-4 h-4" />
-                    <span className="text-sm font-semibold">New Goal</span>
+                    <span className="text-sm font-semibold">{t("goalsHeader.newGoal")}</span>
                 </button>
             </div>
         </div>

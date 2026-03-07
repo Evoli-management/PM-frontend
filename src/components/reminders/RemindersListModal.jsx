@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FaEdit, FaTrash, FaPlus, FaSpinner, FaTimes } from 'react-icons/fa';
 import remindersService from '../../services/remindersService';
 import { useFormattedDate } from '../../hooks/useFormattedDate';
 import ReminderModal from './ReminderModal';
 
 export default function RemindersListModal({ isOpen, onClose, inline = false }) {
+  const { t } = useTranslation();
   const { formatDate, formatTime } = useFormattedDate();
   const [reminders, setReminders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -133,7 +135,7 @@ export default function RemindersListModal({ isOpen, onClose, inline = false }) 
   <div className="bg-white rounded-lg shadow-2xl max-w-3xl w-[min(1100px,90%)] overflow-visible flex flex-col z-10">
           {/* Header */}
           <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-gray-900">Reminders</h2>
+            <h2 className="text-2xl font-bold text-gray-900">{t("remindersListModal.title")}</h2>
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition">
               <FaTimes size={20} />
             </button>
@@ -153,12 +155,12 @@ export default function RemindersListModal({ isOpen, onClose, inline = false }) 
               </div>
             ) : reminders.length === 0 ? (
               <div className="text-center py-12">
-                <p className="text-gray-500 text-lg mb-4">No reminders yet</p>
+                <p className="text-gray-500 text-lg mb-4">{t("remindersListModal.noReminders")}</p>
                 <button
                   onClick={handleCreate}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
                 >
-                  Create your first reminder
+                  {t("remindersListModal.createFirst")}
                 </button>
               </div>
             ) : (
@@ -185,7 +187,7 @@ export default function RemindersListModal({ isOpen, onClose, inline = false }) 
 
                         <div className="text-sm text-gray-500 space-y-1">
                           <p>
-                            <strong>When:</strong> {formatDate(new Date(reminder.reminderDateTime))} at {formatTime(
+                            <strong>{t("remindersListModal.when")}</strong> {formatDate(new Date(reminder.reminderDateTime))} at {formatTime(
                               typeof reminder.reminderDateTime === 'string' && reminder.reminderDateTime.includes('T')
                                 ? reminder.reminderDateTime.split('T')[1]?.slice(0,5)
                                 : (typeof reminder.reminderDateTime === 'string' ? reminder.reminderDateTime.slice(11,16) : '')
@@ -193,13 +195,13 @@ export default function RemindersListModal({ isOpen, onClose, inline = false }) 
                           </p>
                           {reminder.recurrencePattern !== 'none' && (
                             <p>
-                              <strong>Repeat:</strong> {getRecurrenceLabel(reminder.recurrencePattern)}
-                              {reminder.recurrenceEndDate && ` until ${formatDate(new Date(reminder.recurrenceEndDate))}`}
+                              <strong>{t("remindersListModal.repeat")}</strong> {getRecurrenceLabel(reminder.recurrencePattern)}
+                              {reminder.recurrenceEndDate && ` ${t("remindersListModal.until", { date: formatDate(new Date(reminder.recurrenceEndDate)) })}`}
                             </p>
                           )}
                           <div className="flex gap-3">
-                            {reminder.notifyViaPush && <span className="bg-white px-2 py-1 rounded text-xs border border-gray-200">🔔 Push</span>}
-                            {reminder.notifyViaEmail && <span className="bg-white px-2 py-1 rounded text-xs border border-gray-200">✉️ Email</span>}
+                            {reminder.notifyViaPush && <span className="bg-white px-2 py-1 rounded text-xs border border-gray-200">{t("remindersListModal.push")}</span>}
+                            {reminder.notifyViaEmail && <span className="bg-white px-2 py-1 rounded text-xs border border-gray-200">{t("remindersListModal.emailNotify")}</span>}
                           </div>
                         </div>
                       </div>
@@ -209,14 +211,14 @@ export default function RemindersListModal({ isOpen, onClose, inline = false }) 
                         <button
                           onClick={() => handleEdit(reminder)}
                           className="p-2 text-blue-600 hover:bg-blue-50 rounded transition"
-                          title="Edit reminder"
+                          title={t("remindersListModal.editTitle")}
                         >
                           <FaEdit />
                         </button>
                         <button
                           onClick={() => setDeleteConfirm(reminder.id)}
                           className="p-2 text-red-600 hover:bg-red-50 rounded transition"
-                          title="Delete reminder"
+                          title={t("remindersListModal.deleteTitle")}
                         >
                           <FaTrash />
                         </button>
@@ -226,20 +228,20 @@ export default function RemindersListModal({ isOpen, onClose, inline = false }) 
                     {/* Delete Confirmation */}
                     {deleteConfirm === reminder.id && (
                       <div className="mt-3 pt-3 border-t border-gray-200 flex items-center gap-3">
-                        <span className="text-sm text-gray-600">Delete this reminder?</span>
+                        <span className="text-sm text-gray-600">{t("remindersListModal.deleteConfirm")}</span>
                         <button
                           onClick={() => handleDelete(reminder.id)}
                           disabled={deleting}
                           className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 disabled:opacity-50"
                         >
-                          {deleting ? 'Deleting...' : 'Delete'}
+                          {deleting ? t("remindersListModal.deleting") : t("remindersListModal.delete")}
                         </button>
                         <button
                           onClick={() => setDeleteConfirm(null)}
                           disabled={deleting}
                           className="px-3 py-1 bg-gray-300 text-gray-700 text-sm rounded hover:bg-gray-400 disabled:opacity-50"
                         >
-                          Cancel
+                          {t("remindersListModal.cancel")}
                         </button>
                       </div>
                     )}
@@ -255,7 +257,7 @@ export default function RemindersListModal({ isOpen, onClose, inline = false }) 
               onClick={handleCreate}
               className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition font-medium"
             >
-              <FaPlus /> New Reminder
+              <FaPlus /> {t("remindersListModal.newReminder")}
             </button>
           </div>
         </div>
@@ -278,7 +280,7 @@ export default function RemindersListModal({ isOpen, onClose, inline = false }) 
   <div className="bg-white rounded-lg shadow-2xl max-w-2xl w-full overflow-visible flex flex-col pointer-events-auto">
           {/* Header */}
           <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-gray-900">Reminders</h2>
+            <h2 className="text-2xl font-bold text-gray-900">{t("remindersListModal.title")}</h2>
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600 transition"
@@ -301,12 +303,12 @@ export default function RemindersListModal({ isOpen, onClose, inline = false }) 
               </div>
             ) : reminders.length === 0 ? (
               <div className="text-center py-12">
-                <p className="text-gray-500 text-lg mb-4">No reminders yet</p>
+                <p className="text-gray-500 text-lg mb-4">{t("remindersListModal.noReminders")}</p>
                 <button
                   onClick={handleCreate}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
                 >
-                  Create your first reminder
+                  {t("remindersListModal.createFirst")}
                 </button>
               </div>
             ) : (
@@ -333,17 +335,17 @@ export default function RemindersListModal({ isOpen, onClose, inline = false }) 
 
                         <div className="text-sm text-gray-500 space-y-1">
                           <p>
-                            <strong>When:</strong> {formatDate(new Date(reminder.reminderDateTime))} at {formatTime(new Date(reminder.reminderDateTime))}
+                            <strong>{t("remindersListModal.when")}</strong> {formatDate(new Date(reminder.reminderDateTime))} at {formatTime(new Date(reminder.reminderDateTime))}
                           </p>
                           {reminder.recurrencePattern !== 'none' && (
                             <p>
-                              <strong>Repeat:</strong> {getRecurrenceLabel(reminder.recurrencePattern)}
-                              {reminder.recurrenceEndDate && ` until ${formatDate(new Date(reminder.recurrenceEndDate))}`}
+                              <strong>{t("remindersListModal.repeat")}</strong> {getRecurrenceLabel(reminder.recurrencePattern)}
+                              {reminder.recurrenceEndDate && ` ${t("remindersListModal.until", { date: formatDate(new Date(reminder.recurrenceEndDate)) })}`}
                             </p>
                           )}
                           <div className="flex gap-3">
-                            {reminder.notifyViaPush && <span className="bg-white px-2 py-1 rounded text-xs border border-gray-200">🔔 Push</span>}
-                            {reminder.notifyViaEmail && <span className="bg-white px-2 py-1 rounded text-xs border border-gray-200">✉️ Email</span>}
+                            {reminder.notifyViaPush && <span className="bg-white px-2 py-1 rounded text-xs border border-gray-200">{t("remindersListModal.push")}</span>}
+                            {reminder.notifyViaEmail && <span className="bg-white px-2 py-1 rounded text-xs border border-gray-200">{t("remindersListModal.emailNotify")}</span>}
                           </div>
                         </div>
                       </div>
@@ -353,14 +355,14 @@ export default function RemindersListModal({ isOpen, onClose, inline = false }) 
                         <button
                           onClick={() => handleEdit(reminder)}
                           className="p-2 text-blue-600 hover:bg-blue-50 rounded transition"
-                          title="Edit reminder"
+                          title={t("remindersListModal.editTitle")}
                         >
                           <FaEdit />
                         </button>
                         <button
                           onClick={() => setDeleteConfirm(reminder.id)}
                           className="p-2 text-red-600 hover:bg-red-50 rounded transition"
-                          title="Delete reminder"
+                          title={t("remindersListModal.deleteTitle")}
                         >
                           <FaTrash />
                         </button>
@@ -370,20 +372,20 @@ export default function RemindersListModal({ isOpen, onClose, inline = false }) 
                     {/* Delete Confirmation */}
                     {deleteConfirm === reminder.id && (
                       <div className="mt-3 pt-3 border-t border-gray-200 flex items-center gap-3">
-                        <span className="text-sm text-gray-600">Delete this reminder?</span>
+                        <span className="text-sm text-gray-600">{t("remindersListModal.deleteConfirm")}</span>
                         <button
                           onClick={() => handleDelete(reminder.id)}
                           disabled={deleting}
                           className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 disabled:opacity-50"
                         >
-                          {deleting ? 'Deleting...' : 'Delete'}
+                          {deleting ? t("remindersListModal.deleting") : t("remindersListModal.delete")}
                         </button>
                         <button
                           onClick={() => setDeleteConfirm(null)}
                           disabled={deleting}
                           className="px-3 py-1 bg-gray-300 text-gray-700 text-sm rounded hover:bg-gray-400 disabled:opacity-50"
                         >
-                          Cancel
+                          {t("remindersListModal.cancel")}
                         </button>
                       </div>
                     )}
@@ -399,7 +401,7 @@ export default function RemindersListModal({ isOpen, onClose, inline = false }) 
               onClick={handleCreate}
               className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
             >
-              <FaPlus /> New Reminder
+              <FaPlus /> {t("remindersListModal.newReminder")}
             </button>
           </div>
         </div>

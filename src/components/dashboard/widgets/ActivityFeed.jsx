@@ -1,6 +1,8 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 
 export default function ActivityFeed({ items = [], onItemClick }) {
+    const { t } = useTranslation();
     return (
         <ul className="space-y-3 text-[CanvasText]">
             {items.map((it, idx) => (
@@ -11,7 +13,7 @@ export default function ActivityFeed({ items = [], onItemClick }) {
                 >
                     <div>
                         <div className="font-medium">{it.desc}</div>
-                        <div className="text-xs opacity-60">by system</div>
+                        <div className="text-xs opacity-60">{t("activityFeed.bySystem")}</div>
                     </div>
                     <div className="text-xs opacity-60">{it.time}</div>
                 </li>
