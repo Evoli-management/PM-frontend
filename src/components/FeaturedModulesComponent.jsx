@@ -1,31 +1,33 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { Handshake, Smile, Target, Timer } from "lucide-react";
 
 export default function FeaturedModulesComponent() {
+    const { t } = useTranslation();
     const modules = [
         {
             icon: Target,
             color: "#EF4444",
-            title: "Goals & Alignment",
-            desc: "Set and track goals, align your team, and drive results.",
+            title: t("featuredModules.goalsTitle"),
+            desc: t("featuredModules.goalsDesc"),
         },
         {
             icon: Timer,
             color: "#F59E0B",
-            title: "Time Management",
-            desc: "Manage tasks, deadlines, and priorities for maximum productivity.",
+            title: t("featuredModules.timeTitle"),
+            desc: t("featuredModules.timeDesc"),
         },
         {
             icon: Handshake,
             color: "#8B4513",
-            title: "Recognition",
-            desc: "Share recognition and feedback to foster a positive culture.",
+            title: t("featuredModules.recognitionTitle"),
+            desc: t("featuredModules.recognitionDesc"),
         },
         {
             icon: Smile,
             color: "#7C3AED",
-            title: "Engagement",
-            desc: "Assess and improve team engagement and well-being."
+            title: t("featuredModules.engagementTitle"),
+            desc: t("featuredModules.engagementDesc"),
         },
     ];
 
@@ -33,7 +35,7 @@ export default function FeaturedModulesComponent() {
         <section id="modules" className="py-12 w-full max-w-6xl mx-auto">
             <div className="">
                 <div className="mb-4 animate-fade-in-up">
-                    <h2 className="text-center text-3xl md:text-4xl font-bold">Featured Modules</h2>
+                    <h2 className="text-center text-3xl md:text-4xl font-bold">{t("featuredModules.title")}</h2>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-12">
                     {modules.map((m, i) => (

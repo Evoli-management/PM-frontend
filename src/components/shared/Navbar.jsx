@@ -1,5 +1,6 @@
 
 import React, { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { FaUser, FaBolt, FaTh, FaSearch } from "react-icons/fa";
@@ -18,6 +19,7 @@ import ReminderModal from "../reminders/ReminderModal";
 import OrganizationSwitcher from "./OrganizationSwitcher";
 
 export default function Navbar() {
+    const { t } = useTranslation();
     const [open, setOpen] = useState(false);
     const [openQuick, setOpenQuick] = useState(false);
     const [openActiveMenu, setOpenActiveMenu] = useState(false);
@@ -683,11 +685,11 @@ export default function Navbar() {
 
     // Widget keys shown in Navbar control (keeps labels simple) - QuickAdd removed to avoid duplication with navbar quick actions
     const widgetKeys = [
-        { key: 'myDay', label: 'My Day' },
-        { key: 'goals', label: 'Goals' },
-        { key: 'enps', label: 'eNPS' },
-        { key: 'calendarPreview', label: 'Calendar Preview' },
-        { key: 'activity', label: "What's New" },
+        { key: 'myDay', label: t('navbar.widgetMyDay') },
+        { key: 'goals', label: t('navbar.widgetGoals') },
+        { key: 'enps', label: t('navbar.widgetEnps') },
+        { key: 'calendarPreview', label: t('navbar.widgetCalendarPreview') },
+        { key: 'activity', label: t('navbar.widgetWhatsNew') },
     ];
 
     // Toggle a widget on/off and persist to dashboard prefs in localStorage
@@ -763,7 +765,7 @@ export default function Navbar() {
         const params = new URLSearchParams(location.search || '');
         return params.get('active') || 'active';
     })();
-    const activeTasksLabel = activeKeyAreaFilter === 'all' ? 'ALL TASKS' : 'ACTIVE TASKS';
+    const activeTasksLabel = activeKeyAreaFilter === 'all' ? t('navbar.tabAllTasks') : t('navbar.tabActiveTasks');
     const activeTeamsTab = (() => {
         const params = new URLSearchParams(location.search || '');
         return params.get('tab') || 'teams-members';
@@ -776,14 +778,14 @@ export default function Navbar() {
     const NAVBAR_POPUP_Z_INDEX = 'z-[5010]';
     const SEARCH_OVERLAY_Z_INDEX = 'z-[5020]';
     const searchCategoryLabels = {
-        page: "Pages",
-        task: "Tasks",
-        activity: "Activities",
-        goal: "Goals",
-        "key-area": "Key Areas",
-        appointment: "Appointments",
-        user: "Users",
-        other: "Other",
+        page: t("navbar.categoryPages"),
+        task: t("navbar.categoryTasks"),
+        activity: t("navbar.categoryActivities"),
+        goal: t("navbar.categoryGoals"),
+        "key-area": t("navbar.categoryKeyAreas"),
+        appointment: t("navbar.categoryAppointments"),
+        user: t("navbar.categoryUsers"),
+        other: t("navbar.categoryOther"),
     };
     const groupedHistory = (searchHistory || []).reduce((acc, item) => {
         if (!item?.title || !item?.route) return acc;
@@ -893,7 +895,7 @@ export default function Navbar() {
                                                 : 'text-slate-700 hover:bg-slate-50'
                                                 }`}
                                         >
-                                            Active tasks
+                                            {t("navbar.tabActiveTasks")}
                                         </button>
                                         <button
                                             type="button"
@@ -906,7 +908,7 @@ export default function Navbar() {
                                                 : 'text-slate-700 hover:bg-slate-50'
                                                 }`}
                                         >
-                                            All Tasks
+                                            {t("navbar.tabAllTasks")}
                                         </button>
                                     </div>,
                                     document.body
@@ -920,7 +922,7 @@ export default function Navbar() {
                                     : 'text-slate-600 hover:text-slate-900'
                                     }`}
                             >
-                                DELEGATED
+                                {t("navbar.tabDelegated")}
                             </button>
                             <button
                                 type="button"
@@ -930,7 +932,7 @@ export default function Navbar() {
                                     : 'text-slate-600 hover:text-slate-900'
                                     }`}
                             >
-                                TO-DO (RED)
+                                {t("navbar.tabTodoRed")}
                             </button>
                             <button
                                 type="button"
@@ -940,7 +942,7 @@ export default function Navbar() {
                                     : 'text-slate-600 hover:text-slate-900'
                                     }`}
                             >
-                                ACTIVITY TRAP
+                                {t("navbar.tabActivityTrap")}
                             </button>
                             <button
                                 type="button"
@@ -950,7 +952,7 @@ export default function Navbar() {
                                     : 'text-slate-600 hover:text-slate-900'
                                     }`}
                             >
-                                MY FOCUS
+                                {t("navbar.tabMyFocus")}
                             </button>
                         </div>
                     </div>
@@ -966,7 +968,7 @@ export default function Navbar() {
                                     : 'text-slate-600 hover:text-slate-900'
                                     }`}
                             >
-                                OVERVIEW
+                                {t("navbar.tabOverview")}
                             </button>
                             <button
                                 type="button"
@@ -976,7 +978,7 @@ export default function Navbar() {
                                     : 'text-slate-600 hover:text-slate-900'
                                     }`}
                             >
-                                MY ORGANISATION
+                                {t("navbar.tabMyOrganisation")}
                             </button>
                             {hasLeadTeams && (
                                 <button
@@ -987,7 +989,7 @@ export default function Navbar() {
                                         : 'text-slate-600 hover:text-slate-900'
                                         }`}
                                 >
-                                    MY TEAMS
+                                    {t("navbar.tabMyTeams")}
                                 </button>
                             )}
                             <button
@@ -998,7 +1000,7 @@ export default function Navbar() {
                                     : 'text-slate-600 hover:text-slate-900'
                                     }`}
                             >
-                                MY REPORT
+                                {t("navbar.tabMyReport")}
                             </button>
                         </div>
                     </div>
@@ -1014,7 +1016,7 @@ export default function Navbar() {
                                     : 'text-slate-600 hover:text-slate-900'
                                     }`}
                             >
-                                GIVE STROKES
+                                {t("navbar.tabGiveStrokes")}
                             </button>
                             <button
                                 type="button"
@@ -1024,7 +1026,7 @@ export default function Navbar() {
                                     : 'text-slate-600 hover:text-slate-900'
                                     }`}
                             >
-                                STROKE ACCOUNT
+                                {t("navbar.tabStrokeAccount")}
                             </button>
                         </div>
                     </div>
@@ -1042,7 +1044,7 @@ export default function Navbar() {
                                 }}
                                 className={`px-2 py-2 rounded transition ${dfFilter === 'active' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-600 hover:text-slate-900'}`}
                             >
-                                ACTIVE TASKS
+                                {t("navbar.tabActiveTasks")}
                             </button>
                             {/* ALL TASKS */}
                             <button
@@ -1053,7 +1055,7 @@ export default function Navbar() {
                                 }}
                                 className={`px-2 py-2 rounded transition ${dfFilter === 'all' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-600 hover:text-slate-900'}`}
                             >
-                                ALL TASKS
+                                {t("navbar.tabAllTasks")}
                             </button>
                             {/* COMPLETED */}
                             <button
@@ -1064,7 +1066,7 @@ export default function Navbar() {
                                 }}
                                 className={`px-2 py-2 rounded transition ${dfFilter === 'completed' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-600 hover:text-slate-900'}`}
                             >
-                                COMPLETED
+                                {t("navbar.tabCompleted")}
                             </button>
                             {/* IMPORTED TASKS */}
                             <button
@@ -1075,7 +1077,7 @@ export default function Navbar() {
                                 }}
                                 className={`px-2 py-2 rounded transition ${dfFilter === 'imported' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-600 hover:text-slate-900'}`}
                             >
-                                IMPORTED TASKS
+                                {t("navbar.tabImportedTasks")}
                             </button>
                         </div>
                     </div>
@@ -1092,21 +1094,21 @@ export default function Navbar() {
                                     onClick={() => navigate('/goals')}
                                     className={`px-2 py-2 rounded transition ${goalsTab === 'goals' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-600 hover:text-slate-900'}`}
                                 >
-                                    MY GOALS
+                                    {t("navbar.tabMyGoals")}
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => window.dispatchEvent(new CustomEvent('pm-goals-quick-panel', { detail: { open: true } }))}
                                     className="px-2 py-2 rounded transition text-slate-600 hover:text-slate-900"
                                 >
-                                    QUICK GOALS
+                                {t("navbar.tabQuickGoals")}
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => navigate('/goals?tab=report')}
                                     className={`px-2 py-2 rounded transition ${goalsTab === 'report' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-600 hover:text-slate-900'}`}
                                 >
-                                    REPORTS
+                                    {t("navbar.tabReports")}
                                 </button>
                             </div>
                         </div>
@@ -1125,7 +1127,7 @@ export default function Navbar() {
                                 <input
                                     ref={searchInputRef}
                                     type="text"
-                                    placeholder="Search across pages, tasks, activities, goals, key areas, and appointments..."
+                                    placeholder={t("navbar.searchPlaceholder")}
                                     value={search}
                                     onChange={handleSearchChange}
                                     onKeyDown={handleSearchKeyPress}
@@ -1172,7 +1174,7 @@ export default function Navbar() {
                             {openWidgets && (
                                 <div className={`absolute right-2 mt-2 w-64 rounded-md bg-white text-slate-800 shadow-lg ${NAVBAR_POPUP_Z_INDEX} p-2`}>
                                     <div className="px-2 py-1 text-xs text-slate-500 border-b flex items-center justify-between">
-                                        <span>Widgets</span>
+                                        <span>{t("navbar.widgets")}</span>
                                         <button
                                             onClick={() => setOpenWidgets(false)}
                                             className="p-1 rounded-full text-gray-600 hover:bg-gray-100 hover:text-gray-800 focus:outline-none"
@@ -1216,12 +1218,12 @@ export default function Navbar() {
                             aria-label="Quick Actions"
                         >
                             <FaBolt className="text-black w-4 h-4" />
-                            <span className="sr-only">Quick Actions</span>
+                            <span className="sr-only">{t("navbar.quickActions")}</span>
                         </button>
 
                         {openQuick && (
                             <div id="quick-actions-menu" role="menu" className={`absolute right-20 mt-2 w-56 rounded-md bg-white text-slate-800 shadow-lg ${NAVBAR_POPUP_Z_INDEX}`}>
-                                <div className="px-3 py-2 text-xs text-slate-500 border-b">Quick Actions</div>
+                                <div className="px-3 py-2 text-xs text-slate-500 border-b">{t("navbar.quickActions")}</div>
                                 <button
                                     role="menuitem"
                                     tabIndex={0}
@@ -1229,7 +1231,7 @@ export default function Navbar() {
                                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpenQuick(false); openCreateModal('dontforget'); } }}
                                     onClick={() => { setOpenQuick(false); openCreateModal('dontforget'); }}
                                 >
-                                    Don't Forget
+                                    {t("navbar.dontForget")}
                                 </button>
                                 <button
                                     role="menuitem"
@@ -1238,7 +1240,7 @@ export default function Navbar() {
                                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCreateModal('task'); } }}
                                     onClick={() => openCreateModal('task')}
                                 >
-                                    Create Task
+                                    {t("navbar.createTask")}
                                 </button>
                                 <button
                                     role="menuitem"
@@ -1247,7 +1249,7 @@ export default function Navbar() {
                                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCreateModal('activity'); } }}
                                     onClick={() => openCreateModal('activity')}
                                 >
-                                    Create Activity
+                                    {t("navbar.createActivity")}
                                 </button>
                                 <button
                                     role="menuitem"
@@ -1256,7 +1258,7 @@ export default function Navbar() {
                                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCreateModal('appointment'); } }}
                                     onClick={() => openCreateModal('appointment')}
                                 >
-                                    Create Appointment
+                                    {t("navbar.createAppointment")}
                                 </button>
                                 <button
                                     role="menuitem"
@@ -1265,7 +1267,7 @@ export default function Navbar() {
                                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCreateModal('goal'); } }}
                                     onClick={() => openCreateModal('goal')}
                                 >
-                                    Create Goal
+                                    {t("navbar.createGoal")}
                                 </button>
                                 <button
                                     role="menuitem"
@@ -1274,7 +1276,7 @@ export default function Navbar() {
                                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCreateModal('stroke'); } }}
                                     onClick={() => openCreateModal('stroke')}
                                 >
-                                    Give Strokes
+                                    {t("navbar.giveStrokes")}
                                 </button>
                                 <button
                                     role="menuitem"
@@ -1283,7 +1285,7 @@ export default function Navbar() {
                                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpenQuick(false); try { window.location.hash = '#/key-areas'; } catch (ex) { window.location.href = '/#/key-areas'; } } }}
                                     onClick={() => { setOpenQuick(false); try { window.location.hash = '#/key-areas'; } catch (e) { window.location.href = '/#/key-areas'; } }}
                                 >
-                                    Edit Key Areas
+                                    {t("navbar.editKeyAreas")}
                                 </button>
                             </div>
                         )}
@@ -1371,7 +1373,7 @@ export default function Navbar() {
                                     className="block px-3 py-2 text-sm hover:bg-slate-50"
                                     onClick={() => setOpen(false)}
                                 >
-                                    Profile & Settings
+                                    {t("navbar.profileSettings")}
                                 </Link>
                                 <div className="border-t border-gray-200 my-1"></div>
                                 <button
@@ -1387,7 +1389,7 @@ export default function Navbar() {
                                         }
                                     }}
                                 >
-                                    Logout
+                                    {t("navbar.logout")}
                                 </button>
                             </div>
                         )}
@@ -1405,13 +1407,13 @@ export default function Navbar() {
                         >
                             <div className="bg-white rounded-xl shadow-xl border border-gray-200 max-h-[calc(100vh-82px)] overflow-y-auto">
                                 {searchLoading && (
-                                    <div className="px-4 py-3 text-sm text-slate-600">Searching...</div>
+                                    <div className="px-4 py-3 text-sm text-slate-600">{t("navbar.searching")}</div>
                                 )}
 
                                 {showSearchResults && !searchLoading && searchResults.length > 0 && (
                                     <div className="py-1">
                                         <div className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 border-b">
-                                            Search Results
+                                            {t("navbar.searchResults")}
                                         </div>
                                         {visibleResultCategories.map((type) => (
                                                 <div key={type} className="px-4 py-1.5">
@@ -1444,14 +1446,14 @@ export default function Navbar() {
 
                                 {showSearchResults && !searchLoading && searchResults.length === 0 && search.trim() && (
                                     <div className="px-4 py-3 text-sm text-gray-600 border-b border-gray-100">
-                                        No results
+                                        {t("navbar.noResults")}
                                     </div>
                                 )}
 
                                 {searchHistory.length > 0 && !search.trim() && (
                                     <div className="py-1">
                                         <div className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 border-b">
-                                            Recent Searches
+                                            {t("navbar.recentSearches")}
                                         </div>
                                         {Object.entries(groupedHistory).map(([type, items]) => (
                                             <div key={type} className="border-b border-gray-100 last:border-b-0">
