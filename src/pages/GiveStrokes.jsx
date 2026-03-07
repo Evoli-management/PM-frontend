@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { useLocation } from "react-router-dom";
 import Sidebar from "../components/shared/Sidebar";
 import { FaBars, FaSearch } from "react-icons/fa";
@@ -9,6 +10,7 @@ import recognitionsService from "../services/recognitionsService";
 import userProfileService from "../services/userProfileService";
 
 export default function GiveStrokes() {
+    const { t } = useTranslation();
     const location = useLocation();
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -125,7 +127,7 @@ export default function GiveStrokes() {
             } else if (type === 'performance') {
                 const recipientId = recipientRef.current;
                 if (!recipientId) {
-                    alert('Please select a company member for performance strokes');
+                    alert(t("giveStrokes.noOrgForPerformance"));
                     setSelectedType(null);
                     return;
                 }
@@ -134,7 +136,7 @@ export default function GiveStrokes() {
             } else if (type === 'achievement') {
                 const recipientId = recipientRef.current;
                 if (!recipientId) {
-                    alert('Please select a company member for achievement strokes');
+                    alert(t("giveStrokes.noOrgForAchievement"));
                     setSelectedType(null);
                     return;
                 }
@@ -143,7 +145,7 @@ export default function GiveStrokes() {
             }
         } catch (err) {
             console.error('Failed to load type data:', err);
-            alert('Failed to load recognition data');
+            alert(t("giveStrokes.loadDataFailed"));
             setSelectedType(null);
             return;
         }
@@ -188,7 +190,7 @@ export default function GiveStrokes() {
             }
 
             await recognitionsService.createRecognition(data);
-            
+
             // Reset
             setShowDetailsModal(false);
             setShowExternalModal(false);
@@ -202,11 +204,11 @@ export default function GiveStrokes() {
             setPersonalNote("");
             setExternalName("");
             setExternalEmail("");
-            
-            alert("Recognition sent successfully!");
+
+            alert(t("giveStrokes.sentSuccess"));
         } catch (err) {
             console.error("Failed to send recognition:", err);
-            alert("Failed to send recognition");
+            alert(t("giveStrokes.sentFailed"));
         }
     };
 
@@ -242,27 +244,27 @@ export default function GiveStrokes() {
                         {activeTab === 'give' ? (
                             <div className="rounded-lg bg-white p-6 shadow-sm">
                                 <h1 className="text-2xl font-semibold text-gray-600 text-center mb-8">
-                                    Whom do you wish to recognise?
+                                    {t("giveStrokes.whomToRecognise")}
                                 </h1>
 
                                 <div className="grid md:grid-cols-2 gap-8">
                                     {/* Members Section */}
                                     <div>
-                                        <h2 className="text-gray-600 text-lg font-semibold mb-4">Members:</h2>
+                                        <h2 className="text-gray-600 text-lg font-semibold mb-4">{t("giveStrokes.membersLabel")}</h2>
                                         <div className="relative mb-4">
                                             <FaSearch className="absolute left-3 top-3 text-gray-400" />
                                             <input
                                                 value={searchQuery}
                                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                                placeholder="Search..."
+                                                placeholder={t("giveStrokes.searchPlaceholder")}
                                                 className="w-full pl-10 pr-4 py-2 border-b-2 border-gray-300 focus:outline-none focus:border-blue-500"
                                             />
                                         </div>
                                         <div className="space-y-2 max-h-64 overflow-y-auto">
                                             {loading ? (
-                                                <p className="text-gray-500 text-center py-4">Loading...</p>
+                                                <p className="text-gray-500 text-center py-4">{t("giveStrokes.loading")}</p>
                                             ) : filteredMembers.length === 0 ? (
-                                                <p className="text-gray-500 text-center py-4">No members found</p>
+                                                <p className="text-gray-500 text-center py-4">{t("giveStrokes.noMembers")}</p>
                                             ) : (
                                                 filteredMembers.map((member) => (
                                                     <button
@@ -280,19 +282,19 @@ export default function GiveStrokes() {
                                     {/* External People Section */}
                                     <div>
                                         <h2 className="text-gray-600 text-lg font-semibold mb-4">
-                                            People outside your company:
+                                            {t("giveStrokes.externalLabel")}
                                         </h2>
                                         <div className="space-y-4">
                                             <input
                                                 value={externalName}
                                                 onChange={(e) => setExternalName(e.target.value)}
-                                                placeholder="Name"
+                                                placeholder={t("giveStrokes.namePlaceholder")}
                                                 className="w-full px-4 py-2 border-b-2 border-gray-300 focus:outline-none focus:border-blue-500"
                                             />
                                             <input
                                                 value={externalEmail}
                                                 onChange={(e) => setExternalEmail(e.target.value)}
-                                                placeholder="Email"
+                                                placeholder={t("giveStrokes.emailPlaceholder")}
                                                 className="w-full px-4 py-2 border-b-2 border-gray-300 focus:outline-none focus:border-blue-500"
                                             />
                                             <button
@@ -300,7 +302,7 @@ export default function GiveStrokes() {
                                                 disabled={!externalName || !externalEmail}
                                                 className="px-6 py-2 bg-lime-400 text-white rounded-full hover:bg-lime-500 disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
-                                                GIVE STROKES
+                                                {t("giveStrokes.giveStrokesBtn")}
                                             </button>
                                         </div>
                                     </div>
@@ -383,16 +385,17 @@ export default function GiveStrokes() {
 
 // Type Selection Modal Component
 function TypeSelectionModal({ onSelect, onClose }) {
+    const { t } = useTranslation();
     const types = [
-        { id: 'employeeship', label: 'Employeeship', icon: '👔' },
-        { id: 'performance', label: 'Performance', icon: '📊' },
-        { id: 'achievement', label: 'Achievement', icon: '🏆' },
+        { id: 'employeeship', label: t("giveStrokes.typeModal.employeeship"), icon: '👔' },
+        { id: 'performance', label: t("giveStrokes.typeModal.performance"), icon: '📊' },
+        { id: 'achievement', label: t("giveStrokes.typeModal.achievement"), icon: '🏆' },
     ];
 
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg p-8 max-w-2xl w-full">
-                <h2 className="text-2xl font-semibold text-center mb-8">Give strokes</h2>
+                <h2 className="text-2xl font-semibold text-center mb-8">{t("giveStrokes.typeModal.title")}</h2>
                 <div className="grid grid-cols-3 gap-6">
                     {types.map((type) => (
                         <button
@@ -410,7 +413,7 @@ function TypeSelectionModal({ onSelect, onClose }) {
                         onClick={onClose}
                         className="px-6 py-2 bg-red-500 text-white rounded hover:bg-red-600"
                     >
-                        Back
+                        {t("giveStrokes.typeModal.back")}
                     </button>
                 </div>
             </div>
@@ -419,42 +422,43 @@ function TypeSelectionModal({ onSelect, onClose }) {
 }
 
 function ExternalRecipientModal({ recipient, personalNote, onPersonalNoteChange, onSubmit, onClose }) {
+    const { t } = useTranslation();
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg p-8 max-w-xl w-full">
-                <h2 className="text-2xl font-semibold text-center mb-4">Send a recognition</h2>
-                <p className="text-gray-600 text-center mb-6">We will email {recipient?.name || 'this person'} at {recipient?.email}.</p>
+                <h2 className="text-2xl font-semibold text-center mb-4">{t("giveStrokes.externalModal.title")}</h2>
+                <p className="text-gray-600 text-center mb-6">{t("giveStrokes.externalModal.emailNote", { name: recipient?.name || '', email: recipient?.email })}</p>
                 <div className="mb-6">
                     <div className="flex items-center justify-between mb-2">
                         <label className="block text-gray-700 font-medium">
-                            Add your personal note:
+                            {t("giveStrokes.externalModal.personalNoteLabel")}
                         </label>
                         <button
                             type="button"
                             onClick={() => onPersonalNoteChange("")}
                             className="text-sm text-red-600 hover:underline"
                         >
-                            Clear
+                            {t("giveStrokes.externalModal.clear")}
                         </button>
                     </div>
                     <textarea
                         value={personalNote}
                         onChange={(e) => onPersonalNoteChange(e.target.value)}
-                        placeholder={`${recipient?.name || 'there'}, I think you did a very good job...`}
+                        placeholder={t("giveStrokes.notePlaceholder", { name: recipient?.name || '' })}
                         className="w-full px-4 py-3 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
                         rows={4}
                     />
                 </div>
                 <div className="flex justify-end gap-3">
                     <button onClick={onClose} className="px-6 py-2 bg-red-500 text-white rounded hover:bg-red-600">
-                        Back
+                        {t("giveStrokes.externalModal.back")}
                     </button>
                     <button
                         onClick={onSubmit}
                         disabled={!personalNote}
                         className="px-6 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50"
                     >
-                        Send
+                        {t("giveStrokes.externalModal.send")}
                     </button>
                 </div>
             </div>
@@ -464,17 +468,18 @@ function ExternalRecipientModal({ recipient, personalNote, onPersonalNoteChange,
 
 // Employeeship Modal Component
 function EmployeeshipModal({ values, selectedValue, onSelectValue, selectedBehaviors, onToggleBehavior, personalNote, onPersonalNoteChange, recipientName, onSubmit, onBack }) {
+    const { t } = useTranslation();
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
             <div className="bg-white rounded-lg p-8 max-w-2xl w-full my-8">
-                <h2 className="text-2xl font-semibold text-gray-600 text-center mb-6">Employeeship Strokes</h2>
-                
+                <h2 className="text-2xl font-semibold text-gray-600 text-center mb-6">{t("giveStrokes.employeeshipModal.title")}</h2>
+
                 {values.length === 0 ? (
                     <div className="text-center py-8">
-                        <p className="text-gray-600 mb-4">No culture values have been defined yet.</p>
-                        <p className="text-gray-500 text-sm mb-6">Please ask your organization admin to add culture values in the Organization Settings.</p>
+                        <p className="text-gray-600 mb-4">{t("giveStrokes.employeeshipModal.noValues")}</p>
+                        <p className="text-gray-500 text-sm mb-6">{t("giveStrokes.employeeshipModal.noValuesHint")}</p>
                         <button onClick={onBack} className="px-6 py-2 bg-red-500 text-white rounded hover:bg-red-600">
-                            Back
+                            {t("giveStrokes.employeeshipModal.back")}
                         </button>
                     </div>
                 ) : !selectedValue ? (
@@ -500,7 +505,7 @@ function EmployeeshipModal({ values, selectedValue, onSelectValue, selectedBehav
                             )}
                             <div className="flex-1">
                                 <h3 className="text-xl font-semibold text-gray-700 mb-2">{selectedValue.heading}</h3>
-                                <p className="text-sm text-gray-600 mb-3 font-medium">Select behaviors to recognize:</p>
+                                <p className="text-sm text-gray-600 mb-3 font-medium">{t("giveStrokes.employeeshipModal.selectBehaviors")}</p>
                                 {selectedValue.behaviors && selectedValue.behaviors.length > 0 ? (
                                     <div className="space-y-3">
                                         {selectedValue.behaviors.map((behavior, idx) => (
@@ -525,7 +530,7 @@ function EmployeeshipModal({ values, selectedValue, onSelectValue, selectedBehav
                                     </div>
                                 ) : (
                                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                                        <p className="text-sm text-yellow-800">No behaviors defined for this culture value yet.</p>
+                                        <p className="text-sm text-yellow-800">{t("giveStrokes.employeeshipModal.noBehaviors")}</p>
                                     </div>
                                 )}
                             </div>
@@ -534,20 +539,20 @@ function EmployeeshipModal({ values, selectedValue, onSelectValue, selectedBehav
                         <div className="mb-6">
                             <div className="flex items-center justify-between mb-2">
                                 <label className="block text-gray-700 font-medium">
-                                    Select a "+" mark and add your personal note:
+                                    {t("giveStrokes.employeeshipModal.selectAndNote")}
                                 </label>
                                 <button
                                     type="button"
                                     onClick={() => onPersonalNoteChange("")}
                                     className="text-sm text-red-600 hover:underline"
                                 >
-                                    Clear
+                                    {t("giveStrokes.employeeshipModal.clear")}
                                 </button>
                             </div>
                             <textarea
                                 value={personalNote}
                                 onChange={(e) => onPersonalNoteChange(e.target.value)}
-                                placeholder={`${recipientName}, I think you did a very good job...`}
+                                placeholder={t("giveStrokes.notePlaceholder", { name: recipientName || '' })}
                                 className="w-full px-4 py-3 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
                                 rows={4}
                             />
@@ -555,14 +560,14 @@ function EmployeeshipModal({ values, selectedValue, onSelectValue, selectedBehav
 
                         <div className="flex justify-end gap-3">
                             <button onClick={onBack} className="px-6 py-2 bg-red-500 text-white rounded hover:bg-red-600">
-                                Back
+                                {t("giveStrokes.employeeshipModal.back")}
                             </button>
                             <button
                                 onClick={onSubmit}
                                 disabled={selectedBehaviors.length === 0 || !personalNote}
                                 className="px-6 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50"
                             >
-                                Submit
+                                {t("giveStrokes.employeeshipModal.submit")}
                             </button>
                         </div>
                     </div>
@@ -574,15 +579,16 @@ function EmployeeshipModal({ values, selectedValue, onSelectValue, selectedBehav
 
 // Performance Modal Component
 function PerformanceModal({ keyAreas, selectedKeyArea, onSelectKeyArea, personalNote, onPersonalNoteChange, recipientName, onSubmit, onBack }) {
+    const { t } = useTranslation();
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
             <div className="bg-white rounded-lg p-8 max-w-2xl w-full my-8">
-                <h2 className="text-2xl font-semibold text-gray-600 text-center mb-6">Performance Strokes</h2>
-                
+                <h2 className="text-2xl font-semibold text-gray-600 text-center mb-6">{t("giveStrokes.performanceModal.title")}</h2>
+
                 <div className="mb-6">
-                    <p className="text-gray-600 mb-4">Select a key area to recognize:</p>
+                    <p className="text-gray-600 mb-4">{t("giveStrokes.performanceModal.selectKeyArea")}</p>
                     {keyAreas.length === 0 ? (
-                        <p className="text-center text-gray-500">No key areas found for this user</p>
+                        <p className="text-center text-gray-500">{t("giveStrokes.performanceModal.noKeyAreas")}</p>
                     ) : (
                         <div className="space-y-2">
                             {keyAreas.map((area) => (
@@ -606,20 +612,20 @@ function PerformanceModal({ keyAreas, selectedKeyArea, onSelectKeyArea, personal
                     <div className="mb-6">
                         <div className="flex items-center justify-between mb-2">
                             <label className="block text-gray-700 font-medium">
-                                Add your personal note:
+                                {t("giveStrokes.performanceModal.personalNoteLabel")}
                             </label>
                             <button
                                 type="button"
                                 onClick={() => onPersonalNoteChange("")}
                                 className="text-sm text-red-600 hover:underline"
                             >
-                                Clear
+                                {t("giveStrokes.performanceModal.clear")}
                             </button>
                         </div>
                         <textarea
                             value={personalNote}
                             onChange={(e) => onPersonalNoteChange(e.target.value)}
-                            placeholder={`${recipientName}, I think you did a very good job...`}
+                            placeholder={t("giveStrokes.notePlaceholder", { name: recipientName || '' })}
                             className="w-full px-4 py-3 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
                             rows={4}
                         />
@@ -628,14 +634,14 @@ function PerformanceModal({ keyAreas, selectedKeyArea, onSelectKeyArea, personal
 
                 <div className="flex justify-end gap-3">
                     <button onClick={onBack} className="px-6 py-2 bg-red-500 text-white rounded hover:bg-red-600">
-                        Back
+                        {t("giveStrokes.performanceModal.back")}
                     </button>
                     <button
                         onClick={onSubmit}
                         disabled={!selectedKeyArea || !personalNote}
                         className="px-6 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50"
                     >
-                        Submit
+                        {t("giveStrokes.performanceModal.submit")}
                     </button>
                 </div>
             </div>
@@ -645,27 +651,28 @@ function PerformanceModal({ keyAreas, selectedKeyArea, onSelectKeyArea, personal
 
 // Achievement Modal Component
 function AchievementModal({ achievements, selectedGoal, selectedMilestone, onSelectGoal, onSelectMilestone, personalNote, onPersonalNoteChange, recipientName, onSubmit, onBack }) {
+    const { t } = useTranslation();
     const hasAchievements = achievements.goals.length > 0 || achievements.milestones.length > 0;
 
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
             <div className="bg-white rounded-lg p-8 max-w-2xl w-full my-8">
-                <h2 className="text-2xl font-semibold text-gray-600 text-center mb-6">Achievement Strokes</h2>
-                
+                <h2 className="text-2xl font-semibold text-gray-600 text-center mb-6">{t("giveStrokes.achievementModal.title")}</h2>
+
                 {!hasAchievements ? (
                     <div className="text-center py-8">
-                        <p className="text-gray-600 mb-4">There are no current achievements that you can stroke.</p>
+                        <p className="text-gray-600 mb-4">{t("giveStrokes.achievementModal.noAchievements")}</p>
                         <button onClick={onBack} className="px-6 py-2 bg-red-500 text-white rounded hover:bg-red-600">
-                            Back
+                            {t("giveStrokes.achievementModal.back")}
                         </button>
                     </div>
                 ) : (
                     <>
-                        <p className="text-gray-600 mb-4">Select a completed goal or milestone (last 2 weeks):</p>
-                        
+                        <p className="text-gray-600 mb-4">{t("giveStrokes.achievementModal.selectAchievement")}</p>
+
                         {achievements.goals.length > 0 && (
                             <div className="mb-4">
-                                <h3 className="font-semibold text-gray-700 mb-2">Goals</h3>
+                                <h3 className="font-semibold text-gray-700 mb-2">{t("giveStrokes.achievementModal.goals")}</h3>
                                 <div className="space-y-2">
                                     {achievements.goals.map((goal) => (
                                         <button
@@ -686,7 +693,7 @@ function AchievementModal({ achievements, selectedGoal, selectedMilestone, onSel
 
                         {achievements.milestones.length > 0 && (
                             <div className="mb-4">
-                                <h3 className="font-semibold text-gray-700 mb-2">Milestones</h3>
+                                <h3 className="font-semibold text-gray-700 mb-2">{t("giveStrokes.achievementModal.milestones")}</h3>
                                 <div className="space-y-2">
                                     {achievements.milestones.map((milestone) => (
                                         <button
@@ -709,20 +716,20 @@ function AchievementModal({ achievements, selectedGoal, selectedMilestone, onSel
                             <div className="mb-6">
                                 <div className="flex items-center justify-between mb-2">
                                     <label className="block text-gray-700 font-medium">
-                                        Add your personal note:
+                                        {t("giveStrokes.achievementModal.personalNoteLabel")}
                                     </label>
                                     <button
                                         type="button"
                                         onClick={() => onPersonalNoteChange("")}
                                         className="text-sm text-red-600 hover:underline"
                                     >
-                                        Clear
+                                        {t("giveStrokes.achievementModal.clear")}
                                     </button>
                                 </div>
                                 <textarea
                                     value={personalNote}
                                     onChange={(e) => onPersonalNoteChange(e.target.value)}
-                                    placeholder={`${recipientName}, I think you did a very good job...`}
+                                    placeholder={t("giveStrokes.notePlaceholder", { name: recipientName || '' })}
                                     className="w-full px-4 py-3 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
                                     rows={4}
                                 />
@@ -731,14 +738,14 @@ function AchievementModal({ achievements, selectedGoal, selectedMilestone, onSel
 
                         <div className="flex justify-end gap-3">
                             <button onClick={onBack} className="px-6 py-2 bg-red-500 text-white rounded hover:bg-red-600">
-                                Back
+                                {t("giveStrokes.achievementModal.back")}
                             </button>
                             <button
                                 onClick={onSubmit}
                                 disabled={(!selectedGoal && !selectedMilestone) || !personalNote}
                                 className="px-6 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50"
                             >
-                                Submit
+                                {t("giveStrokes.achievementModal.submit")}
                             </button>
                         </div>
                     </>
@@ -749,10 +756,12 @@ function AchievementModal({ achievements, selectedGoal, selectedMilestone, onSel
 }
 // Stroke Account Component
 function StrokeAccount({ recognitions, loading }) {
+    const { t } = useTranslation();
+
     if (loading) {
         return (
             <div className="rounded-lg bg-white p-8 shadow-sm text-center">
-                <p className="text-gray-500">Loading your recognitions...</p>
+                <p className="text-gray-500">{t("giveStrokes.strokeAccount.loading")}</p>
             </div>
         );
     }
@@ -760,8 +769,8 @@ function StrokeAccount({ recognitions, loading }) {
     if (recognitions.length === 0) {
         return (
             <div className="rounded-lg bg-white p-8 shadow-sm text-center">
-                <p className="text-gray-600 text-lg mb-2">No recognitions received yet</p>
-                <p className="text-gray-500 text-sm">When you receive strokes, they'll appear here!</p>
+                <p className="text-gray-600 text-lg mb-2">{t("giveStrokes.strokeAccount.none")}</p>
+                <p className="text-gray-500 text-sm">{t("giveStrokes.strokeAccount.noneHint")}</p>
             </div>
         );
     }
@@ -773,9 +782,9 @@ function StrokeAccount({ recognitions, loading }) {
 
     const getTypeLabel = (type) => {
         const labels = {
-            'employeeship': 'Employeeship',
-            'performance': 'Performance',
-            'achievement': 'Achievement'
+            'employeeship': t("giveStrokes.strokeAccount.employeeship"),
+            'performance': t("giveStrokes.strokeAccount.performance"),
+            'achievement': t("giveStrokes.strokeAccount.achievement"),
         };
         return labels[type] || type;
     };
@@ -791,8 +800,8 @@ function StrokeAccount({ recognitions, loading }) {
 
     return (
         <div className="rounded-lg bg-white p-6 shadow-sm">
-            <h2 className="text-2xl font-semibold text-gray-600 mb-6">Your Stroke Account</h2>
-            <p className="text-gray-600 mb-6">Total recognitions received: <span className="font-bold text-cyan-500">{recognitions.length}</span></p>
+            <h2 className="text-2xl font-semibold text-gray-600 mb-6">{t("giveStrokes.strokeAccount.title")}</h2>
+            <p className="text-gray-600 mb-6">{t("giveStrokes.strokeAccount.totalReceived")} <span className="font-bold text-cyan-500">{recognitions.length}</span></p>
             
             <div className="space-y-4">
                 {recognitions.map((recognition) => (
@@ -812,7 +821,7 @@ function StrokeAccount({ recognitions, loading }) {
                         
                         {recognition.selectedBehaviors && recognition.selectedBehaviors.length > 0 && (
                             <div className="mt-3">
-                                <p className="text-xs text-gray-500 mb-2">Behaviors recognized:</p>
+                                <p className="text-xs text-gray-500 mb-2">{t("giveStrokes.strokeAccount.behaviorsLabel")}</p>
                                 <div className="flex flex-wrap gap-2">
                                     {recognition.selectedBehaviors.map((behavior, idx) => (
                                         <span key={idx} className="px-2 py-1 bg-lime-100 text-lime-700 rounded text-xs">
