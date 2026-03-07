@@ -2788,8 +2788,40 @@ export default function KeyAreas() {
             arr = arr.filter((t) => String(t.status || "").toLowerCase() === fs);
         }
         if (filterAssignee) {
-            const fa = String(filterAssignee).toLowerCase();
-            arr = arr.filter((t) => String(t.assignee || t.responsible || "").toLowerCase() === fa);
+            const selectedRaw = String(filterAssignee || "").trim();
+            const selectedLower = selectedRaw.toLowerCase();
+            const selectedUser = (users || []).find((u) => String(u?.id) === selectedRaw);
+            const emailRx = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i;
+
+            const selectedAliases = new Set([selectedLower]);
+            if (selectedUser) {
+                if (selectedUser?.name) selectedAliases.add(String(selectedUser.name).toLowerCase().trim());
+                if (selectedUser?.email) selectedAliases.add(String(selectedUser.email).toLowerCase().trim());
+                selectedAliases.add(String(selectedUser.id).toLowerCase().trim());
+                if (currentUserId && String(selectedUser.id) === String(currentUserId)) {
+                    selectedAliases.add("me");
+                }
+            } else if (currentUserId && String(currentUserId) === selectedRaw) {
+                selectedAliases.add("me");
+            }
+
+            arr = arr.filter((t) => {
+                const raw = String(t.assignee || t.responsible || t.owner || t.assigned_to || "").trim();
+                if (!raw) return false;
+                const rawLower = raw.toLowerCase();
+                if (selectedAliases.has(rawLower)) return true;
+
+                // Cross-match by detected email fragments (e.g. "Name user@x.com")
+                const rawEmail = (rawLower.match(emailRx) || [null])[0];
+                if (rawEmail && selectedAliases.has(rawEmail)) return true;
+
+                // Tolerate mixed formatting by allowing contains checks across aliases.
+                for (const alias of selectedAliases) {
+                    if (!alias) continue;
+                    if (rawLower.includes(alias) || alias.includes(rawLower)) return true;
+                }
+                return false;
+            });
         }
         if (filterTag.trim()) {
             const ft = filterTag.trim().toLowerCase();
@@ -2798,7 +2830,7 @@ export default function KeyAreas() {
         // Site-wide search already filtered by query in the async fetch; apply quadrant filter if set
         if (quadrant !== "all") arr = arr.filter((t) => String(t.eisenhower_quadrant || "") === quadrant);
         return arr;
-    }, [allTasks, taskTab, searchTerm, quadrant, siteSearch, searchResults, showCompleted, filterStatus, filterAssignee, filterTag, viewTab, activeFilter, selectedKA]);
+    }, [allTasks, taskTab, searchTerm, quadrant, siteSearch, searchResults, showCompleted, filterStatus, filterAssignee, filterTag, viewTab, activeFilter, selectedKA, users, currentUserId]);
 
     const handleTaskSort = (field) => {
         if (taskSortField === field) {
@@ -3632,7 +3664,7 @@ export default function KeyAreas() {
                                                     </select>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-slate-600">Owner:</span>
+                                                    <span className="text-slate-600">Responsible:</span>
                                                     <select
                                                         value={filterAssignee}
                                                         onChange={(e) => setFilterAssignee(e.target.value)}
@@ -3640,7 +3672,7 @@ export default function KeyAreas() {
                                                     >
                                                         <option value="">All</option>
                                                         {(users || []).map((u) => (
-                                                            <option key={u.id} value={u.name}>{u.name}</option>
+                                                            <option key={u.id} value={String(u.id)}>{u.name}</option>
                                                         ))}
                                                     </select>
                                                 </div>
