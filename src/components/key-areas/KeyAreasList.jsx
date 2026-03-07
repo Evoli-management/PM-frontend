@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { FaLock, FaEdit, FaTrash } from 'react-icons/fa';
 
 export default function KeyAreasList({
@@ -14,12 +15,13 @@ export default function KeyAreasList({
   setShowForm,
   onDeleteKA,
 }) {
+  const { t } = useTranslation();
   return (
     <>
       {/* LIST: Key Areas (extracted) */}
       <div className="h-full min-h-0 flex flex-col">
         {loading ? (
-          <div className="text-slate-700">Loading…</div>
+          <div className="text-slate-700">{t("keyAreasList.loading")}</div>
         ) : showOnlyIdeas ? (
           // render Ideas as a single centered full-width card
           <div className="flex justify-center">
@@ -33,7 +35,7 @@ export default function KeyAreasList({
                     <h3 className="text-xl font-bold text-slate-900">{ideaForShow.title}</h3>
                     {ideaForShow.is_default && (
                       <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
-                        <FaLock /> Locked
+                        <FaLock /> {t("keyAreasList.locked")}
                       </span>
                     )}
                   </div>
@@ -106,7 +108,7 @@ export default function KeyAreasList({
                           <span className="font-semibold truncate cursor-inherit text-slate-700">{ka.title}</span>
                           {ka.is_default && (
                             <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
-                              <FaLock /> Locked
+                              <FaLock /> {t("keyAreasList.locked")}
                             </span>
                           )}
                         </div>
@@ -131,7 +133,7 @@ export default function KeyAreasList({
                         disabled={ka.is_default || (ka.title || '').toLowerCase() === 'ideas'}
                         title={
                           ka.is_default || (ka.title || '').toLowerCase() === 'ideas'
-                            ? 'Cannot delete the Ideas key area'
+                            ? t("keyAreasList.cannotDeleteIdeas")
                             : typeof ka.taskCount === 'number' && ka.taskCount > 0
                             ? `${ka.taskCount} task(s) present`
                             : undefined

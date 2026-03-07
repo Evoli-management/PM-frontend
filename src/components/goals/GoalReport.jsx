@@ -1,9 +1,11 @@
 // src/components/goals/GoalReport.jsx
 import React, { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import * as goalService from "../../services/goalService";
 import { FaFilePdf, FaFileExcel, FaFilter, FaCheckCircle, FaClock } from "react-icons/fa";
 
 const GoalReport = () => {
+    const { t } = useTranslation();
     const [dateFromType, setDateFromType] = useState("deadline");
     const [dateToType, setDateToType] = useState("deadline");
     const [dateFrom, setDateFrom] = useState("");
@@ -24,7 +26,7 @@ const GoalReport = () => {
             });
             setGoals(data || []);
         } catch (e) {
-            setError("Failed to load goals.");
+            setError(t("goalReport.failedLoad"));
             console.error(e);
         } finally {
             setLoading(false);
@@ -165,19 +167,19 @@ const GoalReport = () => {
 
                 {/* Date From */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    <label style={{ fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase" }}>From type</label>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase" }}>{t("goalReport.fromType")}</label>
                     <select
                         value={dateFromType}
                         onChange={(e) => setDateFromType(e.target.value)}
                         style={{ padding: "6px 10px", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 13, background: "#f8fafc" }}
                     >
-                        <option value="deadline">Deadline</option>
-                        <option value="date_start">Start date</option>
-                        <option value="date_completed">Date completed</option>
+                        <option value="deadline">{t("goalReport.deadlineOpt")}</option>
+                        <option value="date_start">{t("goalReport.startDateOpt")}</option>
+                        <option value="date_completed">{t("goalReport.dateCompletedOpt")}</option>
                     </select>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    <label style={{ fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase" }}>From</label>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase" }}>{t("goalReport.from")}</label>
                     <input
                         type="date"
                         value={dateFrom}
@@ -188,19 +190,19 @@ const GoalReport = () => {
 
                 {/* Date To */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    <label style={{ fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase" }}>To type</label>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase" }}>{t("goalReport.toType")}</label>
                     <select
                         value={dateToType}
                         onChange={(e) => setDateToType(e.target.value)}
                         style={{ padding: "6px 10px", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 13, background: "#f8fafc" }}
                     >
-                        <option value="deadline">Deadline</option>
-                        <option value="date_start">Start date</option>
-                        <option value="date_completed">Date completed</option>
+                        <option value="deadline">{t("goalReport.deadlineOpt")}</option>
+                        <option value="date_start">{t("goalReport.startDateOpt")}</option>
+                        <option value="date_completed">{t("goalReport.dateCompletedOpt")}</option>
                     </select>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    <label style={{ fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase" }}>To</label>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase" }}>{t("goalReport.to")}</label>
                     <input
                         type="date"
                         value={dateTo}
@@ -213,11 +215,11 @@ const GoalReport = () => {
                 <div style={{ display: "flex", gap: 16, alignItems: "center", paddingBottom: 2 }}>
                     <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 13 }}>
                         <input type="checkbox" checked={showCompleted} onChange={(e) => setShowCompleted(e.target.checked)} />
-                        <FaCheckCircle style={{ color: "#22c55e" }} /> Completed
+                        <FaCheckCircle style={{ color: "#22c55e" }} /> {t("goalReport.completed")}
                     </label>
                     <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 13 }}>
                         <input type="checkbox" checked={showActive} onChange={(e) => setShowActive(e.target.checked)} />
-                        <FaClock style={{ color: "#3b82f6" }} /> Active
+                        <FaClock style={{ color: "#3b82f6" }} /> {t("goalReport.active")}
                     </label>
                 </div>
 
@@ -250,19 +252,19 @@ const GoalReport = () => {
 
             {/* Result count */}
             <div style={{ marginBottom: 12, fontSize: 13, color: "#64748b" }}>
-                <strong style={{ color: "#1e293b" }}>{filteredGoals.length}</strong> goal{filteredGoals.length !== 1 ? "s" : ""} matched
-                {(dateFrom || dateTo) ? " for selected date range" : ""}
+                {t("goalReport.goalsMatched", { n: filteredGoals.length })}
+                {(dateFrom || dateTo) ? ` ${t("goalReport.forDateRange")}` : ""}
             </div>
 
             {/* Goal Table */}
             {loading ? (
-                <div style={{ textAlign: "center", padding: 40, color: "#64748b" }}>Loading goals…</div>
+                <div style={{ textAlign: "center", padding: 40, color: "#64748b" }}>{t("goalReport.loading")}</div>
             ) : error ? (
                 <div style={{ textAlign: "center", padding: 40, color: "#ef4444" }}>{error}</div>
             ) : filteredGoals.length === 0 ? (
                 <div style={{ textAlign: "center", padding: 60, color: "#64748b" }}>
                     <FaFilter style={{ fontSize: 32, marginBottom: 12, opacity: 0.3 }} />
-                    <div>No goals match the selected filters.</div>
+                    <div>{t("goalReport.noGoalsMatch")}</div>
                 </div>
             ) : (
                 <div
@@ -277,7 +279,7 @@ const GoalReport = () => {
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                         <thead>
                             <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e2e8f0" }}>
-                                {["Title", "Status", "Progress", "Start Date", "Deadline", "Completed"].map((h) => (
+                                {[t("goalReport.colTitle"), t("goalReport.colStatus"), t("goalReport.colProgress"), t("goalReport.colStartDate"), t("goalReport.colDeadline"), t("goalReport.colCompleted")].map((h) => (
                                     <th key={h} style={{ textAlign: "left", padding: "10px 14px", fontWeight: 700, color: "#374151", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.4 }}>{h}</th>
                                 ))}
                             </tr>

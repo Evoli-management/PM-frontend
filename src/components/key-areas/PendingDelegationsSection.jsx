@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FaCheck, FaBan, FaSquare, FaListUl, FaExclamation, FaArrowDown } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import Select from 'react-select';
@@ -15,6 +16,7 @@ export default function PendingDelegationsSection({
   currentUserId,
   keyAreas: keyAreasFromProps = []
 }) {
+  const { t } = useTranslation();
   const [respondingItemId, setRespondingItemId] = useState(null);
   const [showAcceptModal, setShowAcceptModal] = useState(false);
   const [acceptingItem, setAcceptingItem] = useState(null);
@@ -236,7 +238,7 @@ export default function PendingDelegationsSection({
       <div className="mb-8">
         <div className="bg-white border border-slate-200 rounded-lg p-4 mb-4">
           <h3 className="text-lg font-semibold text-slate-900 mb-4">
-            Pending Delegations ({pendingTasks.length})
+            {t("pendingDelegationsSection.title", { n: pendingTasks.length })}
           </h3>
 
           {/* Table for pending delegations */}
@@ -244,12 +246,12 @@ export default function PendingDelegationsSection({
             <table className="min-w-full text-sm whitespace-nowrap sm:whitespace-normal">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-700">
                 <tr>
-                  <th className="px-2 sm:px-3 py-2 text-center w-8 font-semibold">Type</th>
-                  <th className="px-2 sm:px-3 py-2 text-center w-6 font-semibold">Prior</th>
-                  <th className="px-2 sm:px-3 py-2 text-left font-semibold">Title</th>
-                  <th className="px-2 sm:px-3 py-2 text-left font-semibold">Deadline</th>
-                  <th className="px-2 sm:px-3 py-2 text-left font-semibold">Received From</th>
-                  <th className="px-2 sm:px-3 py-2 text-center font-semibold">Actions</th>
+                  <th className="px-2 sm:px-3 py-2 text-center w-8 font-semibold">{t("pendingDelegationsSection.colType")}</th>
+                  <th className="px-2 sm:px-3 py-2 text-center w-6 font-semibold">{t("pendingDelegationsSection.colPriority")}</th>
+                  <th className="px-2 sm:px-3 py-2 text-left font-semibold">{t("pendingDelegationsSection.colTitle")}</th>
+                  <th className="px-2 sm:px-3 py-2 text-left font-semibold">{t("pendingDelegationsSection.colDeadline")}</th>
+                  <th className="px-2 sm:px-3 py-2 text-left font-semibold">{t("pendingDelegationsSection.colFrom")}</th>
+                  <th className="px-2 sm:px-3 py-2 text-center font-semibold">{t("pendingDelegationsSection.colActions")}</th>
                 </tr>
               </thead>
               <tbody className="bg-white">
@@ -329,7 +331,7 @@ export default function PendingDelegationsSection({
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
             <div className="flex items-center justify-between p-4 border-b border-gray-200">
               <h2 className="text-lg font-semibold text-gray-900">
-                Accept {acceptingItem?.type === 'task' ? 'Task' : 'Activity'} Delegation
+                {t("pendingDelegationsSection.acceptModalTitle")}
               </h2>
               <button
                 onClick={() => closeModal()}
@@ -365,7 +367,7 @@ export default function PendingDelegationsSection({
               {/* Key Area (Required for all) */}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select Key Area <span className="text-red-500">*</span>
+                  {t("pendingDelegationsSection.keyAreaLabel")} <span className="text-red-500">*</span>
                 </label>
                 <Select
                   options={keyAreaOptions}
@@ -413,7 +415,7 @@ export default function PendingDelegationsSection({
               {/* Task List (Required for all) */}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select Task List <span className="text-red-500">*</span>
+                  {t("pendingDelegationsSection.listLabel")} <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={selectedListIndex}
@@ -424,7 +426,7 @@ export default function PendingDelegationsSection({
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
                   disabled={!selectedKeyArea || availableLists.length === 0}
                 >
-                  <option value="">-- Select a Task List --</option>
+                  <option value="">{t("pendingDelegationsSection.selectKeyArea")}</option>
                   {availableLists.map((n) => (
                     <option key={n} value={n}>
                       {listNames[n] || `List ${n}`}
@@ -440,7 +442,7 @@ export default function PendingDelegationsSection({
               {acceptingItem?.type === 'activity' && (
                 <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    How would you like to proceed?
+                    {t("pendingDelegationsSection.modeLabel")}
                   </label>
                   <div className="space-y-2">
                     <label className="flex items-center">
@@ -453,7 +455,7 @@ export default function PendingDelegationsSection({
                         className="mr-2"
                       />
                       <span className="text-sm text-gray-700">
-                        Add as <b>new Task</b> in Key Area
+                        {t("pendingDelegationsSection.modeTask")}
                       </span>
                     </label>
                     <label className="flex items-center">
@@ -466,7 +468,7 @@ export default function PendingDelegationsSection({
                         className="mr-2"
                       />
                       <span className="text-sm text-gray-700">
-                        Add to existing task in key area
+                        {t("pendingDelegationsSection.modeActivity")}
                       </span>
                     </label>
                   </div>
@@ -502,14 +504,14 @@ export default function PendingDelegationsSection({
                 onClick={() => closeModal()}
                 className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg"
               >
-                Cancel
+                {t("pendingDelegationsSection.cancel")}
               </button>
               <button
                 onClick={confirmAccept}
                 disabled={!selectedKeyArea || respondingItemId}
                 className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg disabled:opacity-50"
               >
-                {respondingItemId ? `Accepting ${acceptingItem?.type}...` : 'Accept'}
+                {respondingItemId ? t("pendingDelegationsSection.confirm") : t("pendingDelegationsSection.accept")}
               </button>
             </div>
           </div>
@@ -521,10 +523,10 @@ export default function PendingDelegationsSection({
           <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
             <div className="p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                Reject Delegation?
+                {t("pendingDelegationsSection.reject")}
               </h3>
               <p className="text-gray-600 mb-4">
-                Are you sure you want to reject this {rejectingItem.type} delegation?
+                {t("pendingDelegationsSection.rejectConfirm")}
               </p>
               <p className="text-sm text-blue-600 mb-4">
                 <strong>{rejectingItem.title}</strong>
@@ -538,13 +540,13 @@ export default function PendingDelegationsSection({
                 }}
                 className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg"
               >
-                Cancel
+                {t("pendingDelegationsSection.cancel")}
               </button>
               <button
                 onClick={confirmReject}
                 className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg"
               >
-                Reject
+                {t("pendingDelegationsSection.reject")}
               </button>
             </div>
           </div>

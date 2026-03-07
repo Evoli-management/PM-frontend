@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 
 /**
@@ -21,6 +22,7 @@ export default function TripleViewLayout({
     activityPanelMinWidth = 300,
     defaultTaskWidth = '50%',
 }) {
+    const { t } = useTranslation();
     const [taskPanelWidth, setTaskPanelWidth] = useState(defaultTaskWidth);
     const [isDragging, setIsDragging] = useState(false);
     const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
@@ -98,8 +100,8 @@ export default function TripleViewLayout({
                         ) : (
                             <div className="flex items-center justify-center h-full text-slate-500 text-center p-4">
                                 <div>
-                                    <p className="text-lg font-medium mb-2">Select a task</p>
-                                    <p className="text-sm">Choose a task from the left panel to view its activities</p>
+                                    <p className="text-lg font-medium mb-2">{t("tripleViewLayout.selectTask")}</p>
+                                    <p className="text-sm">{t("tripleViewLayout.selectTaskHint")}</p>
                                 </div>
                             </div>
                         )}

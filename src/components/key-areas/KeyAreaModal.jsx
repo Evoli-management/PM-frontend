@@ -1,7 +1,9 @@
 import React, { useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FaTimes, FaSave, FaExclamationCircle } from 'react-icons/fa';
 
 export default function KeyAreaModal({ isOpen, editing, onSave, onCancel }) {
+    const { t } = useTranslation();
     const colorRef = useRef(null);
 
     if (!isOpen) return null;
@@ -21,7 +23,7 @@ export default function KeyAreaModal({ isOpen, editing, onSave, onCancel }) {
         <div className="fixed inset-0 bg-black/30 grid place-items-center z-50">
             <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-[92vw] max-w-lg p-4">
                 <div className="flex items-center justify-between mb-3">
-                    <h2 className="text-lg font-bold text-slate-900">{editing ? 'Edit Key Area' : 'New Key Area'}</h2>
+                    <h2 className="text-lg font-bold text-slate-900">{editing ? t("keyAreaModal.editTitle") : t("keyAreaModal.newTitle")}</h2>
                     <button className="p-2 rounded-lg hover:bg-slate-50" onClick={onCancel}>
                         <FaTimes />
                     </button>
@@ -29,7 +31,7 @@ export default function KeyAreaModal({ isOpen, editing, onSave, onCancel }) {
 
                 <form onSubmit={onSave} className="grid gap-3">
                     <div>
-                        <label className="text-sm font-semibold text-slate-900">Title *</label>
+                        <label className="text-sm font-semibold text-slate-900">{t("keyAreaModal.titleLabel")}</label>
                         <input
                             name="title"
                             required
@@ -40,12 +42,12 @@ export default function KeyAreaModal({ isOpen, editing, onSave, onCancel }) {
                             placeholder="e.g., Finance"
                         />
                         {isLocked ? (
-                            <p className="text-xs text-slate-600 mt-1">The "Ideas" key area cannot be renamed.</p>
+                            <p className="text-xs text-slate-600 mt-1">{t("keyAreaModal.lockedNote")}</p>
                         ) : null}
                     </div>
 
                     <div>
-                        <label className="text-sm font-semibold text-slate-900">Description</label>
+                        <label className="text-sm font-semibold text-slate-900">{t("keyAreaModal.descLabel")}</label>
                         <textarea
                             name="description"
                             rows={3}
@@ -56,7 +58,7 @@ export default function KeyAreaModal({ isOpen, editing, onSave, onCancel }) {
                     </div>
 
                     <div>
-                        <label className="text-sm font-semibold text-slate-900">Color</label>
+                        <label className="text-sm font-semibold text-slate-900">{t("keyAreaModal.colorLabel")}</label>
                         <div className="flex items-center gap-2">
                             <input
                                 ref={colorRef}
@@ -92,22 +94,20 @@ export default function KeyAreaModal({ isOpen, editing, onSave, onCancel }) {
 
                     <div className="flex items-center gap-2">
                         <button className="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2">
-                            <FaSave /> Save
+                            <FaSave /> {t("keyAreaModal.save")}
                         </button>
                         <button
                             type="button"
                             onClick={onCancel}
                             className="px-3 py-2 rounded-lg bg-white border text-slate-700 hover:bg-slate-50 font-semibold"
                         >
-                            Cancel
+                            {t("keyAreaModal.cancel")}
                         </button>
                     </div>
 
                     <div className="text-xs text-slate-700 flex items-start gap-2">
                         <FaExclamationCircle className="mt-0.5" />
-                        <span>
-                            “Ideas” is locked and always at position 10. Enforce max 10 on server too.
-                        </span>
+                        <span>{t("keyAreaModal.ideasNote")}</span>
                     </div>
                 </form>
             </div>

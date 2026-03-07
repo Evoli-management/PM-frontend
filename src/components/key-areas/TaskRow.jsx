@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import StatusIndicator from '../ui/StatusIndicator';
 import PriorityBadge from '../ui/PriorityBadge';
@@ -7,7 +8,7 @@ import { FaEdit, FaTrash, FaEllipsisV } from 'react-icons/fa';
 import { useFormattedDate } from '../../hooks/useFormattedDate';
 
 const TaskRow = ({
-  t,
+  t: task,
   q,
   goals = [],
   // isSaving: boolean indicating this row is saving
@@ -40,6 +41,7 @@ const TaskRow = ({
   visibleColumns = null,
   rowClassName = "",
 }) => {
+  const { t } = useTranslation();
   const { formatDate } = useFormattedDate();
   const vc = visibleColumns ?? {
     responsible: true,
@@ -109,13 +111,13 @@ const TaskRow = ({
     <tr
       className={`border-t border-slate-200 hover:bg-slate-50 cursor-pointer transition-colors ${rowClassName}`.trim()}
       onMouseEnter={onMouseEnter}
-      onClick={() => onRowClick && onRowClick(t)}
+      onClick={() => onRowClick && onRowClick(task)}
     >
       <td className="px-3 py-2 align-top w-12">
         <div className="relative inline-flex items-center gap-2">
           <input
             type="checkbox"
-            aria-label={`Select ${t.title}`}
+            aria-label={`Select ${task.title}`}
             checked={!!isSelected}
             onChange={onToggleSelect}
             onClick={(e) => e.stopPropagation()}
@@ -139,7 +141,7 @@ const TaskRow = ({
             {menuOpen && createPortal(
               <div
                 ref={menuRef}
-                id={`task-row-menu-${t.id}`}
+                id={`task-row-menu-${task.id}`}
                 style={{ position: 'fixed', top: menuPos.top, left: menuPos.left, zIndex: 1000, minWidth: 160 }}
                 className="bg-white border border-slate-200 rounded shadow"
               >
@@ -149,7 +151,7 @@ const TaskRow = ({
                   onClick={(e) => { try { e.stopPropagation(); } catch (__) {} setMenuOpen(false); onEditClick && onEditClick(); }}
                 >
                   <FaEdit className="w-3 h-3" />
-                  Edit
+                  {t("taskRow.edit")}
                 </button>
                 <button
                   type="button"
@@ -158,7 +160,7 @@ const TaskRow = ({
                     try { e.stopPropagation(); } catch (__) {}
                     setMenuOpen(false);
                     if (typeof onDeleteClick === 'function') {
-                      const ok = window.confirm(`Delete task "${t.title}"?`);
+                      const ok = window.confirm(t("taskRow.deleteConfirm"));
                       if (ok) {
                         try {
                           await onDeleteClick();
@@ -170,7 +172,7 @@ const TaskRow = ({
                   }}
                 >
                   <FaTrash className="w-3 h-3" />
-                  Delete
+                  {t("taskRow.delete")}
                 </button>
               </div>,
               document.body
@@ -181,7 +183,7 @@ const TaskRow = ({
       <td className="px-3 py-2 align-top w-[240px] overflow-hidden">
         <div className="flex items-start gap-2">
           {(() => {
-            const lvl = getPriorityLevel ? getPriorityLevel(t.priority) : 2;
+            const lvl = getPriorityLevel ? getPriorityLevel(task.priority) : 2;
             if (lvl === 2) return null;
             if (lvl === 3) {
               return (
@@ -202,8 +204,8 @@ const TaskRow = ({
                   onChange={(e) => setLocalValue(e.target.value)}
                   onBlur={async () => {
                     setEditingKey(null);
-                    if (localValue !== t.title && typeof updateField === 'function') {
-                      try { await updateField(t.id, 'name', localValue); } catch (e) {}
+                    if (localValue !== task.title && typeof updateField === 'function') {
+                      try { await updateField(task.id, 'name', localValue); } catch (e) {}
                     }
                   }}
                   onKeyDown={async (e) => {
@@ -211,34 +213,34 @@ const TaskRow = ({
                       e.preventDefault();
                       e.currentTarget.blur();
                     } else if (e.key === 'Escape') {
-                      setLocalValue(t.title);
+                      setLocalValue(task.title);
                       setEditingKey(null);
                     }
                   }}
                 />
               ) : (
                 <div
-                  className={`text-sm truncate max-w-[540px] cursor-pointer ${String(t.status || "").toLowerCase() === 'done' ? 'text-slate-400 line-through' : 'text-slate-800'}`}
+                  className={`text-sm truncate max-w-[540px] cursor-pointer ${String(task.status || "").toLowerCase() === 'done' ? 'text-slate-400 line-through' : 'text-slate-800'}`}
                   onDoubleClick={(e) => {
                     try { if (clickTimer.current) { clearTimeout(clickTimer.current); clickTimer.current = null; } } catch (__) {}
                     e.stopPropagation();
-                    setLocalValue(t.title || '');
+                    setLocalValue(task.title || '');
                     setEditingKey('name');
                   }}
                   title="Double click to edit"
                 >
-                  {t.title}
+                  {task.title}
                 </div>
               )
             ) : (
-              <div className={`text-sm truncate max-w-[540px] ${String(t.status || "").toLowerCase() === 'done' ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
-                {t.title}
+              <div className={`text-sm truncate max-w-[540px] ${String(task.status || "").toLowerCase() === 'done' ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
+                {task.title}
               </div>
             )}
-            <div className="text-xs text-slate-500">{t.notes || t.description || ''}</div>
+            <div className="text-xs text-slate-500">{task.notes || task.description || ''}</div>
           </div>
           {isSaving && (
-            <div className="text-xs text-blue-600 ml-2">Saving...</div>
+            <div className="text-xs text-blue-600 ml-2">{t("taskRow.saving")}</div>
           )}
         </div>
       </td>
@@ -248,15 +250,15 @@ const TaskRow = ({
           <select
             className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-sm w-20"
             value={(() => {
-              if (t.assignee === 'Me' && currentUserId) return String(currentUserId);
-              const found = (users || []).find((u) => (u.name || '') === t.assignee);
+              if (task.assignee === 'Me' && currentUserId) return String(currentUserId);
+              const found = (users || []).find((u) => (u.name || '') === task.assignee);
               return found ? String(found.id) : '';
             })()}
             onChange={async (e) => {
               const sel = e.target.value;
               const user = (users || []).find((u) => String(u.id) === String(sel));
               const valueToSave = user ? ((currentUserId && String(user.id) === String(currentUserId)) ? 'Me' : (user.name || '')) : '';
-              try { await updateField && updateField(t.id, 'assignee', valueToSave); } catch (err) {}
+              try { await updateField && updateField(task.id, 'assignee', valueToSave); } catch (err) {}
             }}
           >
             <option value="">—</option>
@@ -265,23 +267,23 @@ const TaskRow = ({
             ))}
           </select>
           ) : (
-            t.assignee || '—'
+            task.assignee || '—'
           )}
         </td>
       )}
       <td className="px-3 py-2 align-top w-[120px]">
         <div className="flex items-center gap-2">
-          <StatusIndicator status={t.status || "open"} />
+          <StatusIndicator status={task.status || "open"} />
           <div>
             <select
-              aria-label={`Change status for ${t.title}`}
+              aria-label={`Change status for ${task.title}`}
               className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-sm w-18"
-              value={String(t.status || "open").toLowerCase()}
+              value={String(task.status || "open").toLowerCase()}
               onChange={(e) => onStatusChange && onStatusChange(e.target.value)}
             >
-              <option value="open">Open</option>
-              <option value="in_progress">In progress</option>
-              <option value="done">Done</option>
+              <option value="open">{t("taskRow.openOpt")}</option>
+              <option value="in_progress">{t("taskRow.inProgressOpt")}</option>
+              <option value="done">{t("taskRow.doneOpt")}</option>
             </select>
           </div>
         </div>
@@ -291,7 +293,7 @@ const TaskRow = ({
           {enableInlineEditing ? (
             (() => {
               const priorityValue = (() => {
-                const raw = t.priority ?? t.priority_level ?? t.priorityLevel ?? null;
+                const raw = task.priority ?? task.priority_level ?? task.priorityLevel ?? null;
                 if (raw === 1 || raw === '1' || String(raw) === '1') return 'low';
                 if (raw === 3 || raw === '3' || String(raw) === '3') return 'high';
                 const s = String(raw || '').toLowerCase();
@@ -304,18 +306,18 @@ const TaskRow = ({
                   value={priorityValue}
                   onChange={async (e) => {
                     const v = e.target.value;
-                    try { await updateField && updateField(t.id, 'priority', v); } catch (err) {}
+                    try { await updateField && updateField(task.id, 'priority', v); } catch (err) {}
                   }}
                 >
-                  <option value="high">High</option>
-                  <option value="normal">Normal</option>
-                  <option value="low" style={{ color: "#6b7280" }}>Low</option>
+                  <option value="high">{t("taskRow.highOpt")}</option>
+                  <option value="normal">{t("taskRow.normalOpt")}</option>
+                  <option value="low" style={{ color: "#6b7280" }}>{t("taskRow.lowOpt")}</option>
                 </select>
               );
             })()
           ) : (
             (() => {
-              const raw = t.priority ?? t.priority_level ?? t.priorityLevel ?? null;
+              const raw = task.priority ?? task.priority_level ?? task.priorityLevel ?? null;
               let norm;
               if (raw === 1 || raw === '1' || String(raw) === '1') norm = 'low';
               else if (raw === 3 || raw === '3' || String(raw) === '3') norm = 'high';
@@ -366,7 +368,7 @@ const TaskRow = ({
               }}
               title="Edit start date"
             >
-              <span>{(t.start_date) ? formatDate(t.start_date) : '—'}</span>
+              <span>{(task.start_date) ? formatDate(task.start_date) : '—'}</span>
               {editingKey === 'start_date' && <span className="text-sm">📅</span>}
             </button>
             <input
@@ -374,17 +376,17 @@ const TaskRow = ({
               type="date"
               className="absolute opacity-0"
               style={{ width: 0, height: 0 }}
-              value={toDateOnly(t.start_date) || ''}
+              value={toDateOnly(task.start_date) || ''}
               onChange={async (e) => {
-                const v = e.target.value || '';
-                try { await updateField && updateField(t.id, 'start_date', v); } catch (e) {}
+                const v = e.targetask.value || '';
+                try { await updateField && updateField(task.id, 'start_date', v); } catch (e) {}
               }}
               onBlur={() => setEditingKey(null)}
               onClick={(e) => e.stopPropagation()}
             />
           </div>
         ) : (
-          (t.start_date) ? formatDate(t.start_date) : '—'
+          (task.start_date) ? formatDate(task.start_date) : '—'
         )}
         </td>
       )}
@@ -401,7 +403,7 @@ const TaskRow = ({
                 setTimeout(() => {
                   const input = dateInputRefs.current['end_date'];
                   if (input?.showPicker) {
-                    input.showPicker();
+                    inputask.showPicker();
                   } else {
                     input?.focus();
                   }
@@ -409,7 +411,7 @@ const TaskRow = ({
               }}
               title="Edit end date"
             >
-              <span>{(t.end_date) ? formatDate(t.end_date) : '—'}</span>
+              <span>{(task.end_date) ? formatDate(task.end_date) : '—'}</span>
               {editingKey === 'end_date' && <span className="text-sm">📅</span>}
             </button>
             <input
@@ -417,17 +419,17 @@ const TaskRow = ({
               type="date"
               className="absolute opacity-0"
               style={{ width: 0, height: 0 }}
-              value={toDateOnly(t.end_date) || ''}
+              value={toDateOnly(task.end_date) || ''}
               onChange={async (e) => {
-                const v = e.target.value || '';
-                try { await updateField && updateField(t.id, 'end_date', v); } catch (e) {}
+                const v = e.targetask.value || '';
+                try { await updateField && updateField(task.id, 'end_date', v); } catch (e) {}
               }}
               onBlur={() => setEditingKey(null)}
               onClick={(e) => e.stopPropagation()}
             />
           </div>
         ) : (
-          (t.end_date) ? formatDate(t.end_date) : '—'
+          (task.end_date) ? formatDate(task.end_date) : '—'
         )}
         </td>
       )}
@@ -444,7 +446,7 @@ const TaskRow = ({
                 setTimeout(() => {
                   const input = dateInputRefs.current['deadline'];
                   if (input?.showPicker) {
-                    input.showPicker();
+                    inputask.showPicker();
                   } else {
                     input?.focus();
                   }
@@ -452,7 +454,7 @@ const TaskRow = ({
               }}
               title="Edit deadline"
             >
-              <span>{(t.deadline || t.dueDate) ? formatDate(t.deadline || t.dueDate) : '—'}</span>
+              <span>{(task.deadline || task.dueDate) ? formatDate(task.deadline || task.dueDate) : '—'}</span>
               {editingKey === 'deadline' && <span className="text-sm">📅</span>}
             </button>
             <input
@@ -460,24 +462,24 @@ const TaskRow = ({
               type="date"
               className="absolute opacity-0"
               style={{ width: 0, height: 0 }}
-              value={toDateOnly(t.deadline || t.dueDate) || ''}
+              value={toDateOnly(task.deadline || task.dueDate) || ''}
               onChange={async (e) => {
-                const v = e.target.value || '';
-                try { await updateField && updateField(t.id, 'dueDate', v); } catch (e) {}
+                const v = e.targetask.value || '';
+                try { await updateField && updateField(task.id, 'dueDate', v); } catch (e) {}
               }}
               onBlur={() => setEditingKey(null)}
               onClick={(e) => e.stopPropagation()}
             />
           </div>
         ) : (
-          (t.deadline || t.dueDate) ? formatDate(t.deadline || t.dueDate) : '—'
+          (task.deadline || task.dueDate) ? formatDate(task.deadline || task.dueDate) : '—'
         )}
         </td>
       )}
       {vc.duration && (
         <td className="px-3 py-2 align-top text-slate-800 w-[90px]">
           {(() => {
-            const raw = t.duration ?? t.duration_minutes ?? '';
+            const raw = task.duration ?? task.duration_minutes ?? '';
             const val = String(raw).trim();
             return val || '—';
           })()}
@@ -485,7 +487,7 @@ const TaskRow = ({
       )}
       {vc.completed && (
         <td className="px-3 py-2 align-top text-slate-800 w-[120px]">
-          {(t.completionDate || t.completion_date) ? <span>{formatDate(t.completionDate || t.completion_date)}</span> : <span className="text-slate-500">—</span>}
+          {(task.completionDate || task.completion_date) ? <span>{formatDate(task.completionDate || task.completion_date)}</span> : <span className="text-slate-500">—</span>}
         </td>
       )}
       

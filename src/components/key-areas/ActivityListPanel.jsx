@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { FaTimes } from 'react-icons/fa';
 
 /**
@@ -13,6 +14,7 @@ export default function ActivityListPanel({
     onTaskDeselect,
     header,
 }) {
+    const { t } = useTranslation();
     return (
         <div className="flex flex-col h-full">
             {/* Header with Close Button */}
@@ -26,11 +28,11 @@ export default function ActivityListPanel({
                                 {selectedTask.title || 'Untitled Task'}
                             </h3>
                             <p className="text-xs text-slate-500 mt-1">
-                                Activities
+                                {t("activityListPanel.activities")}
                             </p>
                         </div>
                     ) : (
-                        <p className="text-sm text-slate-500">Activities</p>
+                        <p className="text-sm text-slate-500">{t("activityListPanel.activities")}</p>
                     )}
                 </div>
                 {onTaskDeselect && (
@@ -52,7 +54,7 @@ export default function ActivityListPanel({
                     children
                 ) : (
                     <div className="flex items-center justify-center h-full text-slate-400 text-sm">
-                        Select a task to view activities
+                        {t("tripleViewLayout.selectTask")}
                     </div>
                 )}
             </div>

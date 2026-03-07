@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toDateOnly } from '../../utils/keyareasHelpers';
 import Modal from '../shared/Modal';
 import { getPriorityLevel } from '../../utils/keyareasHelpers';
@@ -66,6 +67,7 @@ export default function EditActivityModal({
   const usersLoadedRef = useRef(false);
   const [localKeyAreas, setLocalKeyAreas] = useState(keyAreas || []);
   const [localTasks, setLocalTasks] = useState(tasks || []);
+  const { t } = useTranslation();
   const [localGoals, setLocalGoals] = useState(goals || []);
   const [usersList, setUsersList] = useState(users || []);
   const [listNamesMap, setListNamesMap] = useState({});
@@ -383,7 +385,7 @@ export default function EditActivityModal({
           onMouseDown={handleMouseDown}
         >
           <h3 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xl font-semibold text-slate-900">
-            Edit Activity
+            {t("editActivityModal.title")}
           </h3>
           <div className="flex items-center justify-end gap-2">
             <button
@@ -392,7 +394,7 @@ export default function EditActivityModal({
               className="rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold px-3 py-1.5 text-sm inline-flex items-center gap-1.5"
             >
               <FaSave className="text-xs" />
-              Save
+              {t("createTaskModal.save")}
             </button>
             <button
               type="button"
@@ -410,7 +412,7 @@ export default function EditActivityModal({
 
         <form id="edit-activity-form" className="pm-notched-form px-4 pb-4 pt-2 space-y-2 overflow-y-auto flex-1" onSubmit={onSubmit}>
           <div className="mb-4">
-            <label className="text-sm font-medium text-slate-700" htmlFor="ka-activity-title">Activity name</label>
+            <label className="text-sm font-medium text-slate-700" htmlFor="ka-activity-title">{t("editActivityModal.activityNameLabel")}</label>
             <input
               id="ka-activity-title"
               required
@@ -425,7 +427,7 @@ export default function EditActivityModal({
           <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-y-4 md:gap-x-6">
             <div className="grid grid-rows-6 gap-0 md:col-span-1">
               <div>
-                <label className="text-sm font-medium text-slate-700">Description</label>
+                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.descLabel")}</label>
                 <input
                   name="description"
                   className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 mt-0"
@@ -436,7 +438,7 @@ export default function EditActivityModal({
               </div>
 
               <div>
-                <label className="text-sm font-medium text-slate-700">Start date</label>
+                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.startDateLabel")}</label>
                 <div className="relative mt-0">
                   <input
                     name="start_date"
@@ -457,7 +459,7 @@ export default function EditActivityModal({
               </div>
 
               <div>
-                <label className="text-sm font-medium text-slate-700">End date</label>
+                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.endDateLabel")}</label>
                 <div className="relative mt-0">
                   <input
                     name="end_date"
@@ -480,7 +482,7 @@ export default function EditActivityModal({
               </div>
 
               <div>
-                <label className="text-sm font-medium text-slate-700">Deadline</label>
+                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.deadlineLabel")}</label>
                 <div className="relative mt-0.5">
                   <input
                     name="deadline"
@@ -501,7 +503,7 @@ export default function EditActivityModal({
               </div>
 
               <div>
-                <label className="text-sm font-medium text-slate-700">Duration</label>
+                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.durationLabel")}</label>
                 <input
                   name="duration"
                   className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 mt-0"
@@ -519,10 +521,10 @@ export default function EditActivityModal({
 
             <div className="grid grid-rows-6 gap-0 md:col-span-1">
               <div>
-                <label className="text-sm font-medium text-slate-700">Key Area</label>
+                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.keyAreaLabel")}</label>
                 <div className="relative mt-0">
                   <select name="key_area_id" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" value={keyAreaId} onChange={(e) => { setKeyAreaId(e.target.value); setKeyAreaError(''); }} required>
-                    <option value="">— Select Key Area —</option>
+                    <option value="">{t("createTaskModal.selectKeyArea")}</option>
                     {(localKeyAreas && localKeyAreas.length ? localKeyAreas : keyAreas).map((ka, idx) => (<option key={ka.id} value={ka.id}>{formatKeyAreaLabel(ka, idx)}</option>))}
                   </select>
                   <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
@@ -531,12 +533,12 @@ export default function EditActivityModal({
               </div>
 
               <div>
-                <label className="text-sm font-medium text-slate-700">List</label>
+                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.listLabel")}</label>
                 <div className="relative mt-0">
                   <select name="list_index" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" value={listIndex} onChange={(e) => { setListIndex(e.target.value); setListError(''); }} disabled={!keyAreaId} required>
-                    {!keyAreaId ? (<option value="">— Select Key Area first —</option>) : (<option value="">— Select List —</option>)}
+                    {!keyAreaId ? (<option value="">{t("editActivityModal.selectKeyAreaFirst")}</option>) : (<option value="">{t("editActivityModal.selectList")}</option>)}
                     {keyAreaId && localAvailableLists.map((n) => {
-                      const label = (localListNames && localListNames[n]) || `List ${n}`;
+                      const label = (localListNames && localListNames[n]) || t("createTaskModal.list", { n });
                       return (<option key={n} value={n}>{label}</option>);
                     })}
                   </select>
@@ -546,10 +548,10 @@ export default function EditActivityModal({
               </div>
 
               <div>
-                <label className="text-sm font-medium text-slate-700">Task</label>
+                <label className="text-sm font-medium text-slate-700">{t("editActivityModal.taskLabel")}</label>
                 <div className="relative mt-0">
                   <select name="task_id" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" value={taskId} onChange={(e) => setTaskId(e.target.value)} disabled={!keyAreaId || !listIndex}>
-                    {!keyAreaId ? (<option value="">— Select Key Area first —</option>) : (!listIndex ? (<option value="">— Select List first —</option>) : (<option value="">— Select Task —</option>))}
+                    {!keyAreaId ? (<option value="">{t("editActivityModal.selectKeyAreaFirst")}</option>) : (!listIndex ? (<option value="">{t("editActivityModal.selectListFirst")}</option>) : (<option value="">{t("editActivityModal.selectTask")}</option>))}
                     {keyAreaId && listIndex && filteredTasks.map((t) => {
                       const label = t.title || t.name || t.activity_name || t.text || String(t.id);
                       return (<option key={t.id} value={t.id}>{label}</option>);
@@ -560,10 +562,10 @@ export default function EditActivityModal({
               </div>
 
               <div>
-                <label className="text-sm font-medium text-slate-700">Responsible</label>
+                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.responsibleLabel")}</label>
                 <div className="relative mt-0">
                   <select name="assignee" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" value={assignee} onChange={(e) => setAssignee(e.target.value)}>
-                    <option value="">— Unassigned —</option>
+                    <option value="">{t("createTaskModal.unassigned")}</option>
                     {usersList.map((u) => (
                       <option key={u.id} value={u.id}>
                         {u.name || u.firstname} {u.lastname || ''}
@@ -575,7 +577,7 @@ export default function EditActivityModal({
               </div>
 
               <div>
-                <label className="text-sm font-medium text-slate-700">Priority</label>
+                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.priorityLabel")}</label>
                 <div className="relative mt-0">
                   <select
                     name="priority"
@@ -583,19 +585,19 @@ export default function EditActivityModal({
                     value={priority}
                     onChange={(e) => setPriority(e.target.value)}
                   >
-                    <option value="high">High</option>
-                    <option value="normal">Normal</option>
-                    <option value="low" style={{ color: "#6b7280" }}>Low</option>
+                    <option value="high">{t("createTaskModal.highOpt")}</option>
+                    <option value="normal">{t("createTaskModal.normalOpt")}</option>
+                    <option value="low" style={{ color: "#6b7280" }}>{t("createTaskModal.lowOpt")}</option>
                   </select>
                   <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 </div>
               </div>
 
               <div>
-                <label className="text-sm font-medium text-slate-700">Goal</label>
+                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.goalLabel")}</label>
                 <div className="relative mt-0">
                   <select name="goal" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" value={goal} onChange={(e) => setGoal(e.target.value)}>
-                    <option value="">— Select Goal —</option>
+                    <option value="">{t("createTaskModal.selectGoal")}</option>
                     {(localGoals && localGoals.length ? localGoals : goals).map((g) => (
                       <option key={g.id} value={g.id}>{g.title}</option>
                     ))}

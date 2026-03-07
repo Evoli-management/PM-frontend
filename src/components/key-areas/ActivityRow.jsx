@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import { FaSpinner, FaCheckCircle, FaRegCircle, FaAlignJustify, FaTag, FaTrash, FaEdit, FaAngleDoubleRight, FaChevronUp, FaChevronDown, FaEllipsisV } from 'react-icons/fa';
 import { toDateOnly, getPriorityLabel, mapUiStatusToServer, getStatusColorClass, getPriorityColorClass, resolveAssignee } from '../../utils/keyareasHelpers';
@@ -23,6 +24,7 @@ const ActivityRow = ({
   currentUserId = null,
   taskAssignee = null,
 }) => {
+  const { t } = useTranslation();
   const isSaving = savingActivityIds && savingActivityIds.has(a.id);
   const eff = a.priority ?? taskPriority ?? 2;
   const lvl = getPriorityLevel ? getPriorityLevel(eff) : 2;
@@ -117,15 +119,15 @@ const ActivityRow = ({
               >
                 <button type="button" className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm hover:bg-slate-50" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onEdit && onEdit(a); }}>
                   <FaEdit className="text-slate-600" />
-                  <span>Edit</span>
+                  <span>{t("activityRow.edit")}</span>
                 </button>
                 <button type="button" className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); if (confirm(`Delete activity \"${(a.text||a.activity_name||'Untitled activity')}\"?`)) remove && remove(a.id); }}>
                   <FaTrash />
-                  <span>Delete</span>
+                  <span>{t("activityRow.delete")}</span>
                 </button>
                 <button type="button" className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onCreateAsTask && onCreateAsTask(a); }}>
                   <FaAngleDoubleRight />
-                  <span>Convert to task</span>
+                  <span>{t("activityRow.convertToTask")}</span>
                 </button>
               </div>,
               document.body
@@ -204,7 +206,7 @@ const ActivityRow = ({
       <div className="mt-2 flex items-center gap-4 text-sm text-slate-700">
         {/* Responsible */}
         <div className="flex items-center gap-2">
-          <div className="text-xs text-slate-500">Responsible</div>
+          <div className="text-xs text-slate-500">{t("activityRow.responsible")}</div>
           {typeof updateField === 'function' ? (
                 editingKey === 'assignee' ? (
               <select
@@ -234,7 +236,7 @@ const ActivityRow = ({
 
         {/* Status */}
         <div className="flex items-center gap-2">
-          <div className="text-xs text-slate-500">Status</div>
+          <div className="text-xs text-slate-500">{t("activityRow.status")}</div>
           {typeof updateField === 'function' ? (
             <select
               className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-sm"
@@ -244,9 +246,9 @@ const ActivityRow = ({
                 try { await updateField && updateField(a.id, 'status', mapUiStatusToServer(ui)); } catch (err) {}
               }}
             >
-              <option value="open">Open</option>
-              <option value="in_progress">In progress</option>
-              <option value="done">Done</option>
+              <option value="open">{t("activityRow.openOpt")}</option>
+              <option value="in_progress">{t("activityRow.inProgressOpt")}</option>
+              <option value="done">{t("activityRow.doneOpt")}</option>
             </select>
           ) : (
             (() => {
@@ -258,7 +260,7 @@ const ActivityRow = ({
 
         {/* Priority */}
         <div className="flex items-center gap-2">
-          <div className="text-xs text-slate-500">Priority</div>
+          <div className="text-xs text-slate-500">{t("activityRow.priority")}</div>
           {typeof updateField === 'function' ? (
             (() => {
               const priorityValue = (() => {
@@ -276,24 +278,24 @@ const ActivityRow = ({
                     try { await updateField && updateField(a.id, 'priority', v); } catch (err) {}
                   }}
                 >
-                  <option value="high">High</option>
-                  <option value="normal">Normal</option>
-                  <option value="low" style={{ color: "#6b7280" }}>Low</option>
+                  <option value="high">{t("activityRow.highOpt")}</option>
+                  <option value="normal">{t("activityRow.normalOpt")}</option>
+                  <option value="low" style={{ color: "#6b7280" }}>{t("activityRow.lowOpt")}</option>
                 </select>
               );
             })()
           ) : (
             (() => {
               const lvlLocal = getPriorityLevel ? getPriorityLevel(a.priority ?? a.priority_level ?? eff) : 2;
-              if (lvlLocal === 2) return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-amber-100 text-amber-800">Normal</span>;
-              return <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs ${lvlLocal === 3 ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800'}`}>{lvlLocal === 3 ? 'High' : 'Low'}</span>;
+              if (lvlLocal === 2) return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-amber-100 text-amber-800">{t("activityRow.normalOpt")}</span>;
+              return <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs ${lvlLocal === 3 ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800'}`}>{lvlLocal === 3 ? t("activityRow.highOpt") : t("activityRow.lowOpt")}</span>;
             })()
           )}
         </div>
 
         {/* Dates: start / end / deadline */}
         <div className="flex items-center gap-3 ml-auto">
-          <div className="text-xs text-slate-500">Start</div>
+          <div className="text-xs text-slate-500">{t("activityRow.start")}</div>
           {typeof updateField === 'function' ? (
             editingKey === 'start_date' ? (
               <input autoFocus type="date" className="border rounded px-1 py-0.5 text-sm" value={toDateOnly(a.start_date) || ''} onChange={async (e) => { try { await updateField && updateField(a.id, 'start_date', e.target.value); } catch (err) {} setEditingKey(null); }} onBlur={() => setEditingKey(null)} />
@@ -304,7 +306,7 @@ const ActivityRow = ({
             <div>{toDateOnly(a.start_date) || '—'}</div>
           )}
 
-          <div className="text-xs text-slate-500">End</div>
+          <div className="text-xs text-slate-500">{t("activityRow.end")}</div>
           {typeof updateField === 'function' ? (
             editingKey === 'end_date' ? (
               <input autoFocus type="date" className="border rounded px-1 py-0.5 text-sm" value={toDateOnly(a.end_date) || ''} onChange={async (e) => { try { await updateField && updateField(a.id, 'end_date', e.target.value); } catch (err) {} setEditingKey(null); }} onBlur={() => setEditingKey(null)} />
@@ -315,7 +317,7 @@ const ActivityRow = ({
             <div>{toDateOnly(a.end_date) || '—'}</div>
           )}
 
-          <div className="text-xs text-slate-500">Deadline</div>
+          <div className="text-xs text-slate-500">{t("activityRow.deadline")}</div>
           {typeof updateField === 'function' ? (
             editingKey === 'deadline' ? (
               <input autoFocus type="date" className="border rounded px-1 py-0.5 text-sm" value={toDateOnly(a.deadline) || ''} onChange={async (e) => { try { await updateField && updateField(a.id, 'deadline', e.target.value); } catch (err) {} setEditingKey(null); }} onBlur={() => setEditingKey(null)} />

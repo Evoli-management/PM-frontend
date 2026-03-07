@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 /**
@@ -11,9 +12,10 @@ export default function ViewTabsNavigation({
     setActiveFilter,
     pendingDelegationsCount = 0
 }) {
+    const { t } = useTranslation();
     const [openActiveMenu, setOpenActiveMenu] = useState(false);
     const activeMenuRef = useRef(null);
-    const activeTasksLabel = activeFilter === 'all' ? 'ALL TASKS' : 'ACTIVE TASKS';
+    const activeTasksLabel = activeFilter === 'all' ? t("viewTabsNavigation.allTasks") : t("viewTabsNavigation.activeTasks");
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -60,7 +62,7 @@ export default function ViewTabsNavigation({
                                         : 'text-slate-600 hover:text-slate-900'
                                 }`}
                             >
-                                ACTIVE TASKS
+                                {t("viewTabsNavigation.activeTasks")}
                             </button>
                             <button
                                 type="button"
@@ -75,7 +77,7 @@ export default function ViewTabsNavigation({
                                         : 'text-slate-600 hover:text-slate-900'
                                 }`}
                             >
-                                ALL TASKS
+                                {t("viewTabsNavigation.allTasks")}
                             </button>
                         </div>
                     )}
@@ -97,7 +99,7 @@ export default function ViewTabsNavigation({
                     }`}
                     title="Show delegated tasks"
                 >
-                    DELEGATED
+                    {t("viewTabsNavigation.delegated")}
                     {pendingDelegationsCount > 0 && (
                         <span className="inline-block px-2 py-0.5 bg-red-500 text-white text-xs rounded-full font-bold">
                             {pendingDelegationsCount}
@@ -121,7 +123,7 @@ export default function ViewTabsNavigation({
                     }`}
                     title="Show to-do items"
                 >
-                    TO-DO (RED)
+                    {t("viewTabsNavigation.todo")}
                 </button>
                 
                 {/* ACTIVITY TRAP Tab */}
@@ -140,7 +142,7 @@ export default function ViewTabsNavigation({
                     }`}
                     title="Show tasks without goal assignment"
                 >
-                    ACTIVITY TRAP
+                    {t("viewTabsNavigation.activityTrap")}
                 </button>
                 
                 {/* MY FOCUS Tab */}
@@ -159,7 +161,7 @@ export default function ViewTabsNavigation({
                     }`}
                     title="Show My Focus (Eisenhower matrix)"
                 >
-                    MY FOCUS
+                    {t("viewTabsNavigation.myFocus")}
                 </button>
             </div>
         </div>

@@ -252,15 +252,15 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
     const newErrors = {};
 
     if (!formData.title.trim()) {
-      newErrors.title = "Title is required";
+      newErrors.title = t("goalForm.errTitleRequired");
     } else if (formData.title.length < 3) {
-      newErrors.title = "Title must be at least 3 characters";
+      newErrors.title = t("goalForm.errTitleMinLength");
     } else if (formData.title.length > 200) {
-      newErrors.title = "Title must be less than 200 characters (current: " + formData.title.length + ")";
+      newErrors.title = t("goalForm.errTitleMaxLength", { n: formData.title.length });
     }
 
     if (!formData.dueDate) {
-      newErrors.dueDate = "Deadline is required";
+      newErrors.dueDate = t("goalForm.errDeadlineRequired");
     } else {
       const dueDate = new Date(formData.dueDate);
       const today = new Date();
@@ -268,7 +268,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
 
       // allow deadline to be today or in the future for new goals
       if (dueDate < today && !isEditing) {
-        newErrors.dueDate = "Deadline must be today or in the future";
+        newErrors.dueDate = t("goalForm.errDeadlinePast");
       }
     }
 
@@ -277,7 +277,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
       const startDate = new Date(formData.startDate);
       const dueDate = new Date(formData.dueDate);
       if (startDate > dueDate) {
-        newErrors.startDate = "Start date must be before or equal to due date";
+        newErrors.startDate = t("goalForm.errStartAfterDue");
       }
     }
 
@@ -315,7 +315,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
       onClose();
     } catch (err) {
       setErrors({
-        general: err.message || "Failed to save goal. Please try again.",
+        general: err.message || t("goalForm.errSave"),
       });
     } finally {
       setIsSubmitting(false);
@@ -396,7 +396,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
           {/* left spacer so justify-between places close button on the right */}
           <div className="w-10" aria-hidden="true" />
           <h2 className="text-xl font-semibold text-gray-900 absolute left-1/2 transform -translate-x-1/2">
-            {isEditing ? "Edit Goal" : "Add Goal"}
+            {isEditing ? t("goalForm.editGoalTitle") : t("goalForm.addGoalTitle")}
           </h2>
           <button
             type="button"
@@ -435,7 +435,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
           <div className="mb-3 space-y-2">
             <div className="flex items-center justify-between">
               <label className="block text-sm font-medium text-slate-700">
-                Goal name <span className="text-red-500">*</span>
+                {t("goalForm.goalNameLabel")} <span className="text-red-500">*</span>
               </label>
               <span className={`text-xs font-medium ${formData.title.length > 150 ? 'text-red-600' :
                   formData.title.length > 100 ? 'text-yellow-600' :
@@ -451,10 +451,10 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
               onChange={(e) => handleInputChange("title", e.target.value)}
               className={`w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 mt-0.5 ${errors.title ? "border-red-300 bg-red-50" : ""
                 }`}
-              placeholder="Enter goal name (max 200 characters)"
+              placeholder={t("goalForm.goalNamePlaceholder")}
             />
             {formData.title.length > 150 && !errors.title && (
-              <p className="text-yellow-700 text-xs mt-1">⚠️ Long names may be truncated in some views</p>
+              <p className="text-yellow-700 text-xs mt-1">{t("goalForm.longNameWarning")}</p>
             )}
             {errors.title && (
               <p className="text-red-600 text-xs mt-1">{errors.title}</p>
@@ -467,19 +467,19 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
             <div className="grid gap-3 content-start md:col-span-1">
               <div className="min-h-[72px]">
                 <label className="block text-sm font-medium text-slate-700">
-                  Description
+                  {t("goalForm.descLabel")}
                 </label>
                 <input
                   type="text"
                   value={formData.description}
                   onChange={(e) => handleInputChange("description", e.target.value)}
                   className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 mt-0"
-                  placeholder="Add a short description (optional)"
+                  placeholder={t("goalForm.descPlaceholder")}
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700">
-                  Start date
+                  {t("goalForm.startDateLabel")}
                 </label>
                 <div className="relative mt-0">
                   <input
@@ -501,7 +501,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
 
               <div>
                 <label className="block text-sm font-medium text-slate-700">
-                  Deadline <span className="text-red-500">*</span>
+                  {t("goalForm.deadlineLabel")} <span className="text-red-500">*</span>
                 </label>
                 <div className="relative mt-0">
                   <input
@@ -529,7 +529,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
 
               <div>
                 <label className="block text-sm font-medium text-slate-700">
-                  Key Area
+                  {t("goalForm.keyAreaLabel")}
                 </label>
                 <select
                   value={formData.keyAreaId}
@@ -538,7 +538,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
                   }
                   className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-10 mt-0"
                 >
-                  <option value="">Select key area</option>
+                  <option value="">{t("goalForm.keyAreaPlaceholder")}</option>
                   {keyAreas.map((area, idx) => (
                     <option key={area.id} value={area.id}>
                       {formatKeyAreaLabel(area, idx)}
@@ -549,36 +549,36 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
 
               <div>
                 <label className="block text-sm font-medium text-slate-700">
-                  Visibility
+                  {t("goalForm.visibilityLabel")}
                 </label>
                 <select
                   value={formData.visibility}
                   onChange={(e) => handleInputChange("visibility", e.target.value)}
                   className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-10 mt-0"
                 >
-                  <option value="public">Public</option>
-                  <option value="private">Private</option>
+                  <option value="public">{t("goalForm.publicOpt")}</option>
+                  <option value="private">{t("goalForm.privateOpt")}</option>
                 </select>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-slate-700">
-                  Priority
+                  {t("goalForm.priorityLabel")}
                 </label>
                 <select
                   value={formData.priority}
                   onChange={(e) => handleInputChange("priority", e.target.value)}
                   className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-10 mt-0"
                 >
-                  <option value="low" style={{ color: "#6b7280" }}>↓ Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high" >❗️ High</option>
+                  <option value="low" style={{ color: "#6b7280" }}>{t("goalForm.lowOpt")}</option>
+                  <option value="medium">{t("goalForm.mediumOpt")}</option>
+                  <option value="high">{t("goalForm.highOpt")}</option>
                 </select>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-slate-700">
-                  Tags (comma-separated)
+                  {t("goalForm.tagsLabel")}
                 </label>
                 <input
                   type="text"
@@ -588,20 +588,20 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
                     handleInputChange("tags", tags);
                   }}
                   className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 mt-0"
-                  placeholder="e.g., important, urgent"
+                  placeholder={t("goalForm.tagsPlaceholder")}
                 />
               </div>
 
               {/* Parent Goal Picker */}
               <div ref={parentGoalPickerRef} className="relative">
                 <label className="block text-sm font-medium text-slate-700">
-                  Link to parent goal <span className="text-gray-400 font-normal">(optional)</span>
+                  {t("goalForm.parentGoalLabel")} <span className="text-gray-400 font-normal">{t("goalForm.parentGoalOptional")}</span>
                 </label>
                 {formData.parentGoalId ? (
                   <div className="flex items-center gap-2 mt-0.5 px-3 py-2 rounded-lg border border-purple-300 bg-purple-50">
                     <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-purple-600 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M12.293 3.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 9H7a3 3 0 000 6h1a1 1 0 110 2H7A5 5 0 017 7h7.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
                     <span className="flex-1 text-sm text-purple-800 truncate">
-                      {availableGoals.find(g => g.id === formData.parentGoalId)?.title || 'Parent goal selected'}
+                      {availableGoals.find(g => g.id === formData.parentGoalId)?.title || t("goalForm.parentGoalSelected")}
                     </span>
                     <button type="button" onClick={() => handleInputChange('parentGoalId', null)} className="text-purple-500 hover:text-purple-700 ml-1" aria-label="Remove parent goal">✕</button>
                   </div>
@@ -609,7 +609,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
                   <div className="mt-0.5">
                     <input
                       type="text"
-                      placeholder="Search goals to link as parent..."
+                      placeholder={t("goalForm.parentGoalPlaceholder")}
                       value={parentGoalSearch}
                       onChange={(e) => { setParentGoalSearch(e.target.value); setShowParentGoalDropdown(true); }}
                       onFocus={() => setShowParentGoalDropdown(true)}
@@ -635,7 +635,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
                             </button>
                           ))}
                         {availableGoals.filter(g => g.id !== goal?.id && g.title?.toLowerCase().includes(parentGoalSearch.toLowerCase())).length === 0 && (
-                          <div className="px-3 py-2 text-sm text-slate-400">No matching goals</div>
+                          <div className="px-3 py-2 text-sm text-slate-400">{t("goalForm.noMatchingGoals")}</div>
                         )}
                       </div>
                     )}
@@ -663,7 +663,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
                     <ChevronLeft className="w-3 h-3" />
                   </button>
                   <span className="text-sm font-medium text-gray-800">
-                    Milestones ({activeMilestoneIndex + 1}/{milestones.length})
+                    {t("goalForm.milestonesLabel", { current: activeMilestoneIndex + 1, total: milestones.length })}
                   </span>
                   <button
                     type="button"
@@ -681,14 +681,14 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
                   className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Plus className="w-3 h-3" />
-                  Add
+                  {t("goalForm.addMilestone")}
                 </button>
               </div>
 
               {/* Name of milestone */}
               <div>
                 <label className="block text-sm font-medium text-slate-700">
-                  Name of milestone
+                  {t("goalForm.milestoneName")}
                 </label>
                 <input
                   type="text"
@@ -701,7 +701,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
               {/* Start date (also available on the right for convenience) */}
               <div>
                 <label className="block text-sm font-medium text-slate-700">
-                  Start date
+                  {t("goalForm.startDateLabel")}
                 </label>
                 <div className="relative mt-0">
                   <input
@@ -724,7 +724,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
               {/* Due date */}
               <div>
                 <label className="block text-sm font-medium text-slate-700">
-                  Deadline
+                  {t("goalForm.deadlineLabel")}
                 </label>
                 <div className="relative mt-0">
                   <input
@@ -788,7 +788,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
               className="rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-4 py-2 text-sm"
             >
               <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M433.941 129.941l-83.882-83.882A48 48 0 0 0 316.118 32H48C21.49 32 0 53.49 0 80v352c0 26.51 21.49 48 48 48h352c26.51 0 48-21.49 48-48V163.882a48 48 0 0 0-14.059-33.941zM224 416c-35.346 0-64-28.654-64-64 0-35.346 28.654-64 64-64s64 28.654 64 64c0 35.346-28.654 64-64 64zm96-304.52V212c0 6.627-5.373 12-12 12H76c-6.627 0-12-5.373-12-12V108c0-6.627 5.373-12 12-12h228.52c3.183 0 6.235 1.264 8.485 3.515l3.48 3.48A11.996 11.996 0 0 1 320 111.48z"></path></svg>
-              {isSubmitting ? "Saving..." : isEditing ? "Update" : "Save"}
+              {isSubmitting ? t("goalForm.saving") : isEditing ? t("goalForm.update") : t("goalForm.save")}
             </button>
 
             <button
@@ -796,7 +796,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
               onClick={onClose}
               className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
             >
-              Cancel
+              {t("goalForm.cancel")}
             </button>
 
             <button
@@ -804,7 +804,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
               className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
               disabled
             >
-              Help
+              {t("goalForm.help")}
             </button>
           </div>
         </div>

@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FaSave, FaTrash } from 'react-icons/fa';
 import Modal from '../shared/Modal';
 import usersService from '../../services/usersService';
@@ -60,6 +61,7 @@ export default function EditTaskModal({
   // When true, editing a Don't Forget task (no Key Area required)
   isDontForgetMode = false,
 }) {
+  const { t } = useTranslation();
   const hasSameListNames = (a, b) => {
     const aObj = a && typeof a === 'object' ? a : {};
     const bObj = b && typeof b === 'object' ? b : {};
@@ -437,12 +439,12 @@ export default function EditTaskModal({
   const handleSave = () => {
     // Validate required fields
     if (!keyAreaId && !isDontForgetMode) {
-      setKeyAreaError('Please select a Key Area');
+      setKeyAreaError(t("editTaskModal.keyAreaRequired"));
       try { document.querySelector('select[name="key_area_id"]')?.focus?.(); } catch (_) {}
       return;
     }
     if (!listIndex) {
-      setListError('Please select a List');
+      setListError(t("editTaskModal.listRequired"));
       try { document.querySelector('select[name="list_index"]')?.focus?.(); } catch (_) {}
       return;
     }
@@ -504,7 +506,7 @@ export default function EditTaskModal({
   const handleDelete = async () => {
     const id = initialData.id || initialData.taskId || initialData.task_id || initialData._id;
     if (!id) return;
-    if (!window.confirm('Delete this task?')) return;
+    if (!window.confirm(t("editTaskModal.deleteConfirm"))) return;
     try {
       if (typeof onDelete === 'function') {
         await onDelete(id, initialData);
@@ -546,7 +548,7 @@ export default function EditTaskModal({
           onMouseDown={handleMouseDown}
         >
           <h3 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xl font-semibold text-slate-900">
-            {modalTitle || 'Edit Task'}
+            {modalTitle || t("editTaskModal.title")}
           </h3>
           <div className="flex items-center justify-end gap-2">
             <button
@@ -555,7 +557,7 @@ export default function EditTaskModal({
               className="rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold px-3 py-1.5 text-sm inline-flex items-center gap-1.5"
             >
               <FaSave className="text-xs" />
-              Save
+              {t("createTaskModal.save")}
             </button>
             <button
               type="button"
@@ -577,17 +579,17 @@ export default function EditTaskModal({
         </div>
         <form id="edit-task-form" className="pm-notched-form px-4 pb-4 pt-2 space-y-2 overflow-y-auto flex-1" onSubmit={onSubmit}>
           <div className="mb-4">
-            <label className="text-sm font-medium text-slate-700" htmlFor="edit-task-title">Task name</label>
+            <label className="text-sm font-medium text-slate-700" htmlFor="edit-task-title">{t("createTaskModal.taskNameLabel")}</label>
             <input autoFocus id="edit-task-title" required className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 mt-0.5" placeholder="Task name" value={title} onChange={(e) => setTitle(e.target.value)} />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-y-4 md:gap-x-6">
             <div className="grid grid-rows-5 gap-0 md:col-span-1">
               <div style={{ minHeight: '64px' }}>
-                <label className="text-sm font-medium text-slate-700">Description</label>
+                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.descLabel")}</label>
                 <input className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 mt-0" placeholder="Brief description" value={description} onChange={(e) => setDescription(e.target.value)} />
               </div>
               <div style={{ minHeight: '64px' }}>
-                <label className="text-sm font-medium text-slate-700">Start date</label>
+                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.startDateLabel")}</label>
                 <div className="relative mt-0">
                   <input ref={startRef} className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
                   <button
@@ -606,7 +608,7 @@ export default function EditTaskModal({
                 </div>
               </div>
               <div style={{ minHeight: '64px' }}>
-                <label className="text-sm font-medium text-slate-700">End date</label>
+                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.endDateLabel")}</label>
                 <div className="relative mt-0">
                   <input ref={endRef} className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar" type="date" value={endDate} onChange={(e) => { const v = e.target.value; setEndDate(v); setEndAuto(false); if (v && startDate && v < startDate) setStartDate(v); }} />
                   <button
@@ -625,7 +627,7 @@ export default function EditTaskModal({
                 </div>
               </div>
               <div style={{ minHeight: '64px' }}>
-                <label className="text-sm font-medium text-slate-700">Deadline</label>
+                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.deadlineLabel")}</label>
                 <div className="relative mt-0.5">
                   <input ref={deadlineRef} className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar" type="date" value={deadline} onChange={(e) => { setDeadline(e.target.value); setDeadlineAuto(false); }} />
                   <button
@@ -645,7 +647,7 @@ export default function EditTaskModal({
                 <p className="mt-0 text-xs text-slate-500" aria-hidden="true">&nbsp;</p>
               </div>
               <div style={{ minHeight: '64px' }}>
-                <label className="text-sm font-medium text-slate-700">Duration</label>
+                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.durationLabel")}</label>
                 <input className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 mt-0" type="time" step="60" value={duration || ""} onChange={(e) => setDuration(e.target.value)} />
               </div>
             </div>
@@ -656,10 +658,10 @@ export default function EditTaskModal({
 
             <div className="grid grid-rows-5 gap-0 md:col-span-1">
               <div style={{ minHeight: '64px' }}>
-                <label className="text-sm font-medium text-slate-700">Key Area</label>
+                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.keyAreaLabel")}</label>
                 <div className="relative mt-0">
                   <select name="key_area_id" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" required="" value={keyAreaId} onChange={(e) => setKeyAreaId(e.target.value)}>
-                    <option value="">— Select Key Area —</option>
+                    <option value="">{t("createTaskModal.selectKeyArea")}</option>
                     {(localKeyAreas && localKeyAreas.length ? localKeyAreas : keyAreas).map((area, idx) => (
                       <option key={area.id} value={area.id}>{formatKeyAreaLabel(area, idx)}</option>
                     ))}
@@ -668,20 +670,20 @@ export default function EditTaskModal({
                 </div>
               </div>
               <div style={{ minHeight: '64px' }}>
-                <label className="text-sm font-medium text-slate-700">List</label>
+                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.listLabel")}</label>
                 <div className="relative mt-0">
                   <select name="list_index" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" required="" value={listIndex} onChange={(e) => setListIndex(Number(e.target.value))} disabled={!keyAreaId}>
-                    {!keyAreaId && <option value="">— Select Key Area First —</option>}
+                    {!keyAreaId && <option value="">{t("editTaskModal.selectKeyAreaFirst")}</option>}
                     {keyAreaId && Object.keys(listNames).length > 0 ? (
                       Object.entries(listNames).map(([idx, name]) => (
                         <option key={idx} value={idx}>
-                          {name || `List ${idx}`}
+                          {name || t("createTaskModal.list", { n: idx })}
                         </option>
                       ))
                     ) : (
                       keyAreaId && (availableLists || [1]).map((idx) => (
                         <option key={idx} value={idx}>
-                          {(listNames && listNames[idx]) || `List ${idx}`}
+                          {(listNames && listNames[idx]) || t("createTaskModal.list", { n: idx })}
                         </option>
                       ))
                     )}
@@ -690,10 +692,10 @@ export default function EditTaskModal({
                 </div>
               </div>
               <div style={{ minHeight: '64px' }}>
-                <label className="text-sm font-medium text-slate-700">Responsible</label>
+                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.responsibleLabel")}</label>
                 <div className="relative mt-0">
                   <select name="assignee" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10 mt-0 h-9" value={assignee} onChange={(e) => setAssignee(e.target.value)}>
-                    <option value="">— Unassigned —</option>
+                    <option value="">{t("createTaskModal.unassigned")}</option>
                     {usersList.map((u) => (
                       <option key={u.id} value={u.id}>{u.name}</option>
                     ))}
@@ -702,7 +704,7 @@ export default function EditTaskModal({
                 </div>
               </div>
               <div style={{ minHeight: '64px' }}>
-                <label className="text-sm font-medium text-slate-700">Priority</label>
+                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.priorityLabel")}</label>
                 <div className="relative mt-0">
                   <select
                     name="priority"
@@ -710,18 +712,18 @@ export default function EditTaskModal({
                     value={priority}
                     onChange={(e) => setPriority(Number(e.target.value))}
                   >
-                    <option value="3">High</option>
-                    <option value="2">Normal</option>
-                    <option value="1" style={{ color: "#6b7280" }}>Low</option>
+                    <option value="3">{t("createTaskModal.highOpt")}</option>
+                    <option value="2">{t("createTaskModal.normalOpt")}</option>
+                    <option value="1" style={{ color: "#6b7280" }}>{t("createTaskModal.lowOpt")}</option>
                   </select>
                   <svg viewBox="0 0 24 24" aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"><path fill="currentColor" d="M6.7 8.7a1 1 0 0 1 1.4 0L12 12.6l3.9-3.9a1 1 0 1 1 1.4 1.4l-4.6 4.6a1 1 0 0 1-1.4 0L6.7 10.1a1 1 0 0 1 0-1.4Z"></path></svg>
                 </div>
               </div>
               <div style={{ minHeight: '64px' }}>
-                <label className="text-sm font-medium text-slate-700">Goal</label>
+                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.goalLabel")}</label>
                 <div className="relative mt-0">
                   <select name="goal" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" value={goal || ""} onChange={(e) => setGoal(e.target.value)}>
-                    <option value="">— Select Goal —</option>
+                    <option value="">{t("createTaskModal.selectGoal")}</option>
                     {(localGoals && localGoals.length ? localGoals : goals).map((g) => (
                       <option key={g.id} value={g.id}>
                         {g.title}
