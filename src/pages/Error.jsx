@@ -1,3 +1,6 @@
+import { useTranslation } from "react-i18next";
+
 export default function ErrorPage() {
-    return <>Oops! Something went wrong.</>;
+    const { t } = useTranslation();
+    return <>{t("error.title")}</>;
 }

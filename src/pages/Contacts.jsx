@@ -1,6 +1,8 @@
+import { useTranslation } from "react-i18next";
 import ContactForm from "../components/ContactForm.jsx";
 
 export default function Contacts() {
+    const { t } = useTranslation();
     return (
         <div className="min-h-screen flex items-center justify-center">
             <style>
@@ -84,7 +86,7 @@ export default function Contacts() {
                 `}
             </style>
             <div>
-            <h1 className="text-2xl md:text-4xl font-bold text-gray-800">Contact Page</h1>
+            <h1 className="text-2xl md:text-4xl font-bold text-gray-800">{t("contacts.title")}</h1>
 
             {/* Contact Form Section */}
             <ContactForm />

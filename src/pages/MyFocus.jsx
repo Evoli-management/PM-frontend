@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import Sidebar from '../components/shared/Sidebar';
 import { FaAlignJustify } from 'react-icons/fa';
 import taskService from '../services/taskService';
@@ -6,6 +7,7 @@ import { computeEisenhowerQuadrant, toDateOnly, getQuadrantColorClass } from '..
 import { formatKeyAreaLabel } from '../utils/keyAreaDisplay';
 
 export default function MyFocus() {
+    const { t } = useTranslation();
     const [loading, setLoading] = useState(true);
     const [tasks, setTasks] = useState([]);
     const [keyAreasMap, setKeyAreasMap] = useState({});
@@ -135,15 +137,15 @@ export default function MyFocus() {
                     <div className="max-w-full overflow-x-hidden pb-1 h-full min-h-0 flex flex-col">
                         <div className="px-1 md:px-2 p-3 md:p-4 flex-1 min-h-0 overflow-hidden">
                             {loading ? (
-                                <div className="text-sm text-slate-500">Loading tasks…</div>
+                                <div className="text-sm text-slate-500">{t("myFocus.loading")}</div>
                             ) : (
                                 <div className="relative h-full min-h-0 flex flex-col">
                                     <div className="shrink-0 mb-2 border-b border-slate-300 pb-2">
                                         <div className="flex flex-wrap items-center gap-2 text-sm">
-                                            <span className="text-slate-700 mr-1">Filter:</span>
+                                            <span className="text-slate-700 mr-1">{t("myFocus.filter")}</span>
                                             <button
                                                 type="button"
-                                                title="Filter activities"
+                                                title={t("myFocus.filterActivities")}
                                                 className={`p-2 rounded border transition ${showActivities ? 'text-blue-700 border-blue-300 bg-blue-50' : 'text-slate-500 border-slate-300 bg-white'}`}
                                                 onClick={() => setShowActivities((v) => !v)}
                                             >
@@ -151,7 +153,7 @@ export default function MyFocus() {
                                             </button>
                                             <button
                                                 type="button"
-                                                title="Filter don't forget"
+                                                title={t("myFocus.filterDontForget")}
                                                 className={`p-2 rounded border transition ${showDontForget ? 'text-blue-700 border-blue-300 bg-blue-50' : 'text-slate-500 border-slate-300 bg-white'}`}
                                                 onClick={() => setShowDontForget((v) => !v)}
                                             >
@@ -163,7 +165,7 @@ export default function MyFocus() {
                                             </button>
                                             <button
                                                 type="button"
-                                                title="Show/hide no date items"
+                                                title={t("myFocus.filterNoDate")}
                                                 className={`p-2 rounded border transition ${showNoDateItems ? 'text-blue-700 border-blue-300 bg-blue-50' : 'text-slate-500 border-slate-300 bg-white'}`}
                                                 onClick={() => setShowNoDateItems((v) => !v)}
                                             >
@@ -189,7 +191,7 @@ export default function MyFocus() {
                                                 onChange={(e) => setSelectedKeyArea(e.target.value)}
                                                 title="Key Area"
                                             >
-                                                <option value="">Key Area</option>
+                                                <option value="">{t("myFocus.selectKeyArea")}</option>
                                                 {keyAreaOptions.map((ka) => (
                                                     <option key={ka.id} value={ka.id}>{formatKeyAreaLabel(ka)}</option>
                                                 ))}
@@ -200,7 +202,7 @@ export default function MyFocus() {
                                                 onChange={(e) => setSelectedList(e.target.value)}
                                                 title="List"
                                             >
-                                                <option value="">List</option>
+                                                <option value="">{t("myFocus.selectList")}</option>
                                                 {listOptions.map((listValue) => (
                                                     <option key={listValue} value={listValue}>{listValue}</option>
                                                 ))}
@@ -209,14 +211,14 @@ export default function MyFocus() {
                                     </div>
                                     {/* Top headers */}
                                     <div className="grid grid-cols-2 gap-3 mb-2 shrink-0">
-                                        <div className="text-center font-semibold text-sm md:text-base whitespace-nowrap">Urgent</div>
-                                        <div className="text-center font-semibold text-sm md:text-base whitespace-nowrap">Not urgent</div>
+                                        <div className="text-center font-semibold text-sm md:text-base whitespace-nowrap">{t("myFocus.urgent")}</div>
+                                        <div className="text-center font-semibold text-sm md:text-base whitespace-nowrap">{t("myFocus.notUrgent")}</div>
                                     </div>
 
                                     <div className="grid flex-1 min-h-0 grid-rows-2 grid-cols-[20px_1fr_1fr] gap-3 [grid-template-rows:minmax(0,1fr)_minmax(0,1fr)]">
                                         {/* Row 1, Col 1: Important label (rotated) */}
                                         <div className="flex items-center justify-center">
-                                            <div className="transform -rotate-90 origin-center text-sm md:text-base font-semibold whitespace-nowrap">Important</div>
+                                            <div className="transform -rotate-90 origin-center text-sm md:text-base font-semibold whitespace-nowrap">{t("myFocus.important")}</div>
                                         </div>
 
                                         {/* Row 1, Col 2: Q1 (Urgent & Important) */}
@@ -302,7 +304,7 @@ export default function MyFocus() {
 
                                         {/* Row 2, Col 1: Not important label (rotated) */}
                                         <div className="flex items-center justify-center">
-                                            <div className="transform -rotate-90 origin-center text-sm md:text-base font-semibold whitespace-nowrap">Not important</div>
+                                            <div className="transform -rotate-90 origin-center text-sm md:text-base font-semibold whitespace-nowrap">{t("myFocus.notImportant")}</div>
                                         </div>
 
                                         {/* Row 2, Col 2: Q3 (Urgent, Not important) */}

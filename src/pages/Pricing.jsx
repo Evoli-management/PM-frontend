@@ -1,5 +1,7 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 
 export default function Pricing() {
-    return <>Pricing Page Here</>;
+    const { t } = useTranslation();
+    return <>{t("pricing.title")}</>;
 }

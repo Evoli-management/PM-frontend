@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { ChevronRight, ChevronLeft, Check, Clock, Users, X } from "lucide-react";
 
 export default function OnboardingWizard() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
   const [isSkipping, setIsSkipping] = useState(false);
@@ -51,7 +53,7 @@ export default function OnboardingWizard() {
     const newErrors = {};
     if (step === 2) {
       if (!formData.teamName.trim()) {
-        newErrors.teamName = "Team name is required";
+        newErrors.teamName = t("onboarding.teamNameRequired");
       }
     }
     setErrors(newErrors);
@@ -106,10 +108,10 @@ export default function OnboardingWizard() {
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            Welcome to Practical Manager
+            {t("onboarding.welcome")}
           </h1>
           <p className="text-gray-600">
-            Let's set up your workspace (Step {currentStep} of 3)
+            {t("onboarding.stepOf", { step: currentStep })}
           </p>
         </div>
 
@@ -133,16 +135,16 @@ export default function OnboardingWizard() {
               <div>
                 <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
                   <Clock className="w-6 h-6 text-blue-600" />
-                  Preferences
+                  {t("onboarding.step1Title")}
                 </h2>
                 <p className="text-gray-600 mb-6">
-                  Customize your experience with your timezone and language preferences.
+                  {t("onboarding.step1Subtitle")}
                 </p>
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Timezone
+                  {t("onboarding.timezoneLabel")}
                 </label>
                 <select
                   name="timezone"
@@ -157,13 +159,13 @@ export default function OnboardingWizard() {
                   ))}
                 </select>
                 <p className="text-sm text-gray-500 mt-1">
-                  Used for scheduling and calendar displays
+                  {t("onboarding.timezoneHint")}
                 </p>
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Language
+                  {t("onboarding.languageLabel")}
                 </label>
                 <select
                   name="language"
@@ -187,21 +189,21 @@ export default function OnboardingWizard() {
               <div>
                 <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
                   <Users className="w-6 h-6 text-blue-600" />
-                  Create Your First Team (Optional)
+                  {t("onboarding.step2Title")}
                 </h2>
                 <p className="text-gray-600 mb-6">
-                  Set up a team to start collaborating. You can create teams later if you prefer.
+                  {t("onboarding.step2Subtitle")}
                 </p>
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Team Name
+                  {t("onboarding.teamNameLabel")}
                 </label>
                 <input
                   type="text"
                   name="teamName"
-                  placeholder="e.g., Engineering, Marketing, Sales"
+                  placeholder={t("onboarding.teamNamePlaceholder")}
                   value={formData.teamName}
                   onChange={handleInputChange}
                   className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 ${
@@ -217,11 +219,11 @@ export default function OnboardingWizard() {
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Team Description (Optional)
+                  {t("onboarding.teamDescLabel")}
                 </label>
                 <textarea
                   name="teamDescription"
-                  placeholder="What does this team work on?"
+                  placeholder={t("onboarding.teamDescPlaceholder")}
                   value={formData.teamDescription}
                   onChange={handleInputChange}
                   rows="4"
@@ -231,7 +233,7 @@ export default function OnboardingWizard() {
 
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <p className="text-sm text-blue-900">
-                  💡 <span className="font-semibold">Tip:</span> You can skip this and create teams from the Teams page anytime.
+                  {t("onboarding.teamTip")}
                 </p>
               </div>
             </div>
@@ -243,16 +245,16 @@ export default function OnboardingWizard() {
               <div>
                 <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
                   <Users className="w-6 h-6 text-blue-600" />
-                  Invite Team Members (Optional)
+                  {t("onboarding.step3Title")}
                 </h2>
                 <p className="text-gray-600 mb-6">
-                  Add team members to collaborate. You can send invitations anytime.
+                  {t("onboarding.step3Subtitle")}
                 </p>
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Email Addresses
+                  {t("onboarding.emailAddressesLabel")}
                 </label>
                 <textarea
                   name="inviteEmails"
@@ -263,13 +265,13 @@ export default function OnboardingWizard() {
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none font-mono text-sm"
                 />
                 <p className="text-sm text-gray-500 mt-1">
-                  Enter one email per line. We'll send them an invitation link.
+                  {t("onboarding.emailAddressesHint")}
                 </p>
               </div>
 
               <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                 <p className="text-sm text-green-900">
-                  ✓ <span className="font-semibold">Almost done!</span> You're all set to start using Practical Manager.
+                  {t("onboarding.almostDone")}
                 </p>
               </div>
             </div>
@@ -285,7 +287,7 @@ export default function OnboardingWizard() {
                   className="flex items-center gap-2 px-6 py-3 border border-gray-300 rounded-lg text-gray-700 font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <ChevronLeft className="w-5 h-5" />
-                  Back
+                  {t("onboarding.back")}
                 </button>
               )}
               <button
@@ -294,7 +296,7 @@ export default function OnboardingWizard() {
                 className="flex items-center gap-2 px-6 py-3 text-gray-700 font-semibold hover:text-gray-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <X className="w-5 h-5" />
-                Skip for now
+                {t("onboarding.skipForNow")}
               </button>
             </div>
 
@@ -306,11 +308,11 @@ export default function OnboardingWizard() {
               {currentStep === 3 ? (
                 <>
                   <Check className="w-5 h-5" />
-                  Get Started
+                  {t("onboarding.getStarted")}
                 </>
               ) : (
                 <>
-                  Next
+                  {t("onboarding.next")}
                   <ChevronRight className="w-5 h-5" />
                 </>
               )}
@@ -323,7 +325,7 @@ export default function OnboardingWizard() {
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
             <div className="bg-white rounded-lg p-8 text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-gray-700 font-semibold">Finalizing setup...</p>
+              <p className="text-gray-700 font-semibold">{t("onboarding.finalizing")}</p>
             </div>
           </div>
         )}

@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import Sidebar from "../components/shared/Sidebar";
 import { FaBars, FaFilter, FaTrophy, FaStar, FaAward } from "react-icons/fa";
 import recognitionsService from "../services/recognitionsService";
 
 export default function ViewStrokes() {
+    const { t } = useTranslation();
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const [activeTab, setActiveTab] = useState('received'); // 'received' or 'given'
     const [strokes, setStrokes] = useState([]);
@@ -96,26 +98,26 @@ export default function ViewStrokes() {
                         >
                             <FaBars />
                         </button>
-                        <h1 className="text-3xl font-semibold text-gray-800">My Strokes</h1>
+                        <h1 className="text-3xl font-semibold text-gray-800">{t("viewStrokes.title")}</h1>
                     </div>
 
                     {/* Stroke Account Summary */}
                     {score && (
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                             <div className="bg-white rounded-lg shadow-sm p-6 border-l-4 border-green-500">
-                                <p className="text-gray-600 text-sm mb-2">Strokes Received</p>
+                                <p className="text-gray-600 text-sm mb-2">{t("viewStrokes.strokesReceived")}</p>
                                 <p className="text-3xl font-bold text-gray-800">{score.totalReceivedPoints || 0}</p>
-                                <p className="text-xs text-gray-500 mt-2">Points earned from strokes received</p>
+                                <p className="text-xs text-gray-500 mt-2">{t("viewStrokes.strokesReceivedDesc")}</p>
                             </div>
                             <div className="bg-white rounded-lg shadow-sm p-6 border-l-4 border-blue-500">
-                                <p className="text-gray-600 text-sm mb-2">Strokes Given</p>
+                                <p className="text-gray-600 text-sm mb-2">{t("viewStrokes.strokesGiven")}</p>
                                 <p className="text-3xl font-bold text-gray-800">{score.totalSentPoints || 0}</p>
-                                <p className="text-xs text-gray-500 mt-2">Points used for strokes given</p>
+                                <p className="text-xs text-gray-500 mt-2">{t("viewStrokes.strokesGivenDesc")}</p>
                             </div>
                             <div className="bg-white rounded-lg shadow-sm p-6 border-l-4 border-purple-500">
-                                <p className="text-gray-600 text-sm mb-2">Total Recognitions</p>
+                                <p className="text-gray-600 text-sm mb-2">{t("viewStrokes.totalRecognitions")}</p>
                                 <p className="text-3xl font-bold text-gray-800">{(score.totalReceivedCount || 0) + (score.totalSentCount || 0)}</p>
-                                <p className="text-xs text-gray-500 mt-2">Total recognitions given and received</p>
+                                <p className="text-xs text-gray-500 mt-2">{t("viewStrokes.totalRecognitionsDesc")}</p>
                             </div>
                         </div>
                     )}
@@ -130,7 +132,7 @@ export default function ViewStrokes() {
                                     : 'bg-white text-blue-500 border border-blue-500 hover:bg-blue-50'
                             }`}
                         >
-                            {showLedger ? 'Hide Ledger' : 'View Ledger'}
+                            {showLedger ? t("viewStrokes.hideLedger") : t("viewStrokes.viewLedger")}
                         </button>
                     </div>
 
@@ -140,23 +142,23 @@ export default function ViewStrokes() {
                             <table className="w-full">
                                 <thead className="bg-gray-50 border-b border-gray-200">
                                     <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t("viewStrokes.dateHeader")}</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t("viewStrokes.descriptionHeader")}</th>
+                                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{t("viewStrokes.typeHeader")}</th>
+                                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{t("viewStrokes.amountHeader")}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-200">
                                     <tr className="bg-green-50">
                                         <td className="px-6 py-4 text-sm text-gray-600">—</td>
-                                        <td className="px-6 py-4 text-sm font-medium text-gray-800">Total Strokes Received</td>
-                                        <td className="px-6 py-4 text-right text-sm text-gray-600">Credit</td>
+                                        <td className="px-6 py-4 text-sm font-medium text-gray-800">{t("viewStrokes.totalStrokesReceived")}</td>
+                                        <td className="px-6 py-4 text-right text-sm text-gray-600">{t("viewStrokes.credit")}</td>
                                         <td className="px-6 py-4 text-right text-sm font-bold text-green-600">+{score.totalReceivedPoints || 0}</td>
                                     </tr>
                                     <tr className="bg-blue-50">
                                         <td className="px-6 py-4 text-sm text-gray-600">—</td>
-                                        <td className="px-6 py-4 text-sm font-medium text-gray-800">Total Strokes Given</td>
-                                        <td className="px-6 py-4 text-right text-sm text-gray-600">Debit</td>
+                                        <td className="px-6 py-4 text-sm font-medium text-gray-800">{t("viewStrokes.totalStrokesGiven")}</td>
+                                        <td className="px-6 py-4 text-right text-sm text-gray-600">{t("viewStrokes.debit")}</td>
                                         <td className="px-6 py-4 text-right text-sm font-bold text-blue-600">-{score.totalSentPoints || 0}</td>
                                     </tr>
                                 </tbody>
@@ -176,7 +178,7 @@ export default function ViewStrokes() {
                                             : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                     }`}
                                 >
-                                    Received
+                                    {t("viewStrokes.tabReceived")}
                                 </button>
                                 <button
                                     onClick={() => setActiveTab('given')}
@@ -186,7 +188,7 @@ export default function ViewStrokes() {
                                             : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                     }`}
                                 >
-                                    Given
+                                    {t("viewStrokes.tabGiven")}
                                 </button>
                             </nav>
                         </div>
@@ -200,10 +202,10 @@ export default function ViewStrokes() {
                                     onChange={(e) => setFilters({ ...filters, type: e.target.value })}
                                     className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
                                 >
-                                    <option value="">All Types</option>
-                                    <option value="employeeship">Employeeship</option>
-                                    <option value="performance">Performance</option>
-                                    <option value="achievement">Achievement</option>
+                                    <option value="">{t("viewStrokes.filterAllTypes")}</option>
+                                    <option value="employeeship">{t("viewStrokes.filterEmployeeship")}</option>
+                                    <option value="performance">{t("viewStrokes.filterPerformance")}</option>
+                                    <option value="achievement">{t("viewStrokes.filterAchievement")}</option>
                                 </select>
                             </div>
                         </div>
@@ -213,11 +215,11 @@ export default function ViewStrokes() {
                     <div className="bg-white rounded-lg shadow-sm">
                         {loading ? (
                             <div className="text-center py-12 text-gray-500">
-                                Loading strokes...
+                                {t("viewStrokes.loading")}
                             </div>
                         ) : strokes.length === 0 ? (
                             <div className="text-center py-12 text-gray-500">
-                                No strokes found
+                                {t("viewStrokes.noStrokes")}
                             </div>
                         ) : (
                             <div className="divide-y divide-gray-200">
@@ -238,13 +240,13 @@ export default function ViewStrokes() {
                                                         </span>
                                                     </div>
                                                     <div className="text-sm text-gray-600">
-                                                        +{stroke.recipientPoints} points
+                                                        {t("viewStrokes.points", { n: stroke.recipientPoints })}
                                                     </div>
                                                 </div>
 
                                                 {activeTab === 'received' && (
                                                     <div className="text-sm text-gray-600 mb-2">
-                                                        From: <span className="font-medium text-gray-800">Anonymous</span>
+                                                        {t("viewStrokes.fromAnonymous")}
                                                     </div>
                                                 )}
 
