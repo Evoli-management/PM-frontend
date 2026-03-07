@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, Suspense } from "react";
 // keep rendering inline (match KeyAreas behavior)
+import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "../components/shared/Sidebar.jsx";
 import { getPriorityLevel } from "../utils/keyareasHelpers";
@@ -50,6 +51,7 @@ const getGoalService = async () => {
 // Note: activityService loader removed for DontForget (no activity fetching)
 
 export default function DontForget() {
+    const { t } = useTranslation();
     const location = useLocation();
     const navigate = useNavigate();
 
@@ -569,7 +571,7 @@ export default function DontForget() {
     };
     const renameDfList = (n) => {
         const current = getDfListName(n);
-        const val = prompt("Rename list", current);
+        const val = prompt(t("dontForget.promptRenameList"), current);
         if (val === null) return;
         const nextMap = { ...(dfListNames || {}), [n]: val };
         setDfListNames(nextMap);
@@ -606,7 +608,7 @@ export default function DontForget() {
     const deleteDfList = (n) => {
         const hasTasks = (tasks || []).some((t) => Number(t.listIndex || 1) === Number(n));
         if (hasTasks) {
-            alert("This list contains tasks. Move those tasks to another list before deleting.");
+            alert(t("dontForget.alertListHasTasks"));
             return;
         }
         setDfListNames((prev) => {
@@ -944,18 +946,18 @@ export default function DontForget() {
             // Provide user feedback
             if (failCount > 0) {
                 addToast && addToast({
-                    message: `Deleted ${successCount} task${successCount !== 1 ? 's' : ''}, failed to delete ${failCount} task${failCount !== 1 ? 's' : ''}`,
+                    message: t("dontForget.toastDeletedPartial", { success: successCount, fail: failCount }),
                     type: "warning"
                 });
             } else if (successCount > 0) {
                 addToast && addToast({
-                    message: `Deleted ${successCount} task${successCount !== 1 ? 's' : ''}`,
+                    message: t("dontForget.toastDeleted", { n: successCount }),
                     type: "success"
                 });
             }
         } catch (e) {
             console.error("Mass delete error", e);
-            addToast && addToast({ message: "Failed to delete tasks", type: "error" });
+            addToast && addToast({ message: t("dontForget.toastDeleteFailed"), type: "error" });
         } finally {
             clearSelection();
         }
@@ -1043,7 +1045,7 @@ export default function DontForget() {
             });
         } catch (e) {
             console.error("Failed to delete task", e);
-            addToast && addToast({ message: "Failed to delete task: " + (e?.message || "Unknown error"), type: "error" });
+            addToast && addToast({ message: t("dontForget.toastDeleteTaskFailed", { error: e?.message || "Unknown error" }), type: "error" });
             throw e;
         }
     };
@@ -1599,7 +1601,7 @@ export default function DontForget() {
                                     parentListNames={dfListNames}
                                     users={users}
                                     goals={goals}
-                                    modalTitle={massEditingMode ? `Mass editing ${selectedIds.size} tasks` : "edit don't forget task"}
+                                    modalTitle={massEditingMode ? t("dontForget.massEditingTitle", { n: selectedIds.size }) : t("dontForget.editTaskTitle")}
                                     isDontForgetMode={true}
                                 />
                                 {/* Activity composer removed from DontForget */}
@@ -1651,7 +1653,7 @@ export default function DontForget() {
                                                     if (e?.currentTarget) e.currentTarget.src = "/dont-forget.png";
                                                 }}
                                             />
-                                            <span className="relative text-base md:text-lg font-bold text-slate-900 truncate px-1" style={{ color: 'rgba(196, 118, 15, 1)' }}>Don't Forget</span>
+                                            <span className="relative text-base md:text-lg font-bold text-slate-900 truncate px-1" style={{ color: 'rgba(196, 118, 15, 1)' }}>{t("dontForget.title")}</span>
                                         </div>
                                     </div>
 
@@ -1663,7 +1665,7 @@ export default function DontForget() {
                                             className="bg-white rounded-lg border border-slate-200 px-4 py-1 text-sm font-semibold hover:bg-slate-50"
                                             style={{ minWidth: 100 }}
                                         >
-                                            My Focus
+                                            {t("dontForget.myFocus")}
                                         </button>
                                         <div className="relative" ref={viewMenuRef}>
                                             <button
@@ -1672,7 +1674,7 @@ export default function DontForget() {
                                                 aria-haspopup="menu"
                                                 aria-expanded={showViewMenu ? "true" : "false"}
                                             >
-                                                View
+                                                {t("dontForget.viewBtn")}
                                                 <svg
                                                     className={`w-4 h-4 transition-transform ${showViewMenu ? "rotate-180" : "rotate-0"}`}
                                                     viewBox="0 0 24 24"
@@ -1690,7 +1692,7 @@ export default function DontForget() {
                                                     role="menu"
                                                     className="absolute right-0 mt-2 w-40 bg-white border border-slate-200 rounded-lg shadow z-50"
                                                 >
-                                                    {[{ key: "list", label: "List" }].map((opt) => (
+                                                    {[{ key: "list", label: t("dontForget.viewList") }].map((opt) => (
                                                         <button
                                                             key={opt.key}
                                                             role="menuitem"
@@ -1727,14 +1729,14 @@ export default function DontForget() {
                                                     role="menu"
                                                     className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-lg shadow z-50 p-3 text-sm"
                                                 >
-                                                    <div className="font-medium mb-2">Columns</div>
+                                                    <div className="font-medium mb-2">{t("dontForget.columns")}</div>
                                                     <label className="flex items-center gap-2 py-1">
                                                         <input
                                                             type="checkbox"
                                                             checked={!!showCompleted}
                                                             onChange={() => setShowCompleted((s) => !s)}
                                                         />
-                                                        <span className="capitalize">Show completed items</span>
+                                                        <span className="capitalize">{t("dontForget.showCompleted")}</span>
                                                     </label>
                                                     {Object.keys(visibleColumns).map((key) => (
                                                         <label key={key} className="flex items-center gap-2 py-1">
@@ -1759,7 +1761,7 @@ export default function DontForget() {
                                             <div className="col-span-3 md:col-span-2">
                                                 <div className="flex items-center gap-2 min-w-0">
                                                     <div className="text-sm font-semibold whitespace-nowrap mr-1">
-                                                        Task Lists
+                                                        {t("dontForget.taskLists")}
                                                     </div>
                                                     <div
                                                         ref={chipsRef}
@@ -1833,14 +1835,14 @@ export default function DontForget() {
                                                                                     setOpenDfListMenu(null);
                                                                                 }}
                                                                             >
-                                                                                Rename
+                                                                                {t("dontForget.renameList")}
                                                                             </button>
                                                                             <button
                                                                                 role="menuitem"
                                                                                 className="block w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
                                                                                 onClick={() => deleteDfList(n)}
                                                                             >
-                                                                                Delete
+                                                                                {t("dontForget.deleteList")}
                                                                             </button>
                                                                         </div>
                                                                     </>
@@ -1871,7 +1873,7 @@ export default function DontForget() {
                                             </div>
                                             <div className="col-span-3 md:col-span-1 flex items-center justify-end gap-3">
                                                 <span className="text-sm text-gray-600" aria-live="polite">
-                                                    {selectedIds.size} selected
+                                                    {t("dontForget.selected", { n: selectedIds.size })}
                                                 </span>
                                                 <button
                                                     type="button"
@@ -1888,7 +1890,7 @@ export default function DontForget() {
                                                         setMassEditingMode(true);
                                                     }}
                                                 >
-                                                    Mass Edit
+                                                    {t("dontForget.massEdit")}
                                                 </button>
                                                 <button
                                                     type="button"
@@ -1898,7 +1900,7 @@ export default function DontForget() {
                                                     className="inline-flex items-center gap-2 px-4 py-1 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                     aria-label="Add task"
                                                 >
-                                                    Add Task
+                                                    {t("dontForget.addTask")}
                                                 </button>
                                             </div>
                                         </div>
@@ -1923,28 +1925,28 @@ export default function DontForget() {
                                                                 className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[240px] cursor-pointer hover:bg-slate-100"
                                                                 onClick={() => handleDfSort('title')}
                                                             >
-                                                                Task {dfSortField === 'title' && (dfSortDirection === 'asc' ? '↑' : '↓')}
+                                                                {t("dontForget.colTask")} {dfSortField === 'title' && (dfSortDirection === 'asc' ? '↑' : '↓')}
                                                             </th>
                                                             {visibleColumns.responsible && (
                                                                 <th
                                                                     className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[140px] cursor-pointer hover:bg-slate-100"
                                                                     onClick={() => handleDfSort('responsible')}
                                                                 >
-                                                                    Responsible {dfSortField === 'responsible' && (dfSortDirection === 'asc' ? '↑' : '↓')}
+                                                                    {t("dontForget.colResponsible")} {dfSortField === 'responsible' && (dfSortDirection === 'asc' ? '↑' : '↓')}
                                                                 </th>
                                                             )}
                                                             <th
                                                                 className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[120px] cursor-pointer hover:bg-slate-100"
                                                                 onClick={() => handleDfSort('status')}
                                                             >
-                                                                Status {dfSortField === 'status' && (dfSortDirection === 'asc' ? '↑' : '↓')}
+                                                                {t("dontForget.colStatus")} {dfSortField === 'status' && (dfSortDirection === 'asc' ? '↑' : '↓')}
                                                             </th>
                                                             {visibleColumns.priority && (
                                                                 <th
                                                                     className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[100px] cursor-pointer hover:bg-slate-100"
                                                                     onClick={() => handleDfSort('priority')}
                                                                 >
-                                                                    Priority {dfSortField === 'priority' && (dfSortDirection === 'asc' ? '↑' : '↓')}
+                                                                    {t("dontForget.colPriority")} {dfSortField === 'priority' && (dfSortDirection === 'asc' ? '↑' : '↓')}
                                                                 </th>
                                                             )}
                                                             {visibleColumns.quadrant && (
@@ -1952,7 +1954,7 @@ export default function DontForget() {
                                                                     className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[90px] cursor-pointer hover:bg-slate-100"
                                                                     onClick={() => handleDfSort('quadrant')}
                                                                 >
-                                                                    Quadrant {dfSortField === 'quadrant' && (dfSortDirection === 'asc' ? '↑' : '↓')}
+                                                                    {t("dontForget.colQuadrant")} {dfSortField === 'quadrant' && (dfSortDirection === 'asc' ? '↑' : '↓')}
                                                                 </th>
                                                             )}
                                                             {visibleColumns.start_date && (
@@ -1960,7 +1962,7 @@ export default function DontForget() {
                                                                     className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[120px] cursor-pointer hover:bg-slate-100"
                                                                     onClick={() => handleDfSort('start_date')}
                                                                 >
-                                                                    Start Date {dfSortField === 'start_date' && (dfSortDirection === 'asc' ? '↑' : '↓')}
+                                                                    {t("dontForget.colStartDate")} {dfSortField === 'start_date' && (dfSortDirection === 'asc' ? '↑' : '↓')}
                                                                 </th>
                                                             )}
                                                             {visibleColumns.end_date && (
@@ -1968,7 +1970,7 @@ export default function DontForget() {
                                                                     className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[120px] cursor-pointer hover:bg-slate-100"
                                                                     onClick={() => handleDfSort('end_date')}
                                                                 >
-                                                                    End date {dfSortField === 'end_date' && (dfSortDirection === 'asc' ? '↑' : '↓')}
+                                                                    {t("dontForget.colEndDate")} {dfSortField === 'end_date' && (dfSortDirection === 'asc' ? '↑' : '↓')}
                                                                 </th>
                                                             )}
                                                             {visibleColumns.deadline && (
@@ -1976,7 +1978,7 @@ export default function DontForget() {
                                                                     className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[120px] cursor-pointer hover:bg-slate-100"
                                                                     onClick={() => handleDfSort('deadline')}
                                                                 >
-                                                                    Deadline {dfSortField === 'deadline' && (dfSortDirection === 'asc' ? '↑' : '↓')}
+                                                                    {t("dontForget.colDeadline")} {dfSortField === 'deadline' && (dfSortDirection === 'asc' ? '↑' : '↓')}
                                                                 </th>
                                                             )}
                                                             {visibleColumns.duration && (
@@ -1984,7 +1986,7 @@ export default function DontForget() {
                                                                     className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[90px] cursor-pointer hover:bg-slate-100"
                                                                     onClick={() => handleDfSort('duration')}
                                                                 >
-                                                                    Duration {dfSortField === 'duration' && (dfSortDirection === 'asc' ? '↑' : '↓')}
+                                                                    {t("dontForget.colDuration")} {dfSortField === 'duration' && (dfSortDirection === 'asc' ? '↑' : '↓')}
                                                                 </th>
                                                             )}
                                                             {visibleColumns.completed && (
@@ -1992,7 +1994,7 @@ export default function DontForget() {
                                                                     className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[120px] cursor-pointer hover:bg-slate-100"
                                                                     onClick={() => handleDfSort('completed')}
                                                                 >
-                                                                    Completed {dfSortField === 'completed' && (dfSortDirection === 'asc' ? '↑' : '↓')}
+                                                                    {t("dontForget.colCompleted")} {dfSortField === 'completed' && (dfSortDirection === 'asc' ? '↑' : '↓')}
                                                                 </th>
                                                             )}
                                                             {/* Actions column removed — use row menu instead */}
@@ -2063,8 +2065,8 @@ export default function DontForget() {
                                                         <tr>
                                                             <td className="px-6 py-8 text-gray-500" colSpan={12}>
                                                                 {dfFilter === 'imported'
-                                                                    ? "No Imported tasks currently..."
-                                                                    : `This list has no tasks yet. Click "Add Task" to create one for ${getDfListName(selectedDfList)}.`}
+                                                                    ? t("dontForget.noImportedTasks")
+                                                                    : t("dontForget.noTasksYet", { listName: getDfListName(selectedDfList) })}
                                                             </td>
                                                         </tr>
                                                     )}
@@ -2116,7 +2118,7 @@ export default function DontForget() {
                                             parentListNames={dfListNames}
                                             users={users}
                                             goals={goals}
-                                            modalTitle={massEditingMode ? `Mass editing ${selectedIds.size} tasks` : "Edit Don't forget task"}
+                                            modalTitle={massEditingMode ? t("dontForget.massEditingTitle", { n: selectedIds.size }) : t("dontForget.editTaskTitle")}
                                             isDontForgetMode={true}
                                         />
 

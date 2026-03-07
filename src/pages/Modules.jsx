@@ -1,3 +1,6 @@
+import { useTranslation } from "react-i18next";
+
 export default function Modules() {
-    return <>Modules Page Here</>;
+    const { t } = useTranslation();
+    return <>{t("modules.title")}</>;
 }

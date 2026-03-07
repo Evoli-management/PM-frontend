@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { syncService } from '../services/syncService';
 import authService from '../services/authService';
 import { 
@@ -12,6 +13,7 @@ import {
 } from 'lucide-react';
 
 export default function CalendarSyncStatus() {
+  const { t } = useTranslation();
   const [user, setUser] = useState(null);
   const [syncStatus, setSyncStatus] = useState(null);
   const [syncPreferences, setSyncPreferences] = useState(null);
@@ -79,16 +81,16 @@ export default function CalendarSyncStatus() {
   };
 
   const formatDate = (dateString) => {
-    if (!dateString) return 'Never';
+    if (!dateString) return t('calendarSync.never');
     const date = new Date(dateString);
     const now = new Date();
     const diffMs = now - date;
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMs / 3600000);
     
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins} min ago`;
-    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    if (diffMins < 1) return t('calendarSync.justNow');
+    if (diffMins < 60) return t('calendarSync.minAgo', { n: diffMins });
+    if (diffHours < 24) return diffHours === 1 ? t('calendarSync.hourAgo', { n: diffHours }) : t('calendarSync.hoursAgo', { n: diffHours });
     return date.toLocaleString();
   };
 
@@ -108,13 +110,13 @@ export default function CalendarSyncStatus() {
   const getStatusText = (status) => {
     switch (status) {
       case 'idle':
-        return 'Active';
+        return t('calendarSync.statusActive');
       case 'syncing':
-        return 'Syncing...';
+        return t('calendarSync.statusSyncing');
       case 'error':
-        return 'Error';
+        return t('calendarSync.statusError');
       default:
-        return 'Unknown';
+        return t('calendarSync.statusUnknown');
     }
   };
 
@@ -133,10 +135,10 @@ export default function CalendarSyncStatus() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
             <Calendar className="w-6 h-6" />
-            Calendar Sync
+            {t('calendarSync.title')}
           </h1>
           <p className="text-gray-600 mt-1">
-            Manage your calendar synchronization settings
+            {t('calendarSync.subtitle')}
           </p>
         </div>
         <button
@@ -145,7 +147,7 @@ export default function CalendarSyncStatus() {
           className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
         >
           <RefreshCw className={`w-4 h-4 ${updating ? 'animate-spin' : ''}`} />
-          Refresh
+          {t('calendarSync.refresh')}
         </button>
       </div>
 
@@ -153,7 +155,7 @@ export default function CalendarSyncStatus() {
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
           <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
           <div>
-            <h3 className="text-sm font-medium text-red-800">Error</h3>
+            <h3 className="text-sm font-medium text-red-800">{t('calendarSync.errorHeading')}</h3>
             <p className="text-sm text-red-700 mt-1">{error}</p>
           </div>
         </div>
@@ -169,9 +171,9 @@ export default function CalendarSyncStatus() {
                 <Calendar className="w-5 h-5 text-blue-600" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">Google Calendar</h3>
+                <h3 className="text-lg font-semibold text-gray-900">{t('calendarSync.googleCalendar')}</h3>
                 <p className="text-sm text-gray-500">
-                  {syncPreferences?.syncToGoogle ? 'Enabled' : 'Disabled'}
+                  {syncPreferences?.syncToGoogle ? t('calendarSync.enabled') : t('calendarSync.disabled')}
                 </p>
               </div>
             </div>
@@ -190,7 +192,7 @@ export default function CalendarSyncStatus() {
           {syncStatus?.providers?.find(p => p.provider === 'google') && (
             <div className="space-y-3 mt-4 pt-4 border-t border-gray-100">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Status</span>
+                <span className="text-sm text-gray-600">{t('calendarSync.statusLabel')}</span>
                 <div className="flex items-center gap-2">
                   {getStatusIcon(syncStatus.providers.find(p => p.provider === 'google')?.syncStatus)}
                   <span className="text-sm font-medium">
@@ -199,7 +201,7 @@ export default function CalendarSyncStatus() {
                 </div>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Last Sync</span>
+                <span className="text-sm text-gray-600">{t('calendarSync.lastSync')}</span>
                 <span className="text-sm text-gray-900">
                   {formatDate(syncStatus.providers.find(p => p.provider === 'google')?.lastSyncAt)}
                 </span>
@@ -221,9 +223,9 @@ export default function CalendarSyncStatus() {
                 <Calendar className="w-5 h-5 text-blue-600" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">Microsoft Outlook</h3>
+                <h3 className="text-lg font-semibold text-gray-900">{t('calendarSync.microsoftOutlook')}</h3>
                 <p className="text-sm text-gray-500">
-                  {syncPreferences?.syncToOutlook ? 'Enabled' : 'Disabled'}
+                  {syncPreferences?.syncToOutlook ? t('calendarSync.enabled') : t('calendarSync.disabled')}
                 </p>
               </div>
             </div>
@@ -242,7 +244,7 @@ export default function CalendarSyncStatus() {
           {syncStatus?.providers?.find(p => p.provider === 'microsoft') && (
             <div className="space-y-3 mt-4 pt-4 border-t border-gray-100">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Status</span>
+                <span className="text-sm text-gray-600">{t('calendarSync.statusLabel')}</span>
                 <div className="flex items-center gap-2">
                   {getStatusIcon(syncStatus.providers.find(p => p.provider === 'microsoft')?.syncStatus)}
                   <span className="text-sm font-medium">
@@ -251,7 +253,7 @@ export default function CalendarSyncStatus() {
                 </div>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Last Sync</span>
+                <span className="text-sm text-gray-600">{t('calendarSync.lastSync')}</span>
                 <span className="text-sm text-gray-900">
                   {formatDate(syncStatus.providers.find(p => p.provider === 'microsoft')?.lastSyncAt)}
                 </span>
@@ -270,38 +272,38 @@ export default function CalendarSyncStatus() {
       <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border border-blue-200 p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
           <Settings className="w-5 h-5" />
-          Sync Statistics
+          {t('calendarSync.syncStatistics')}
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white rounded-lg p-4">
             <div className="text-2xl font-bold text-gray-900">
               {syncStatus?.totalAppointments || 0}
             </div>
-            <div className="text-sm text-gray-600">Total Appointments</div>
+            <div className="text-sm text-gray-600">{t('calendarSync.totalAppointments')}</div>
           </div>
           <div className="bg-white rounded-lg p-4">
             <div className="text-2xl font-bold text-gray-900">
               {syncStatus?.providers?.filter(p => p.syncStatus === 'idle').length || 0}
             </div>
-            <div className="text-sm text-gray-600">Active Syncs</div>
+            <div className="text-sm text-gray-600">{t('calendarSync.activeSyncs')}</div>
           </div>
           <div className="bg-white rounded-lg p-4">
             <div className="text-2xl font-bold text-gray-900">
               {syncStatus?.providers?.[0]?.syncFrequencyMinutes || 15} min
             </div>
-            <div className="text-sm text-gray-600">Sync Frequency</div>
+            <div className="text-sm text-gray-600">{t('calendarSync.syncFrequency')}</div>
           </div>
         </div>
       </div>
 
       {/* Help Text */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h4 className="text-sm font-medium text-blue-900 mb-2">How Calendar Sync Works</h4>
+        <h4 className="text-sm font-medium text-blue-900 mb-2">{t('calendarSync.howItWorks')}</h4>
         <ul className="text-sm text-blue-700 space-y-1 list-disc list-inside">
-          <li>Events from your external calendars are automatically synced to Practical Manager</li>
-          <li>Sync happens every {syncStatus?.providers?.[0]?.syncFrequencyMinutes || 15} minutes</li>
-          <li>Changes in your external calendar will override local changes (conflict resolution: external-wins)</li>
-          <li>You can enable/disable sync for each calendar provider independently</li>
+          <li>{t('calendarSync.bullet1')}</li>
+          <li>{t('calendarSync.bullet2', { n: syncStatus?.providers?.[0]?.syncFrequencyMinutes || 15 })}</li>
+          <li>{t('calendarSync.bullet3')}</li>
+          <li>{t('calendarSync.bullet4')}</li>
         </ul>
       </div>
     </div>

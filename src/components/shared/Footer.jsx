@@ -1,30 +1,32 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 
 const Footer = () => {
+    const { t } = useTranslation();
     return (
             <footer className="bg-blue-900 text-white py-12 text-center">
                 <div className="">
                     <div className="mb-6 flex flex-wrap justify-center gap-6 text-sm">
                         <a href="#" className="hover:text-yellow-400 transition-colors">
-                            User guidelines
+                            {t("footer.userGuidelines")}
                         </a>
                         <a href="#" className="hover:text-yellow-400 transition-colors">
-                            FAQ
+                            {t("footer.faq")}
                         </a>
                         <a href="#" className="hover:text-yellow-400 transition-colors">
-                            Contact us
+                            {t("footer.contactUs")}
                         </a>
                         <a href="#" className="hover:text-yellow-400 transition-colors">
-                            About us
+                            {t("footer.aboutUs")}
                         </a>
                         <a href="#" className="hover:text-yellow-400 transition-colors">
-                            Privacy policy
+                            {t("footer.privacyPolicy")}
                         </a>
                         <a href="#" className="hover:text-yellow-400 transition-colors">
-                            Terms of service
+                            {t("footer.termsOfService")}
                         </a>
                     </div>
-                    <div className="text-gray-400 text-xs mt-4">Copyright ©{ new Date().getFullYear() } Evoli management d.o.o.</div>
+                    <div className="text-gray-400 text-xs mt-4">{t("footer.copyright", { year: new Date().getFullYear() })}</div>
                 </div>
             </footer>
     );

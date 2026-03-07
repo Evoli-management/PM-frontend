@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import Sidebar from '../../components/shared/Sidebar';
 import { FaBars } from 'react-icons/fa';
 import { getCurrentEnpsScore, getEnpsTrend, getEnpsTeamBreakdown } from '../../services/enpsService';
@@ -6,6 +7,7 @@ import teamsService from '../../services/teamsService';
 import apiClient from '../../services/apiClient';
 
 export default function EnpsDashboard() {
+  const { t } = useTranslation();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [current, setCurrent] = useState(null);
   const [trend, setTrend] = useState([]);
@@ -19,7 +21,7 @@ export default function EnpsDashboard() {
   const [emailStatus, setEmailStatus] = useState(null);
 
   const handleSendEnpsEmails = async () => {
-    if (!window.confirm('Send eNPS survey emails to all users? This action will trigger email notifications.')) {
+    if (!window.confirm(t('enpsDashboard.confirmSendEmails'))) {
       return;
     }
     setSendingEmails(true);
@@ -28,7 +30,7 @@ export default function EnpsDashboard() {
       const response = await apiClient.post('/enps/send-survey-emails');
       setEmailStatus({
         type: 'success',
-        message: `eNPS survey emails sent successfully to ${response.data.count || 'users'}`
+        message: t('enpsDashboard.emailSentSuccess', { count: response.data.count || 'users' })
       });
       // Refresh data after sending
       setTimeout(async () => {
@@ -38,7 +40,7 @@ export default function EnpsDashboard() {
     } catch (error) {
       setEmailStatus({
         type: 'error',
-        message: error.response?.data?.message || 'Failed to send eNPS survey emails'
+        message: error.response?.data?.message || t('enpsDashboard.emailSendFailed')
       });
     } finally {
       setSendingEmails(false);
@@ -106,10 +108,10 @@ export default function EnpsDashboard() {
           <FaBars className="h-5 w-5 text-gray-600" />
         </button>
         <div className="mb-4">
-          <a href="#/dashboard" className="text-sm text-blue-600">← Back to Dashboard</a>
+          <a href="#/dashboard" className="text-sm text-blue-600">{t('enpsDashboard.backToDashboard')}</a>
         </div>
-        <h1 className="text-2xl font-bold text-blue-700 dark:text-blue-400 mb-2">eNPS Admin Dashboard</h1>
-        <p className="text-gray-600 dark:text-gray-300">Organization eNPS overview, trend, and team breakdown.</p>
+        <h1 className="text-2xl font-bold text-blue-700 dark:text-blue-400 mb-2">{t('enpsDashboard.title')}</h1>
+        <p className="text-gray-600 dark:text-gray-300">{t('enpsDashboard.subtitle')}</p>
 
         {/* Email Status Message */}
         {emailStatus && (
@@ -122,24 +124,24 @@ export default function EnpsDashboard() {
         <div className="mt-4 bg-white border rounded-2xl p-4 shadow">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
-              <label className="block text-sm text-gray-600 mb-1">Trend periods</label>
+              <label className="block text-sm text-gray-600 mb-1">{t('enpsDashboard.filterTrendPeriods')}</label>
               <input type="number" min={1} max={52} value={periods} onChange={(e) => setPeriods(parseInt(e.target.value || '12'))} className="w-full border rounded px-3 py-2" />
             </div>
             <div>
-              <label className="block text-sm text-gray-600 mb-1">Team</label>
+              <label className="block text-sm text-gray-600 mb-1">{t('enpsDashboard.filterTeam')}</label>
               <select value={selectedTeamId} onChange={(e) => setSelectedTeamId(e.target.value)} className="w-full border rounded px-3 py-2">
-                <option value="">All teams</option>
-                {allTeams.map(t => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
+                <option value="">{t('enpsDashboard.filterAllTeams')}</option>
+                {allTeams.map(tm => (
+                  <option key={tm.id} value={tm.id}>{tm.name}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-sm text-gray-600 mb-1">Period (e.g., 2025-W52)</label>
-              <input value={selectedPeriod} onChange={(e) => setSelectedPeriod(e.target.value)} placeholder="Leave blank for current" className="w-full border rounded px-3 py-2" />
+              <label className="block text-sm text-gray-600 mb-1">{t('enpsDashboard.filterPeriodLabel')}</label>
+              <input value={selectedPeriod} onChange={(e) => setSelectedPeriod(e.target.value)} placeholder={t('enpsDashboard.filterPeriodPlaceholder')} className="w-full border rounded px-3 py-2" />
             </div>
             <div className="flex items-end">
-              <button onClick={handleApplyFilters} className="px-4 py-2 bg-blue-600 text-white rounded">Apply</button>
+              <button onClick={handleApplyFilters} className="px-4 py-2 bg-blue-600 text-white rounded">{t('enpsDashboard.filterApply')}</button>
             </div>
             <div className="flex items-end md:col-span-4">
               <button 
@@ -147,35 +149,35 @@ export default function EnpsDashboard() {
                 disabled={sendingEmails}
                 className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded font-semibold transition"
               >
-                {sendingEmails ? 'Sending Survey Emails...' : 'Send eNPS Survey Emails'}
+                {sendingEmails ? t('enpsDashboard.sendingSurveyEmails') : t('enpsDashboard.sendSurveyEmails')}
               </button>
             </div>
           </div>
         </div>
 
         {loading ? (
-          <div className="mt-6 p-6 bg-white rounded-2xl shadow">Loading…</div>
+          <div className="mt-6 p-6 bg-white rounded-2xl shadow">{t('enpsDashboard.loading')}</div>
         ) : !current || current.totalResponses === 0 ? (
           <div className="mt-6 p-6 bg-yellow-50 border border-yellow-200 rounded-2xl shadow text-center">
-            <p className="text-yellow-800 font-semibold mb-3">No eNPS responses yet</p>
-            <p className="text-yellow-700 text-sm mb-4">The chart will populate as soon as users start responding to the eNPS survey.</p>
-            <p className="text-yellow-700 text-sm">Use the button above to send eNPS survey emails to your team members.</p>
+            <p className="text-yellow-800 font-semibold mb-3">{t('enpsDashboard.noResponsesTitle')}</p>
+            <p className="text-yellow-700 text-sm mb-4">{t('enpsDashboard.noResponsesDesc')}</p>
+            <p className="text-yellow-700 text-sm">{t('enpsDashboard.noResponsesHint')}</p>
           </div>
         ) : (
           <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
             <section className="bg-white border rounded-2xl p-6 shadow col-span-1">
-              <h2 className="font-semibold mb-3">Current eNPS</h2>
+              <h2 className="font-semibold mb-3">{t('enpsDashboard.currentENPS')}</h2>
               {current && (
                 <div>
                   <div className="text-4xl font-bold mb-2"><ScoreBadge score={current.score} /></div>
-                  <div className="text-sm text-gray-500">Promoters: {current.promoters}% • Passives: {current.passives}% • Detractors: {current.detractors}%</div>
-                  <div className="text-sm text-gray-500 mt-1">Responses: {current.totalResponses} • Period: {current.period}</div>
+                  <div className="text-sm text-gray-500">{t('enpsDashboard.promotersPassivesDetractors', { promoters: current.promoters, passives: current.passives, detractors: current.detractors })}</div>
+                  <div className="text-sm text-gray-500 mt-1">{t('enpsDashboard.responsesAndPeriod', { responses: current.totalResponses, period: current.period })}</div>
                 </div>
               )}
             </section>
 
             <section className="bg-white border rounded-2xl p-6 shadow col-span-2">
-              <h2 className="font-semibold mb-3">Trend (12 periods)</h2>
+              <h2 className="font-semibold mb-3">{t('enpsDashboard.trendPeriods', { n: periods })}</h2>
               <div className="flex items-end gap-2 h-40">
                 {trend.map((p, idx) => (
                   <div key={idx} className="flex flex-col items-center">
@@ -191,19 +193,19 @@ export default function EnpsDashboard() {
             </section>
 
             <section className="bg-white border rounded-2xl p-6 shadow col-span-3">
-              <h2 className="font-semibold mb-3">Team Breakdown (current period)</h2>
+              <h2 className="font-semibold mb-3">{t('enpsDashboard.teamBreakdown')}</h2>
               {teams.length === 0 ? (
-                <div className="text-gray-500">No teams or no responses yet.</div>
+                <div className="text-gray-500">{t('enpsDashboard.noTeamsOrResponses')}</div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {teams.map(t => (
-                    <div key={t.teamId} className="border rounded-xl p-4">
+                  {teams.map(tm => (
+                    <div key={tm.teamId} className="border rounded-xl p-4">
                       <div className="flex items-center justify-between">
-                        <div className="font-medium">{t.teamName}</div>
-                        <ScoreBadge score={t.score} />
+                        <div className="font-medium">{tm.teamName}</div>
+                        <ScoreBadge score={tm.score} />
                       </div>
-                      <div className="text-xs text-gray-500 mt-1">Responses: {t.totalResponses}</div>
-                      <div className="mt-2 text-xs text-gray-600">Promoters {t.promoters}% • Passives {t.passives}% • Detractors {t.detractors}%</div>
+                      <div className="text-xs text-gray-500 mt-1">{t('enpsDashboard.teamResponses', { n: tm.totalResponses })}</div>
+                      <div className="mt-2 text-xs text-gray-600">{t('enpsDashboard.teamPromotersPassivesDetractors', { promoters: tm.promoters, passives: tm.passives, detractors: tm.detractors })}</div>
                     </div>
                   ))}
                 </div>

@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
 import TestimonialCards from "../components/TestimonialCards.jsx";
@@ -8,6 +9,7 @@ import FeaturedModulesComponent from "../components/FeaturedModulesComponent.jsx
 import { HiMiniRectangleGroup } from "react-icons/hi2";
 
 const Home = () => {
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const handleNavigate = (e, to) => {
         e && e.preventDefault();
@@ -105,15 +107,15 @@ const Home = () => {
                     <div className="flex items-center justify-between py-2">
                         <div className="flex items-center gap-6">
                             <a href="/why" className="text-teal-800 font-semibold hover:underline">
-                                WHY PRACTICAL MANAGER?
+                                {t("home.navWhy")}
                             </a>
                             <a href="/how-it-works" className="text-teal-800 hover:underline">
-                                HOW IT WORKS?
+                                {t("home.navHowItWorks")}
                             </a>
 
                             <div className="relative group">
                                 <button className="flex items-center gap-2 text-teal-800 hover:underline focus:outline-none font-medium tracking-wide">
-                                    ABOUT EMPLOYEESHIP
+                                    {t("home.navAboutEmployeeship")}
                                     <span className="text-xs text-teal-700">▾</span>
                                 </button>
                                 <div className="absolute left-0 mt-2 w-48 bg-white shadow-sm border-t-2 border-black z-50 opacity-0 group-hover:opacity-100 transform scale-95 group-hover:scale-100 transition-all duration-150 pointer-events-none group-hover:pointer-events-auto">
@@ -123,7 +125,7 @@ const Home = () => {
                                                 href="/employeeship"
                                                 className="block text-center px-6 py-3 text-sm text-gray-800 uppercase tracking-wider font-semibold hover:bg-gray-50"
                                             >
-                                                EMPLOYEESHIP
+                                                {t("home.navEmployeeship")}
                                             </a>
                                         </li>
                                         <li>
@@ -131,7 +133,7 @@ const Home = () => {
                                                 href="/leadership"
                                                 className="block text-center px-6 py-3 text-sm text-gray-800 uppercase tracking-wider font-semibold hover:bg-gray-50"
                                             >
-                                                LEADERSHIP
+                                                {t("home.navLeadership")}
                                             </a>
                                         </li>
                                         <li>
@@ -139,7 +141,7 @@ const Home = () => {
                                                 href="/excellence"
                                                 className="block text-center px-6 py-3 text-sm text-gray-800 uppercase tracking-wider font-semibold hover:bg-gray-50"
                                             >
-                                                EXCELLENCE
+                                                {t("home.navExcellence")}
                                             </a>
                                         </li>
                                     </ul>
@@ -149,16 +151,16 @@ const Home = () => {
 
                         <div className="flex items-center gap-6">
                             <a href="/knowledge-base" className="text-teal-800 hover:underline">
-                                KNOWLEDGE BASE
+                                {t("home.navKnowledgeBase")}
                             </a>
                             <a href="#pricing" className="text-teal-800 hover:underline">
-                                PRICING
+                                {t("home.navPricing")}
                             </a>
                             <a href="#contacts" className="text-teal-800 hover:underline">
-                                CONTACT US
+                                {t("home.navContactUs")}
                             </a>
                             <a href="/blog" className="text-teal-800 hover:underline">
-                                BLOG
+                                {t("home.navBlog")}
                             </a>
                         </div>
                     </div>
@@ -167,25 +169,25 @@ const Home = () => {
 
             {/* Navigation Bar */}
             <nav className="flex flex-col sm:flex-row justify-between items-center px-6 py-4 bg-white shadow-md sticky top-0 z-20 transition-shadow duration-300">
-                <div className="font-bold text-2xl text-blue-700">Practical Manager</div>
+                <div className="font-bold text-2xl text-blue-700">{t("home.brand")}</div>
                 <div className="flex flex-col sm:flex-row gap-4 sm:gap-8 text-base">
                     <a
                         href="#modules"
                         className="text-blue-900 hover:text-blue-700 font-medium transition-colors duration-200"
                     >
-                        Modules
+                        {t("home.navModules")}
                     </a>
                     <a
                         href="#values"
                         className="text-blue-900 hover:text-blue-700 font-medium transition-colors duration-200"
                     >
-                        Values
+                        {t("home.navValues")}
                     </a>
                     <a
                         href="#testimonials"
                         className="text-blue-900 hover:text-blue-700 font-medium transition-colors duration-200"
                     >
-                        Testimonials
+                        {t("home.navTestimonials")}
                     </a>
                 </div>
                 <div className="flex gap-2 mt-4 sm:mt-0">
@@ -194,14 +196,14 @@ const Home = () => {
                         onClick={(e) => handleNavigate(e, "/login")}
                         className="inline-flex items-center justify-center border border-slate-200 text-slate-700 rounded-lg px-8 py-2 text-lg font-medium hover:bg-slate-50"
                     >
-                        Login
+                        {t("home.login")}
                     </a>
                     <a
                         href="/registration"
                         onClick={(e) => handleNavigate(e, "/registration")}
                         className="inline-flex items-center justify-center btn-gradient btn-glow text-white rounded-lg px-8 py-2 text-lg font-semibold shadow-xl"
                     >
-                        Register
+                        {t("home.register")}
                     </a>
                 </div>
             </nav>
@@ -215,27 +217,24 @@ const Home = () => {
                         {/* Left column: headline, copy, CTAs, stats */}
                         <div className="md:w-6/12 text-center md:text-left">
                             <h1 className="text-5xl sm:text-5xl md:text-6xl lg:text-6xl font-extrabold leading-tight mb-2">
-                                <span className="heading-gradient block">Lead with clarity.</span>
-                                <span className="heading-subtle block mt-3 text-3xl md:text-4xl">Deliver with confidence.</span>
+                                <span className="heading-gradient block">{t("home.heroHeadline")}</span>
+                                <span className="heading-subtle block mt-3 text-3xl md:text-4xl">{t("home.heroSubheadline")}</span>
                             </h1>
-                            <p className="text-lg md:text-xl text-gray-600 mb-8 leading-relaxed">
-                                Transform your team's productivity with our all-in-one project management platform. 
-                                Streamline workflows, track progress, and achieve your goals with clarity and confidence.
-                            </p>
+                            <p className="text-lg md:text-xl text-gray-600 mb-8 leading-relaxed">{t("home.heroDescription")}</p>
                             <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
                                 <a
                                     href="/get-started"
                                     onClick={(e) => handleNavigate(e, "/get-started")}
                                     className="btn-gradient btn-glow text-white px-8 py-4 rounded-lg font-semibold text-lg shadow-xl hover:shadow-2xl transition-all duration-300"
                                 >
-                                    Get Started Free
+                                    {t("home.getStartedFree")}
                                 </a>
                                 <a
                                     href="/login"
                                     onClick={(e) => handleNavigate(e, "/login")}
                                     className="border-2 border-blue-600 text-blue-600 px-8 py-4 rounded-lg font-semibold text-lg hover:bg-blue-600 hover:text-white transition-all duration-300"
                                 >
-                                    Sign In
+                                    {t("home.signIn")}
                                 </a>
                             </div>
                         </div>
@@ -264,11 +263,10 @@ const Home = () => {
                     style={{ animationDelay: "0.6s" }}
                 >
                     <h2 className="text-3xl md:text-6xl font-bold mb-6">
-                        Start your journey <br/><span className="bg-amber-500 text-2xl md:text-3xl p-1">to better team management today</span>
+                        {t("home.joinTitle")} <br/><span className="bg-amber-500 text-2xl md:text-3xl p-1">{t("home.joinHighlight")}</span>
                     </h2>
                     <p className="md:text-lg text-gray-700 mb-4">
-                        Join thousands of teams who are simplifying their workflows and boosting productivity with our
-                        all-in-one platform.
+                        {t("home.joinDescription")}
                     </p>
                     {/* <a
                         href="/registration"
@@ -300,7 +298,7 @@ const Home = () => {
                         className="text-[48px] md:text-[96px] lg:text-[120px] font-extrabold text-white opacity-40 select-none"
                         style={{ transform: "translateY(-10px)", mixBlendMode: "overlay" }}
                     >
-                        Ready to transform your team?
+                        {t("home.ctaTitle")}
                     </span>
                 </div>
 
@@ -312,10 +310,9 @@ const Home = () => {
                             className="rounded-md shadow-lg"
                         />
                         <div className="text-white">
-                            <h2 className="text-2xl md:text-4xl font-bold mb-4">Ready to transform your team?</h2>
+                            <h2 className="text-2xl md:text-4xl font-bold mb-4">{t("home.ctaTitle")}</h2>
                             <p className="">
-                                Get a live demo from one of our specialists and see how Practical Manager can work for
-                                you.
+                                {t("home.ctaDescription")}
                             </p>
                             <a
                                 href="#contacts"
@@ -323,7 +320,7 @@ const Home = () => {
                                 className="inline-flex items-center justify-center btn-gradient btn-glow text-white rounded-lg px-8 py-4 text-lg font-semibold shadow-xl"
                                 aria-label="Get started - it's free"
                             >
-                                Request a Demo
+                                {t("home.requestDemo")}
                             </a>
                         </div>
                     </div>

@@ -1,18 +1,8 @@
 import React, { useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { FaBars } from "react-icons/fa";
+import { useTranslation } from "react-i18next";
 import Sidebar from "../components/shared/Sidebar.jsx";
-
-const searchCategoryLabels = {
-  page: "Pages",
-  task: "Tasks",
-  activity: "Activities",
-  goal: "Goals",
-  "key-area": "Key Areas",
-  appointment: "Appointments",
-  user: "Users",
-  other: "Other",
-};
 
 const resultCategoryOrder = ["task", "activity", "goal", "key-area", "appointment", "user", "page", "other"];
 
@@ -41,8 +31,20 @@ const splitItemsAcrossColumns = (items, columns) => {
 };
 
 export default function SearchResults() {
+  const { t } = useTranslation();
   const location = useLocation();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  const searchCategoryLabels = {
+    page: t("searchResults.categories.page"),
+    task: t("searchResults.categories.task"),
+    activity: t("searchResults.categories.activity"),
+    goal: t("searchResults.categories.goal"),
+    "key-area": t("searchResults.categories.keyArea"),
+    appointment: t("searchResults.categories.appointment"),
+    user: t("searchResults.categories.user"),
+    other: t("searchResults.categories.other"),
+  };
   const params = new URLSearchParams(location.search || "");
   const query = params.get("q") || location.state?.q || "";
 
@@ -103,17 +105,17 @@ export default function SearchResults() {
             <div className="px-1 md:px-2 h-full min-h-0 overflow-hidden">
               <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden h-full min-h-0 flex flex-col">
                 <div className="px-4 py-3 border-b border-gray-200">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Search Results</div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t("searchResults.header")}</div>
                 </div>
 
                 {visibleCategories.length === 0 ? (
-                  <div className="p-4 text-sm text-slate-500">No results found.</div>
+                  <div className="p-4 text-sm text-slate-500">{t("searchResults.noResults")}</div>
                 ) : (
                   <div className="flex-1 min-h-0 overflow-y-auto py-1">
                     {visibleCategories.map((type) => (
                       <div key={type} className="px-4 py-1.5">
                         <div className="px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400 bg-slate-50">
-                          {searchCategoryLabels[type] || "Other"}
+                          {searchCategoryLabels[type] || t("searchResults.categories.other")}
                         </div>
                         <div className={`mt-1 px-4 gap-x-8 gap-y-0 ${getSearchColumnsClass()}`}>
                           {splitItemsAcrossColumns(

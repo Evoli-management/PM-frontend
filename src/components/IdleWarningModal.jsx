@@ -1,10 +1,12 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 /**
  * Modal to warn user about idle session timeout
  * TC011: Session timeout warning
  */
 const IdleWarningModal = ({ isOpen, onContinue, onLogout, timeRemaining }) => {
+  const { t } = useTranslation();
   if (!isOpen) return null;
 
   return (
@@ -12,27 +14,26 @@ const IdleWarningModal = ({ isOpen, onContinue, onLogout, timeRemaining }) => {
       <div className="bg-white rounded-xl p-8 max-w-md w-[90%] shadow-2xl text-center animate-slideUp">
         <div className="text-5xl mb-4">⏰</div>
         <h2 className="text-2xl font-semibold text-gray-900 mb-4">
-          Session Expiring Soon
+          {t("idleWarning.title")}
         </h2>
         <p className="text-base text-gray-600 mb-2 leading-relaxed">
-          You've been inactive for a while. Your session will expire in {timeRemaining} minutes
-          for your security.
+          {t("idleWarning.body", { minutes: timeRemaining })}
         </p>
         <p className="text-sm text-gray-500 mb-6">
-          Would you like to continue your session?
+          {t("idleWarning.continuePrompt")}
         </p>
         <div className="flex gap-4 justify-center">
           <button
             className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-all hover:-translate-y-0.5 hover:shadow-lg"
             onClick={onContinue}
           >
-            Continue Session
+            {t("idleWarning.continueSession")}
           </button>
           <button
             className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-all"
             onClick={onLogout}
           >
-            Log Out
+            {t("idleWarning.logout")}
           </button>
         </div>
       </div>

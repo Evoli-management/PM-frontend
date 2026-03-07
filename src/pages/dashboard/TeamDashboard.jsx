@@ -1,21 +1,23 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import Sidebar from "../../components/shared/Sidebar";
 import { FaBars } from "react-icons/fa";
 
 export default function TeamDashboard() {
+    const { t } = useTranslation();
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
     return (
         <div className="flex min-h-screen bg-[#EDEDED] text-[CanvasText]">
-            <Sidebar 
-                user={{ name: "Hussein" }} 
+            <Sidebar
+                user={{ name: "Hussein" }}
                 mobileOpen={mobileSidebarOpen}
                 onMobileClose={() => setMobileSidebarOpen(false)}
             />
 
             {/* Mobile backdrop */}
             {mobileSidebarOpen && (
-                <div 
+                <div
                     className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
                     onClick={() => setMobileSidebarOpen(false)}
                 />
@@ -31,19 +33,19 @@ export default function TeamDashboard() {
                 </button>
                 <div className="mb-4">
                     <a href="#/dashboard" className="text-sm text-blue-600">
-                        ← Back to Dashboard
+                        {t("teamDashboard.backToDashboard")}
                     </a>
                 </div>
-                <h1 className="text-2xl font-bold text-blue-700 dark:text-blue-400 mb-2">Team Dashboard</h1>
-                <p className="text-gray-600 dark:text-gray-300">Overview of team goals, workload, and recognition.</p>
+                <h1 className="text-2xl font-bold text-blue-700 dark:text-blue-400 mb-2">{t("teamDashboard.title")}</h1>
+                <p className="text-gray-600 dark:text-gray-300">{t("teamDashboard.subtitle")}</p>
                 <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                     <section className="bg-[Canvas] border rounded-2xl p-6 shadow text-[CanvasText]">
-                        <h2 className="font-semibold mb-2">Team goals</h2>
-                        <div className="text-sm text-gray-500">Completion: 68%</div>
+                        <h2 className="font-semibold mb-2">{t("teamDashboard.teamGoals")}</h2>
+                        <div className="text-sm text-gray-500">{t("teamDashboard.completion")}</div>
                     </section>
                     <section className="bg-[Canvas] border rounded-2xl p-6 shadow text-[CanvasText]">
-                        <h2 className="font-semibold mb-2">Workload</h2>
-                        <div className="text-sm text-gray-500">Avg 32h/week</div>
+                        <h2 className="font-semibold mb-2">{t("teamDashboard.workload")}</h2>
+                        <div className="text-sm text-gray-500">{t("teamDashboard.avgHours")}</div>
                     </section>
                 </div>
             </main>

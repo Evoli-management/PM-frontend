@@ -1,22 +1,24 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { Award, Shield, Star } from "lucide-react";
 
 export default function ValuesComponent() {
+    const { t } = useTranslation();
     const values = [
         {
             icon: <Award/>,
-            title: "Customer-first",
-            desc: "We build for our users and their success."
+            title: t("values.customerFirstTitle"),
+            desc: t("values.customerFirstDesc"),
         },
         {
             icon: <Star/>,
-            title: "Continuous Improvement",
-            desc: "We invest in research and development to deliver the best.",
+            title: t("values.continuousImprovementTitle"),
+            desc: t("values.continuousImprovementDesc"),
         },
         {
             icon: <Shield/>,
-            title: "Privacy-focused",
-            desc: "Your data is secure and private with us."
+            title: t("values.privacyFocusedTitle"),
+            desc: t("values.privacyFocusedDesc"),
         },
     ];
 
@@ -24,7 +26,7 @@ export default function ValuesComponent() {
         <section id="values" className="py-20">
             <div className="container mx-auto px-4">
                 <h2 className="text-center text-3xl md:text-4xl font-bold text-blue-700 mb-16 animate-fade-in-up">
-                    Our Core Values
+                    {t("values.title")}
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-12">
                     {values.map((v, i) => (

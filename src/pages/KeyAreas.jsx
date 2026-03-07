@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useToast } from '../components/shared/ToastProvider.jsx';
 import { useFormattedDate } from '../hooks/useFormattedDate';
@@ -345,17 +346,17 @@ const normalizeActivityWithTask = (activity, task) => {
 // Minimal placeholders to keep non-list views functional
 const KanbanView = ({ tasks = [], onSelect, selectedIds = new Set(), toggleSelect = () => {}, onStatusChange = () => {} }) => {
     const cols = [
-        { key: "open", label: "Open" },
-        { key: "in_progress", label: "In progress" },
-        { key: "blocked", label: "Blocked" },
-        { key: "done", label: "Done" },
+        { key: "open", label: t("keyAreas.statusOpen") },
+        { key: "in_progress", label: t("keyAreas.statusInProgress") },
+        { key: "blocked", label: t("keyAreas.statusBlocked") },
+        { key: "done", label: t("keyAreas.statusDone") },
     ];
     const groups = cols.map((c) => ({
         ...c,
         items: tasks.filter((t) => String(t.status || "open").toLowerCase() === c.key),
     }));
     const leftovers = tasks.filter((t) => !cols.some((c) => String(t.status || "open").toLowerCase() === c.key));
-    if (leftovers.length) groups.push({ key: "other", label: "Other", items: leftovers });
+    if (leftovers.length) groups.push({ key: "other", label: t("keyAreas.statusOther"), items: leftovers });
 
     const priorityBadge = (p) => {
         const lvl = getPriorityLevel(p);
@@ -506,6 +507,7 @@ const CalendarView = ({ tasks = [], onSelect, selectedIds = new Set(), toggleSel
 
 /* --------------------------------- Screen -------------------------------- */
 export default function KeyAreas() {
+    const { t } = useTranslation();
     const location = useLocation();
     const navigate = useNavigate();
     const { formatDate } = useFormattedDate();
@@ -732,11 +734,11 @@ export default function KeyAreas() {
                         </button>
                         <button type="button" className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50" onClick={handleDelete}>
                             <FaTrash />
-                            <span>Delete</span>
+                            <span>{t("keyAreas.deleteActivity")}</span>
                         </button>
                         <button type="button" className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50" onClick={handleConvert}>
                             <FaAngleDoubleLeft />
-                            <span>Convert to task</span>
+                            <span>{t("keyAreas.convertToTask")}</span>
                         </button>
                     </div>,
                     document.body,
@@ -849,7 +851,7 @@ export default function KeyAreas() {
                     ...prev,
                     [tid]: (prev[tid] || []).map((a) => (a.id === activity.id ? { ...a, ...norm } : a)),
                 }));
-                addToast && addToast({ title: 'Saved', variant: 'success' });
+                addToast && addToast({ title: t('keyAreas.toastSaved'), variant: 'success' });
             } else {
                 const svc = await getActivityService();
                 const body = {};
@@ -876,12 +878,12 @@ export default function KeyAreas() {
                     ...prev,
                     [tid]: (prev[tid] || []).map((a) => (a.id === activity.id ? { ...a, ...norm } : a)),
                 }));
-                addToast && addToast({ title: 'Saved', variant: 'success' });
+                addToast && addToast({ title: t('keyAreas.toastSaved'), variant: 'success' });
             }
         } catch (error) {
             console.error('Failed to update activity', error);
             setActivitiesByTask((prev) => ({ ...prev, [tid]: prevList }));
-            addToast && addToast({ title: 'Failed to update activity', variant: 'error' });
+            addToast && addToast({ title: t('keyAreas.toastUpdateActivityFailed'), variant: 'error' });
         } finally {
             setSavingActivityIds((s) => {
                 const copy = new Set(s);
@@ -1707,7 +1709,7 @@ export default function KeyAreas() {
         } catch (err) {
             console.error('[KeyAreas] Failed to update task field', err);
             setAllTasks(prev);
-            try { addToast && addToast({ type: 'error', message: err?.message || 'Failed to save' }); } catch (e) {}
+            try { addToast && addToast({ type: 'error', message: err?.message || t('keyAreas.toastSaveFailed') }); } catch (e) {}
         }
     };
 
@@ -2671,11 +2673,11 @@ export default function KeyAreas() {
     const renameList = async (n) => {
         if (!selectedKA) return;
         const current = getListName(selectedKA.id, n);
-        const raw = prompt("Rename list", current);
+        const raw = prompt(t("keyAreas.promptRenameList"), current);
         if (raw === null) return; // cancelled
         const val = String(raw || "").trim();
         if (!val) {
-            alert("List name cannot be empty.");
+            alert(t("keyAreas.alertListNameEmpty"));
             return;
         }
         const existingNames = Object.values(listNames[String(selectedKA.id)] || {});
@@ -2683,7 +2685,7 @@ export default function KeyAreas() {
             (name) => String(name || "").toLowerCase() === val.toLowerCase() && String(name) !== String(current),
         );
         if (hasDuplicate) {
-            alert("A list with this name already exists in this Key Area.");
+            alert(t("keyAreas.alertListNameExists"));
             return;
         }
 
@@ -2706,7 +2708,7 @@ export default function KeyAreas() {
                     String(ka.id) === String(selectedKA.id) ? { ...ka, listNames: prevMap } : ka,
                 ),
             );
-            alert("Failed to save list name. Please try again.");
+            alert(t("keyAreas.alertSaveListFailed"));
         }
     };
 
@@ -2718,7 +2720,7 @@ export default function KeyAreas() {
             (t) => (t.list_index || 1) === n && String(t.key_area_id) === String(kaId),
         );
         if (hasTasks) {
-            alert("This list contains tasks. Move or update those tasks to another list before deleting.");
+            alert(t("keyAreas.alertListHasTasks"));
             return;
         }
         const names = listNames[String(kaId)] || {};
@@ -2750,7 +2752,7 @@ export default function KeyAreas() {
                 ),
             );
             setTaskTab(prevTab);
-            alert("Failed to delete list. Please try again.");
+            alert(t("keyAreas.alertDeleteListFailed"));
         }
     };
 
@@ -3089,7 +3091,7 @@ export default function KeyAreas() {
                 // If state lost, attempt to find id via form (not ideal) — fallback: abort
                 if (!activityId) {
                     console.error("No activity id available for activity edit");
-                    alert("Could not determine which activity to update.");
+                    alert(t("keyAreas.alertActivityIdUnknown"));
                     return;
                 }
                 const mapPriorityToApi = (p) => {
@@ -3123,7 +3125,7 @@ export default function KeyAreas() {
                 return;
             } catch (err) {
                 console.error("Failed to update activity via task modal", err);
-                alert("Could not save activity.");
+                alert(t("keyAreas.alertSaveActivityFailed"));
                 return;
             }
         }
@@ -3204,7 +3206,7 @@ export default function KeyAreas() {
             setEditingActivityId(null);
         } catch (err) {
             console.error("Failed to create activity", err);
-            alert("Could not create activity.");
+            alert(t("keyAreas.alertCreateActivityFailed"));
         }
     };
 
@@ -3279,7 +3281,7 @@ export default function KeyAreas() {
         if (keyAreaChanged) {
             // Task moved to different key area - clear selection and show success message
             setSelectedTaskFull(null);
-            try { addToast && addToast({ type: 'success', message: 'Task moved to different key area' }); } catch (e) {}
+            try { addToast && addToast({ type: 'success', message: t('keyAreas.toastMovedKeyArea') }); } catch (e) {}
         }
         
         await refreshActivitiesForTask(saved.id);
@@ -3389,7 +3391,7 @@ export default function KeyAreas() {
             console.error("Failed to save activity from modal", err);
             // If the server returned validation messages, log them to help debugging
             console.error('Save activity error response data:', err?.response?.data);
-            alert("Could not save activity.");
+            alert(t("keyAreas.alertSaveActivityFailed"));
         } finally {
             setIsSavingActivity(false);
         }
@@ -3414,7 +3416,7 @@ export default function KeyAreas() {
         } catch (e) {
             // If activities cannot be loaded, fail-safe and do not delete
             console.error("Failed to verify activities before delete", e);
-            alert("Unable to verify activities for this task. Please try again.");
+            alert(t("keyAreas.alertVerifyActivitiesFailed"));
             return;
         }
 
@@ -3523,7 +3525,7 @@ export default function KeyAreas() {
                             >
                             {!selectedKA && !isGlobalTasksView ? (
                                 <div className="flex items-center gap-3 w-full">
-                                    <h1 className="text-2xl font-bold text-slate-900">Key Areas</h1>
+                                    <h1 className="text-2xl font-bold text-slate-900">{t("keyAreas.title")}</h1>
                                     <div className="ml-auto flex items-center gap-2">
                                         {!showOnlyIdeas && (
                                             <>
@@ -3610,10 +3612,10 @@ export default function KeyAreas() {
                                                         onChange={(e) => setSortBy(e.target.value)}
                                                         className="border border-slate-200 rounded px-2 py-0.5 text-sm bg-white w-[100px]"
                                                     >
-                                                        <option value="manual">Manual</option>
-                                                        <option value="date">Due Date</option>
-                                                        <option value="priority">Priority</option>
-                                                        <option value="status">Status</option>
+                                                        <option value="manual">{t("keyAreas.sortManual")}</option>
+                                                        <option value="date">{t("keyAreas.sortDate")}</option>
+                                                        <option value="priority">{t("keyAreas.sortPriority")}</option>
+                                                        <option value="status">{t("keyAreas.sortStatus")}</option>
                                                     </select>
                                                 </div>
                                                 <div className="flex items-center gap-2">
@@ -3625,7 +3627,7 @@ export default function KeyAreas() {
                                                     >
                                                         <option value="all">All</option>
                                                         <option value="open">Open</option>
-                                                        <option value="in_progress">In Progress</option>
+                                                        <option value="in_progress">{t("keyAreas.statusInProgress")}</option>
                                                         <option value="done">Done</option>
                                                     </select>
                                                 </div>
@@ -3648,7 +3650,7 @@ export default function KeyAreas() {
                                                         value={filterTag}
                                                         onChange={(e) => setFilterTag(e.target.value)}
                                                         className="border border-slate-200 rounded px-2 py-0.5 text-sm bg-white w-16"
-                                                        placeholder="Tag"
+                                                        placeholder={t("keyAreas.tagPlaceholder")}
                                                     />
                                                 </div>
                                             </div>
@@ -3665,7 +3667,7 @@ export default function KeyAreas() {
                                                 >
                                                     <span>View</span>
                                                     <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
-                                                        {panelViewMode === "triple" ? "Triple" : "Simple"}
+                                                        {panelViewMode === "triple" ? t("keyAreas.viewTriple") : t("keyAreas.viewSimple")}
                                                     </span>
                                                     <FaChevronDown className={`${showPanelViewMenu ? "rotate-180" : "rotate-0"} transition-transform`} />
                                                 </button>
@@ -3684,7 +3686,7 @@ export default function KeyAreas() {
                                                                     setShowPanelViewMenu(false);
                                                                 }}
                                                             >
-                                                                {mode === "triple" ? "Triple View" : "Simple View"}
+                                                                {mode === "triple" ? t("keyAreas.viewTripleFull") : t("keyAreas.viewSimpleFull")}
                                                             </button>
                                                         ))}
                                                     </div>
@@ -3707,14 +3709,14 @@ export default function KeyAreas() {
                                             </button>
                                             {showColumnsMenu && (
                                                 <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded shadow z-50 p-3 text-sm">
-                                                    <div className="font-medium mb-2">Columns</div>
+                                                    <div className="font-medium mb-2">{t("keyAreas.columns")}</div>
                                                     <label className="flex items-center gap-2 py-1">
                                                         <input
                                                             type="checkbox"
                                                             checked={!!showCompleted}
                                                             onChange={() => setShowCompleted((s) => !s)}
                                                         />
-                                                        <span className="capitalize">Show completed items</span>
+                                                        <span className="capitalize">{t("keyAreas.showCompleted")}</span>
                                                     </label>
                                                     {Object.keys(visibleColumns).map((key) => (
                                                         <label key={key} className="flex items-center gap-2 py-1">
@@ -4036,7 +4038,7 @@ export default function KeyAreas() {
                                                                                 "ideas"
                                                                         ) {
                                                                             alert(
-                                                                                "Cannot add lists for the Ideas key area.",
+                                                                                t("keyAreas.alertCannotAddListIdeas"),
                                                                             );
                                                                             return;
                                                                         }
@@ -4295,7 +4297,7 @@ export default function KeyAreas() {
                                                                                     <td className="px-3 py-2" />
                                                                                     <td colSpan={14} className="px-0 py-2">
                                                                                         <div className="ml-6 pl-6 border-l-2 border-slate-200">
-                                                                                            <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-2">Activities</div>
+                                                                                            <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-2">{t("keyAreas.activities")}</div>
                                                                                             <ActivityList
                                                                                                 task={t}
                                                                                                 activitiesByTask={activitiesByTask}
@@ -4818,7 +4820,7 @@ export default function KeyAreas() {
                                                         <div className="flex-1 min-h-0 overflow-auto p-4">
                                                             <div className="flex items-center justify-center h-full text-slate-500 text-center">
                                                                 <div>
-                                                                    <p className="text-lg font-medium mb-2">Select a task</p>
+                                                                    <p className="text-lg font-medium mb-2">{t("keyAreas.selectTask")}</p>
                                                                     <p className="text-sm">Choose a task from the left panel to view its activities</p>
                                                                 </div>
                                                             </div>
@@ -5222,9 +5224,9 @@ export default function KeyAreas() {
                                                     
                                                     // Show appropriate feedback
                                                     if (keyAreaChanged) {
-                                                        try { addToast && addToast({ type: 'success', message: 'Task moved to different key area' }); } catch (e) {}
+                                                        try { addToast && addToast({ type: 'success', message: t('keyAreas.toastMovedKeyArea') }); } catch (e) {}
                                                     } else if (listChanged) {
-                                                        try { addToast && addToast({ type: 'success', message: 'Task moved to different list' }); } catch (e) {}
+                                                        try { addToast && addToast({ type: 'success', message: t('keyAreas.toastMovedList') }); } catch (e) {}
                                                     }
                                                 }}
                                                 onCancel={() => { setShowTaskComposer(false); setEditingTaskId(null); }}

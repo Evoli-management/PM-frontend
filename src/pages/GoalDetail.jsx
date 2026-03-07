@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import Sidebar from "../components/shared/Sidebar";
 import GoalDetailModal from "../components/goals/GoalDetailModal";
 import * as goalService from "../services/goalService";
 import { FaArrowLeft } from "react-icons/fa";
 
 const GoalDetail = () => {
+    const { t } = useTranslation();
     const { goalId } = useParams();
     const navigate = useNavigate();
     const [goal, setGoal] = useState(null);
@@ -53,7 +55,7 @@ const GoalDetail = () => {
                     }
                 } catch (e) {
                     console.error("Failed to fetch goal:", e);
-                    if (mounted) setError("Failed to load goal. Please try again later.");
+                    if (mounted) setError(t("goalDetail.loadError"));
                 } finally {
                     if (mounted) setLoading(false);
                 }

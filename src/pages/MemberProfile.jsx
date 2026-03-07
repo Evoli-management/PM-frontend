@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useParams, useNavigate } from "react-router-dom";
 import Sidebar from "../components/shared/Sidebar";
 import { FaBars, FaEdit, FaCheck, FaTimes } from "react-icons/fa";
@@ -10,6 +11,7 @@ import teamsService from "../services/teamsService";
 import recognitionsService from "../services/recognitionsService";
 
 export default function MemberProfile() {
+    const { t } = useTranslation();
     const { userId } = useParams();
     const navigate = useNavigate();
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -60,14 +62,14 @@ export default function MemberProfile() {
                 const allTeams = await teamsService.getTeams();
                 const teamsArr = Array.isArray(allTeams) ? allTeams : [];
                 const membershipChecks = await Promise.all(
-                    teamsArr.map(async (t) => {
+                    teamsArr.map(async (team) => {
                         try {
-                            const members = await teamsService.getTeamMembers(t.id);
+                            const members = await teamsService.getTeamMembers(team.id);
                             const isMember = Array.isArray(members) && members.some((m) => {
                                 const mid = String(m.id || m.userId);
                                 return mid === String(userId);
                             });
-                            return isMember ? { ...t, members } : null;
+                            return isMember ? { ...team, members } : null;
                         } catch (e) {
                             return null;
                         }
@@ -96,7 +98,7 @@ export default function MemberProfile() {
                 setRecentAchievements(Array.isArray(achievements) ? achievements : []);
             } catch {}
         } catch (err) {
-            const message = err?.response?.data?.message || err?.message || 'Failed to load member profile';
+            const message = err?.response?.data?.message || err?.message || t("memberProfile.loading");
             setError(message);
             console.error('Error loading member profile:', err);
         } finally {
@@ -128,14 +130,14 @@ export default function MemberProfile() {
             setEditForm({});
             loadData(); // Reload to get fresh data
         } catch (err) {
-            const message = err?.response?.data?.message || 'Failed to update goal';
+            const message = err?.response?.data?.message || t("memberProfile.failedUpdateGoal");
             setError(message);
         }
     };
 
     const getKeyAreaName = (keyAreaId) => {
         const area = keyAreas.find(ka => ka.id === keyAreaId);
-        return area ? area.name : 'No Key Area';
+        return area ? area.name : t("memberProfile.noKeyArea");
     };
 
     const getStatusColor = (status) => {
@@ -149,9 +151,9 @@ export default function MemberProfile() {
 
     const getVisibilityBadge = (visibility) => {
         return visibility === 'private' ? (
-            <span className="text-xs px-2 py-1 bg-orange-100 text-orange-800 rounded">Private</span>
+            <span className="text-xs px-2 py-1 bg-orange-100 text-orange-800 rounded">{t("memberProfile.badgePrivate")}</span>
         ) : (
-            <span className="text-xs px-2 py-1 bg-green-100 text-green-800 rounded">Public</span>
+            <span className="text-xs px-2 py-1 bg-green-100 text-green-800 rounded">{t("memberProfile.badgePublic")}</span>
         );
     };
 
@@ -160,7 +162,7 @@ export default function MemberProfile() {
             <div className="flex h-screen bg-gray-50">
                 <Sidebar onMobileToggle={setMobileSidebarOpen} isOpen={mobileSidebarOpen} />
                 <div className="flex-1 flex items-center justify-center">
-                    <div className="text-gray-600">Loading member profile...</div>
+                    <div className="text-gray-600">{t("memberProfile.loading")}</div>
                 </div>
             </div>
         );
@@ -172,12 +174,12 @@ export default function MemberProfile() {
                 <Sidebar onMobileToggle={setMobileSidebarOpen} isOpen={mobileSidebarOpen} />
                 <div className="flex-1 flex items-center justify-center">
                     <div className="text-center">
-                        <p className="text-red-600 mb-4">{error || 'Member not found'}</p>
+                        <p className="text-red-600 mb-4">{error || t("memberProfile.notFound")}</p>
                         <button
                             onClick={() => navigate('/profile-settings?tab=Organization')}
                             className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
                         >
-                            Back to Organization
+                            {t("memberProfile.backToOrg")}
                         </button>
                     </div>
                 </div>
@@ -208,7 +210,7 @@ export default function MemberProfile() {
                     </div>
                     {isAdmin && (
                         <span className="px-3 py-1 bg-purple-100 text-purple-800 rounded text-sm font-medium">
-                            Admin View
+                            {t("memberProfile.adminView")}
                         </span>
                     )}
                 </header>
@@ -218,28 +220,28 @@ export default function MemberProfile() {
                     <div className="max-w-6xl mx-auto space-y-6">
                         {/* Member Info Card */}
                         <div className="bg-white rounded-lg border border-gray-200 p-6">
-                            <h2 className="text-lg font-semibold mb-4">Profile Information</h2>
+                            <h2 className="text-lg font-semibold mb-4">{t("memberProfile.profileInfo")}</h2>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <p className="text-sm text-gray-600">Job Title</p>
-                                    <p className="font-medium">{member.jobTitle || 'Not specified'}</p>
+                                    <p className="text-sm text-gray-600">{t("memberProfile.jobTitle")}</p>
+                                    <p className="font-medium">{member.jobTitle || t("memberProfile.notSpecified")}</p>
                                 </div>
                                 <div>
-                                    <p className="text-sm text-gray-600">Department</p>
-                                    <p className="font-medium">{member.department || 'Not specified'}</p>
+                                    <p className="text-sm text-gray-600">{t("memberProfile.department")}</p>
+                                    <p className="font-medium">{member.department || t("memberProfile.notSpecified")}</p>
                                 </div>
                                 <div>
-                                    <p className="text-sm text-gray-600">Manager</p>
-                                    <p className="font-medium">{member.manager || 'Not specified'}</p>
+                                    <p className="text-sm text-gray-600">{t("memberProfile.manager")}</p>
+                                    <p className="font-medium">{member.manager || t("memberProfile.notSpecified")}</p>
                                 </div>
                                 <div>
-                                    <p className="text-sm text-gray-600">Status</p>
+                                    <p className="text-sm text-gray-600">{t("memberProfile.status")}</p>
                                     <p className="font-medium capitalize">{member.status || 'active'}</p>
                                 </div>
                             </div>
                             {member.bio && (
                                 <div className="mt-4">
-                                    <p className="text-sm text-gray-600">Bio</p>
+                                    <p className="text-sm text-gray-600">{t("memberProfile.bio")}</p>
                                     <p className="text-gray-800 mt-1">{member.bio}</p>
                                 </div>
                             )}
@@ -248,7 +250,7 @@ export default function MemberProfile() {
                         {/* Key Areas */}
                         {keyAreas.length > 0 && (
                             <div className="bg-white rounded-lg border border-gray-200 p-6">
-                                <h2 className="text-lg font-semibold mb-4">Key Areas</h2>
+                                <h2 className="text-lg font-semibold mb-4">{t("memberProfile.keyAreas")}</h2>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                                     {keyAreas.map((area) => (
                                         <div
@@ -268,9 +270,9 @@ export default function MemberProfile() {
 
                         {/* Teams */}
                         <div className="bg-white rounded-lg border border-gray-200 p-6">
-                            <h2 className="text-lg font-semibold mb-4">Teams</h2>
+                            <h2 className="text-lg font-semibold mb-4">{t("memberProfile.teams")}</h2>
                             {memberTeams.length === 0 ? (
-                                <p className="text-gray-600">No team memberships.</p>
+                                <p className="text-gray-600">{t("memberProfile.noTeamMemberships")}</p>
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                     {memberTeams.map(team => (
@@ -286,7 +288,7 @@ export default function MemberProfile() {
                                                             const count = Number.isFinite(team.memberCount)
                                                                 ? team.memberCount
                                                                 : (Array.isArray(team.members) ? team.members.length : 0);
-                                                            return `${count} ${count === 1 ? 'member' : 'members'}`;
+                                                            return t("memberProfile.member", { count });
                                                         })()}
                                                     </p>
                                                 </div>
@@ -300,39 +302,39 @@ export default function MemberProfile() {
                         {/* Recognitions / Strokes */}
                         <div className="bg-white rounded-lg border border-gray-200 p-6">
                             <div className="flex items-center justify-between mb-4">
-                                <h2 className="text-lg font-semibold">Recognitions</h2>
+                                <h2 className="text-lg font-semibold">{t("memberProfile.recognitions")}</h2>
                             </div>
                             {/* Score Summary */}
                             {recognitionScore ? (
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
                                     <div className="p-3 border rounded">
-                                        <p className="text-sm text-gray-600">Employeeship</p>
+                                        <p className="text-sm text-gray-600">{t("memberProfile.employeeship")}</p>
                                         <p className="text-xl font-semibold">{recognitionScore.employeeshipScore}</p>
                                     </div>
                                     <div className="p-3 border rounded">
-                                        <p className="text-sm text-gray-600">Performance</p>
+                                        <p className="text-sm text-gray-600">{t("memberProfile.performance")}</p>
                                         <p className="text-xl font-semibold">{recognitionScore.performanceScore}</p>
                                     </div>
                                     <div className="p-3 border rounded">
-                                        <p className="text-sm text-gray-600">Total</p>
+                                        <p className="text-sm text-gray-600">{t("memberProfile.total")}</p>
                                         <p className="text-xl font-semibold">{recognitionScore.totalScore}</p>
                                     </div>
                                 </div>
                             ) : (
-                                <p className="text-gray-600 mb-4">No recognition score yet.</p>
+                                <p className="text-gray-600 mb-4">{t("memberProfile.noRecognitionScore")}</p>
                             )}
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <h3 className="font-semibold mb-2">Received (latest)</h3>
+                                    <h3 className="font-semibold mb-2">{t("memberProfile.receivedLatest")}</h3>
                                     {receivedStrokes.length === 0 ? (
-                                        <p className="text-gray-600">No recognitions received.</p>
+                                        <p className="text-gray-600">{t("memberProfile.noRecognitionsReceived")}</p>
                                     ) : (
                                         <div className="space-y-2">
                                             {receivedStrokes.map(r => (
                                                 <div key={r.id} className="p-2 border rounded">
                                                     <div className="flex items-center justify-between">
-                                                        <span className="text-sm font-medium">{r.type || 'Recognition'}</span>
+                                                        <span className="text-sm font-medium">{r.type || t("memberProfile.recognition")}</span>
                                                         <span className="text-xs text-gray-500">{new Date(r.createdAt).toLocaleString()}</span>
                                                     </div>
                                                     {r.personalNote && (
@@ -344,15 +346,15 @@ export default function MemberProfile() {
                                     )}
                                 </div>
                                 <div>
-                                    <h3 className="font-semibold mb-2">Given (latest)</h3>
+                                    <h3 className="font-semibold mb-2">{t("memberProfile.givenLatest")}</h3>
                                     {givenStrokes.length === 0 ? (
-                                        <p className="text-gray-600">No recognitions given.</p>
+                                        <p className="text-gray-600">{t("memberProfile.noRecognitionsGiven")}</p>
                                     ) : (
                                         <div className="space-y-2">
                                             {givenStrokes.map(r => (
                                                 <div key={r.id} className="p-2 border rounded">
                                                     <div className="flex items-center justify-between">
-                                                        <span className="text-sm font-medium">{r.type || 'Recognition'}</span>
+                                                        <span className="text-sm font-medium">{r.type || t("memberProfile.recognition")}</span>
                                                         <span className="text-xs text-gray-500">{new Date(r.createdAt).toLocaleString()}</span>
                                                     </div>
                                                     {r.personalNote && (
@@ -367,15 +369,15 @@ export default function MemberProfile() {
 
                             {/* Recent Achievements */}
                             <div className="mt-6">
-                                <h3 className="font-semibold mb-2">Recent Achievements</h3>
+                                <h3 className="font-semibold mb-2">{t("memberProfile.recentAchievements")}</h3>
                                 {recentAchievements.length === 0 ? (
-                                    <p className="text-gray-600">No recent achievements.</p>
+                                    <p className="text-gray-600">{t("memberProfile.noRecentAchievements")}</p>
                                 ) : (
                                     <div className="space-y-2">
                                         {recentAchievements.map(a => (
                                             <div key={a.id || `${a.type}-${a.createdAt}`} className="p-2 border rounded">
                                                 <div className="flex items-center justify-between">
-                                                    <span className="text-sm font-medium">{a.title || a.type || 'Achievement'}</span>
+                                                    <span className="text-sm font-medium">{a.title || a.type || t("memberProfile.recognition")}</span>
                                                     <span className="text-xs text-gray-500">{new Date(a.createdAt).toLocaleString()}</span>
                                                 </div>
                                                 {a.description && (
@@ -392,18 +394,18 @@ export default function MemberProfile() {
                         <div className="bg-white rounded-lg border border-gray-200 p-6">
                             <div className="flex items-center justify-between mb-4">
                                 <h2 className="text-lg font-semibold">
-                                    Goals {!isAdmin && <span className="text-sm font-normal text-gray-500">(Public only)</span>}
+                                    {t("memberProfile.goals")} {!isAdmin && <span className="text-sm font-normal text-gray-500">{t("memberProfile.goalsPublicOnly")}</span>}
                                 </h2>
                                 {isAdmin && (
                                     <span className="text-sm text-gray-600">
-                                        You can edit these goals as an admin
+                                        {t("memberProfile.goalsAdminEdit")}
                                     </span>
                                 )}
                             </div>
 
                             {goals.length === 0 ? (
                                 <p className="text-gray-600 text-center py-8">
-                                    No {!isAdmin && 'public'} goals found for this member.
+                                    {isAdmin ? t("memberProfile.noGoals") : t("memberProfile.noPublicGoals")}
                                 </p>
                             ) : (
                                 <div className="space-y-4">
@@ -417,13 +419,13 @@ export default function MemberProfile() {
                                                         value={editForm.title}
                                                         onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
                                                         className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
-                                                        placeholder="Goal title"
+                                                        placeholder={t("memberProfile.goalTitlePlaceholder")}
                                                     />
                                                     <textarea
                                                         value={editForm.description}
                                                         onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
                                                         className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
-                                                        placeholder="Description"
+                                                        placeholder={t("memberProfile.descriptionPlaceholder")}
                                                         rows="3"
                                                     />
                                                     <div className="grid grid-cols-2 gap-3">
@@ -432,17 +434,17 @@ export default function MemberProfile() {
                                                             onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
                                                             className="px-3 py-2 border rounded"
                                                         >
-                                                            <option value="active">Active</option>
-                                                            <option value="completed">Completed</option>
-                                                            <option value="archived">Archived</option>
+                                                            <option value="active">{t("memberProfile.statusActive")}</option>
+                                                            <option value="completed">{t("memberProfile.statusCompleted")}</option>
+                                                            <option value="archived">{t("memberProfile.statusArchived")}</option>
                                                         </select>
                                                         <select
                                                             value={editForm.visibility}
                                                             onChange={(e) => setEditForm({ ...editForm, visibility: e.target.value })}
                                                             className="px-3 py-2 border rounded"
                                                         >
-                                                            <option value="public">Public</option>
-                                                            <option value="private">Private</option>
+                                                            <option value="public">{t("memberProfile.visibilityPublic")}</option>
+                                                            <option value="private">{t("memberProfile.visibilityPrivate")}</option>
                                                         </select>
                                                     </div>
                                                     <input
@@ -452,7 +454,7 @@ export default function MemberProfile() {
                                                         className="w-full px-3 py-2 border rounded"
                                                     />
                                                     <div>
-                                                        <label className="text-sm text-gray-600">Progress: {editForm.progressPercent}%</label>
+                                                        <label className="text-sm text-gray-600">{t("memberProfile.progressLabel", { n: editForm.progressPercent })}</label>
                                                         <input
                                                             type="range"
                                                             min="0"
@@ -467,13 +469,13 @@ export default function MemberProfile() {
                                                             onClick={cancelEdit}
                                                             className="px-3 py-1 border rounded hover:bg-gray-100 flex items-center gap-1"
                                                         >
-                                                            <FaTimes /> Cancel
+                                                            <FaTimes /> {t("memberProfile.cancelBtn")}
                                                         </button>
                                                         <button
                                                             onClick={() => saveGoal(goal.id)}
                                                             className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center gap-1"
                                                         >
-                                                            <FaCheck /> Save
+                                                            <FaCheck /> {t("memberProfile.saveBtn")}
                                                         </button>
                                                     </div>
                                                 </div>
@@ -503,7 +505,7 @@ export default function MemberProfile() {
                                                         </span>
                                                         {getVisibilityBadge(goal.visibility)}
                                                         <span className="text-xs text-gray-600">
-                                                            Due: {new Date(goal.dueDate).toLocaleDateString()}
+                                                            {t("memberProfile.dueDate", { date: new Date(goal.dueDate).toLocaleDateString() })}
                                                         </span>
                                                         {goal.keyAreaId && (
                                                             <span className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded">
@@ -514,7 +516,7 @@ export default function MemberProfile() {
                                                     {goal.progressPercent > 0 && (
                                                         <div className="mt-3">
                                                             <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
-                                                                <span>Progress</span>
+                                                                <span>{t("memberProfile.progressTitle")}</span>
                                                                 <span>{goal.progressPercent}%</span>
                                                             </div>
                                                             <div className="w-full bg-gray-200 rounded-full h-2">

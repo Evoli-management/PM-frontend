@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import Sidebar from "../../components/shared/Sidebar";
 import { FaBars, FaSmile, FaMeh, FaFrown, FaCheckCircle } from "react-icons/fa";
 import { getCurrentEnpsScore, getEnpsTrend, submitEnpsResponse, getReminderStatus, getMyEnpsResponse } from "../../services/enpsService";
 
 export default function ENPS() {
+    const { t } = useTranslation();
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const [current, setCurrent] = useState(null);
     const [trend, setTrend] = useState([]);
@@ -44,7 +46,7 @@ export default function ENPS() {
 
     const handleSubmit = async () => {
         if (selectedScore === null) {
-            alert("Please select a score");
+            alert(t("enps.alertSelectScore"));
             return;
         }
         setSubmitting(true);
@@ -61,7 +63,7 @@ export default function ENPS() {
             setTimeout(() => setSubmitted(false), 3000);
         } catch (e) {
             console.error('Failed to submit response', e);
-            alert('Failed to submit your response');
+            alert(t("enps.alertSubmitFailed"));
         } finally {
             setSubmitting(false);
         }
@@ -84,14 +86,14 @@ export default function ENPS() {
 
     return (
         <div className="flex min-h-screen bg-[Canvas] text-[CanvasText]">
-            <Sidebar 
-                user={{ name: "Hussein" }} 
+            <Sidebar
+                user={{ name: "Hussein" }}
                 mobileOpen={mobileSidebarOpen}
                 onMobileClose={() => setMobileSidebarOpen(false)}
             />
 
             {mobileSidebarOpen && (
-                <div 
+                <div
                     className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
                     onClick={() => setMobileSidebarOpen(false)}
                 />
@@ -104,20 +106,20 @@ export default function ENPS() {
                 >
                     <FaBars className="h-5 w-5 text-gray-600" />
                 </button>
-                
+
                 <div className="mb-4">
                     <a href="#/dashboard" className="text-sm text-blue-600 hover:underline">
-                        ← Back to Dashboard
+                        {t("enps.backToDashboard")}
                     </a>
                 </div>
-                
-                <h1 className="text-3xl font-bold text-blue-700 dark:text-blue-400 mb-2">Employee Net Promoter Score (eNPS)</h1>
-                <p className="text-gray-600 dark:text-gray-300 mb-6">Help us understand how you feel about working here</p>
+
+                <h1 className="text-3xl font-bold text-blue-700 dark:text-blue-400 mb-2">{t("enps.title")}</h1>
+                <p className="text-gray-600 dark:text-gray-300 mb-6">{t("enps.subtitle")}</p>
 
                 {loading ? (
                     <div className="text-center py-12">
                         <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                        <p className="mt-4 text-gray-500">Loading survey...</p>
+                        <p className="mt-4 text-gray-500">{t("enps.loading")}</p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -126,18 +128,18 @@ export default function ENPS() {
                             <div className="flex items-center mb-6">
                                 {submitted && (
                                     <div className="flex items-center text-green-600 text-sm">
-                                        <FaCheckCircle className="mr-2" /> Response submitted!
+                                        <FaCheckCircle className="mr-2" /> {t("enps.responseSubmitted")}
                                     </div>
                                 )}
                                 <div className="text-sm text-gray-500">
-                                    {myResponse ? `Last updated: ${new Date(myResponse.updatedAt).toLocaleDateString()}` : 'You haven\'t responded yet'}
+                                    {myResponse ? t("enps.lastUpdated", { date: new Date(myResponse.updatedAt).toLocaleDateString() }) : t("enps.notRespondedYet")}
                                 </div>
                             </div>
 
                             <div className="mb-6">
-                                <label className="block font-semibold mb-4">How likely are you to recommend this company as a great place to work?</label>
-                                <p className="text-sm text-gray-600 mb-4">Please rate on a scale of 0-10</p>
-                                
+                                <label className="block font-semibold mb-4">{t("enps.question")}</label>
+                                <p className="text-sm text-gray-600 mb-4">{t("enps.scaleHint")}</p>
+
                                 <div className="grid grid-cols-5 gap-2 mb-6">
                                     {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(score => (
                                         <button
@@ -156,26 +158,26 @@ export default function ENPS() {
 
                                 <div className="grid grid-cols-3 gap-2 mb-6">
                                     <div className="text-center text-xs text-gray-500">
-                                        <p className="font-semibold text-red-600">Unlikely</p>
+                                        <p className="font-semibold text-red-600">{t("enps.unlikely")}</p>
                                         <p>0-6</p>
                                     </div>
                                     <div className="text-center text-xs text-gray-500">
-                                        <p className="font-semibold text-yellow-600">Neutral</p>
+                                        <p className="font-semibold text-yellow-600">{t("enps.neutral")}</p>
                                         <p>7-8</p>
                                     </div>
                                     <div className="text-center text-xs text-gray-500">
-                                        <p className="font-semibold text-green-600">Likely</p>
+                                        <p className="font-semibold text-green-600">{t("enps.likely")}</p>
                                         <p>9-10</p>
                                     </div>
                                 </div>
                             </div>
 
                             <div className="mb-6">
-                                <label className="block font-semibold mb-2">Additional comments (optional)</label>
+                                <label className="block font-semibold mb-2">{t("enps.commentsLabel")}</label>
                                 <textarea
                                     value={comment}
                                     onChange={(e) => setComment(e.target.value)}
-                                    placeholder="Tell us what we're doing well or where we can improve..."
+                                    placeholder={t("enps.commentsPlaceholder")}
                                     className="w-full border rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
                                     rows={4}
                                 />
@@ -186,7 +188,7 @@ export default function ENPS() {
                                 disabled={submitting || selectedScore === null}
                                 className="w-full px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition"
                             >
-                                {submitting ? 'Submitting...' : 'Submit Response'}
+                                {submitting ? t("enps.submitting") : t("enps.submitResponse")}
                             </button>
                         </section>
 
@@ -194,41 +196,41 @@ export default function ENPS() {
                         <aside className="space-y-6">
                             {/* Current Score */}
                             <section className="bg-white border rounded-2xl p-6 shadow-sm">
-                                <h2 className="font-semibold mb-4">Organization Score</h2>
+                                <h2 className="font-semibold mb-4">{t("enps.orgScore")}</h2>
                                 {current ? (
                                     <div>
                                         <div className="text-4xl font-bold text-blue-600 mb-3">{current.score}</div>
                                         <div className="space-y-2 text-sm">
                                             <div className="flex items-center">
                                                 <FaSmile className="text-green-600 mr-2" />
-                                                <span>Promoters: {current.promoters}%</span>
+                                                <span>{t("enps.promoters", { n: current.promoters })}</span>
                                             </div>
                                             <div className="flex items-center">
                                                 <FaMeh className="text-yellow-600 mr-2" />
-                                                <span>Passives: {current.passives}%</span>
+                                                <span>{t("enps.passives", { n: current.passives })}</span>
                                             </div>
                                             <div className="flex items-center">
                                                 <FaFrown className="text-red-600 mr-2" />
-                                                <span>Detractors: {current.detractors}%</span>
+                                                <span>{t("enps.detractors", { n: current.detractors })}</span>
                                             </div>
                                         </div>
                                         <div className="mt-3 pt-3 border-t border-gray-200 text-xs text-gray-500">
-                                            {current.totalResponses} responses • Period: {current.period}
+                                            {t("enps.responses", { n: current.totalResponses, period: current.period })}
                                         </div>
                                     </div>
                                 ) : (
-                                    <p className="text-gray-500 text-sm">No data yet</p>
+                                    <p className="text-gray-500 text-sm">{t("enps.noData")}</p>
                                 )}
                             </section>
 
                             {/* Reminder Status */}
                             {reminderStatus && (
                                 <section className="bg-blue-50 border border-blue-200 rounded-2xl p-4 shadow-sm">
-                                    <h3 className="font-semibold text-blue-900 mb-2 text-sm">Reminders</h3>
+                                    <h3 className="font-semibold text-blue-900 mb-2 text-sm">{t("enps.reminders")}</h3>
                                     <p className="text-sm text-blue-800">
                                         {reminderStatus.hasReminder
-                                            ? `Last reminder: ${new Date(reminderStatus.lastSentAt).toLocaleDateString()}`
-                                            : 'No reminders sent yet'
+                                            ? t("enps.lastReminder", { date: new Date(reminderStatus.lastSentAt).toLocaleDateString() })
+                                            : t("enps.noRemindersSent")
                                         }
                                     </p>
                                 </section>
@@ -237,7 +239,7 @@ export default function ENPS() {
                             {/* Trend */}
                             {trend.length > 0 && (
                                 <section className="bg-white border rounded-2xl p-6 shadow-sm">
-                                    <h2 className="font-semibold mb-4 text-sm">Recent Trend</h2>
+                                    <h2 className="font-semibold mb-4 text-sm">{t("enps.recentTrend")}</h2>
                                     <div className="flex items-end gap-2 h-20">
                                         {trend.slice(-8).map((p, idx) => (
                                             <div key={idx} className="flex-1 flex flex-col items-center group">

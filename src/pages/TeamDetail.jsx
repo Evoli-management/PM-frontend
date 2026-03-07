@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useParams, useNavigate } from "react-router-dom";
 import Sidebar from "../components/shared/Sidebar";
 import { FaBars, FaAward, FaUsers, FaChartLine, FaSmile } from "react-icons/fa";
 import teamsService from "../services/teamsService";
 
 export default function TeamDetail() {
+  const { t } = useTranslation();
   const { teamId } = useParams();
   const navigate = useNavigate();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -26,7 +28,7 @@ export default function TeamDetail() {
         setDashboard(dashboardData || null);
         setMembers(membersData || []);
       } catch (e) {
-        const msg = e?.response?.data?.message || e?.message || "Failed to load team";
+        const msg = e?.response?.data?.message || e?.message || t("teamDetail.failedToLoad");
         setError(msg);
       } finally {
         setLoading(false);
@@ -38,13 +40,13 @@ export default function TeamDetail() {
   return (
     <div className="min-h-screen bg-[#EDEDED]">
       <div className="flex w-full min-h-screen">
-        <Sidebar 
+        <Sidebar
           user={{ name: "Hussein" }}
           mobileOpen={mobileSidebarOpen}
           onMobileClose={() => setMobileSidebarOpen(false)}
         />
         {mobileSidebarOpen && (
-          <div 
+          <div
             className="fixed inset-0 bg-black/40 z-30 md:hidden"
             onClick={() => setMobileSidebarOpen(false)}
           />
@@ -64,7 +66,7 @@ export default function TeamDetail() {
                   onClick={() => navigate('/teams')}
                   className="px-3 py-2 text-xs border rounded hover:bg-gray-100"
                 >
-                  ← Back to Teams
+                  {t("teamDetail.backToTeams")}
                 </button>
               </div>
             </div>
@@ -73,7 +75,7 @@ export default function TeamDetail() {
               {loading ? (
                 <div className="text-center py-12 text-gray-500">
                   <div className="text-4xl mb-2">⏳</div>
-                  <p>Loading team…</p>
+                  <p>{t("teamDetail.loadingTeam")}</p>
                 </div>
               ) : error ? (
                 <div className="text-center py-12 text-gray-500">
@@ -83,7 +85,7 @@ export default function TeamDetail() {
                     onClick={() => navigate('/teams')}
                     className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
                   >
-                    Go back
+                    {t("teamDetail.goBack")}
                   </button>
                 </div>
               ) : (
@@ -97,8 +99,8 @@ export default function TeamDetail() {
                       <div>
                         <h1 className="text-lg font-semibold text-gray-900">{dashboard?.name}</h1>
                         <p className="text-xs text-gray-600">
-                          {dashboard?.memberCount || 0} {dashboard?.memberCount === 1 ? 'member' : 'members'}
-                          {dashboard?.leadName && <span className="ml-2">• Led by {dashboard.leadName}</span>}
+                          {t("teamDetail.member", { count: dashboard?.memberCount || 0 })}
+                          {dashboard?.leadName && <span className="ml-2">• {t("teamDetail.ledBy", { name: dashboard.leadName })}</span>}
                         </p>
                       </div>
                     </div>
@@ -114,7 +116,7 @@ export default function TeamDetail() {
                           : 'text-gray-600 hover:text-gray-900'
                       }`}
                     >
-                      Dashboard
+                      {t("teamDetail.tabDashboard")}
                     </button>
                     <button
                       onClick={() => setActiveTab('members')}
@@ -124,7 +126,7 @@ export default function TeamDetail() {
                           : 'text-gray-600 hover:text-gray-900'
                       }`}
                     >
-                      Members
+                      {t("teamDetail.tabMembers")}
                     </button>
                   </div>
 
@@ -134,7 +136,7 @@ export default function TeamDetail() {
                       {/* Description */}
                       {dashboard.description && (
                         <section>
-                          <h2 className="mb-2 text-[15px] font-semibold text-gray-800">Description</h2>
+                          <h2 className="mb-2 text-[15px] font-semibold text-gray-800">{t("teamDetail.description")}</h2>
                           <p className="text-sm text-gray-700">{dashboard.description}</p>
                         </section>
                       )}
@@ -143,51 +145,57 @@ export default function TeamDetail() {
                       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         <StatCard
                           icon={<FaAward className="text-blue-500" />}
-                          label="Total Strokes"
+                          label={t("teamDetail.totalStrokes")}
                           value={dashboard.recognitions.total}
-                          subtitle="Last 30 days"
+                          subtitle={t("teamDetail.last30Days")}
                         />
                         <StatCard
                           icon={<FaUsers className="text-green-500" />}
-                          label="Participation"
+                          label={t("teamDetail.participation")}
                           value={`${dashboard.recognitions.participation.participationRate}%`}
-                          subtitle={`${dashboard.recognitions.participation.participatedMembers}/${dashboard.recognitions.participation.totalMembers} members`}
+                          subtitle={t("teamDetail.participatedMembers", {
+                            participated: dashboard.recognitions.participation.participatedMembers,
+                            total: dashboard.recognitions.participation.totalMembers
+                          })}
                         />
                         <StatCard
                           icon={<FaSmile className="text-yellow-500" />}
-                          label="Team eNPS"
+                          label={t("teamDetail.teamENPS")}
                           value={dashboard.enps.avgScore !== null ? dashboard.enps.avgScore.toFixed(1) : 'N/A'}
-                          subtitle={`${dashboard.enps.responseCount} responses`}
+                          subtitle={t("teamDetail.enpsResponses", { n: dashboard.enps.responseCount })}
                         />
                         <StatCard
                           icon={<FaChartLine className="text-purple-500" />}
-                          label="Active Members"
+                          label={t("teamDetail.activeMembers")}
                           value={dashboard.memberCount}
-                          subtitle={dashboard.leadName ? `Led by ${dashboard.leadName}` : 'No lead assigned'}
+                          subtitle={dashboard.leadName ? t("teamDetail.ledBy", { name: dashboard.leadName }) : t("teamDetail.noLeadAssigned")}
                         />
                       </section>
 
                       {/* Recognition Breakdown */}
                       <section>
-                        <h2 className="mb-3 text-[15px] font-semibold text-gray-800">Recognition Breakdown</h2>
+                        <h2 className="mb-3 text-[15px] font-semibold text-gray-800">{t("teamDetail.recognitionBreakdown")}</h2>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                           <RecognitionTypeCard
                             type="Employeeship"
                             count={dashboard.recognitions.byType.employeeship}
                             total={dashboard.recognitions.total}
                             color="bg-blue-500"
+                            percentLabel={t("teamDetail.percentOfTotal", { pct: dashboard.recognitions.total > 0 ? Math.round((dashboard.recognitions.byType.employeeship / dashboard.recognitions.total) * 100) : 0 })}
                           />
                           <RecognitionTypeCard
                             type="Performance"
                             count={dashboard.recognitions.byType.performance}
                             total={dashboard.recognitions.total}
                             color="bg-green-500"
+                            percentLabel={t("teamDetail.percentOfTotal", { pct: dashboard.recognitions.total > 0 ? Math.round((dashboard.recognitions.byType.performance / dashboard.recognitions.total) * 100) : 0 })}
                           />
                           <RecognitionTypeCard
                             type="Achievement"
                             count={dashboard.recognitions.byType.achievement}
                             total={dashboard.recognitions.total}
                             color="bg-yellow-500"
+                            percentLabel={t("teamDetail.percentOfTotal", { pct: dashboard.recognitions.total > 0 ? Math.round((dashboard.recognitions.byType.achievement / dashboard.recognitions.total) * 100) : 0 })}
                           />
                         </div>
                       </section>
@@ -195,7 +203,7 @@ export default function TeamDetail() {
                       {/* Recognition Trend */}
                       {dashboard.recognitions.trend.length > 0 && (
                         <section>
-                          <h2 className="mb-3 text-[15px] font-semibold text-gray-800">Recognition Trend</h2>
+                          <h2 className="mb-3 text-[15px] font-semibold text-gray-800">{t("teamDetail.recognitionTrend")}</h2>
                           <div className="space-y-2">
                             {dashboard.recognitions.trend.map((item, index) => (
                               <TrendBar key={index} week={item.week} count={item.count} />
@@ -207,11 +215,11 @@ export default function TeamDetail() {
                       {/* eNPS Details */}
                       {dashboard.enps.responseCount > 0 && (
                         <section>
-                          <h2 className="mb-3 text-[15px] font-semibold text-gray-800">Team eNPS Details</h2>
+                          <h2 className="mb-3 text-[15px] font-semibold text-gray-800">{t("teamDetail.teamENPSDetails")}</h2>
                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            <EnpsCard label="Promoters" count={dashboard.enps.promoters} color="bg-green-100 text-green-800" />
-                            <EnpsCard label="Passives" count={dashboard.enps.passives} color="bg-yellow-100 text-yellow-800" />
-                            <EnpsCard label="Detractors" count={dashboard.enps.detractors} color="bg-red-100 text-red-800" />
+                            <EnpsCard label={t("teamDetail.promoters")} count={dashboard.enps.promoters} color="bg-green-100 text-green-800" />
+                            <EnpsCard label={t("teamDetail.passives")} count={dashboard.enps.passives} color="bg-yellow-100 text-yellow-800" />
+                            <EnpsCard label={t("teamDetail.detractors")} count={dashboard.enps.detractors} color="bg-red-100 text-red-800" />
                           </div>
                         </section>
                       )}
@@ -221,7 +229,7 @@ export default function TeamDetail() {
                   {/* Members Tab */}
                   {activeTab === 'members' && (
                     <section>
-                      <h2 className="mb-3 text-[15px] font-semibold text-gray-800">Team Members</h2>
+                      <h2 className="mb-3 text-[15px] font-semibold text-gray-800">{t("teamDetail.teamMembers")}</h2>
                       {members && members.length > 0 ? (
                         <div className="space-y-2">
                           {members.map((m) => (
@@ -229,7 +237,7 @@ export default function TeamDetail() {
                           ))}
                         </div>
                       ) : (
-                        <p className="text-sm text-gray-500">No members to display.</p>
+                        <p className="text-sm text-gray-500">{t("teamDetail.noMembersDisplay")}</p>
                       )}
                     </section>
                   )}
@@ -258,7 +266,7 @@ function StatCard({ icon, label, value, subtitle }) {
   );
 }
 
-function RecognitionTypeCard({ type, count, total, color }) {
+function RecognitionTypeCard({ type, count, total, color, percentLabel }) {
   const percentage = total > 0 ? Math.round((count / total) * 100) : 0;
   return (
     <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
@@ -269,7 +277,7 @@ function RecognitionTypeCard({ type, count, total, color }) {
       <div className="w-full bg-gray-200 rounded-full h-2">
         <div className={`${color} h-2 rounded-full transition-all`} style={{ width: `${percentage}%` }}></div>
       </div>
-      <p className="text-xs text-gray-500 mt-1">{percentage}% of total</p>
+      <p className="text-xs text-gray-500 mt-1">{percentLabel}</p>
     </div>
   );
 }
@@ -279,12 +287,12 @@ function TrendBar({ week, count }) {
   const formatted = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const maxCount = 20; // Scale bar relative to 20 strokes
   const width = Math.min((count / maxCount) * 100, 100);
-  
+
   return (
     <div className="flex items-center gap-3">
       <span className="text-xs text-gray-600 w-20">{formatted}</span>
       <div className="flex-1 bg-gray-200 rounded-full h-6 relative">
-        <div 
+        <div
           className="bg-blue-500 h-6 rounded-full transition-all flex items-center justify-end pr-2"
           style={{ width: `${width}%` }}
         >
@@ -308,8 +316,9 @@ function EnpsCard({ label, count, color }) {
 }
 
 function MemberRow({ member, onView }) {
+  const { t } = useTranslation();
   const name = member.firstName ? `${member.firstName} ${member.lastName}` : (member.name || 'Unknown');
-  const role = member.role === 'lead' ? 'Lead' : 'Member';
+  const role = member.role === 'lead' ? t("teamDetail.roleLead") : t("teamDetail.roleMember");
   const initial = (member.firstName || member.name || 'U').charAt(0);
   return (
     <div className="flex items-center justify-between rounded border bg-gray-50 px-2 py-2">
@@ -324,7 +333,7 @@ function MemberRow({ member, onView }) {
           </span>
         )}
       </div>
-      <button onClick={onView} className="text-xs px-2 py-1 border rounded hover:bg-gray-100">View Profile</button>
+      <button onClick={onView} className="text-xs px-2 py-1 border rounded hover:bg-gray-100">{t("teamDetail.viewProfile")}</button>
     </div>
   );
 }
