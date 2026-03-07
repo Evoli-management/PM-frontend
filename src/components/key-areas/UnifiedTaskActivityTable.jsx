@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import { format } from 'date-fns';
 import { FaCheck, FaTimes, FaTrash, FaLock, FaLockOpen, FaExternalLinkAlt, FaStop, FaAlignJustify, FaBan, FaSquare, FaListUl, FaEllipsisV, FaEdit } from 'react-icons/fa';
@@ -36,6 +37,7 @@ export default function UnifiedTaskActivityTable({
     onActivityDelete,
     onMassEdit
 }) {
+    const { t } = useTranslation();
     const [selectedItems, setSelectedItems] = useState(new Set());
     const selectAllRef = useRef(null);
     const [sortField, setSortField] = useState(null);
@@ -328,7 +330,7 @@ export default function UnifiedTaskActivityTable({
 
     const handleDelete = (item, e) => {
         e.stopPropagation();
-        if (confirm(`Are you sure you want to delete this ${item.type}?`)) {
+        if (confirm(t("unifiedTable.deleteConfirm", { type: item.type }))) {
             if (item.type === 'task' && onTaskDelete) {
                 onTaskDelete(item.id || item.task_id);
             } else if (item.type === 'activity' && onActivityDelete) {
@@ -598,7 +600,7 @@ export default function UnifiedTaskActivityTable({
                 keyAreaId: selectedKeyArea,
             });
             
-            alert('Task accepted successfully! The new task has been added to your selected Key Area.');
+            alert(t("unifiedTable.taskAccepted"));
             
             // Close modal
             setShowAcceptModal(false);
@@ -609,14 +611,14 @@ export default function UnifiedTaskActivityTable({
             window.location.href = `/key-areas?id=${selectedKeyArea}`;
         } catch (error) {
             console.error('Failed to accept delegation:', error);
-            alert(error.response?.data?.message || 'Failed to accept delegation');
+            alert(error.response?.data?.message || t("unifiedTable.failedAccept"));
         } finally {
             setRespondingTaskId(null);
         }
     };
 
     const handleRejectClick = async (task) => {
-        if (!confirm('Are you sure you want to reject this delegation?')) return;
+        if (!confirm(t("unifiedTable.rejectConfirm"))) return;
         
         setRespondingTaskId(task.id);
         try {
@@ -627,10 +629,10 @@ export default function UnifiedTaskActivityTable({
                 onTaskUpdate(task.id, { delegationStatus: 'rejected' });
             }
             
-            alert('Task rejected successfully');
+            alert(t("unifiedTable.taskRejected"));
         } catch (error) {
             console.error('Failed to reject delegation:', error);
-            alert(error.response?.data?.message || 'Failed to reject delegation');
+            alert(error.response?.data?.message || t("unifiedTable.failedReject"));
         } finally {
             setRespondingTaskId(null);
         }
@@ -695,9 +697,9 @@ export default function UnifiedTaskActivityTable({
             const result = await activityDelegationService.acceptDelegation(acceptingActivity.id, payload);
             
             if (result.type === 'task') {
-                alert('Activity accepted and converted to a task in your selected Key Area!');
+                alert(t("unifiedTable.activityAcceptedTask"));
             } else {
-                alert('Activity accepted and added to the selected task!');
+                alert(t("unifiedTable.activityAccepted"));
             }
             
             // Close modal
@@ -711,14 +713,14 @@ export default function UnifiedTaskActivityTable({
             window.location.href = `/key-areas?id=${selectedKeyArea}`;
         } catch (error) {
             console.error('Failed to accept activity delegation:', error);
-            alert(error.response?.data?.message || 'Failed to accept activity delegation');
+            alert(error.response?.data?.message || t("unifiedTable.failedAcceptActivity"));
         } finally {
             setRespondingTaskId(null);
         }
     };
 
     const handleRejectActivityClick = async (activity) => {
-        if (!confirm('Are you sure you want to reject this activity delegation?')) return;
+        if (!confirm(t("unifiedTable.rejectActivityConfirm"))) return;
         
         setRespondingTaskId(activity.id);
         try {
@@ -729,10 +731,10 @@ export default function UnifiedTaskActivityTable({
                 onActivityUpdate(activity.id, { delegationStatus: 'rejected' });
             }
             
-            alert('Activity rejected successfully');
+            alert(t("unifiedTable.activityRejected"));
         } catch (error) {
             console.error('Failed to reject activity delegation:', error);
-            alert(error.response?.data?.message || 'Failed to reject activity delegation');
+            alert(error.response?.data?.message || t("unifiedTable.failedRejectActivity"));
         } finally {
             setRespondingTaskId(null);
         }
@@ -743,14 +745,14 @@ export default function UnifiedTaskActivityTable({
             {/* Special Header for Delegated View */}
             {viewTab === 'delegated' && (
                 <div className="px-4 py-3 bg-white border-b border-slate-200">
-                    <h3 className="text-lg font-semibold text-center text-slate-900">Delegated Tasks</h3>
+                    <h3 className="text-lg font-semibold text-center text-slate-900">{t("unifiedTable.delegatedTasks")}</h3>
                 </div>
             )}
 
             {/* Filters Row */}
             <div className="flex items-center justify-between gap-3 px-4 py-3 bg-white border-b border-slate-200 flex-wrap">
                 <div className="flex items-center gap-3 flex-wrap">
-                    <span className="text-sm font-medium text-slate-700">Filter:</span>
+                    <span className="text-sm font-medium text-slate-700">{t("unifiedTable.filter")}</span>
 
                     {/* Task/Activity Toggle Buttons */}
                     <div className="flex items-center gap-2">
@@ -784,7 +786,7 @@ export default function UnifiedTaskActivityTable({
                         onChange={(e) => setKeyAreaFilter(e.target.value)}
                         className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-200"
                     >
-                        <option value="">Key Area</option>
+                        <option value="">{t("unifiedTable.keyArea")}</option>
                         {keyAreas.map((ka, idx) => (
                             <option key={ka.id} value={ka.id}>
                                 {formatKeyAreaLabel(ka, idx)}
@@ -799,7 +801,7 @@ export default function UnifiedTaskActivityTable({
                             onChange={(e) => setResponsibleFilter(e.target.value)}
                             className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-200"
                         >
-                            <option value="">Responsible</option>
+                            <option value="">{t("unifiedTable.responsible")}</option>
                             {users.map(user => (
                                 <option key={user.id} value={user.id || user.member_id}>
                                     {user.name || user.firstname} {user.lastname || ''}
@@ -814,7 +816,7 @@ export default function UnifiedTaskActivityTable({
                     <div className="flex items-center gap-2">
                         <input
                             type="text"
-                            placeholder="Search"
+                            placeholder={t("unifiedTable.search")}
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-200"
@@ -825,13 +827,13 @@ export default function UnifiedTaskActivityTable({
                     {/* Mass Edit - hidden for delegated view */}
                     {viewTab !== 'delegated' && (
                         <div className="flex items-center gap-2">
-                            <span className="text-sm text-slate-600">{selectedItems.size} selected</span>
+                            <span className="text-sm text-slate-600">{t("unifiedTable.selectedCount", { n: selectedItems.size })}</span>
                             <button
                                 onClick={handleMassEdit}
                                 className="px-3 py-2 rounded-md text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
                                 disabled={selectedItems.size === 0}
                             >
-                                Mass edit
+                                {t("unifiedTable.massEdit")}
                             </button>
                         </div>
                     )}
@@ -856,7 +858,7 @@ export default function UnifiedTaskActivityTable({
                             {columns.includes('title') && (
                                 <>
                                   <th className="px-2 sm:px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100" onClick={() => handleSort('title')}>
-                                      Title {sortField === 'title' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                      {t("unifiedTable.colTitle")} {sortField === 'title' && (sortDirection === 'asc' ? '↑' : '↓')}
                                   </th>
                                 </>
                             )}
@@ -865,7 +867,7 @@ export default function UnifiedTaskActivityTable({
                                     className="w-40 px-2 sm:px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
                                     onClick={() => handleSort('responsible')}
                                 >
-                                    {viewTab === 'delegated' ? 'Received From' : 'Responsible'} {sortField === 'responsible' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                    {viewTab === 'delegated' ? t("unifiedTable.receivedFrom") : t("unifiedTable.responsible")} {sortField === 'responsible' && (sortDirection === 'asc' ? '↑' : '↓')}
                                 </th>
                             )}
                             {columns.includes('keyArea') && (
@@ -873,7 +875,7 @@ export default function UnifiedTaskActivityTable({
                                     className="w-32 px-2 sm:px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
                                     onClick={() => handleSort('keyArea')}
                                 >
-                                    Key Area {sortField === 'keyArea' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                    {t("unifiedTable.colKeyArea")} {sortField === 'keyArea' && (sortDirection === 'asc' ? '↑' : '↓')}
                                 </th>
                             )}
                             {columns.includes('tab') && (
@@ -881,12 +883,12 @@ export default function UnifiedTaskActivityTable({
                                     className="w-20 px-2 sm:px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
                                     onClick={() => handleSort('tab')}
                                 >
-                                    Tab {sortField === 'tab' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                    {t("unifiedTable.colTab")} {sortField === 'tab' && (sortDirection === 'asc' ? '↑' : '↓')}
                                 </th>
                             )}
                             {columns.includes('priority') && (
                                 <th className="w-28 px-2 sm:px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100" onClick={() => handleSort('priority')}>
-                                    Priority {sortField === 'priority' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                    {t("unifiedTable.colPriority")} {sortField === 'priority' && (sortDirection === 'asc' ? '↑' : '↓')}
                                 </th>
                             )}
                             {columns.includes('goal') && (
@@ -894,22 +896,22 @@ export default function UnifiedTaskActivityTable({
                                     className="w-40 px-2 sm:px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
                                     onClick={() => handleSort('goal')}
                                 >
-                                    Goal {sortField === 'goal' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                    {t("unifiedTable.colGoal")} {sortField === 'goal' && (sortDirection === 'asc' ? '↑' : '↓')}
                                 </th>
                             )}
                             {columns.includes('startDate') && (
                                 <th className="w-28 px-2 sm:px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100" onClick={() => handleSort('startDate')}>
-                                    Start {sortField === 'startDate' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                    {t("unifiedTable.colStart")} {sortField === 'startDate' && (sortDirection === 'asc' ? '↑' : '↓')}
                                 </th>
                             )}
                             {columns.includes('endDate') && (
                                 <th className="w-28 px-2 sm:px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100" onClick={() => handleSort('endDate')}>
-                                    End {sortField === 'endDate' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                    {t("unifiedTable.colEnd")} {sortField === 'endDate' && (sortDirection === 'asc' ? '↑' : '↓')}
                                 </th>
                             )}
                             {columns.includes('deadline') && (
                                 <th className="w-28 px-2 sm:px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100" onClick={() => handleSort('dueDate')}>
-                                    Deadline {sortField === 'dueDate' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                    {t("unifiedTable.colDeadline")} {sortField === 'dueDate' && (sortDirection === 'asc' ? '↑' : '↓')}
                                 </th>
                             )}
                         </tr>
@@ -1014,7 +1016,7 @@ export default function UnifiedTaskActivityTable({
                                                             }}
                                                         >
                                                             <FaExternalLinkAlt size={12} />
-                                                            Open in details
+                                                            {t("unifiedTable.openInDetails")}
                                                         </button>
                                                         <button
                                                             type="button"
@@ -1027,7 +1029,7 @@ export default function UnifiedTaskActivityTable({
                                                             }}
                                                         >
                                                             <FaEdit size={12} />
-                                                            Edit
+                                                            {t("unifiedTable.edit")}
                                                         </button>
                                                         <button
                                                             type="button"
@@ -1039,7 +1041,7 @@ export default function UnifiedTaskActivityTable({
                                                             }}
                                                         >
                                                             <FaTrash size={12} />
-                                                            Delete
+                                                            {t("unifiedTable.delete")}
                                                         </button>
                                                         {viewTab !== 'delegated' && (
                                                             <>
@@ -1053,7 +1055,7 @@ export default function UnifiedTaskActivityTable({
                                                                     }}
                                                                 >
                                                                     {isCompleted ? <FaTimes size={12} /> : <FaCheck size={12} />}
-                                                                    {isCompleted ? 'Mark as not completed' : 'Mark as completed'}
+                                                                    {isCompleted ? t("unifiedTable.markNotCompleted") : t("unifiedTable.markCompleted")}
                                                                 </button>
                                                                 <button
                                                                     type="button"
@@ -1065,7 +1067,7 @@ export default function UnifiedTaskActivityTable({
                                                                     }}
                                                                 >
                                                                     {isPrivate ? <FaLockOpen size={12} /> : <FaLock size={12} />}
-                                                                    {isPrivate ? 'Mark as public' : 'Mark as private'}
+                                                                    {isPrivate ? t("unifiedTable.markPublic") : t("unifiedTable.markPrivate")}
                                                                 </button>
                                                             </>
                                                         )}
@@ -1099,8 +1101,8 @@ export default function UnifiedTaskActivityTable({
                                                         <FaListUl title="Activity" className="text-purple-600 flex-shrink-0" />
                                                       )}
                                                       <div className="flex-grow min-w-0">
-                                                        <p className="text-sm font-medium text-slate-900 truncate">{titleValue || 'Untitled'}</p>
-                                                        <p className="text-xs text-slate-500">From: {responsibleNameValue || '—'}</p>
+                                                        <p className="text-sm font-medium text-slate-900 truncate">{titleValue || t("unifiedTable.untitled")}</p>
+                                                        <p className="text-xs text-slate-500">{t("unifiedTable.from")} {responsibleNameValue || '—'}</p>
                                                       </div>
                                                     </>
                                                 ) : (
@@ -1119,7 +1121,7 @@ export default function UnifiedTaskActivityTable({
                                                             onClick={(e) => e.stopPropagation()}
                                                         />
                                                       ) : (
-                                                        <span className={`text-sm ${isCompleted ? 'line-through text-slate-400' : 'text-slate-800'}`}>{titleValue || 'Untitled'}</span>
+                                                        <span className={`text-sm ${isCompleted ? 'line-through text-slate-400' : 'text-slate-800'}`}>{titleValue || t("unifiedTable.untitled")}</span>
                                                       )}
                                                     </>
                                                 )}
@@ -1165,7 +1167,7 @@ export default function UnifiedTaskActivityTable({
                                                     onBlur={cancelEdit}
                                                     onClick={(e) => e.stopPropagation()}
                                                 >
-                                                    <option value="">Key Area</option>
+                                                    <option value="">{t("unifiedTable.keyArea")}</option>
                                                     {keyAreas.map((ka, idx) => (
                                                         <option key={ka.id} value={ka.id}>
                                                             {formatKeyAreaLabel(ka, idx)}

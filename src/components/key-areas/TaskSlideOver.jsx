@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FaTimes, FaSave, FaTag, FaTrash, FaAngleDoubleLeft } from 'react-icons/fa';
 import EmptyState from '../../components/goals/EmptyState.jsx';
 
@@ -41,6 +42,7 @@ export default function TaskSlideOver({
     savingActivityIds: savingActivityIdsProp = undefined,
     setSavingActivityIds: setSavingActivityIdsProp = undefined,
 }) {
+    const { t } = useTranslation();
     const [form, setForm] = useState(null);
     const [activeTab, setActiveTab] = useState("details"); // details | activities
     const [taskActivities, setTaskActivities] = useState([]);
@@ -173,7 +175,7 @@ export default function TaskSlideOver({
     };
 
     const clearActivities = async () => {
-        if (!confirm("Clear all activities for this selection?")) return;
+        if (!confirm(t("taskSlideOver.clearConfirm"))) return;
         try {
             const ids = (taskActivities || []).map((a) => a.id);
             const _svc = await getActivityService();
@@ -214,7 +216,7 @@ export default function TaskSlideOver({
             <div className="relative w-full max-w-3xl">
                 <div className="bg-slate-50 rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
                     <div className="flex items-center justify-between p-4 border-b border-slate-100">
-                        <h3 className="text-lg font-bold text-slate-900">Task</h3>
+                        <h3 className="text-lg font-bold text-slate-900">{t("taskSlideOver.taskTitle")}</h3>
                         <button className="p-2 rounded-lg hover:bg-slate-100 text-slate-700" onClick={onClose}>
                             <FaTimes />
                         </button>
@@ -228,14 +230,14 @@ export default function TaskSlideOver({
                                     onClick={() => setActiveTab("details")}
                                     type="button"
                                 >
-                                    Details
+                                    {t("taskSlideOver.details")}
                                 </button>
                                 <button
                                     className={`px-3 py-1 rounded-md text-sm font-semibold ${activeTab === "activities" ? "bg-white text-slate-900 shadow" : "text-slate-700 hover:bg-slate-200"}`}
                                     onClick={() => setActiveTab("activities")}
                                     type="button"
                                 >
-                                    Activities
+                                    {t("taskSlideOver.activities")}
                                 </button>
                             </div>
                         </div>
@@ -249,37 +251,37 @@ export default function TaskSlideOver({
                                     <div className="md:col-span-2 h-full flex flex-col">
                                         <div className="grid grid-rows-[auto_1fr] gap-1 flex-1">
                                             <div className="bg-slate-50 border border-slate-200 rounded-md p-1.5 h-full flex flex-col">
-                                                <div className="text-[10px] uppercase tracking-wide text-slate-500">Title</div>
+                                                <div className="text-[10px] uppercase tracking-wide text-slate-500">{t("taskSlideOver.titleLabel")}</div>
                                                 <textarea
                                                     rows={2}
                                                     className="mt-1 w-full rounded-md border border-slate-300 bg-white p-2 text-base leading-snug"
                                                     value={form.title || ""}
                                                     onChange={(e) => setForm((s) => ({ ...s, title: e.target.value }))}
-                                                    placeholder="Enter a descriptive task name…"
+                                                    placeholder={t("taskSlideOver.titlePlaceholder")}
                                                     disabled={readOnly}
                                                 />
                                             </div>
                                             <div className="bg-slate-50 border border-slate-200 rounded-md p-1.5 h-full flex flex-col">
-                                                <div className="text-[10px] uppercase tracking-wide text-slate-500">Description</div>
+                                                <div className="text-[10px] uppercase tracking-wide text-slate-500">{t("taskSlideOver.descLabel")}</div>
                                                 <textarea
                                                     rows={4}
                                                     className="mt-1.5 w-full rounded-md border border-slate-300 bg-white p-1.5 text-sm"
                                                     value={form.description || ""}
                                                     onChange={(e) => setForm((s) => ({ ...s, description: e.target.value }))}
-                                                    placeholder="Add more context…"
+                                                    placeholder={t("taskSlideOver.descPlaceholder")}
                                                     disabled={readOnly}
                                                 />
                                                 <div className="mt-2 border-t border-slate-200 pt-2">
                                                     <div className="grid md:grid-cols-3 gap-2">
                                                         <div>
-                                                            <div className="text-[11px] text-slate-600">Linked Goal</div>
+                                                            <div className="text-[11px] text-slate-600">{t("taskSlideOver.linkedGoalLabel")}</div>
                                                             <select
                                                                 className="mt-1 w-full rounded-md border border-slate-300 bg-white p-1.5 text-sm"
                                                                 value={form.goal_id || ""}
                                                                 onChange={(e) => setForm((s) => ({ ...s, goal_id: e.target.value }))}
                                                                 disabled={readOnly}
                                                             >
-                                                                <option value="">— None —</option>
+                                                                <option value="">{t("taskSlideOver.noneOpt")}</option>
                                                                 {goals.map((g) => (
                                                                     <option key={g.id} value={g.id}>
                                                                         {g.title}
@@ -288,17 +290,17 @@ export default function TaskSlideOver({
                                                             </select>
                                                         </div>
                                                         <div>
-                                                            <div className="text-[11px] text-slate-600">Tags</div>
+                                                            <div className="text-[11px] text-slate-600">{t("taskSlideOver.tagsLabel")}</div>
                                                             <input
                                                                 className="mt-1 w-full rounded-md border border-slate-300 bg-white p-1.5 text-sm"
                                                                 value={form.tags || ""}
                                                                 onChange={(e) => setForm((s) => ({ ...s, tags: e.target.value }))}
-                                                                placeholder="comma,separated"
+                                                                placeholder={t("taskSlideOver.tagsPlaceholder")}
                                                                 disabled={readOnly}
                                                             />
                                                         </div>
                                                         <div>
-                                                            <div className="text-[11px] text-slate-600">{`List (Tab) — ${listNameFor(form.list_index || 1)}`}</div>
+                                                            <div className="text-[11px] text-slate-600">{`${t("taskSlideOver.listLabel")} — ${listNameFor(form.list_index || 1)}`}</div>
                                                             <select
                                                                 className="mt-1 w-full rounded-md border border-slate-300 bg-white p-1.5 text-sm"
                                                                 value={String(form.list_index || 1)}
@@ -319,45 +321,45 @@ export default function TaskSlideOver({
                                         {!readOnly && (
                                             <div className="mt-1.5 flex items-center gap-2">
                                                 <button className="rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-1.5 px-2.5 py-1.5 text-xs">
-                                                    <FaSave /> Save changes
+                                                    <FaSave /> {t("taskSlideOver.saveChanges")}
                                                 </button>
                                                 <button type="button" className="px-2.5 py-1.5 rounded-md bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs" onClick={onClose}>
-                                                    Close
+                                                    {t("taskSlideOver.close")}
                                                 </button>
                                             </div>
                                         )}
                                     </div>
                                     <div className="grid grid-rows-[1fr_1fr] gap-1.5 h-full">
                                         <div className="bg-slate-50 border border-slate-200 rounded-md p-1.5 h-full flex flex-col">
-                                            <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-1.5">Summary</div>
+                                            <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-1.5">{t("taskSlideOver.summaryLabel")}</div>
                                             <div className="mb-1.5">
-                                                <div className="text-[11px] text-slate-600">Responsible</div>
+                                                <div className="text-[11px] text-slate-600">{t("taskSlideOver.responsibleLabel")}</div>
                                                 <input className="mt-1 w-full rounded-md border border-slate-300 bg-white p-1.5 text-sm" value={form.assignee || ""} onChange={(e) => setForm((s) => ({ ...s, assignee: e.target.value }))} disabled={readOnly} />
                                             </div>
                                             <div className="grid grid-cols-2 gap-1.5">
                                                 <div>
-                                                    <div className="text-[11px] text-slate-600">Status</div>
+                                                    <div className="text-[11px] text-slate-600">{t("taskSlideOver.statusLabel")}</div>
                                                     <select className="mt-1 w-full rounded-md border border-slate-300 bg-white p-1.5 text-sm" value={form.status || "open"} onChange={(e) => setForm((s) => ({ ...s, status: e.target.value }))} disabled={readOnly}>
-                                                        <option value="open">Open</option>
-                                                        <option value="in_progress">In Progress</option>
-                                                        <option value="done">Done</option>
-                                                        <option value="cancelled">Cancelled</option>
+                                                        <option value="open">{t("taskSlideOver.openOpt")}</option>
+                                                        <option value="in_progress">{t("taskSlideOver.inProgressOpt")}</option>
+                                                        <option value="done">{t("taskSlideOver.doneOpt")}</option>
+                                                        <option value="cancelled">{t("taskSlideOver.cancelledOpt")}</option>
                                                     </select>
                                                 </div>
                                                 <div>
-                                                    <div className="text-[11px] text-slate-600">Priority</div>
+                                                    <div className="text-[11px] text-slate-600">{t("taskSlideOver.priorityLabel")}</div>
                                                     <select className="mt-1 w-full rounded-md border border-slate-300 bg-white p-1.5 text-sm" value={form.priority || "med"} onChange={(e) => setForm((s) => ({ ...s, priority: e.target.value }))} disabled={readOnly}>
-                                                        <option value="high" >❗️ High</option>
-                                                        <option value="med">Medium</option>
-                                                        <option value="low" style={{ color: "#6b7280" }}>↓ Low</option>
+                                                        <option value="high">{t("taskSlideOver.highOpt")}</option>
+                                                        <option value="med">{t("taskSlideOver.medOpt")}</option>
+                                                        <option value="low" style={{ color: "#6b7280" }}>{t("taskSlideOver.lowOpt")}</option>
                                                     </select>
                                                 </div>
                                             </div>
                                         </div>
                                         <div className="bg-slate-50 border border-slate-200 rounded-md p-1.5 h-full flex flex-col">
-                                            <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-1.5">Schedule</div>
+                                            <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-1.5">{t("taskSlideOver.scheduleLabel")}</div>
                                             <div className="grid grid-cols-3 gap-1.5">
-                                                {[{ key: "start_date", label: "Start" }, { key: "end_date", label: "End date" }, { key: "deadline", label: "Deadline" }].map((f) => (
+                                                {[{ key: "start_date", label: t("taskSlideOver.startLabel") }, { key: "end_date", label: t("taskSlideOver.endLabel") }, { key: "deadline", label: t("taskSlideOver.deadlineLabel") }].map((f) => (
                                                     <div key={f.key}>
                                                         <div className="text-[11px] text-slate-600">{f.label}</div>
                                                         <input type="date" className="mt-1 w-full rounded-md border border-slate-300 bg-white p-1.5 text-sm" value={toDateOnly(form[f.key]) || ""} onChange={(e) => setForm((s) => ({ ...s, [f.key]: e.target.value }))} disabled={readOnly} />
@@ -376,30 +378,30 @@ export default function TaskSlideOver({
                     ) : (
                         <div className="p-4 max-h-[80vh] overflow-auto">
                             <div className="flex items-center justify-between">
-                                <div className="text-sm font-semibold">Your activities</div>
-                                <div className="text-xs text-slate-500">Attach to a task or keep as new</div>
+                                <div className="text-sm font-semibold">{t("taskSlideOver.yourActivities")}</div>
+                                <div className="text-xs text-slate-500">{t("taskSlideOver.attachHint")}</div>
                             </div>
 
                             <div className="mt-3 flex items-center">
                                 {savingActivityIds && savingActivityIds.size > 0 && (
-                                    <div className="inline-block align-middle text-xs text-slate-500">Saving...</div>
+                                    <div className="inline-block align-middle text-xs text-slate-500">{t("taskSlideOver.saving")}</div>
                                 )}
-                                <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("ka-open-activity-composer", { detail: { taskId: task?.id } }))} className="ml-auto px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm">Add Activity</button>
+                                <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("ka-open-activity-composer", { detail: { taskId: task?.id } }))} className="ml-auto px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm">{t("taskSlideOver.addActivity")}</button>
                             </div>
                             <div className="mt-3 overflow-x-auto">
                                 {taskActivities && taskActivities.length > 0 ? (
                                     <table className="min-w-full text-sm">
                                         <thead className="bg-slate-50 border border-slate-200 text-slate-700">
                                             <tr>
-                                                <th className="px-3 py-2 text-left w-[320px] font-semibold">Activity</th>
-                                                <th className="px-3 py-2 text-left font-semibold">Responsible</th>
-                                                <th className="px-3 py-2 text-left font-semibold">Status</th>
-                                                <th className="px-3 py-2 text-left font-semibold">Priority</th>
-                                                <th className="px-3 py-2 text-left font-semibold">Start date</th>
-                                                <th className="px-3 py-2 text-left font-semibold">End date</th>
-                                                <th className="px-3 py-2 text-left font-semibold">Deadline</th>
-                                                <th className="px-3 py-2 text-left font-semibold">Duration</th>
-                                                <th className="px-3 py-2 text-left font-semibold">Completed</th>
+                                                <th className="px-3 py-2 text-left w-[320px] font-semibold">{t("taskSlideOver.colActivity")}</th>
+                                                <th className="px-3 py-2 text-left font-semibold">{t("taskSlideOver.colResponsible")}</th>
+                                                <th className="px-3 py-2 text-left font-semibold">{t("taskSlideOver.colStatus")}</th>
+                                                <th className="px-3 py-2 text-left font-semibold">{t("taskSlideOver.colPriority")}</th>
+                                                <th className="px-3 py-2 text-left font-semibold">{t("taskSlideOver.colStart")}</th>
+                                                <th className="px-3 py-2 text-left font-semibold">{t("taskSlideOver.colEnd")}</th>
+                                                <th className="px-3 py-2 text-left font-semibold">{t("taskSlideOver.colDeadline")}</th>
+                                                <th className="px-3 py-2 text-left font-semibold">{t("taskSlideOver.colDuration")}</th>
+                                                <th className="px-3 py-2 text-left font-semibold">{t("taskSlideOver.colCompleted")}</th>
                                                 {/* Actions column removed — use row menu instead */}
                                             </tr>
                                         </thead>
@@ -420,9 +422,9 @@ export default function TaskSlideOver({
                                                         <div className="flex items-center gap-2">
                                                             <span className={`inline-block w-2.5 h-2.5 rounded-full ${String(a.status || '').toLowerCase() === 'done' ? 'bg-emerald-500' : String(a.status || '').toLowerCase() === 'in_progress' ? 'bg-blue-500' : 'bg-slate-400'}`} aria-hidden="true" />
                                                             <select value={a.status || 'open'} onChange={(e)=> setActivityStatus(a.id, e.target.value)} className="text-xs rounded-md border bg-white px-2 py-1" aria-label={`Change status for activity ${a.text}`}>
-                                                                <option value="open">Open</option>
-                                                                <option value="in_progress">In progress</option>
-                                                                <option value="done">Done</option>
+                                                                <option value="open">{t("taskSlideOver.openOpt")}</option>
+                                                                <option value="in_progress">{t("taskSlideOver.inProgressOpt")}</option>
+                                                                <option value="done">{t("taskSlideOver.doneOpt")}</option>
                                                             </select>
                                                         </div>
                                                     </td>
@@ -452,12 +454,12 @@ export default function TaskSlideOver({
                                         </tbody>
                                     </table>
                                 ) : (
-                                    <div className="text-sm text-slate-500 mt-2">No activities yet.</div>
+                                    <div className="text-sm text-slate-500 mt-2">{t("taskSlideOver.noActivities")}</div>
                                 )}
                             </div>
 
                             <div className="mt-4 flex items-center gap-2">
-                                <button type="button" onClick={onClose} className="ml-auto rounded-lg text-sm text-slate-700 hover:underline">Close</button>
+                                <button type="button" onClick={onClose} className="ml-auto rounded-lg text-sm text-slate-700 hover:underline">{t("taskSlideOver.close")}</button>
                             </div>
                         </div>
                     )}

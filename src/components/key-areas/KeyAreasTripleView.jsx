@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import TripleViewLayout from './TripleViewLayout';
 import TaskListPanel from './TaskListPanel';
 import ActivityListPanel from './ActivityListPanel';
@@ -21,6 +22,7 @@ export default function KeyAreasTripleView({
     onAddTask,
     tasksLoading = false,
 }) {
+    const { t } = useTranslation();
     const [taskPanelWidth, setTaskPanelWidth] = useState('50%');
 
     return (
@@ -34,10 +36,10 @@ export default function KeyAreasTripleView({
                         header={
                             <div>
                                 <h3 className="font-semibold text-slate-900">
-                                    {selectedKA?.title || 'Tasks'}
+                                    {selectedKA?.title || t("keyAreasTripleView.tasksLabel")}
                                 </h3>
                                 <p className="text-xs text-slate-500 mt-1">
-                                    {allTasks.length} task{allTasks.length !== 1 ? 's' : ''}
+                                    {t("keyAreasTripleView.taskCount", { count: allTasks.length })}
                                 </p>
                             </div>
                         }
@@ -53,10 +55,10 @@ export default function KeyAreasTripleView({
                             selectedTaskInPanel && (
                                 <div>
                                     <h3 className="text-sm font-semibold text-slate-900 truncate">
-                                        {selectedTaskInPanel.title || 'Untitled Task'}
+                                        {selectedTaskInPanel.title || t("keyAreasTripleView.untitledTask")}
                                     </h3>
                                     <p className="text-xs text-slate-500 mt-1">
-                                        Activities
+                                        {t("keyAreasTripleView.activities")}
                                     </p>
                                 </div>
                             )
