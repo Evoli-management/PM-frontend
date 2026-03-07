@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import Sidebar from "../../components/shared/Sidebar";
 import DashboardContainer from "../../components/dashboard/DashboardContainer";
 import DashboardTile from "../../components/dashboard/DashboardTile";
@@ -7,6 +8,7 @@ import notificationsService from "../../services/notificationsService";
 import { useNavigate } from "react-router-dom";
 
 export default function Notifications() {
+    const { t } = useTranslation();
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -70,9 +72,9 @@ export default function Notifications() {
         const diffInHours = Math.floor(diffInMs / 3600000);
         const diffInDays = Math.floor(diffInMs / 86400000);
 
-        if (diffInMins < 60) return `${diffInMins}m ago`;
-        if (diffInHours < 24) return `${diffInHours}h ago`;
-        return `${diffInDays}d ago`;
+        if (diffInMins < 60) return t("notifications.minutesAgo", { n: diffInMins });
+        if (diffInHours < 24) return t("notifications.hoursAgo", { n: diffInHours });
+        return t("notifications.daysAgo", { n: diffInDays });
     };
     
     return (
@@ -91,17 +93,17 @@ export default function Notifications() {
                 />
             )}
 
-            <DashboardContainer title="Notifications">
+            <DashboardContainer title={t("notifications.title")}>
                 <div className="col-span-full mb-4 px-1">
-                    <a href="#/dashboard" className="text-sm text-blue-600">← Back to Dashboard</a>
+                    <a href="#/dashboard" className="text-sm text-blue-600">{t("notifications.backToDashboard")}</a>
                     <div className="flex justify-between items-center mt-2">
-                        <p className="text-gray-600 dark:text-gray-300">Your recent activity and alerts.</p>
+                        <p className="text-gray-600 dark:text-gray-300">{t("notifications.description")}</p>
                         {notifications.some(n => !n.isRead) && (
                             <button
                                 onClick={handleMarkAllRead}
                                 className="text-sm text-blue-600 hover:underline"
                             >
-                                Mark all as read
+                                {t("notifications.markAllRead")}
                             </button>
                         )}
                     </div>
@@ -109,11 +111,11 @@ export default function Notifications() {
 
                 {loading ? (
                     <div className="col-span-full text-center py-8 text-gray-500">
-                        Loading notifications...
+                        {t("notifications.loading")}
                     </div>
                 ) : notifications.length === 0 ? (
                     <div className="col-span-full text-center py-8 text-gray-500">
-                        No notifications yet
+                        {t("notifications.none")}
                     </div>
                 ) : (
                     notifications.map((notification) => (

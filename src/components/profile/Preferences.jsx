@@ -331,18 +331,17 @@ export const Preferences = ({ showToast }) => {
             // and finally fall back to existing defaults (prev).
             setPreferences(prev => {
                 const mergedTimeFormat = apiPreferences.timeFormat ?? localPreferences.timeFormat ?? prev.timeFormat;
+                const mergedLanguage = apiPreferences.preferredLanguage ?? localPreferences.language ?? prev.language;
                 return {
                     ...prev,
                     ...localPreferences,
                     ...apiPreferences,
-                    // Ensure work hours use API when available, otherwise local or prev
                     workStartTime: apiPreferences.workStartTime ?? localPreferences.workStartTime ?? prev.workStartTime,
                     workEndTime: apiPreferences.workEndTime ?? localPreferences.workEndTime ?? prev.workEndTime,
-                    // Ensure timeFormat/dateFormat/timezone pick normalized API values if present,
-                    // otherwise prefer localStorage then existing prev defaults
                     timeFormat: normalizeTimeFormat(mergedTimeFormat),
                     dateFormat: apiPreferences.dateFormat ?? localPreferences.dateFormat ?? prev.dateFormat,
                     timezone: apiPreferences.timezone ?? localPreferences.timezone ?? prev.timezone,
+                    language: mergedLanguage,
                 };
             });
         } catch (error) {
@@ -476,6 +475,7 @@ export const Preferences = ({ showToast }) => {
             if (preferences.pmRemindersEmail !== undefined) apiData.pmRemindersEmail = preferences.pmRemindersEmail;
             if (preferences.pmRemindersDesktop !== undefined) apiData.pmRemindersDesktop = preferences.pmRemindersDesktop;
             if (preferences.pmReminderTiming) apiData.pmReminderTiming = preferences.pmReminderTiming;
+            if (preferences.language) apiData.preferredLanguage = preferences.language;
 
             // Save to API (preferences)
             await userPreferencesService.updatePreferences(apiData);

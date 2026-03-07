@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { FaUser, FaBolt, FaTh, FaSearch } from "react-icons/fa";
 import userProfileService from "../../services/userProfileService";
+import userPreferencesService from "../../services/userPreferencesService";
 import teamsService from "../../services/teamsService";
 import taskService from "../../services/taskService";
 import activityService from "../../services/activityService";
@@ -58,6 +59,7 @@ export default function Navbar() {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [open, openQuick, openActiveMenu]);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [currentLang, setCurrentLang] = useState(() => localStorage.getItem('preferred_language') || 'en');
     const location = useLocation();
     const navigate = useNavigate();
     const [openWidgets, setOpenWidgets] = useState(false);
@@ -555,10 +557,43 @@ export default function Navbar() {
         return () => window.removeEventListener('authChanged', onAuthChanged);
     }, []);
 
+    // Keep currentLang in sync when language changes from any source (Preferences, etc.)
+    useEffect(() => {
+        const handler = (e) => {
+            const lang = e?.detail?.language;
+            if (lang) setCurrentLang(lang);
+        };
+        window.addEventListener('languageChanged', handler);
+        return () => window.removeEventListener('languageChanged', handler);
+    }, []);
+
+    const handleLangToggle = async (lang) => {
+        if (lang === currentLang) return;
+        setCurrentLang(lang);
+        localStorage.setItem('preferred_language', lang);
+        window.dispatchEvent(new CustomEvent('languageChanged', { detail: { language: lang } }));
+        try {
+            await userPreferencesService.updatePreferences({ preferredLanguage: lang });
+        } catch (e) {
+            // non-fatal
+        }
+    };
+
     const fetchUserProfile = async () => {
         try {
             const profile = await userProfileService.getProfile();
             setUserProfile(profile);
+            // Load preferred language from backend and apply if different from local
+            try {
+                const prefs = await userPreferencesService.getPreferences();
+                if (prefs?.preferredLanguage) {
+                    const lang = prefs.preferredLanguage;
+                    setCurrentLang(lang);
+                    window.dispatchEvent(new CustomEvent('languageChanged', { detail: { language: lang } }));
+                }
+            } catch (e) {
+                // non-fatal: keep localStorage value
+            }
         } catch (error) {
             console.error('Failed to fetch user profile:', error);
         }
@@ -1270,6 +1305,25 @@ export default function Navbar() {
                         onClose={handleGlobalReminderClose}
                         onSave={handleGlobalReminderSave}
                     />
+
+                    {/* Language toggle */}
+                    <div className="flex items-center text-xs font-semibold gap-0.5">
+                        <button
+                            onClick={() => handleLangToggle('en')}
+                            className={`px-1.5 py-0.5 rounded transition ${currentLang === 'en' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:text-slate-900'}`}
+                            title="English"
+                        >
+                            EN
+                        </button>
+                        <span className="text-slate-400">|</span>
+                        <button
+                            onClick={() => handleLangToggle('sl')}
+                            className={`px-1.5 py-0.5 rounded transition ${currentLang === 'sl' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:text-slate-900'}`}
+                            title="Slovenščina"
+                        >
+                            SL
+                        </button>
+                    </div>
 
                     {/* Organization Switcher - for multi-org users */}
                     {isAuthenticated && <OrganizationSwitcher />}

@@ -3,8 +3,10 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faLock, faEyeSlash, faEye } from "@fortawesome/free-solid-svg-icons";
 import { getFriendlyErrorMessage } from "../utils/errorMessages";
+import { useTranslation } from "react-i18next";
 
 const ResetPasswordPage = () => {
+    const { t } = useTranslation();
     const [passwords, setPasswords] = useState({
         newPassword: "",
         confirmPassword: "",
@@ -49,22 +51,22 @@ const ResetPasswordPage = () => {
 
         // Validation
         if (!passwords.newPassword || !passwords.confirmPassword) {
-            alert("Please fill in all password fields");
+            alert(t("resetPassword.fillAll"));
             return;
         }
 
         if (passwords.newPassword.length < 8) {
-            alert("Password must be at least 8 characters long");
+            alert(t("resetPassword.tooShort"));
             return;
         }
 
         if (passwords.newPassword !== passwords.confirmPassword) {
-            alert("Passwords do not match");
+            alert(t("resetPassword.noMatch"));
             return;
         }
 
         if (!token) {
-            setError("Missing or invalid password reset token.");
+            setError(t("resetPassword.missingToken"));
             return;
         }
         setIsLoading(true);
@@ -73,10 +75,10 @@ const ResetPasswordPage = () => {
         try {
             const authService = await import("../services/authService").then(module => module.default);
             await authService.resetPassword(token, passwords.newPassword);
-            alert("Password reset successful! You can now login with your new password.");
+            alert(t("resetPassword.successAlert"));
             navigate("/login");
         } catch (err) {
-            const msg = err?.response?.data?.message || "Failed to reset password. Please try again.";
+            const msg = err?.response?.data?.message || t("resetPassword.failedFallback");
             setError(getFriendlyErrorMessage(msg));
         } finally {
             setIsLoading(false);
@@ -91,25 +93,25 @@ const ResetPasswordPage = () => {
                     {!token ? (
                         <div className="w-full mb-4 p-3 bg-red-50 border border-red-200 rounded-lg max-w-[420px] mx-auto text-center">
                             <h2 className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 text-red-700 text-center">
-                                Invalid Access
+                                {t("resetPassword.invalidAccess")}
                             </h2>
                             <p className="text-red-800 font-medium text-sm sm:text-base">
-                                Missing or invalid password reset token. Please use the link from your email.
+                                {t("resetPassword.invalidTokenMsg")}
                             </p>
                         </div>
                     ) : (
                         <>
                             <h2 className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 text-gray-900 text-center">
-                                Reset password
+                                {t("resetPassword.title")}
                             </h2>
                             <p className="text-gray-600 font-medium mb-4 text-base text-center">
-                                Please enter your new password to reset your account
+                                {t("resetPassword.subtitle")}
                             </p>
                             <div className="w-full mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg max-w-[420px] mx-auto text-center">
                                 <p className="text-blue-800 font-medium text-sm sm:text-base">
-                                    <span className="text-xs sm:text-sm text-blue-600">Reset password for:</span>
+                                    <span className="text-xs sm:text-sm text-blue-600">{t("resetPassword.resetPasswordFor")}</span>
                                     <br />
-                                    <span className="font-bold">(email hidden for privacy)</span>
+                                    <span className="font-bold">{t("resetPassword.emailHidden")}</span>
                                 </p>
                             </div>
                             <form onSubmit={handleSubmit} className="w-full">
@@ -121,8 +123,8 @@ const ResetPasswordPage = () => {
                                         className={`text-xs sm:text-sm mb-2 ${passwords.newPassword === passwords.confirmPassword ? "text-green-600" : "text-red-600"}`}
                                     >
                                         {passwords.newPassword === passwords.confirmPassword
-                                            ? "✓ Passwords match"
-                                            : "✗ Passwords do not match"}
+                                            ? t("resetPassword.passwordsMatch")
+                                            : t("resetPassword.passwordsDontMatch")}
                                     </div>
                                 )}
                                 <div className="relative mb-4 sm:mb-6 w-full">
@@ -131,7 +133,7 @@ const ResetPasswordPage = () => {
                                         name="newPassword"
                                         value={passwords.newPassword}
                                         onChange={handlePasswordChange}
-                                        placeholder="Enter your new password"
+                                        placeholder={t("resetPassword.newPasswordPlaceholder")}
                                         className="w-full pl-10 pr-10 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 bg-blue-100 border-gray-300 text-black"
                                         required
                                     />
@@ -154,7 +156,7 @@ const ResetPasswordPage = () => {
                                         name="confirmPassword"
                                         value={passwords.confirmPassword}
                                         onChange={handlePasswordChange}
-                                        placeholder="Confirm new password"
+                                        placeholder={t("resetPassword.confirmPasswordPlaceholder")}
                                         className="w-full pl-10 pr-10 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 bg-blue-100 border-gray-300 text-black"
                                         required
                                     />
@@ -176,7 +178,7 @@ const ResetPasswordPage = () => {
                                     disabled={isLoading}
                                     className="w-full rounded-lg bg-green-500 hover:bg-green-600 text-white h-10 sm:h-12 font-semibold"
                                 >
-                                    {isLoading ? "RESETTING..." : "Reset password"}
+                                    {isLoading ? t("resetPassword.resetting") : t("resetPassword.submit")}
                                 </button>
                             </form>
                         </>
@@ -193,8 +195,7 @@ const ResetPasswordPage = () => {
                             />
                         </div>
                         <p className="mt-4 text-black text-sm sm:text-base font-semibold mx-auto max-w-[439px] px-4 text-center">
-                            No worries we’ll get you back in quickly and securely. Reset your password in seconds and regain
-                            access to your tasks and projects.
+                            {t("resetPassword.illustration")}
                         </p>
                     </div>
                 )}

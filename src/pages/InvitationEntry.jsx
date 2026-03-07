@@ -4,8 +4,10 @@ import { Loader, AlertCircle } from "lucide-react";
 import organizationService from "../services/organizationService";
 import authService from "../services/authService";
 import { getFriendlyErrorMessage } from "../utils/errorMessages";
+import { useTranslation } from "react-i18next";
 
 export default function InvitationEntry() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token");
@@ -16,7 +18,7 @@ export default function InvitationEntry() {
 
   useEffect(() => {
     if (!token) {
-      setError("No invitation token provided");
+      setError(t("invitationEntry.noToken"));
       setState("error");
       return;
     }
@@ -45,7 +47,7 @@ export default function InvitationEntry() {
           // User is not logged in
           const invitedEmail = info?.invitedEmail;
           if (!invitedEmail) {
-            setError("Invalid invitation - no email found");
+            setError(t("invitationEntry.noEmail"));
             setState("error");
             return;
           }
@@ -55,7 +57,7 @@ export default function InvitationEntry() {
           navigate(`/registration?token=${token}&email=${encodeURIComponent(invitedEmail)}`);
         }
       } catch (err) {
-        setError(getFriendlyErrorMessage(err?.response?.data?.message || err.message || "Failed to process invitation"));
+        setError(getFriendlyErrorMessage(err?.response?.data?.message || err.message || t("invitationEntry.processFailed")));
         setState("error");
       }
     };
@@ -70,8 +72,8 @@ export default function InvitationEntry() {
         {state === "loading" && (
           <div className="bg-white rounded-lg shadow-lg p-8 text-center">
             <Loader className="w-16 h-16 text-blue-600 mx-auto animate-spin mb-4" />
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Processing Invitation</h1>
-            <p className="text-gray-600">Please wait while we verify your invitation...</p>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">{t("invitationEntry.processingTitle")}</h1>
+            <p className="text-gray-600">{t("invitationEntry.processingText")}</p>
           </div>
         )}
 
@@ -80,13 +82,13 @@ export default function InvitationEntry() {
           <div className="bg-white rounded-lg shadow-lg p-8">
             <div className="text-center">
               <AlertCircle className="w-16 h-16 text-red-600 mx-auto mb-4" />
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">Invalid Invitation</h1>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">{t("invitationEntry.invalidTitle")}</h1>
               <p className="text-gray-600 mb-6">{error}</p>
               <button
                 onClick={() => navigate("/login")}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition"
               >
-                Back to Login
+                {t("invitationEntry.backToLogin")}
               </button>
             </div>
           </div>

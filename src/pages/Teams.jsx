@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "../components/shared/Sidebar";
 import { FaBars, FaEdit, FaTrash, FaEye, FaSearch } from "react-icons/fa";
@@ -10,6 +11,7 @@ import { SelectionPane } from "../components/teams/SelectionPane";
 import { IndexPanel } from "../components/teams/IndexPanel";
 
 export default function Teams() {
+    const { t } = useTranslation();
     // ============ API STATE ============
     const [teamsData, setTeamsData] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -146,7 +148,7 @@ export default function Teams() {
     const createTeam = async (name) => {
         if (!canManage) return;
         if (!name || !name.trim()) {
-            showToast('Team name is required', 'error');
+            showToast(t("teams.toastCreated"), 'error');
             return;
         }
         setSaving(true);
@@ -155,10 +157,10 @@ export default function Teams() {
                 name: name.trim(),
             });
             setTeamsData((prev) => [...prev, newTeam]);
-            showToast('Team created successfully');
+            showToast(t("teams.toastCreated"));
             loadUsage(); // Reload usage stats
         } catch (err) {
-            const message = err?.response?.data?.message || 'Failed to create team';
+            const message = err?.response?.data?.message || t("teams.toastCreated");
             showToast(message, 'error');
         } finally {
             setSaving(false);
@@ -173,10 +175,10 @@ export default function Teams() {
             const updated = await teamsService.updateTeam(teamId, {
                 name: newName.trim(),
             });
-            setTeamsData(teamsData.map(t => t.id === teamId ? updated : t));
-            showToast('Team renamed successfully');
+            setTeamsData(teamsData.map(tm => tm.id === teamId ? updated : tm));
+            showToast(t("teams.toastRenamed"));
         } catch (err) {
-            const message = err?.response?.data?.message || 'Failed to rename team';
+            const message = err?.response?.data?.message || t("teams.toastRenamed");
             showToast(message, 'error');
         } finally {
             setSaving(false);
@@ -185,14 +187,14 @@ export default function Teams() {
 
     const deleteTeam = async (teamId) => {
         if (!canManage) return;
-        if (!confirm('Are you sure you want to delete this team?')) return;
+        if (!confirm(t("teams.confirmDeleteTeam"))) return;
         setSaving(true);
         try {
             await teamsService.deleteTeam(teamId);
-            setTeamsData(teamsData.filter(t => t.id !== teamId));
-            showToast('Team deleted successfully');
+            setTeamsData(teamsData.filter(tm => tm.id !== teamId));
+            showToast(t("teams.toastDeleted"));
         } catch (err) {
-            const message = err?.response?.data?.message || 'Failed to delete team';
+            const message = err?.response?.data?.message || t("teams.toastDeleted");
             showToast(message, 'error');
         } finally {
             setSaving(false);
@@ -206,9 +208,9 @@ export default function Teams() {
         try {
             await teamsService.addTeamMember(teamId, userId, 'member');
             await loadTeams();
-            showToast('Member added successfully');
+            showToast(t("teams.toastMemberAdded"));
         } catch (err) {
-            const message = err?.response?.data?.message || 'Failed to add member';
+            const message = err?.response?.data?.message || t("teams.toastMemberAdded");
             showToast(message, 'error');
         } finally {
             setSaving(false);
@@ -217,14 +219,14 @@ export default function Teams() {
 
     const removeMemberFromTeam = async (teamId, userId) => {
         if (!canManage) return;
-        if (!confirm('Remove this member from the team?')) return;
+        if (!confirm(t("teams.confirmRemoveMember"))) return;
         setSaving(true);
         try {
             await teamsService.removeTeamMember(teamId, userId);
             await loadTeams();
-            showToast('Member removed successfully');
+            showToast(t("teams.toastMemberRemoved"));
         } catch (err) {
-            const message = err?.response?.data?.message || 'Failed to remove member';
+            const message = err?.response?.data?.message || t("teams.toastMemberRemoved");
             showToast(message, 'error');
         } finally {
             setSaving(false);
@@ -237,9 +239,9 @@ export default function Teams() {
         try {
             await teamsService.assignTeamLead(teamId, userId);
             await loadTeams();
-            showToast('Team leader updated successfully');
+            showToast(t("teams.toastLeaderUpdated"));
         } catch (err) {
-            const message = err?.response?.data?.message || 'Failed to update team leader';
+            const message = err?.response?.data?.message || t("teams.toastLeaderUpdated");
             showToast(message, 'error');
         } finally {
             setSaving(false);
@@ -318,22 +320,22 @@ export default function Teams() {
             const perfMetrics = await teamsService.getPerformanceMetrics(reportLevel, null);
             
             setEmployeeshipMetrics([
-                { key: 'commitment', label: 'Commitment', value: empMetrics.commitment },
-                { key: 'responsibility', label: 'Responsibility', value: empMetrics.responsibility },
-                { key: 'loyalty', label: 'Loyalty', value: empMetrics.loyalty },
-                { key: 'initiative', label: 'Initiative', value: empMetrics.initiative },
-                { key: 'productivity', label: 'Productivity', value: empMetrics.productivity },
-                { key: 'relations', label: 'Relations', value: empMetrics.relations },
-                { key: 'quality', label: 'Quality', value: empMetrics.quality },
-                { key: 'competence', label: 'Professional Competence', value: empMetrics.competence },
-                { key: 'flexibility', label: 'Flexibility', value: empMetrics.flexibility },
-                { key: 'implementation', label: 'Implementation', value: empMetrics.implementation },
-                { key: 'energy', label: 'Energy', value: empMetrics.energy },
+                { key: 'commitment', label: t("teams.empMetricCommitment"), value: empMetrics.commitment },
+                { key: 'responsibility', label: t("teams.empMetricResponsibility"), value: empMetrics.responsibility },
+                { key: 'loyalty', label: t("teams.empMetricLoyalty"), value: empMetrics.loyalty },
+                { key: 'initiative', label: t("teams.empMetricInitiative"), value: empMetrics.initiative },
+                { key: 'productivity', label: t("teams.empMetricProductivity"), value: empMetrics.productivity },
+                { key: 'relations', label: t("teams.empMetricRelations"), value: empMetrics.relations },
+                { key: 'quality', label: t("teams.empMetricQuality"), value: empMetrics.quality },
+                { key: 'competence', label: t("teams.empMetricCompetence"), value: empMetrics.competence },
+                { key: 'flexibility', label: t("teams.empMetricFlexibility"), value: empMetrics.flexibility },
+                { key: 'implementation', label: t("teams.empMetricImplementation"), value: empMetrics.implementation },
+                { key: 'energy', label: t("teams.empMetricEnergy"), value: empMetrics.energy },
             ]);
-            
+
             const performanceList = Array.isArray(perfMetrics?.metrics) && perfMetrics.metrics.length > 0
                 ? perfMetrics.metrics
-                : [{ key: 'overall', label: 'Overall Performance', value: perfMetrics?.overall || 0 }];
+                : [{ key: 'overall', label: t("teams.empMetricOverallPerf"), value: perfMetrics?.overall || 0 }];
 
             setPerformanceMetrics(performanceList);
         } catch (err) {
@@ -366,29 +368,29 @@ export default function Teams() {
     const getDefaultPerformanceMetrics = () => [];
 
     const organizationName = useMemo(() => {
-        return orgName || userProfile?.organizationName || userProfile?.companyName || userProfile?.organization?.name || 'My Organization';
+        return orgName || userProfile?.organizationName || userProfile?.companyName || userProfile?.organization?.name || t("teams.myOrgDefault");
     }, [orgName, userProfile]);
 
     const currentUserId = userProfile?.id;
 
     const filteredTeams = useMemo(() => {
-        const base = teamsData.filter(t => t.name.toLowerCase().includes(teamsSearch.toLowerCase()));
+        const base = teamsData.filter(tm => tm.name.toLowerCase().includes(teamsSearch.toLowerCase()));
         if (teamsFilter === 'all') return base;
         if (teamsFilter === 'empty') {
-            return base.filter(t => {
-                const count = Number.isFinite(t.memberCount)
-                    ? t.memberCount
-                    : (Array.isArray(t.members) ? t.members.length : 0);
+            return base.filter(tm => {
+                const count = Number.isFinite(tm.memberCount)
+                    ? tm.memberCount
+                    : (Array.isArray(tm.members) ? tm.members.length : 0);
                 return count === 0;
             });
         }
         if (teamsFilter === 'lead') {
-            return base.filter(t => String(t.leadId || t.leaderId || t.teamLeadUserId || t.lead?.id || '') === String(currentUserId || ''));
+            return base.filter(tm => String(tm.leadId || tm.leaderId || tm.teamLeadUserId || tm.lead?.id || '') === String(currentUserId || ''));
         }
         if (teamsFilter === 'mine') {
-            return base.filter(t => {
-                const memberIds = Array.isArray(t.memberIds) ? t.memberIds : [];
-                const members = Array.isArray(t.members) ? t.members : [];
+            return base.filter(tm => {
+                const memberIds = Array.isArray(tm.memberIds) ? tm.memberIds : [];
+                const members = Array.isArray(tm.members) ? tm.members : [];
                 const inIds = currentUserId && memberIds.some(id => String(id) === String(currentUserId));
                 const inMembers = currentUserId && members.some(m => String(m.id || m.userId) === String(currentUserId));
                 return Boolean(inIds || inMembers);
@@ -406,9 +408,16 @@ export default function Teams() {
 
     const getMemberRoleLabel = (member) => {
         const role = (member.role || member.orgRole || member.accessRole || '').toLowerCase();
-        if (role.includes('admin') || role.includes('owner')) return 'Admin';
-        if (role.includes('lead')) return 'Lead';
-        return 'Member';
+        if (role.includes('admin') || role.includes('owner')) return t("teams.roleAdmin");
+        if (role.includes('lead')) return t("teams.roleLead");
+        return t("teams.roleMember");
+    };
+
+    const getMemberRoleColor = (member) => {
+        const role = (member.role || member.orgRole || member.accessRole || '').toLowerCase();
+        if (role.includes('admin') || role.includes('owner')) return 'bg-purple-600 text-white';
+        if (role.includes('lead')) return 'bg-green-600 text-white';
+        return 'bg-gray-100 text-gray-600';
     };
 
     const getTeamRiskLabel = (team) => {
@@ -416,18 +425,18 @@ export default function Teams() {
             ? team.memberCount
             : (Array.isArray(team.members) ? team.members.length : 0);
         const hasLead = Boolean(team.leadId || team.leaderId || team.teamLeadUserId || team.lead?.id);
-        if (count === 0 && !hasLead) return 'No lead & no members';
-        if (count === 0) return 'No members';
-        if (!hasLead) return 'No lead';
-        return 'At risk';
+        if (count === 0 && !hasLead) return t("teams.riskNoLeadNoMembers");
+        if (count === 0) return t("teams.riskNoMembers");
+        if (!hasLead) return t("teams.riskNoLead");
+        return t("teams.riskAtRisk");
     };
 
     const myTeams = useMemo(() => {
         if (!currentUserId) return [];
-        return teamsData.filter(t => {
-            const memberIds = Array.isArray(t.memberIds) ? t.memberIds : [];
-            const members = Array.isArray(t.members) ? t.members : [];
-            const isLead = String(t.leadId || t.leaderId || t.teamLeadUserId || t.lead?.id || '') === String(currentUserId);
+        return teamsData.filter(tm => {
+            const memberIds = Array.isArray(tm.memberIds) ? tm.memberIds : [];
+            const members = Array.isArray(tm.members) ? tm.members : [];
+            const isLead = String(tm.leadId || tm.leaderId || tm.teamLeadUserId || tm.lead?.id || '') === String(currentUserId);
             const inIds = memberIds.some(id => String(id) === String(currentUserId));
             const inMembers = members.some(m => String(m.id || m.userId) === String(currentUserId));
             return isLead || inIds || inMembers;
@@ -436,7 +445,7 @@ export default function Teams() {
 
     const hasLeadTeams = useMemo(() => {
         if (!currentUserId) return false;
-        return teamsData.some(t => String(t.leadId || t.leaderId || t.teamLeadUserId || t.lead?.id || '') === String(currentUserId));
+        return teamsData.some(tm => String(tm.leadId || tm.leaderId || tm.teamLeadUserId || tm.lead?.id || '') === String(currentUserId));
     }, [teamsData, currentUserId]);
 
     useEffect(() => {
@@ -446,21 +455,21 @@ export default function Teams() {
     }, [view, reportLevel, hasLeadTeams]);
 
     const atRiskTeams = useMemo(() => {
-        return teamsData.filter(t => {
-            const count = Number.isFinite(t.memberCount)
-                ? t.memberCount
-                : (Array.isArray(t.members) ? t.members.length : 0);
-            const hasLead = Boolean(t.leadId || t.leaderId || t.teamLeadUserId || t.lead?.id);
+        return teamsData.filter(tm => {
+            const count = Number.isFinite(tm.memberCount)
+                ? tm.memberCount
+                : (Array.isArray(tm.members) ? tm.members.length : 0);
+            const hasLead = Boolean(tm.leadId || tm.leaderId || tm.teamLeadUserId || tm.lead?.id);
             return count === 0 || !hasLead;
         }).slice(0, 4);
     }, [teamsData]);
 
     const recentActivity = useMemo(() => {
-        const entries = teamsData.map(t => {
-            const timestamp = t.lastActivityAt || t.last_activity_at || t.updatedAt || t.updated_at || t.lastActivity;
+        const entries = teamsData.map(tm => {
+            const timestamp = tm.lastActivityAt || tm.last_activity_at || tm.updatedAt || tm.updated_at || tm.lastActivity;
             return {
-                id: t.id,
-                name: t.name,
+                id: tm.id,
+                name: tm.name,
                 timestamp: timestamp ? new Date(timestamp) : null,
             };
         }).filter(e => e.timestamp instanceof Date && !Number.isNaN(e.timestamp.getTime()));
@@ -468,10 +477,10 @@ export default function Teams() {
     }, [teamsData]);
 
     const activeTeamsCount = useMemo(() => {
-        return teamsData.filter(t => {
-            const count = Number.isFinite(t.memberCount)
-                ? t.memberCount
-                : (Array.isArray(t.members) ? t.members.length : 0);
+        return teamsData.filter(tm => {
+            const count = Number.isFinite(tm.memberCount)
+                ? tm.memberCount
+                : (Array.isArray(tm.members) ? tm.members.length : 0);
             return count > 0;
         }).length;
     }, [teamsData]);
@@ -498,9 +507,9 @@ export default function Teams() {
     }, [employeeshipAverage, performanceOverall]);
 
     const profileStatus = useMemo(() => {
-        if (profileStars >= 3) return 'Star Double Bagger';
-        if (profileStars === 2) return 'Star Performer';
-        if (profileStars === 1) return 'Double Bagger';
+        if (profileStars >= 3) return t("teams.starDoubleBagger");
+        if (profileStars === 2) return t("teams.starPerformer");
+        if (profileStars === 1) return t("teams.doubleBagger");
         return '';
     }, [profileStars]);
 
@@ -523,10 +532,10 @@ export default function Teams() {
                 ? (personalOverall >= teamPerformance ? 'up' : 'down')
                 : 'neutral';
             const trendLabel = trendDirection === 'up'
-                ? 'Trending up vs team avg'
+                ? t("teams.trendingUp")
                 : trendDirection === 'down'
-                    ? 'Below team avg'
-                    : 'No team average yet';
+                    ? t("teams.belowAvg")
+                    : t("teams.noTeamAvg");
 
             return (
                 <div className="bg-white rounded-lg border border-gray-200 p-4">
@@ -543,7 +552,7 @@ export default function Teams() {
                             </div>
                         )}
                         {profileStatus && (
-                            <div className="text-sm text-gray-700">Profile status: {profileStatus}</div>
+                            <div className="text-sm text-gray-700">{profileStatus}</div>
                         )}
                         <div className="flex items-center gap-1 text-blue-600">
                             {[1, 2, 3].map((i) => (
@@ -561,17 +570,17 @@ export default function Teams() {
                         {hasMetrics ? (
                             <>
                                 <div>
-                                    <div className="text-xs font-semibold text-gray-700 mb-1">Employeeship</div>
+                                    <div className="text-xs font-semibold text-gray-700 mb-1">{t("giveStrokes.typeModal.employeeship")}</div>
                                     <div className="space-y-1">
                                         <div className="flex items-center gap-2">
-                                            <span className="text-[11px] text-gray-500 w-16">You</span>
+                                            <span className="text-[11px] text-gray-500 w-16">{t("teams.you")}</span>
                                             <div className="flex-1 bg-gray-200 h-2 rounded-full">
                                                 <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${Math.min(employeeshipAverage, 100)}%` }}></div>
                                             </div>
                                             <span className="text-[11px] text-gray-600 w-10 text-right">{employeeshipAverage.toFixed(1)}%</span>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <span className="text-[11px] text-gray-500 w-16">Team avg</span>
+                                            <span className="text-[11px] text-gray-500 w-16">{t("teams.teamAvg")}</span>
                                             <div className="flex-1 bg-gray-200 h-2 rounded-full">
                                                 <div className="bg-cyan-500 h-2 rounded-full" style={{ width: `${Math.min(teamEmployeeship, 100)}%` }}></div>
                                             </div>
@@ -581,17 +590,17 @@ export default function Teams() {
                                 </div>
 
                                 <div>
-                                    <div className="text-xs font-semibold text-gray-700 mb-1">Performance</div>
+                                    <div className="text-xs font-semibold text-gray-700 mb-1">{t("giveStrokes.typeModal.performance")}</div>
                                     <div className="space-y-1">
                                         <div className="flex items-center gap-2">
-                                            <span className="text-[11px] text-gray-500 w-16">You</span>
+                                            <span className="text-[11px] text-gray-500 w-16">{t("teams.you")}</span>
                                             <div className="flex-1 bg-gray-200 h-2 rounded-full">
                                                 <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${Math.min(performanceOverall, 100)}%` }}></div>
                                             </div>
                                             <span className="text-[11px] text-gray-600 w-10 text-right">{performanceOverall.toFixed(1)}%</span>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <span className="text-[11px] text-gray-500 w-16">Team avg</span>
+                                            <span className="text-[11px] text-gray-500 w-16">{t("teams.teamAvg")}</span>
                                             <div className="flex-1 bg-gray-200 h-2 rounded-full">
                                                 <div className="bg-cyan-500 h-2 rounded-full" style={{ width: `${Math.min(teamPerformance, 100)}%` }}></div>
                                             </div>
@@ -602,13 +611,13 @@ export default function Teams() {
 
                                 {strongestWeakest.strongest && strongestWeakest.weakest && (
                                     <div className="rounded-md bg-slate-50 border border-slate-200 p-2 text-xs text-gray-700">
-                                        <div><span className="font-semibold">Strongest:</span> {strongestWeakest.strongest.label}</div>
-                                        <div><span className="font-semibold">Next focus:</span> {strongestWeakest.weakest.label}</div>
+                                        <div><span className="font-semibold">{t("teams.strongest")}:</span> {strongestWeakest.strongest.label}</div>
+                                        <div><span className="font-semibold">{t("teams.nextFocus")}:</span> {strongestWeakest.weakest.label}</div>
                                     </div>
                                 )}
                             </>
                         ) : (
-                            <div className="text-xs text-gray-500">Metrics are not available yet.</div>
+                            <div className="text-xs text-gray-500">{t("teams.metricsUnavailable")}</div>
                         )}
                     </div>
                 </div>
@@ -616,8 +625,8 @@ export default function Teams() {
         }
 
         const listTitle = reportLevel === 'organization'
-            ? 'Select a team you lead to see the report:'
-            : 'Select team member to see his/her report:';
+            ? t("teams.selectTeamLed")
+            : t("teams.selectMemberReport");
         const listItems = matrixData || [];
         const averageScore = listItems.length
             ? listItems.reduce((acc, item) => acc + (Number(item.score) || 0), 0) / listItems.length
@@ -634,15 +643,15 @@ export default function Teams() {
                                 checked={compareMode}
                                 onChange={(e) => setCompareMode(e.target.checked)}
                             />
-                            Compare mode
+                            {t("teams.compareMode")}
                         </label>
-                        <span className="text-[11px] text-gray-500">Avg score: {averageScore.toFixed(1)}</span>
+                        <span className="text-[11px] text-gray-500">{t("teams.avgScore", { score: averageScore.toFixed(1) })}</span>
                     </div>
                 )}
 
                 {listItems.length === 0 ? (
                     <div className="text-xs text-gray-500">
-                        {reportLevel === 'organization' ? 'No teams led yet.' : 'No items available.'}
+                        {reportLevel === 'organization' ? t("teams.noTeamsLed") : t("teams.noItemsAvailable")}
                         {reportLevel === 'organization' && (
                             <div className="mt-2">
                                 <button
@@ -650,7 +659,7 @@ export default function Teams() {
                                     onClick={() => navigate('/teams?tab=teams-members')}
                                     className="px-3 py-1.5 text-xs rounded bg-green-600 text-white hover:bg-green-700"
                                 >
-                                    Create team
+                                    {t("teams.createTeam")}
                                 </button>
                             </div>
                         )}
@@ -660,7 +669,7 @@ export default function Teams() {
                         {listItems.map((item) => {
                             const score = Number(item.score) || 0;
                             const trendUp = score >= averageScore;
-                            const team = teamsData.find(t => String(t.id) === String(item.id));
+                            const team = teamsData.find(tm => String(tm.id) === String(item.id));
                             const memberCount = Number.isFinite(team?.memberCount)
                                 ? team.memberCount
                                 : (Array.isArray(team?.members) ? team.members.length : 0);
@@ -686,8 +695,8 @@ export default function Teams() {
                                         <span className="text-[11px] text-gray-500">{score.toFixed(1)}%</span>
                                     </div>
                                     <div className="mt-1 flex items-center justify-between text-[11px] text-gray-500">
-                                        <span>{memberCount} members</span>
-                                        <span>{trendUp ? 'Above avg' : 'Below avg'}</span>
+                                        <span>{t("teams.memberCount", { count: memberCount })}</span>
+                                        <span>{trendUp ? t("teams.aboveAvg") : t("teams.belowAvgShort")}</span>
                                     </div>
                                 </button>
                             );
@@ -718,7 +727,7 @@ export default function Teams() {
                             onClick={() => navigate('/teams?tab=organization')}
                             className="px-3 py-1.5 text-xs rounded bg-red-500 text-white hover:bg-red-600"
                         >
-                            Back
+                            {t("teams.reportBack")}
                         </button>
                     </div>
                 )}
@@ -765,7 +774,7 @@ export default function Teams() {
                                 <div className="space-y-3">
                                     {view === 'list' && (
                                         <div className="flex flex-col gap-3 mb-3">
-                                            <h1 className="text-lg font-semibold text-gray-600 sm:text-xl">{canManage ? 'Teams & Members' : 'Teams'}</h1>
+                                            <h1 className="text-lg font-semibold text-gray-600 sm:text-xl">{canManage ? t("teams.title") : t("teams.titleViewOnly")}</h1>
                                         </div>
                                     )}
 
@@ -804,23 +813,23 @@ export default function Teams() {
                                     ) : !hasOrganization ? (
                                         <div className="text-center py-12">
                                             <div className="text-6xl mb-4">🏢</div>
-                                            <h2 className="text-2xl font-semibold text-gray-800 mb-2">No Organization Yet</h2>
-                                            <p className="text-gray-600 mb-6">You haven't joined or created an organization yet.</p>
+                                            <h2 className="text-2xl font-semibold text-gray-800 mb-2">{t("teams.noOrg")}</h2>
+                                            <p className="text-gray-600 mb-6">{t("teams.noOrgDesc")}</p>
                                             <div className="flex flex-col sm:flex-row gap-3 justify-center">
                                                 <button
                                                     onClick={() => {
                                                         // Trigger organization creation
-                                                        const orgName = prompt('Enter your organization name:', 'My Organization');
+                                                        const orgName = prompt(t("teams.promptOrgName"), t("teams.promptOrgNameDefault"));
                                                         if (orgName?.trim()) {
                                                             setSaving(true);
                                                             organizationService.createSelfOrganization()
                                                                 .then(() => {
-                                                                    showToast('Organization created successfully!');
+                                                                    showToast(t("teams.toastOrgCreated"));
                                                                     // Reload the page to get the new organization
                                                                     window.location.reload();
                                                                 })
                                                                 .catch(err => {
-                                                                    const message = err?.response?.data?.message || 'Failed to create organization';
+                                                                    const message = err?.response?.data?.message || t("teams.toastCreateOrgFailed");
                                                                     showToast(message, 'error');
                                                                     setSaving(false);
                                                                 });
@@ -828,12 +837,12 @@ export default function Teams() {
                                                     }}
                                                     className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold transition"
                                                 >
-                                                    ✨ Create Organization
+                                                    {t("teams.createOrg")}
                                                 </button>
                                                 <button
                                                     onClick={() => {
                                                         // Prompt for invitation token/link
-                                                        const token = prompt('Enter your invitation token or link:', '');
+                                                        const token = prompt('', '');
                                                         if (token?.trim()) {
                                                             // Navigate to invitation acceptance page
                                                             window.location.href = `/invite/${token.trim()}`;
@@ -841,7 +850,7 @@ export default function Teams() {
                                                     }}
                                                     className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold transition"
                                                 >
-                                                    📬 Accept Invitation
+                                                    {t("teams.acceptInvitation")}
                                                 </button>
                                             </div>
                                         </div>
@@ -853,20 +862,20 @@ export default function Teams() {
                                                 onClick={loadTeams}
                                                 className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
                                             >
-                                                Retry
+                                                {t("teams.retry")}
                                             </button>
                                         </div>
                                     ) : (
-                                        <Section title="Teams & Members">
+                                        <Section title={t("teams.sectionTitle")}>
                                             <div className="space-y-3">
                                                 <div className="grid gap-2 md:grid-cols-3">
                                                     <div className="rounded-lg border border-gray-200 bg-white p-3">
-                                                        <div className="text-xs text-gray-500">Organization</div>
+                                                        <div className="text-xs text-gray-500">{t("teams.orgLabel")}</div>
                                                         <div className="text-sm font-semibold text-gray-800">{organizationName}</div>
-                                                        <div className="mt-2 text-[11px] text-gray-500">Plan: {usage?.planName || '—'}</div>
+                                                        <div className="mt-2 text-[11px] text-gray-500">{t("teams.planLabel", { plan: usage?.planName || "—" })}</div>
                                                     </div>
                                                     <div className="rounded-lg border border-gray-200 bg-white p-3">
-                                                        <div className="text-xs text-gray-500">Members</div>
+                                                        <div className="text-xs text-gray-500">{t("teams.membersLabel")}</div>
                                                         <div className="text-sm font-semibold text-gray-800">
                                                             {usage?.currentMembers ?? orgMembers.length} / {usage?.maxMembers ?? '—'}
                                                         </div>
@@ -878,7 +887,7 @@ export default function Teams() {
                                                         </div>
                                                     </div>
                                                     <div className="rounded-lg border border-gray-200 bg-white p-3">
-                                                        <div className="text-xs text-gray-500">Teams</div>
+                                                        <div className="text-xs text-gray-500">{t("teams.teamsLabel")}</div>
                                                         <div className="text-sm font-semibold text-gray-800">
                                                             {usage?.currentTeams ?? teamsData.length} / {usage?.maxTeams ?? '—'}
                                                         </div>
@@ -895,20 +904,20 @@ export default function Teams() {
                                                     <div className="lg:col-span-2 space-y-3">
                                                         <div className="rounded-lg border border-gray-200 bg-white p-3">
                                                             <div className="flex items-center justify-between">
-                                                                <div className="text-sm font-semibold text-gray-800">Your Teams</div>
-                                                                <span className="text-xs text-gray-500">{myTeams.length} pinned</span>
+                                                                <div className="text-sm font-semibold text-gray-800">{t("teams.yourTeams")}</div>
+                                                                <span className="text-xs text-gray-500">{t("teams.pinnedCount", { count: myTeams.length })}</span>
                                                             </div>
                                                             <div className="mt-2 grid gap-2 sm:grid-cols-2">
                                                                 {myTeams.length === 0 ? (
-                                                                    <div className="text-xs text-gray-500">No teams assigned yet.</div>
+                                                                    <div className="text-xs text-gray-500">{t("teams.noTeamsAssigned")}</div>
                                                                 ) : (
                                                                     myTeams.map(team => (
                                                                         <div key={team.id} className="rounded border border-gray-200 px-3 py-2 text-xs text-gray-700">
                                                                             <div className="font-semibold text-gray-800">{team.name}</div>
                                                                             <div className="mt-1 text-[11px] text-gray-500">
                                                                                 {Number.isFinite(team.memberCount)
-                                                                                    ? `${team.memberCount} members`
-                                                                                    : `${Array.isArray(team.members) ? team.members.length : 0} members`}
+                                                                                    ? t("teams.memberCount", { count: team.memberCount })
+                                                                                    : t("teams.memberCount", { count: Array.isArray(team.members) ? team.members.length : 0 })}
                                                                             </div>
                                                                         </div>
                                                                     ))
@@ -918,12 +927,12 @@ export default function Teams() {
 
                                                         <div className="rounded-lg border border-gray-200 bg-white p-3">
                                                             <div className="flex items-center justify-between">
-                                                                <div className="text-sm font-semibold text-gray-800">Recent Activity</div>
-                                                                <span className="text-xs text-gray-500">Latest updates</span>
+                                                                <div className="text-sm font-semibold text-gray-800">{t("teams.recentActivity")}</div>
+                                                                <span className="text-xs text-gray-500">{t("teams.latestUpdates")}</span>
                                                             </div>
                                                             <div className="mt-2 space-y-2">
                                                                 {recentActivity.length === 0 ? (
-                                                                    <div className="text-xs text-gray-500">No recent activity yet.</div>
+                                                                    <div className="text-xs text-gray-500">{t("teams.noRecentActivity")}</div>
                                                                 ) : (
                                                                     recentActivity.map((entry) => (
                                                                         <div key={entry.id} className="flex items-center justify-between text-xs text-gray-600">
@@ -938,34 +947,34 @@ export default function Teams() {
 
                                                     <div className="space-y-3 lg:sticky lg:top-20 self-start">
                                                         <div className="rounded-lg border border-gray-200 bg-white p-3">
-                                                            <div className="text-sm font-semibold text-gray-800">Quick Actions</div>
+                                                            <div className="text-sm font-semibold text-gray-800">{t("teams.quickActions")}</div>
                                                             <div className="mt-2 flex flex-col gap-2">
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => document.getElementById('newTeamName')?.focus()}
                                                                     className="px-3 py-2 text-xs rounded bg-green-600 text-white hover:bg-green-700"
                                                                 >
-                                                                    Create team
+                                                                    {t("teams.createTeam")}
                                                                 </button>
                                                                 <button
                                                                     type="button"
                                                                     onClick={async () => {
-                                                                        const email = prompt('Invite member email:', '');
+                                                                        const email = prompt(t("teams.promptInviteEmail"), '');
                                                                         if (!email?.trim()) return;
                                                                         try {
                                                                             await organizationService.inviteUser(email.trim());
-                                                                            showToast('Invitation sent');
+                                                                            showToast(t("teams.toastInvitationSent"));
                                                                         } catch (err) {
-                                                                            const message = err?.response?.data?.message || 'Failed to invite member';
+                                                                            const message = err?.response?.data?.message || t("teams.toastInviteFailed");
                                                                             showToast(message, 'error');
                                                                         }
                                                                     }}
                                                                     className="px-3 py-2 text-xs rounded bg-blue-600 text-white hover:bg-blue-700"
                                                                 >
-                                                                    Invite member
+                                                                    {t("teams.inviteMember")}
                                                                 </button>
                                                                 <div className="mt-1 text-[11px] text-gray-500">
-                                                                    Active teams: {activeTeamsCount} • Open slots: {usage?.maxMembers ? Math.max(usage.maxMembers - (usage.currentMembers || 0), 0) : '—'}
+                                                                    {t("teams.activeTeamsSlots", { active: activeTeamsCount, slots: usage?.maxMembers ? Math.max(usage.maxMembers - (usage.currentMembers || 0), 0) : "—" })}
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -977,21 +986,21 @@ export default function Teams() {
                                                     <input
                                                         value={teamsSearch}
                                                         onChange={(e) => setTeamsSearch(e.target.value)}
-                                                        placeholder="Search teams..."
+                                                        placeholder={t("teams.searchTeams")}
                                                         className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
                                                     />
                                                     {canManage && (
                                                         <div className="flex gap-2">
                                                             <input 
                                                                 id="newTeamName" 
-                                                                placeholder={usage && !usage.canAddTeams ? `Team limit reached (${usage.maxTeams} max)` : "Enter new team name"}
+                                                                placeholder={usage && !usage.canAddTeams ? t("teams.teamLimitPlaceholder", { max: usage.maxTeams }) : t("teams.enterNewTeamName")}
                                                                 className="px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
                                                                 disabled={usage && !usage.canAddTeams}
                                                             />
                                                             <button
                                                                 onClick={() => {
                                                                     if (usage && !usage.canAddTeams) {
-                                                                        showToast(`Cannot create team: You have ${usage.currentTeams} team(s) but ${usage.planName} plan allows only ${usage.maxTeams}. Upgrade your plan to add more teams.`, 'error');
+                                                                        showToast(t("teams.cannotCreateTeam", { current: usage.currentTeams, plan: usage.planName, max: usage.maxTeams }), 'error');
                                                                         return;
                                                                     }
                                                                     const el = document.getElementById('newTeamName');
@@ -1002,9 +1011,9 @@ export default function Teams() {
                                                                 }}
                                                                 disabled={saving || (usage && !usage.canAddTeams)}
                                                                 className="px-3 py-2 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed"
-                                                                title={usage && !usage.canAddTeams ? `Team limit reached (${usage.currentTeams}/${usage.maxTeams} on ${usage.planName} plan). Upgrade to add more teams.` : "Create a new team"}
+                                                                title={usage && !usage.canAddTeams ? t("teams.teamLimitTitle", { current: usage.currentTeams, max: usage.maxTeams, plan: usage.planName }) : t("teams.createTeamBtn")}
                                                             >
-                                                                {saving ? 'Creating...' : 'Create Team'}
+                                                                {saving ? t("teams.creating") : t("teams.createTeamBtn")}
                                                             </button>
                                                         </div>
                                                     )}
@@ -1015,32 +1024,32 @@ export default function Teams() {
                                                         onClick={() => setTeamsFilter('all')}
                                                         className={`px-3 py-1 rounded-full border ${teamsFilter === 'all' ? 'border-blue-600 text-blue-700 bg-blue-50' : 'border-gray-200 text-gray-600 hover:text-gray-800'}`}
                                                     >
-                                                        All Teams
+                                                        {t("teams.allTeams")}
                                                     </button>
                                                     <button
                                                         onClick={() => setTeamsFilter('mine')}
                                                         className={`px-3 py-1 rounded-full border ${teamsFilter === 'mine' ? 'border-blue-600 text-blue-700 bg-blue-50' : 'border-gray-200 text-gray-600 hover:text-gray-800'}`}
                                                     >
-                                                        My Teams
+                                                        {t("teams.myTeams")}
                                                     </button>
                                                     <button
                                                         onClick={() => setTeamsFilter('lead')}
                                                         className={`px-3 py-1 rounded-full border ${teamsFilter === 'lead' ? 'border-blue-600 text-blue-700 bg-blue-50' : 'border-gray-200 text-gray-600 hover:text-gray-800'}`}
                                                     >
-                                                        Teams I Lead
+                                                        {t("teams.teamsILead")}
                                                     </button>
                                                     <button
                                                         onClick={() => setTeamsFilter('empty')}
                                                         className={`px-3 py-1 rounded-full border ${teamsFilter === 'empty' ? 'border-blue-600 text-blue-700 bg-blue-50' : 'border-gray-200 text-gray-600 hover:text-gray-800'}`}
                                                     >
-                                                        Empty Teams
+                                                        {t("teams.emptyTeams")}
                                                     </button>
                                                 </div>
 
                                                 <div className="rounded-lg border border-gray-200 bg-white p-3">
                                                     <div className="flex items-center justify-between">
-                                                        <div className="text-sm font-semibold text-gray-800">Members</div>
-                                                        <span className="text-xs text-gray-500">{orgMembers.length} total</span>
+                                                        <div className="text-sm font-semibold text-gray-800">{t("teams.membersSection")}</div>
+                                                        <span className="text-xs text-gray-500">{t("teams.totalCount", { count: orgMembers.length })}</span>
                                                     </div>
                                                     <div className="mt-2">
                                                         <div className="relative">
@@ -1048,15 +1057,15 @@ export default function Teams() {
                                                             <input
                                                                 value={memberSearch}
                                                                 onChange={(e) => setMemberSearch(e.target.value)}
-                                                                placeholder="Search members..."
+                                                                placeholder={t("teams.searchMembers")}
                                                                 className="w-full pl-7 pr-2 py-1.5 text-xs border border-gray-200 rounded"
                                                             />
                                                         </div>
                                                         <div className="mt-2 flex flex-wrap gap-2">
                                                             {loadingMembers ? (
-                                                                <span className="text-xs text-gray-500">Loading members...</span>
+                                                                <span className="text-xs text-gray-500">{t("teams.loadingMembers")}</span>
                                                             ) : filteredMembers.length === 0 ? (
-                                                                <span className="text-xs text-gray-500">No members found.</span>
+                                                                <span className="text-xs text-gray-500">{t("teams.noMembersFound")}</span>
                                                             ) : (
                                                                 filteredMembers.slice(0, 12).map((m) => (
                                                                     <div key={m.id || m.member_id} className="flex items-center gap-2 rounded-full border border-gray-200 px-2 py-1 text-xs text-gray-700">
@@ -1064,7 +1073,7 @@ export default function Teams() {
                                                                             {(m.firstName || m.name || 'U').charAt(0)}
                                                                         </span>
                                                                         <span>{`${m.firstName || ''} ${m.lastName || ''}`.trim() || m.name}</span>
-                                                                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${getMemberRoleLabel(m) === 'Admin' ? 'bg-purple-600 text-white' : getMemberRoleLabel(m) === 'Lead' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
+                                                                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${getMemberRoleColor(m)}`}>
                                                                             {getMemberRoleLabel(m)}
                                                                         </span>
                                                                     </div>
@@ -1078,7 +1087,7 @@ export default function Teams() {
                                                     {filteredTeams.length === 0 ? (
                                                         <div className="col-span-full text-center py-12 text-gray-500 border border-gray-200 rounded">
                                                             <div className="text-4xl mb-2">👥</div>
-                                                            <p>No teams yet. Create your first team!</p>
+                                                            <p>{t("teams.noTeamsYet")}</p>
                                                         </div>
                                                     ) : (
                                                         filteredTeams.map((team) => (
@@ -1127,7 +1136,7 @@ export default function Teams() {
                                                         
                                                         {(canManage || reportLevel === 'myself') && (
                                                             <SelectionPane
-                                                                title={`Select ${reportLevel === 'organization' ? 'Teams' : 'Users'} to View`}
+                                                                title={reportLevel === 'organization' ? t("teams.reportSelectTeams") : t("teams.reportSelectUsers")}
                                                                 items={matrixData}
                                                                 selectedItems={selectedItems}
                                                                 onSelect={handleItemSelect}
@@ -1139,12 +1148,12 @@ export default function Teams() {
                                                     <div className="space-y-4 lg:sticky lg:top-20 self-start">
                                                         {renderReportSidePanel()}
                                                         <IndexPanel
-                                                            title="Employeeship Index"
+                                                            title={t("teams.employeeshipIndex")}
                                                             metrics={employeeshipMetrics}
                                                         />
                                                         
                                                         <IndexPanel
-                                                            title="Performance Index"
+                                                            title={t("teams.performanceIndex")}
                                                             metrics={performanceMetrics}
                                                             highlightedMetric="overall"
                                                         />
@@ -1164,6 +1173,7 @@ export default function Teams() {
 }
 
 function TeamCard({ team, onRename, onDelete, onAddMember, onRemoveMember, onSetLead, saving, canManage, orgMembers }) {
+    const { t } = useTranslation();
     const [showRenameInput, setShowRenameInput] = useState(false);
     const [renameValue, setRenameValue] = useState(team.name);
     const navigate = useNavigate();
@@ -1207,7 +1217,7 @@ function TeamCard({ team, onRename, onDelete, onAddMember, onRemoveMember, onSet
                                 const count = Number.isFinite(team.memberCount)
                                     ? team.memberCount
                                     : (Array.isArray(team.members) ? team.members.length : 0);
-                                return `${count} ${count === 1 ? 'member' : 'members'}`;
+                                return t("teams.memberCount", { count });
                             })()}
                         </p>
                     </div>
@@ -1259,9 +1269,9 @@ function TeamCard({ team, onRename, onDelete, onAddMember, onRemoveMember, onSet
                     <div className="h-6 w-6 rounded-full bg-gray-200 flex items-center justify-center text-[10px] text-gray-600">
                         {leadInitial}
                     </div>
-                    <span>{leadName ? `Lead: ${leadName}` : 'Lead: —'}</span>
+                    <span>{leadName ? t("teams.leadLabel", { name: leadName }) : t("teams.leadNone")}</span>
                 </div>
-                <span>Last activity: {lastActivityLabel}</span>
+                <span>{t("teams.lastActivity", { date: lastActivityLabel })}</span>
             </div>
 
             {canManage && showRenameInput && (
@@ -1279,7 +1289,7 @@ function TeamCard({ team, onRename, onDelete, onAddMember, onRemoveMember, onSet
                         disabled={saving}
                         className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-60"
                     >
-                        Save
+                        {t("teams.save")}
                     </button>
                 </div>
             )}
@@ -1289,15 +1299,15 @@ function TeamCard({ team, onRename, onDelete, onAddMember, onRemoveMember, onSet
             {showDetails && (
                 <div className="mt-3 border-t pt-3">
                     {detailsLoading ? (
-                        <div className="text-xs text-gray-500">Loading team details…</div>
+                        <div className="text-xs text-gray-500">{t("teams.loadingDetails")}</div>
                     ) : (
                         <>
                             <div className="mb-2">
-                                <h4 className="text-sm font-semibold text-gray-900">Description</h4>
-                                <p className="text-sm text-gray-700">{teamDetail?.description || 'No description provided.'}</p>
+                                <h4 className="text-sm font-semibold text-gray-900">{t("teams.description")}</h4>
+                                <p className="text-sm text-gray-700">{teamDetail?.description || t("teams.noDescription")}</p>
                             </div>
                             <div>
-                                <h4 className="text-sm font-semibold text-gray-900 mb-2">Members</h4>
+                                <h4 className="text-sm font-semibold text-gray-900 mb-2">{t("teams.membersTitle")}</h4>
                                 <div className="space-y-1 max-h-48 overflow-y-auto">
                                     {(teamMembers && teamMembers.length > 0) ? (
                                         teamMembers.map((m) => (
@@ -1316,7 +1326,7 @@ function TeamCard({ team, onRename, onDelete, onAddMember, onRemoveMember, onSet
                                                     </div>
                                                     {m.role && (
                                                         <span className={`text-[10px] px-1.5 py-0.5 rounded ${m.role === 'lead' ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700'}`}>
-                                                            {m.role === 'lead' ? 'Lead' : 'Member'}
+                                                            {m.role === "lead" ? t("teams.roleLead") : t("teams.roleMember")}
                                                         </span>
                                                     )}
                                                 </div>
@@ -1324,12 +1334,12 @@ function TeamCard({ team, onRename, onDelete, onAddMember, onRemoveMember, onSet
                                                     onClick={(e) => { e.stopPropagation(); navigate(`/member/${m.id || m.userId}`); }}
                                                     className="text-xs px-2 py-0.5 border rounded hover:bg-gray-50"
                                                 >
-                                                    View Profile
+                                                    {t("teams.viewProfile")}
                                                 </button>
                                             </div>
                                         ))
                                     ) : (
-                                        <p className="text-xs text-gray-500">No members to display.</p>
+                                        <p className="text-xs text-gray-500">{t("teams.noMembersDisplay")}</p>
                                     )}
                                 </div>
                             </div>

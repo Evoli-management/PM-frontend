@@ -4,8 +4,10 @@ import { CheckCircle, AlertCircle, Loader } from "lucide-react";
 import organizationService from "../services/organizationService";
 import authService from "../services/authService";
 import { getFriendlyErrorMessage } from "../utils/errorMessages";
+import { useTranslation } from "react-i18next";
 
 export default function JoinOrganization() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token");
@@ -21,7 +23,7 @@ export default function JoinOrganization() {
   useEffect(() => {
     if (!token) {
       console.log("[JoinOrganization] No token provided");
-      setError("No invitation token provided");
+      setError(t("joinOrg.noToken"));
       setState("error");
       return;
     }
@@ -77,7 +79,7 @@ export default function JoinOrganization() {
             }, 2000);
           } catch (acceptErr) {
             console.error("[JoinOrganization] Failed to accept invitation:", acceptErr);
-            setError(getFriendlyErrorMessage(acceptErr?.response?.data?.message || acceptErr.message || "Failed to accept invitation"));
+            setError(getFriendlyErrorMessage(acceptErr?.response?.data?.message || acceptErr.message || t("joinOrg.acceptFailed")));
             setState("pending"); // Fall back to pending state if acceptance fails
           }
         } else {
@@ -87,7 +89,7 @@ export default function JoinOrganization() {
         }
       } catch (err) {
         console.error("[JoinOrganization] Error in loadInvitation:", err);
-        setError(getFriendlyErrorMessage(err?.response?.data?.message || err.message || "Failed to load invitation"));
+        setError(getFriendlyErrorMessage(err?.response?.data?.message || err.message || t("joinOrg.loadFailed")));
         setState("error");
       }
     };
@@ -105,7 +107,7 @@ export default function JoinOrganization() {
         navigate("/dashboard");
       }, 2000);
     } catch (err) {
-      setError(getFriendlyErrorMessage(err?.response?.data?.message || err.message || "Failed to accept invitation"));
+      setError(getFriendlyErrorMessage(err?.response?.data?.message || err.message || t("joinOrg.acceptFailed")));
       setState("error");
     }
   };
@@ -117,8 +119,8 @@ export default function JoinOrganization() {
         {state === "loading" && (
           <div className="bg-white rounded-lg shadow-lg p-8 text-center">
             <Loader className="w-16 h-16 text-blue-600 mx-auto animate-spin mb-4" />
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Loading Invitation</h1>
-            <p className="text-gray-600">Please wait while we verify your invitation...</p>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">{t("joinOrg.loadingTitle")}</h1>
+            <p className="text-gray-600">{t("joinOrg.loadingText")}</p>
           </div>
         )}
 
@@ -129,16 +131,16 @@ export default function JoinOrganization() {
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="text-3xl">🎉</span>
               </div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">You're Invited!</h1>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">{t("joinOrg.youreInvited")}</h1>
             </div>
 
             <div className="bg-blue-50 rounded-lg p-4 mb-6">
               <p className="text-gray-700 mb-2">
-                <span className="font-semibold">You've been invited to join</span>
+                <span className="font-semibold">{t("joinOrg.invitedToJoin")}</span>
               </p>
               <p className="text-xl font-bold text-blue-600">{invitationInfo.organizationName}</p>
               <p className="text-sm text-gray-600 mt-2">
-                Invited by: <span className="font-semibold">{invitationInfo.invitedBy}</span>
+                {t("joinOrg.invitedBy")} <span className="font-semibold">{invitationInfo.invitedBy}</span>
               </p>
             </div>
 
@@ -146,13 +148,12 @@ export default function JoinOrganization() {
               <div className="bg-amber-50 border border-amber-300 rounded-lg p-4 mb-6 flex items-start gap-3">
                 <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-semibold text-amber-900 mb-1">Email Address Mismatch</p>
+                  <p className="font-semibold text-amber-900 mb-1">{t("joinOrg.emailMismatchTitle")}</p>
                   <p className="text-sm text-amber-800 mb-2">
-                    You're logged in as <span className="font-semibold">{currentUserEmail}</span>, but this invitation was sent to{" "}
-                    <span className="font-semibold">{invitationInfo.invitedEmail}</span>.
+                    {t("joinOrg.emailMismatchDesc", { currentEmail: currentUserEmail, invitedEmail: invitationInfo.invitedEmail })}
                   </p>
                   <p className="text-xs text-amber-700">
-                    You can still join, but make sure this is the correct account. If not, please log out and log in with the invited email address.
+                    {t("joinOrg.emailMismatchHint")}
                   </p>
                 </div>
               </div>
@@ -162,14 +163,14 @@ export default function JoinOrganization() {
               onClick={handleAcceptInvitation}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition-colors duration-200 mb-4"
             >
-              Accept Invitation & Join
+              {t("joinOrg.acceptBtn")}
             </button>
 
             <button
               onClick={() => navigate("/login")}
               className="w-full bg-gray-200 hover:bg-gray-300 text-gray-900 font-semibold py-3 rounded-lg transition-colors duration-200"
             >
-              Back to Login
+              {t("joinOrg.backToLogin")}
             </button>
           </div>
         )}
@@ -181,21 +182,21 @@ export default function JoinOrganization() {
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="text-3xl">📧</span>
               </div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">Invitation Received</h1>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">{t("joinOrg.invitationReceived")}</h1>
             </div>
 
             <div className="bg-blue-50 rounded-lg p-4 mb-6">
               <p className="text-gray-700 mb-2">
-                <span className="font-semibold">You've been invited to join</span>
+                <span className="font-semibold">{t("joinOrg.invitedToJoin")}</span>
               </p>
               <p className="text-xl font-bold text-blue-600">{invitationInfo.organizationName}</p>
               <p className="text-sm text-gray-600 mt-2">
-                Invited by: <span className="font-semibold">{invitationInfo.invitedBy}</span>
+                {t("joinOrg.invitedBy")} <span className="font-semibold">{invitationInfo.invitedBy}</span>
               </p>
             </div>
 
             <p className="text-gray-600 mb-6 text-center">
-              To accept this invitation, please log in or create a new account.
+              {t("joinOrg.loginOrCreate")}
             </p>
 
             <div className="space-y-3">
@@ -203,21 +204,21 @@ export default function JoinOrganization() {
                 onClick={() => navigate(`/login?invitationToken=${token}`)}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition-colors duration-200"
               >
-                Sign In to Accept
+                {t("joinOrg.signInToAccept")}
               </button>
 
               <button
                 onClick={() => navigate(`/registration?token=${token}`)}
                 className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg transition-colors duration-200"
               >
-                Create New Account & Accept
+                {t("joinOrg.createAccountBtn")}
               </button>
 
               <button
                 onClick={() => navigate("/")}
                 className="w-full bg-gray-200 hover:bg-gray-300 text-gray-900 font-semibold py-3 rounded-lg transition-colors duration-200"
               >
-                Back to Home
+                {t("joinOrg.backToHome")}
               </button>
             </div>
           </div>
@@ -227,8 +228,8 @@ export default function JoinOrganization() {
         {state === "accepting" && (
           <div className="bg-white rounded-lg shadow-lg p-8 text-center">
             <Loader className="w-16 h-16 text-blue-600 mx-auto animate-spin mb-4" />
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Joining Organization</h1>
-            <p className="text-gray-600">Setting up your access...</p>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">{t("joinOrg.joiningTitle")}</h1>
+            <p className="text-gray-600">{t("joinOrg.joiningText")}</p>
           </div>
         )}
 
@@ -236,9 +237,9 @@ export default function JoinOrganization() {
         {state === "success" && (
           <div className="bg-white rounded-lg shadow-lg p-8 text-center">
             <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Welcome!</h1>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">{t("joinOrg.welcomeTitle")}</h1>
             <p className="text-gray-600 mb-4">
-              You've successfully joined the organization. Redirecting to dashboard...
+              {t("joinOrg.welcomeText")}
             </p>
             <div className="flex justify-center">
               <div className="animate-pulse flex space-x-2">
@@ -255,7 +256,7 @@ export default function JoinOrganization() {
           <div className="bg-white rounded-lg shadow-lg p-8">
             <div className="text-center mb-6">
               <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">Invalid Invitation</h1>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">{t("joinOrg.invalidTitle")}</h1>
             </div>
 
             <div className="bg-red-50 rounded-lg p-4 mb-6">
@@ -267,13 +268,13 @@ export default function JoinOrganization() {
                 onClick={() => navigate("/")}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition-colors duration-200"
               >
-                Go to Home
+                {t("joinOrg.goToHome")}
               </button>
               <button
                 onClick={() => navigate("/login")}
                 className="w-full bg-gray-200 hover:bg-gray-300 text-gray-900 font-semibold py-3 rounded-lg transition-colors duration-200"
               >
-                Back to Login
+                {t("joinOrg.backToLogin")}
               </button>
             </div>
           </div>

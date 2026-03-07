@@ -1,5 +1,6 @@
 // src/pages/Goals.jsx
 import React, { useState, useEffect, useCallback, Suspense } from "react";
+import { useTranslation } from "react-i18next";
 import * as goalService from "../services/goalService";
 import { useNavigate, useLocation } from "react-router-dom";
 import Sidebar from "../components/shared/Sidebar";
@@ -26,6 +27,7 @@ import {
 // keyAreaService helpers are imported on-demand to allow code-splitting
 
 const Goals = () => {
+    const { t } = useTranslation();
     const [goals, setGoals] = useState([]);
     const [filteredGoals, setFilteredGoals] = useState([]);
     // Start false so the page opens silently; we still set it while fetching
@@ -85,7 +87,7 @@ const Goals = () => {
             setGoals(data);
             setFilteredGoals(data);
         } catch (err) {
-            setError("Could not fetch goals. Please ensure the backend server is running.");
+            setError(t('goals.fetchError'));
             console.error(err);
         } finally {
             setIsLoading(false);
@@ -186,10 +188,10 @@ const Goals = () => {
         try {
             await goalService.createGoal(goalData);
             await fetchGoals();
-            showToast("success", "Goal created successfully!");
+            showToast("success", t('goals.toast.created'));
         } catch (error) {
             console.error("Failed to create goal from page:", error);
-            showToast("error", "Failed to create goal. Please try again.");
+            showToast("error", t('goals.toast.createFailed'));
             throw error;
         }
     };
@@ -211,16 +213,16 @@ const Goals = () => {
 
             await fetchGoals();
 
-            showToast("success", "Goal updated successfully!");
+            showToast("success", t('goals.toast.updated'));
         } catch (error) {
             console.error("Failed to update goal:", error);
-            showToast("error", `Failed to update goal: ${error.message}`);
+            showToast("error", `${t('goals.toast.updateFailed')}: ${error.message}`);
             throw error;
         }
     };
 
     const handleDeleteGoal = async (goalId) => {
-        if (window.confirm("Are you sure you want to delete this goal? This action cannot be undone.")) {
+        if (window.confirm(t('goals.confirm.deleteGoal'))) {
             try {
                 console.log("Goals.jsx - Attempting to delete goal:", goalId);
                 const mod = await import("../services/goalService");
@@ -237,22 +239,22 @@ const Goals = () => {
                     // Use functional updates to avoid stale-closure issues
                     setGoals((prev) => prev.filter((g) => g.id !== goalId));
                     setFilteredGoals((prev) => prev.filter((g) => g.id !== goalId));
-                    showToast("success", "Goal has been permanently deleted.");
+                    showToast("success", t('goals.toast.deleted'));
                 } catch (err) {
                     console.error("Failed to permanently delete goal, attempting archive fallback:", err);
                     try {
                         await goalService.archiveGoal(goalId);
                         setGoals((prev) => prev.filter((g) => g.id !== goalId));
                         setFilteredGoals((prev) => prev.filter((g) => g.id !== goalId));
-                        showToast("success", "Goal has been archived.");
+                        showToast("success", t('goals.toast.archived'));
                     } catch (archiveError) {
                         console.error("Archive fallback also failed:", archiveError);
-                        showToast("error", `Failed to delete goal: ${archiveError?.message || err?.message || 'Unknown error'}`);
+                        showToast("error", `${t('goals.toast.deleteFailed')}: ${archiveError?.message || err?.message || 'Unknown error'}`);
                     }
                 }
             } catch (error) {
                 console.error("Failed to delete goal:", error);
-                showToast("error", `Failed to delete goal: ${error.message}`);
+                showToast("error", `${t('goals.toast.deleteFailed')}: ${error.message}`);
             }
         }
     };
@@ -260,7 +262,7 @@ const Goals = () => {
     const handleBulkAction = async (action) => {
         const selectedIds = Array.from(selectedGoals);
         if (selectedIds.length === 0) {
-            showToast("error", "No goals selected");
+            showToast("error", t('goals.toast.noneSelected'));
             return;
         }
 
@@ -271,24 +273,24 @@ const Goals = () => {
             switch (action) {
                 case "complete":
                     updates = { status: "completed" };
-                    confirmMessage = `Mark ${selectedIds.length} goal(s) as completed?`;
+                    confirmMessage = t('goals.confirm.markComplete', { count: selectedIds.length });
                     break;
                 case "archive":
                     updates = { status: "archived" };
-                    confirmMessage = `Archive ${selectedIds.length} goal(s)?`;
+                    confirmMessage = t('goals.confirm.archive', { count: selectedIds.length });
                     break;
                 case "activate":
                     updates = { status: "active" };
-                    confirmMessage = `Activate ${selectedIds.length} goal(s)?`;
+                    confirmMessage = t('goals.confirm.activate', { count: selectedIds.length });
                     break;
                 case "delete":
-                    confirmMessage = `Delete ${selectedIds.length} goal(s)? This action cannot be undone.`;
+                    confirmMessage = t('goals.confirm.delete', { count: selectedIds.length });
                     if (window.confirm(confirmMessage)) {
                         await Promise.all(selectedIds.map((id) => goalService.deleteGoal(id)));
                         setGoals((prev) => prev.filter((g) => !selectedIds.includes(g.id)));
                         setFilteredGoals((prev) => prev.filter((g) => !selectedIds.includes(g.id)));
                         setSelectedGoals(new Set());
-                        showToast("success", `${selectedIds.length} goal(s) deleted`);
+                        showToast("success", t('goals.toast.bulkDeleted', { count: selectedIds.length }));
                     }
                     return;
                 default:
@@ -302,10 +304,10 @@ const Goals = () => {
             await goalService.bulkUpdateGoals(selectedIds, updates);
             await fetchGoals(statusFilter);
             setSelectedGoals(new Set());
-            showToast("success", `${selectedIds.length} goal(s) updated`);
+            showToast("success", t('goals.toast.bulkUpdated', { count: selectedIds.length }));
         } catch (error) {
             console.error("Bulk action failed:", error);
-            showToast("error", `Bulk action failed: ${error.message}`);
+            showToast("error", `${t('goals.toast.bulkFailed')}: ${error.message}`);
         }
     };
 
@@ -350,13 +352,13 @@ const Goals = () => {
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                     <div className="p-4 bg-red-50 border border-red-200 rounded-xl max-w-md">
                         <FaExclamationCircle className="w-10 h-10 mx-auto mb-3 text-red-500" />
-                        <h3 className="text-base font-semibold text-red-900">Unable to Load Goals</h3>
+                        <h3 className="text-base font-semibold text-red-900">{t('goals.unableToLoad')}</h3>
                         <p className="mt-1 text-sm text-red-700">{error}</p>
                         <button
                             onClick={fetchGoals}
                             className="px-4 py-2 mt-3 text-sm text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
                         >
-                            Try Again
+                            {t('goals.tryAgain')}
                         </button>
                     </div>
                 </div>
@@ -489,8 +491,8 @@ const Goals = () => {
                             <div className="mb-4">
                                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
                                     <div>
-                                        <h1 className="text-2xl font-bold text-slate-900">Goals</h1>
-                                        <p className="text-sm text-slate-600">Track and achieve your objectives</p>
+                                        <h1 className="text-2xl font-bold text-slate-900">{t('goals.title')}</h1>
+                                        <p className="text-sm text-slate-600">{t('goals.subtitle')}</p>
                                     </div>
 
                                     <div className="flex items-center gap-2">
@@ -498,23 +500,23 @@ const Goals = () => {
                                             <button
                                                 onClick={() => setCurrentView("grid")}
                                                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all ${currentView === "grid" ? "bg-blue-500 text-white shadow-sm" : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"}`}
-                                                title="Grid"
+                                                title={t('goals.grid')}
                                             >
-                                                <span className="hidden sm:inline text-xs font-medium">Grid</span>
+                                                <span className="hidden sm:inline text-xs font-medium">{t('goals.grid')}</span>
                                             </button>
                                             <button
                                                 onClick={() => setCurrentView("list")}
                                                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all ${currentView === "list" ? "bg-blue-500 text-white shadow-sm" : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"}`}
-                                                title="List"
+                                                title={t('goals.list')}
                                             >
-                                                <span className="hidden sm:inline text-xs font-medium">List</span>
+                                                <span className="hidden sm:inline text-xs font-medium">{t('goals.list')}</span>
                                             </button>
                                             <button
                                                 onClick={() => setCurrentView("kanban")}
                                                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all ${currentView === "kanban" ? "bg-blue-500 text-white shadow-sm" : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"}`}
-                                                title="Kanban"
+                                                title={t('goals.kanban')}
                                             >
-                                                <span className="hidden sm:inline text-xs font-medium">Kanban</span>
+                                                <span className="hidden sm:inline text-xs font-medium">{t('goals.kanban')}</span>
                                             </button>
                                         </div>
 
@@ -522,7 +524,7 @@ const Goals = () => {
                                             onClick={() => setIsModalOpen(true)}
                                             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-sm hover:shadow-md"
                                         >
-                                            <span className="text-sm font-semibold">New Goal</span>
+                                            <span className="text-sm font-semibold">{t('goals.newGoal')}</span>
                                         </button>
                                     </div>
                                 </div>
@@ -544,28 +546,28 @@ const Goals = () => {
                                                     />
                                                     <div className="flex items-baseline gap-1">
                                                         <span className="text-sm font-bold text-gray-900">{stats.total}</span>
-                                                        <span className="text-xs text-gray-500">Total</span>
+                                                        <span className="text-xs text-gray-500">{t('goals.total')}</span>
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 rounded-lg border border-blue-200">
                                                     <FaClock className="w-3.5 h-3.5 text-blue-600" />
                                                     <div className="flex items-baseline gap-1">
                                                         <span className="text-sm font-bold text-blue-600">{stats.active}</span>
-                                                        <span className="text-xs text-gray-500">Active</span>
+                                                        <span className="text-xs text-gray-500">{t('goals.active')}</span>
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-1.5 px-3 py-2 bg-green-50 rounded-lg border border-green-200">
                                                     <FaCheckCircle className="w-3.5 h-3.5 text-green-600" />
                                                     <div className="flex items-baseline gap-1">
                                                         <span className="text-sm font-bold text-green-600">{stats.completed}</span>
-                                                        <span className="text-xs text-gray-500">Done</span>
+                                                        <span className="text-xs text-gray-500">{t('goals.done')}</span>
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-1.5 px-3 py-2 bg-red-50 rounded-lg border border-red-200">
                                                     <FaClock className="w-3.5 h-3.5 text-red-600" />
                                                     <div className="flex items-baseline gap-1">
                                                         <span className="text-sm font-bold text-red-600">{stats.overdue}</span>
-                                                        <span className="text-xs text-gray-500">Overdue</span>
+                                                        <span className="text-xs text-gray-500">{t('goals.overdue')}</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -579,16 +581,16 @@ const Goals = () => {
                                                         onChange={(e) => setStatusFilter(e.target.value)}
                                                         className="pl-9 pr-8 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-slate-50 focus:bg-white transition-colors min-w-[120px]"
                                                     >
-                                                        <option value="all">All Status</option>
-                                                        <option value="active">Active</option>
-                                                        <option value="completed">Completed</option>
-                                                        <option value="archived">Archived</option>
+                                                        <option value="all">{t('goals.allStatus')}</option>
+                                                        <option value="active">{t('goals.active')}</option>
+                                                        <option value="completed">{t('goals.completed')}</option>
+                                                        <option value="archived">{t('goals.archived')}</option>
                                                     </select>
                                                 </div>
 
                                                 <input
                                                     type="text"
-                                                    placeholder="Filter by tag..."
+                                                    placeholder={t('goals.filterByTag')}
                                                     value={tagFilter}
                                                     onChange={(e) => setTagFilter(e.target.value)}
                                                     className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-slate-50 focus:bg-white transition-colors min-w-[120px]"
@@ -601,11 +603,11 @@ const Goals = () => {
                                                         onChange={(e) => setSortBy(e.target.value)}
                                                         className="pl-9 pr-8 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-slate-50 focus:bg-white transition-colors min-w-[140px]"
                                                     >
-                                                        <option value="dueDate">Due Date</option>
-                                                        <option value="priority">Priority</option>
-                                                        <option value="progress">Progress</option>
-                                                        <option value="title">Title</option>
-                                                        <option value="created">Recently Created</option>
+                                                        <option value="dueDate">{t('goals.dueDate')}</option>
+                                                        <option value="priority">{t('goals.priority')}</option>
+                                                        <option value="progress">{t('goals.progress')}</option>
+                                                        <option value="title">{t('goals.titleSort')}</option>
+                                                        <option value="created">{t('goals.recentlyCreated')}</option>
                                                     </select>
                                                 </div>
                                             </div>
@@ -624,13 +626,13 @@ const Goals = () => {
                                                 <span className="text-sm font-bold text-blue-600">{selectedGoals.size}</span>
                                             </div>
                                             <span className="text-sm font-medium text-slate-700">
-                                                {selectedGoals.size} goal{selectedGoals.size !== 1 ? "s" : ""} selected
+                                                {t('goals.goalsSelected', { count: selectedGoals.size })}
                                             </span>
                                             <button
                                                 onClick={handleSelectAll}
                                                 className="ml-2 text-sm text-blue-600 hover:text-blue-700 font-medium underline"
                                             >
-                                                {selectedGoals.size === filteredGoals.length ? "Deselect All" : "Select All"}
+                                                {selectedGoals.size === filteredGoals.length ? t('goals.deselectAll') : t('goals.selectAll')}
                                             </button>
                                         </div>
                                         <div className="flex flex-wrap gap-2">
@@ -638,25 +640,25 @@ const Goals = () => {
                                                 onClick={() => handleBulkAction("complete")}
                                                 className="px-3 py-1.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors"
                                             >
-                                                Mark Complete
+                                                {t('goals.markComplete')}
                                             </button>
                                             <button
                                                 onClick={() => handleBulkAction("activate")}
                                                 className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
                                             >
-                                                Activate
+                                                {t('goals.activate')}
                                             </button>
                                             <button
                                                 onClick={() => handleBulkAction("archive")}
                                                 className="px-3 py-1.5 text-sm font-medium text-slate-700 bg-slate-200 hover:bg-slate-300 rounded-lg transition-colors"
                                             >
-                                                Archive
+                                                {t('goals.archive')}
                                             </button>
                                             <button
                                                 onClick={() => handleBulkAction("delete")}
                                                 className="px-3 py-1.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
                                             >
-                                                Delete
+                                                {t('goals.delete')}
                                             </button>
                                         </div>
                                     </div>

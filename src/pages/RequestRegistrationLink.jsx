@@ -2,8 +2,10 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Mail, AlertCircle, CheckCircle2 } from "lucide-react";
 import { getFriendlyErrorMessage } from "../utils/errorMessages";
+import { useTranslation } from "react-i18next";
 
 export default function RequestRegistrationLink() {
+  const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState("idle"); // idle, loading, success, error
   const [message, setMessage] = useState("");
@@ -19,12 +21,12 @@ export default function RequestRegistrationLink() {
 
     // Client-side validation
     if (!trimmedEmail) {
-      setMessage("Please enter your email address.");
+      setMessage(t("requestLink.emailRequired"));
       setStatus("error");
       return;
     }
     if (!isValidEmail(trimmedEmail)) {
-      setMessage("Email must be an email.");
+      setMessage(t("requestLink.emailInvalid"));
       setStatus("error");
       return;
     }
@@ -57,8 +59,8 @@ export default function RequestRegistrationLink() {
     } catch (err) {
       setStatus("error");
       const errorMsg =
-        err?.response?.data?.message || 
-        "Failed to send registration link. Please try again.";
+        err?.response?.data?.message ||
+        t("requestLink.failedFallback");
       setMessage(getFriendlyErrorMessage(errorMsg));
     }
   };
@@ -70,19 +72,19 @@ export default function RequestRegistrationLink() {
           <div className="bg-white rounded-lg shadow-lg p-8 text-center">
             <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-4" />
             <h1 className="text-2xl font-bold text-gray-900 mb-4">
-              Check Your Email
+              {t("requestLink.checkEmail")}
             </h1>
             <p className="text-gray-600 mb-6">
-              We've sent a registration link to <span className="font-semibold">{message}</span>
+              {t("requestLink.sentTo")} <span className="font-semibold">{message}</span>
             </p>
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-left">
               <p className="text-sm text-gray-700">
-                <strong>Didn't see the email?</strong>
+                <strong>{t("requestLink.didntSee")}</strong>
               </p>
               <ul className="text-sm text-gray-600 mt-2 space-y-1 list-disc list-inside">
-                <li>Check your spam or junk folder</li>
-                <li>Verify you entered the correct email</li>
-                <li>Link expires in 24 hours</li>
+                <li>{t("requestLink.checkSpam")}</li>
+                <li>{t("requestLink.verifyEmail")}</li>
+                <li>{t("requestLink.linkExpires")}</li>
               </ul>
             </div>
             <button
@@ -94,14 +96,14 @@ export default function RequestRegistrationLink() {
                   : "bg-blue-600 hover:bg-blue-700 text-white"
               }`}
             >
-              {cooldown > 0 ? `Resend in ${cooldown}s` : "Send Another Link"}
+              {cooldown > 0 ? t("requestLink.resendIn", { seconds: cooldown }) : t("requestLink.sendAnother")}
             </button>
             <div className="mt-4">
               <Link
                 to="/login"
                 className="text-blue-600 hover:text-blue-800 text-sm font-semibold"
               >
-                Already have an account? Sign in
+                {t("requestLink.alreadyAccountLink")}
               </Link>
             </div>
           </div>
@@ -118,16 +120,16 @@ export default function RequestRegistrationLink() {
             <Mail className="w-12 h-12 text-blue-600" />
           </div>
           <h1 className="text-3xl font-bold text-center text-gray-900 mb-2">
-            Get Started
+            {t("requestLink.title")}
           </h1>
           <p className="text-center text-gray-600 mb-8">
-            Enter your email to create a new account
+            {t("requestLink.subtitle")}
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label htmlFor="email" className="sr-only">
-                Email address
+                {t("requestLink.emailLabel")}
               </label>
               <input
                 id="email"
@@ -160,34 +162,34 @@ export default function RequestRegistrationLink() {
                   : "bg-blue-600 hover:bg-blue-700"
               }`}
             >
-              {status === "loading" ? "Sending…" : "Send Registration Link"}
+              {status === "loading" ? t("requestLink.sending") : t("requestLink.submit")}
             </button>
           </form>
 
           <div className="mt-6 flex items-center gap-2">
             <div className="flex-1 h-px bg-gray-300" />
-            <span className="text-sm text-gray-500">or</span>
+            <span className="text-sm text-gray-500">{t("requestLink.or")}</span>
             <div className="flex-1 h-px bg-gray-300" />
           </div>
 
           <p className="text-center text-sm text-gray-600 mt-6">
-            Already have an account?{" "}
+            {t("requestLink.alreadyHave")}{" "}
             <Link
               to="/login"
               className="font-semibold text-blue-600 hover:text-blue-800"
             >
-              Sign in
+              {t("requestLink.signIn")}
             </Link>
           </p>
 
           <p className="text-xs text-gray-500 text-center mt-4">
-            By continuing, you agree to our{" "}
+            {t("requestLink.agreeText")}{" "}
             <Link to="/terms-of-service" target="_blank" className="text-blue-600 hover:text-blue-800">
-              Terms of Service
+              {t("requestLink.termsOfService")}
             </Link>{" "}
-            and{" "}
+            {t("requestLink.and")}{" "}
             <Link to="/privacy-policy" target="_blank" className="text-blue-600 hover:text-blue-800">
-              Privacy Policy
+              {t("requestLink.privacyPolicy")}
             </Link>
           </p>
         </div>

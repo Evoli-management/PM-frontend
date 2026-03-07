@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { CheckCircle2, User, Mail, Lock, Eye, EyeOff, Info } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { getFriendlyErrorMessage, getErrorSuggestion } from "../utils/errorMessages";
 import TermsOfServiceModal from "../components/modals/TermsOfServiceModal";
 import PrivacyPolicyModal from "../components/modals/PrivacyPolicyModal";
 // authService is imported dynamically at call sites to allow code-splitting
 
 export default function Registration() {
+    const { t } = useTranslation();
     const [searchParams] = useSearchParams();
     const invitationToken = searchParams.get("token");
     const registrationToken = searchParams.get("regToken");
@@ -74,36 +76,36 @@ export default function Registration() {
         
         switch (name) {
             case 'firstName':
-                if (!value.trim()) errors.firstName = "First name is required.";
+                if (!value.trim()) errors.firstName = t('registration.errors.firstNameRequired');
                 break;
             case 'lastName':
-                if (!value.trim()) errors.lastName = "Last name is required.";
+                if (!value.trim()) errors.lastName = t('registration.errors.lastNameRequired');
                 break;
             case 'email':
                 if (!value.trim()) {
-                    errors.email = "Email is required.";
+                    errors.email = t('registration.errors.emailRequired');
                 } else if (!emailRegex.test(value)) {
-                    errors.email = "Email must be an email.";
+                    errors.email = t('registration.errors.emailInvalid');
                 } else if (value.length > 255) {
-                    errors.email = "Email must not exceed 255 characters.";
+                    errors.email = t('registration.errors.emailTooLong');
                 } else if (invitedEmail && value.toLowerCase() !== invitedEmail.toLowerCase()) {
-                    errors.email = `You must use the invited email: ${invitedEmail}`;
+                    errors.email = t('registration.errors.emailMustMatchInvite', { email: invitedEmail });
                 }
                 break;
             case 'password':
                 if (!value) {
-                    errors.password = "Password is required.";
+                    errors.password = t('registration.errors.passwordRequired');
                 } else if (value.length < 8) {
-                    errors.password = "Password must be at least 8 characters.";
+                    errors.password = t('registration.errors.passwordTooShort');
                 } else if (!/[A-Z]/.test(value)) {
-                    errors.password = "Password must contain at least one uppercase letter.";
+                    errors.password = t('registration.errors.passwordNeedsUppercase');
                 } else if (!/\d/.test(value)) {
-                    errors.password = "Password must contain at least one number.";
+                    errors.password = t('registration.errors.passwordNeedsNumber');
                 }
                 break;
             case 'confirmPassword':
                 if (value !== formData.password) {
-                    errors.confirmPassword = "Passwords do not match.";
+                    errors.confirmPassword = t('registration.errors.passwordsNoMatch');
                 }
                 break;
             default:
@@ -116,29 +118,29 @@ export default function Registration() {
     const validateForm = () => {
         const errors = {};
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!formData.firstName.trim()) errors.firstName = "First name is required.";
-        if (!formData.lastName.trim()) errors.lastName = "Last name is required.";
+        if (!formData.firstName.trim()) errors.firstName = t('registration.errors.firstNameRequired');
+        if (!formData.lastName.trim()) errors.lastName = t('registration.errors.lastNameRequired');
         if (!formData.email.trim()) {
-            errors.email = "Email is required.";
+            errors.email = t('registration.errors.emailRequired');
         } else if (!emailRegex.test(formData.email)) {
-            errors.email = "Email must be an email.";
+            errors.email = t('registration.errors.emailInvalid');
         } else if (invitedEmail && formData.email.toLowerCase() !== invitedEmail.toLowerCase()) {
-            errors.email = `You must use the invited email: ${invitedEmail}`;
+            errors.email = t('registration.errors.emailMustMatchInvite', { email: invitedEmail });
         }
         if (!formData.password) {
-            errors.password = "Password is required.";
+            errors.password = t('registration.errors.passwordRequired');
         } else if (formData.password.length < 8) {
-            errors.password = "Password must be at least 8 characters.";
+            errors.password = t('registration.errors.passwordTooShort');
         } else if (!/[A-Z]/.test(formData.password)) {
-            errors.password = "Password must contain at least one uppercase letter.";
+            errors.password = t('registration.errors.passwordNeedsUppercase');
         } else if (!/\d/.test(formData.password)) {
-            errors.password = "Password must contain at least one number.";
+            errors.password = t('registration.errors.passwordNeedsNumber');
         }
         if (formData.password !== formData.confirmPassword) {
-            errors.confirmPassword = "Passwords do not match.";
+            errors.confirmPassword = t('registration.errors.passwordsNoMatch');
         }
         if (!formData.agreedToTerms) {
-            errors.agreedToTerms = "You must agree to the terms.";
+            errors.agreedToTerms = t('registration.errors.mustAgreeTerms');
         }
         setFormErrors(errors);
         return Object.keys(errors).length === 0;
@@ -183,18 +185,17 @@ export default function Registration() {
             const errors = {};
             
             if (status === 409) {
-                errors.email = "An account with this email already exists. Would you like to sign in instead?";
+                errors.email = t('registration.errors.emailExists');
             } else if (Array.isArray(msg)) {
                 const text = msg.join(" \n ").toLowerCase();
-                if (text.includes("email")) errors.email = "Please enter a valid email address.";
-                if (text.includes("least 8")) errors.password = "Password must be at least 8 characters.";
-                if (text.includes("uppercase"))
-                    errors.password = "Password must contain at least one uppercase letter.";
-                if (text.includes("number")) errors.password = "Password must contain at least one number.";
+                if (text.includes("email")) errors.email = t('registration.errors.emailInvalidDetailed');
+                if (text.includes("least 8")) errors.password = t('registration.errors.passwordTooShort');
+                if (text.includes("uppercase")) errors.password = t('registration.errors.passwordNeedsUppercase');
+                if (text.includes("number")) errors.password = t('registration.errors.passwordNeedsNumber');
             } else if (typeof msg === "string") {
                 errors.general = getFriendlyErrorMessage(msg);
             } else {
-                errors.general = "Registration failed. Please try again.";
+                errors.general = t('registration.errors.registrationFailed');
             }
             setFormErrors(errors);
             setIsSubmitted(false);
@@ -205,7 +206,7 @@ export default function Registration() {
 
     // Password strength helper
     const password = formData.password || "";
-    const getPasswordStrength = (pw) => {
+    const getPasswordStrengthKey = (pw) => {
         if (!pw) return "";
         let score = 0;
         if (/[A-Z]/.test(pw)) score++;
@@ -216,7 +217,8 @@ export default function Registration() {
         if (score >= 3) return "Medium";
         return "Weak";
     };
-    const strength = getPasswordStrength(password);
+    const strengthKey = getPasswordStrengthKey(password);
+    const strength = strengthKey ? t(`registration.strength${strengthKey}`) : "";
 
     return (
         <>
@@ -235,8 +237,7 @@ export default function Registration() {
                         </div>
                         <div className="text-center">
                             <p className="mt-1 mb-0 leading-5 text-gray-700 font-semibold">
-                                    Simplify your workflow and accomplish more with Practical Manager.
-                                Your data is safe with us.
+                            {t('registration.tagline')}
                             </p>
                         </div>
                     </div>
@@ -244,7 +245,7 @@ export default function Registration() {
                     {/* Right Form Section */}
                     <div className="p-8 flex flex-col justify-center items-center w-full h-full">
                         <h2 className="text-2xl md:text-3xl font-bold mb-4 text-center">
-                            Sign Up
+                            {t('registration.signUp')}
                         </h2>
 
                         {invitationError && (
@@ -255,27 +256,27 @@ export default function Registration() {
 
                         {loadingInvitation && (
                             <div className="w-full mb-4 p-3 bg-blue-100 border border-blue-400 text-blue-700 rounded">
-                                Loading invitation details...
+                                {t('registration.loadingInvitation')}
                             </div>
                         )}
 
                         {registrationToken && emailFromUrl && !invitationToken && (
                             <div className="w-full mb-4 p-3 bg-green-50 border border-green-300 text-green-800 rounded flex items-start gap-2">
-                                <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                                <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" />
                                 <div>
-                                    <p className="font-semibold">Registration link verified</p>
-                                    <p className="text-sm">Complete the form below to create your account.</p>
+                                    <p className="font-semibold">{t('registration.inviteLinkVerified')}</p>
+                                    <p className="text-sm">{t('registration.inviteLinkSubtext')}</p>
                                 </div>
                             </div>
                         )}
                         {isSubmitted ? (
                             <div className="flex flex-col items-center justify-center p-8 text-center bg-green-50 rounded-lg shadow-inner">
                                 <CheckCircle2 size={48} className="text-green-500 mb-4" />
-                                <h3 className="text-2xl font-bold text-green-700">Registration Successful!</h3>
+                                <h3 className="text-2xl font-bold text-green-700">{t('registration.successTitle')}</h3>
                                 <p className="mt-2 text-gray-600">
-                                    A verification email has been sent to your address.<br />
-                                    Please check your inbox and verify your email to continue.<br />
-                                    <span className="text-sm text-gray-500">If you don't see the email, please look in your spam or junk folder.</span>
+                                    {t('registration.successMsg')}<br />
+                                    {t('registration.successMsg2')}<br />
+                                    <span className="text-sm text-gray-500">{t('registration.successMsg3')}</span>
                                 </p>
                                 <button
                                     type="button"
@@ -284,20 +285,20 @@ export default function Registration() {
                                             try {
                                                 const authService = await import("../services/authService").then((m) => m.default);
                                                 await authService.resendVerification({ email: formData.email });
-                                                alert("Verification email resent! Please check your inbox.");
+                                                alert(t('registration.emailResentSuccess'));
                                             } catch (err) {
-                                                alert("Failed to resend verification email. Please try again later.");
+                                                alert(t('registration.emailResentFail'));
                                             }
                                         }}
                                 >
-                                    Resend verification email
+                                    {t('registration.resendEmail')}
                                 </button>
                             </div>
                         ) : (
                             <form onSubmit={handleSubmit} className="space-y-4">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <label className="relative">
-                                        <span className="sr-only">First name</span>
+                                        <span className="sr-only">{t('registration.firstName')}</span>
                                         <div className="absolute left-3 top-4 text-slate-400">
                                             <User size={16} />
                                         </div>
@@ -305,7 +306,7 @@ export default function Registration() {
                                             id="firstName"
                                             type="text"
                                             name="firstName"
-                                            placeholder="First name"
+                                            placeholder={t('registration.firstName')}
                                             value={formData.firstName}
                                             onChange={handleInputChange}
                                             onBlur={handleFieldBlur}
@@ -319,7 +320,7 @@ export default function Registration() {
                                     </label>
 
                                     <label className="relative">
-                                        <span className="sr-only">Last name</span>
+                                        <span className="sr-only">{t('registration.lastName')}</span>
                                         <div className="absolute left-3 top-4 text-slate-400">
                                             <User size={16} />
                                         </div>
@@ -327,7 +328,7 @@ export default function Registration() {
                                             id="lastName"
                                             type="text"
                                             name="lastName"
-                                            placeholder="Last name"
+                                            placeholder={t('registration.lastName')}
                                             value={formData.lastName}
                                             onChange={handleInputChange}
                                             onBlur={handleFieldBlur}
@@ -349,7 +350,7 @@ export default function Registration() {
                                         type="email"
                                         name="email"
                                         autoComplete="username email"
-                                        placeholder="Enter your email"
+                                        placeholder={t('registration.emailPlaceholder')}
                                         value={formData.email}
                                         onChange={invitedEmail ? undefined : handleInputChange}
                                         onBlur={invitedEmail ? undefined : handleFieldBlur}
@@ -361,7 +362,7 @@ export default function Registration() {
                                         }`}
                                     />
                                     {invitedEmail && (
-                                        <p className="text-blue-600 text-xs mt-1">✓ Email from invitation (locked)</p>
+                                        <p className="text-blue-600 text-xs mt-1">{t('registration.emailLocked')}</p>
                                     )}
                                     {formErrors.email && (
                                         <p className="text-red-500 text-sm mt-1">{formErrors.email}</p>
@@ -377,7 +378,7 @@ export default function Registration() {
                                             type={showPassword ? "text" : "password"}
                                             name="password"
                                             autoComplete="new-password"
-                                            placeholder="Enter password"
+                                            placeholder={t('registration.passwordPlaceholder')}
                                             value={formData.password}
                                             onChange={handleInputChange}
                                             onBlur={handleFieldBlur}
@@ -405,7 +406,7 @@ export default function Registration() {
                                             type={showConfirm ? "text" : "password"}
                                             name="confirmPassword"
                                             autoComplete="new-password"
-                                            placeholder="Confirm password"
+                                            placeholder={t('registration.confirmPasswordPlaceholder')}
                                             value={formData.confirmPassword}
                                             onChange={handleInputChange}
                                             onBlur={handleFieldBlur}
@@ -430,24 +431,24 @@ export default function Registration() {
                                     <div className="mb-4">
                                         <p
                                             className={`text-sm font-semibold ${
-                                                strength === "Strong" ? "text-green-400" : "text-yellow-400"
+                                                strengthKey === "Strong" ? "text-green-400" : "text-yellow-400"
                                             }`}
                                         >
-                                            Password Strength: {strength}
+                                            {t('registration.passwordStrength', { strength })}
                                         </p>
-                                        {strength === "Weak" && (
+                                        {strengthKey === "Weak" && (
                                             <div className="text-xs text-gray-400 mt-1 space-y-1">
                                                 <p className={/[A-Z]/.test(password) ? "text-green-400" : ""}>
-                                                    • At least one uppercase letter
+                                                    {t('registration.hintUppercase')}
                                                 </p>
                                                 <p className={/[0-9]/.test(password) ? "text-green-400" : ""}>
-                                                    • At least one number
+                                                    {t('registration.hintNumber')}
                                                 </p>
                                                 <p className={/[^A-Za-z0-9]/.test(password) ? "text-green-400" : ""}>
-                                                    • At least one special character
+                                                    {t('registration.hintSpecial')}
                                                 </p>
                                                 <p className={password.length >= 8 ? "text-green-400" : ""}>
-                                                    • Minimum 8 characters
+                                                    {t('registration.hintMinChars')}
                                                 </p>
                                             </div>
                                         )}
@@ -464,21 +465,21 @@ export default function Registration() {
                                         className="cursor-pointer mt-1 rounded-sm text-green-600 focus:ring-green-500"
                                     />
                                     <label htmlFor="terms" className="text-gray-600 leading-tight">
-                                        I agree to the{" "}
+                                        {t('registration.iAgreeTo')}{" "}
                                         <button
                                             type="button"
                                             onClick={() => setShowTermsModal(true)}
                                             className="text-blue-600 underline hover:text-blue-800"
                                         >
-                                            Terms of Service
+                                            {t('registration.termsOfService')}
                                         </button>{" "}
-                                        and{" "}
+                                        {t('registration.and')}{" "}
                                         <button
                                             type="button"
                                             onClick={() => setShowPrivacyModal(true)}
                                             className="text-blue-600 underline hover:text-blue-800"
                                         >
-                                            privacy policy
+                                            {t('registration.privacyPolicy')}
                                         </button>
                                     </label>
                                 </div>
@@ -491,7 +492,7 @@ export default function Registration() {
                                     disabled={submitting}
                                     className={`w-full ${submitting ? "bg-blue-300" : "bg-blue-600 hover:bg-blue-700"} text-white h-10 sm:h-12 rounded-lg font-semibold transition-colors flex items-center justify-center`}
                                 >
-                                    {submitting ? "Signing up…" : "SIGN UP FOR FREE"}
+                                    {submitting ? t('registration.signingUp') : t('registration.signUpBtn')}
                                 </button>
 
                                 <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -510,7 +511,7 @@ export default function Registration() {
                                                 e.currentTarget.style.display = "none";
                                             }}
                                         />
-                                        <span className="text-sm">Continue with Google</span>
+                                        <span className="text-sm">{t('registration.continueGoogle')}</span>
                                     </button>
                                     <button
                                         aria-label="Continue with Microsoft"
@@ -527,7 +528,7 @@ export default function Registration() {
                                                 e.currentTarget.style.display = "none";
                                             }}
                                         />
-                                        <span className="text-sm">Continue with Microsoft</span>
+                                        <span className="text-sm">{t('registration.continueMicrosoft')}</span>
                                     </button>
                                 </div>
 
@@ -540,7 +541,7 @@ export default function Registration() {
                                             to="/login"
                                             className="transition-colors"
                                         >
-                                            Already have an account? <span className="underline font-semibold text-blue-600 hover:text-blue-800">Sign in here</span>
+                                            {t('registration.alreadyAccount')} <span className="underline font-semibold text-blue-600 hover:text-blue-800">{t('registration.signInHere')}</span>
                                         </Link>
                                     </div>
                                 </div>
