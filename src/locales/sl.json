@@ -362,5 +362,50 @@
     "title": "Preverjanje spremembe gesla",
     "expiredHint": "Preverilna povezava je morda potekla ali že bila uporabljena.",
     "goToProfile": "Na nastavitve profila"
+  },
+  "joinOrg": {
+    "loadingTitle": "Nalaganje povabila",
+    "loadingText": "Počakajte, medtem ko preverjamo vaše povabilo...",
+    "youreInvited": "Povabljeni ste!",
+    "invitedToJoin": "Povabljeni ste, da se pridružite",
+    "invitedBy": "Povabil vas:",
+    "emailMismatchTitle": "Neujemanje e-poštnih naslovov",
+    "emailMismatchDesc": "Prijavljeni ste kot {{currentEmail}}, vendar je bilo to povabilo poslano na {{invitedEmail}}.",
+    "emailMismatchHint": "Kljub temu se lahko pridružite, toda prepričajte se, da je to pravi račun. V nasprotnem primeru se odjavite in prijavite z povabljenim e-poštnim naslovom.",
+    "acceptBtn": "Sprejmi povabilo in se pridruži",
+    "backToLogin": "Nazaj na prijavo",
+    "invitationReceived": "Povabilo prejeto",
+    "loginOrCreate": "Za sprejem povabila se prijavite ali ustvarite nov račun.",
+    "signInToAccept": "Prijavite se za sprejem",
+    "createAccountBtn": "Ustvarite nov račun in se pridružite",
+    "backToHome": "Nazaj na začetek",
+    "joiningTitle": "Pridruževanje organizaciji",
+    "joiningText": "Nastavljamo vaš dostop...",
+    "welcomeTitle": "Dobrodošli!",
+    "welcomeText": "Uspešno ste se pridružili organizaciji. Preusmerjanje na nadzorno ploščo...",
+    "invalidTitle": "Neveljavno povabilo",
+    "goToHome": "Na začetek",
+    "noToken": "Ni žetona za povabilo",
+    "acceptFailed": "Sprejem povabila ni uspel",
+    "loadFailed": "Nalaganje povabila ni uspelo"
+  },
+  "invitationEntry": {
+    "processingTitle": "Obdelava povabila",
+    "processingText": "Počakajte, medtem ko preverjamo vaše povabilo...",
+    "invalidTitle": "Neveljavno povabilo",
+    "backToLogin": "Nazaj na prijavo",
+    "noToken": "Ni žetona za povabilo",
+    "noEmail": "Neveljavno povabilo - e-poštni naslov ni bil najden",
+    "processFailed": "Obdelava povabila ni uspela"
+  },
+  "orgTabs": {
+    "overview": "Pregled",
+    "manageTeams": "Upravljanje ekip",
+    "viewTeams": "Ogled ekip",
+    "manageMembers": "Upravljanje članov",
+    "viewMembers": "Ogled članov",
+    "manageCulture": "Upravljanje kulture in vrednot",
+    "viewCulture": "Ogled kulture in vrednot",
+    "settings": "Nastavitve"
   }
 }

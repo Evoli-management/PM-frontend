@@ -363,5 +363,50 @@
     "title": "Password Change Verification",
     "expiredHint": "The verification link may have expired or already been used.",
     "goToProfile": "Go to Profile Settings"
+  },
+  "joinOrg": {
+    "loadingTitle": "Loading Invitation",
+    "loadingText": "Please wait while we verify your invitation...",
+    "youreInvited": "You're Invited!",
+    "invitedToJoin": "You've been invited to join",
+    "invitedBy": "Invited by:",
+    "emailMismatchTitle": "Email Address Mismatch",
+    "emailMismatchDesc": "You're logged in as {{currentEmail}}, but this invitation was sent to {{invitedEmail}}.",
+    "emailMismatchHint": "You can still join, but make sure this is the correct account. If not, please log out and log in with the invited email address.",
+    "acceptBtn": "Accept Invitation & Join",
+    "backToLogin": "Back to Login",
+    "invitationReceived": "Invitation Received",
+    "loginOrCreate": "To accept this invitation, please log in or create a new account.",
+    "signInToAccept": "Sign In to Accept",
+    "createAccountBtn": "Create New Account & Accept",
+    "backToHome": "Back to Home",
+    "joiningTitle": "Joining Organization",
+    "joiningText": "Setting up your access...",
+    "welcomeTitle": "Welcome!",
+    "welcomeText": "You've successfully joined the organization. Redirecting to dashboard...",
+    "invalidTitle": "Invalid Invitation",
+    "goToHome": "Go to Home",
+    "noToken": "No invitation token provided",
+    "acceptFailed": "Failed to accept invitation",
+    "loadFailed": "Failed to load invitation"
+  },
+  "invitationEntry": {
+    "processingTitle": "Processing Invitation",
+    "processingText": "Please wait while we verify your invitation...",
+    "invalidTitle": "Invalid Invitation",
+    "backToLogin": "Back to Login",
+    "noToken": "No invitation token provided",
+    "noEmail": "Invalid invitation - no email found",
+    "processFailed": "Failed to process invitation"
+  },
+  "orgTabs": {
+    "overview": "Overview",
+    "manageTeams": "Manage Teams",
+    "viewTeams": "View Teams",
+    "manageMembers": "Manage Members",
+    "viewMembers": "View Members",
+    "manageCulture": "Manage Culture and Values",
+    "viewCulture": "View Culture and Values",
+    "settings": "Settings"
   }
 }

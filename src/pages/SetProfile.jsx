@@ -1,4 +1,5 @@
 ﻿import React, { useState, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import Sidebar from '../components/shared/Sidebar';
 import { ProfileLayout } from '../components/profile/ProfileLayout';
 import { PersonalInformation } from '../components/profile/PersonalInformation';
@@ -14,6 +15,7 @@ import userProfileService from '../services/userProfileService';
 import organizationService from '../services/organizationService';
 
 const OrganizationTab = ({ showToast }) => {
+    const { t } = useTranslation();
     const [activeSubTab, setActiveSubTab] = React.useState("overview");
     const [canManage, setCanManage] = React.useState(false);
 
@@ -33,11 +35,11 @@ const OrganizationTab = ({ showToast }) => {
     }, []);
 
     const subTabs = [
-        { id: "overview", label: "Overview" },
-        { id: "teams", label: canManage ? "Manage Teams" : "View Teams" },
-        { id: "members", label: canManage ? "Manage Members" : "View Members" },
-        { id: "culture", label: canManage ? "Manage Culture and Values" : "View Culture and Values" },
-        ...(canManage ? [{ id: "settings", label: "Settings" }] : []),
+        { id: "overview", label: t("orgTabs.overview") },
+        { id: "teams", label: canManage ? t("orgTabs.manageTeams") : t("orgTabs.viewTeams") },
+        { id: "members", label: canManage ? t("orgTabs.manageMembers") : t("orgTabs.viewMembers") },
+        { id: "culture", label: canManage ? t("orgTabs.manageCulture") : t("orgTabs.viewCulture") },
+        ...(canManage ? [{ id: "settings", label: t("orgTabs.settings") }] : []),
     ];
 
     const renderSubTabContent = () => {
