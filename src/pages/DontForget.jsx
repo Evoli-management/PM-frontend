@@ -311,7 +311,7 @@ export default function DontForget() {
                         notes: t.description || "",
                         keyArea: "", // DF has no key area
                         listIndex: t.listIndex || t.list_index || 1,
-                        completed: t.status === "done", // FE semantic
+                        completed: t.status === "completed" || t.status === "done", // FE semantic
                         // Use real imported value from API — imported tasks come from Google/Microsoft sync
                         imported: typeof t.imported === 'boolean' ? t.imported : !!t.imported,
                         // Expose provider IDs so SyncSourceBadge can show the right icon
