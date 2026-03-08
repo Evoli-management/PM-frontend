@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { FaSave, FaTimes } from "react-icons/fa";
 // Load keyAreaService on demand to reduce initial bundle weight
 let _keyAreaService = null;
@@ -12,6 +13,7 @@ import usersService from "../../services/usersService";
 import userProfileService from "../../services/userProfileService";
 
 export default function DontForgetComposer({ open, onClose, onAdd, defaultList = 1 }) {
+    const { t } = useTranslation();
     const modalRef = useRef(null);
     const startDateRef = useRef(null);
     const endDateRef = useRef(null);
@@ -174,13 +176,13 @@ export default function DontForgetComposer({ open, onClose, onAdd, defaultList =
             >
                 {/* Header strip */}
                 <div className="bg-white text-slate-900 border-b border-slate-200 py-3 px-4 text-center font-semibold">
-                    Add Task
+                    {t("dontForgetComposer.addTask")}
                 </div>
                 <form onSubmit={submit} className="p-4 md:p-6">
                     {/* Task name field under header */}
                     <div className="mb-4">
                         <label className="sr-only" htmlFor="task-title">
-                            Task name
+                            {t("dontForgetComposer.taskNameLabel")}
                         </label>
                         <input
                             id="task-title"
@@ -188,7 +190,7 @@ export default function DontForgetComposer({ open, onClose, onAdd, defaultList =
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
                             className="w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="Task name"
+                            placeholder={t("dontForgetComposer.taskNamePlaceholder")}
                             required
                         />
                     </div>
@@ -199,18 +201,18 @@ export default function DontForgetComposer({ open, onClose, onAdd, defaultList =
                         <div className="grid gap-3 content-start">
                             {/* Description (short) */}
                             <div className="flex flex-col">
-                                <label className="text-xs font-semibold text-slate-700">Description</label>
+                                <label className="text-xs font-semibold text-slate-700">{t("dontForgetComposer.descLabel")}</label>
                                 <input
                                     value={notes}
                                     onChange={(e) => setNotes(e.target.value)}
                                     className="mt-1 h-9 rounded-md border border-slate-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    placeholder="Brief description"
+                                    placeholder={t("dontForgetComposer.descPlaceholder")}
                                 />
                             </div>
 
                             {/* Start date */}
                             <div className="flex flex-col">
-                                <label className="text-xs font-semibold text-slate-700">Start date</label>
+                                <label className="text-xs font-semibold text-slate-700">{t("dontForgetComposer.startDateLabel")}</label>
                                 <div className="relative mt-1">
                                     <input
                                         type="date"
@@ -236,7 +238,7 @@ export default function DontForgetComposer({ open, onClose, onAdd, defaultList =
 
                             {/* End date */}
                             <div className="flex flex-col">
-                                <label className="text-xs font-semibold text-slate-700">End date</label>
+                                <label className="text-xs font-semibold text-slate-700">{t("dontForgetComposer.endDateLabel")}</label>
                                 <div className="relative mt-1">
                                     <input
                                         type="date"
@@ -262,7 +264,7 @@ export default function DontForgetComposer({ open, onClose, onAdd, defaultList =
 
                             {/* Deadline */}
                             <div className="flex flex-col">
-                                <label className="text-xs font-semibold text-slate-700">Deadline</label>
+                                <label className="text-xs font-semibold text-slate-700">{t("dontForgetComposer.deadlineLabel")}</label>
                                 <div className="relative mt-1">
                                     <input
                                         type="date"
@@ -289,7 +291,7 @@ export default function DontForgetComposer({ open, onClose, onAdd, defaultList =
 
                             {/* Date (finish) */}
                             <div className="flex flex-col">
-                                <label className="text-xs font-semibold text-slate-700">Date (finish)</label>
+                                <label className="text-xs font-semibold text-slate-700">{t("dontForgetComposer.finishDateLabel")}</label>
                                 <div className="relative mt-1">
                                     <input
                                         type="date"
@@ -315,13 +317,13 @@ export default function DontForgetComposer({ open, onClose, onAdd, defaultList =
 
                             {/* Duration */}
                             <div className="flex flex-col">
-                                <label className="text-xs font-semibold text-slate-700">Duration</label>
+                                <label className="text-xs font-semibold text-slate-700">{t("dontForgetComposer.durationLabel")}</label>
                                 <div className="relative mt-1">
                                     <input
                                         value={duration}
                                         onChange={(e) => setDuration(e.target.value)}
                                         className="h-9 w-full rounded-md border border-slate-300 pl-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        placeholder="e.g., 1h, 1d"
+                                        placeholder={t("dontForgetComposer.durationPlaceholder")}
                                     />
                                 </div>
                             </div>
@@ -331,18 +333,18 @@ export default function DontForgetComposer({ open, onClose, onAdd, defaultList =
                         <div className="grid gap-3 content-start">
                             {/* List */}
                             <div className="flex flex-col">
-                                <label className="text-xs font-semibold text-slate-700">List</label>
+                                <label className="text-xs font-semibold text-slate-700">{t("dontForgetComposer.listLabel")}</label>
                                 <input
                                     value={project}
                                     onChange={(e) => setProject(e.target.value)}
                                     className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    placeholder="List name"
+                                    placeholder={t("dontForgetComposer.listPlaceholder")}
                                 />
                             </div>
 
                             {/* Key Area */}
                             <div className="flex flex-col">
-                                <label className="text-xs font-semibold text-slate-700">Key Area</label>
+                                <label className="text-xs font-semibold text-slate-700">{t("dontForgetComposer.keyAreaLabel")}</label>
                                 <input
                                     value={"Don't Forget"}
                                     readOnly
@@ -352,37 +354,37 @@ export default function DontForgetComposer({ open, onClose, onAdd, defaultList =
 
                             {/* Responsible */}
                             <div className="flex flex-col">
-                                <label className="text-xs font-semibold text-slate-700">Respons.</label>
+                                <label className="text-xs font-semibold text-slate-700">{t("dontForgetComposer.responsibleLabel")}</label>
                                 <input
                                     value={assignee}
                                     onChange={(e) => setAssignee(e.target.value)}
                                     className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    placeholder="Assignee"
+                                    placeholder={t("dontForgetComposer.assigneePlaceholder")}
                                 />
                             </div>
 
                             {/* Priority */}
                             <div className="flex flex-col">
-                                <label className="text-xs font-semibold text-slate-700">Priority</label>
+                                <label className="text-xs font-semibold text-slate-700">{t("dontForgetComposer.priorityLabel")}</label>
                                 <select
                                     value={priority}
                                     onChange={(e) => setPriority(e.target.value)}
                                     className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 >
-                                    <option value="high" >❗️ High</option>
-                                    <option value="normal">Normal</option>
-                                    <option value="low" style={{ color: "#6b7280" }}>↓ Low</option>
+                                    <option value="high">{t("dontForgetComposer.highOpt")}</option>
+                                    <option value="normal">{t("dontForgetComposer.normalOpt")}</option>
+                                    <option value="low" style={{ color: "#6b7280" }}>{t("dontForgetComposer.lowOpt")}</option>
                                 </select>
                             </div>
 
                             {/* Goal */}
                             <div className="flex flex-col">
-                                <label className="text-xs font-semibold text-slate-700">Goal</label>
+                                <label className="text-xs font-semibold text-slate-700">{t("dontForgetComposer.goalLabel")}</label>
                                 <input
                                     value={goal}
                                     onChange={(e) => setGoal(e.target.value)}
                                     className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    placeholder="Goal"
+                                    placeholder={t("dontForgetComposer.goalPlaceholder")}
                                 />
                             </div>
 
@@ -394,7 +396,7 @@ export default function DontForgetComposer({ open, onClose, onAdd, defaultList =
                     <div className="mt-6 flex items-center justify-between">
                         {showHelp ? (
                             <div className="text-xs text-slate-600">
-                                • OK saves the task • Cancel closes without saving • Dates use your local timezone.
+                                {t("dontForgetComposer.helpText")}
                             </div>
                         ) : (
                             <span />
@@ -405,7 +407,7 @@ export default function DontForgetComposer({ open, onClose, onAdd, defaultList =
                                 className="rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-4 py-2 text-sm disabled:opacity-50"
                                 disabled={saving}
                             >
-                                <FaSave /> {saving ? "Saving..." : "OK"}
+                                <FaSave /> {saving ? t("dontForgetComposer.saving") : t("dontForgetComposer.ok")}
                             </button>
                             <button
                                 type="button"
@@ -413,7 +415,7 @@ export default function DontForgetComposer({ open, onClose, onAdd, defaultList =
                                 className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
                                 disabled={saving}
                             >
-                                Cancel
+                                {t("dontForgetComposer.cancel")}
                             </button>
                             <button
                                 type="button"
@@ -421,7 +423,7 @@ export default function DontForgetComposer({ open, onClose, onAdd, defaultList =
                                 className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
                                 disabled={saving}
                             >
-                                Help
+                                {t("dontForgetComposer.help")}
                             </button>
                         </div>
                     </div>

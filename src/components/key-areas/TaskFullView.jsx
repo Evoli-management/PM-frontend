@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef, Suspense } from 'react';
+import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import { FaChevronLeft, FaStop, FaEllipsisV, FaSave, FaTag, FaTrash, FaEdit, FaAngleDoubleLeft, FaUserPlus } from 'react-icons/fa';
 import EmptyState from '../../components/goals/EmptyState.jsx';
@@ -67,6 +68,7 @@ export default function TaskFullView({
     setSavingActivityIds: setSavingActivityIdsProp = undefined,
 }) {
     // derive a key-area color to use for inline icons (fallback matches previous hardcoded color)
+    const { t } = useTranslation();
     const kaColor = (selectedKA && selectedKA.color) || (task && (task.key_area_color || task.keyAreaColor)) || '#4DC3D8';
     // Small per-activity menu component placed near the activity icon so it's
     // visible and not clipped by table layout. Uses local state and a ref to
@@ -135,15 +137,15 @@ export default function TaskFullView({
                     <div id={`activity-menu-${item.id}`} style={{ position: 'fixed', top: anchor.top, left: anchor.left, zIndex: 9999, minWidth: 176 }} className="bg-white border border-slate-200 rounded shadow">
                         <button type="button" className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm hover:bg-slate-50" onClick={(e) => { e.stopPropagation(); setOpen(false); toggleRow(item.id); }}>
                             <FaEdit className="text-slate-600" />
-                            <span>Edit</span>
+                            <span>{t("taskFullView.activityEdit")}</span>
                         </button>
                         <button type="button" className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50" onClick={(e) => { e.stopPropagation(); setOpen(false); if (confirm(`Delete activity "${(item.text||item.activity_name||'Untitled activity')}"?`)) removeActivity(item.id); }}>
                             <FaTrash />
-                            <span>Delete</span>
+                            <span>{t("taskFullView.activityDelete")}</span>
                         </button>
                         <button type="button" className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${item.created_task_id ? 'text-slate-300 cursor-not-allowed' : 'text-slate-700 hover:bg-slate-50'}`} onClick={(e) => { e.stopPropagation(); setOpen(false); if (!item.created_task_id) createTaskFromActivity(item); }} disabled={!!item.created_task_id}>
                             <FaAngleDoubleLeft />
-                            <span>{item.created_task_id ? 'Task created' : 'Convert to task'}</span>
+                            <span>{item.created_task_id ? t("taskFullView.taskCreated") : t("taskFullView.convertToTask")}</span>
                         </button>
                     </div>,
                     document.body,
@@ -551,7 +553,7 @@ export default function TaskFullView({
         setList(list.map((a) => (a.id === id ? { ...a, priority: value } : a)));
     };
     const createTaskFromActivity = (item) => {
-        const confirmed = window.confirm("Convert this activity into a task? OK = convert, Cancel = abort");
+        const confirmed = window.confirm(t("taskFullView.convertConfirm"));
         if (!confirmed) return;
         try {
             window.dispatchEvent(new CustomEvent("ka-create-task-from-activity", { detail: { taskId: task.id, activity: item, remove: true } }));
@@ -580,7 +582,7 @@ export default function TaskFullView({
 
     const closeOnHoverDifferent = (id) => {};
     const updateField = (id, field, value) => { setList(list.map((a) => (a.id === id ? { ...a, [field]: value } : a))); };
-    const clearActivities = () => { if (!confirm("Clear all activities for this task?")) return; onUpdateActivities && onUpdateActivities(String(task.id), []); };
+    const clearActivities = () => { if (!confirm(t("taskFullView.clearConfirm"))) return; onUpdateActivities && onUpdateActivities(String(task.id), []); };
 
     const listNameFor = (n) => {
         if (!kaId) return `List ${n}`;
@@ -678,7 +680,7 @@ export default function TaskFullView({
                                                     }
                                                 }}
                                             >
-                                                Edit details
+                                                {t("taskFullView.editDetails")}
                                             </button>
                                             {!readOnly && (
                                                 <button
@@ -689,7 +691,7 @@ export default function TaskFullView({
                                                         setDelegateModalOpen(true);
                                                     }}
                                                 >
-                                                    Delegate task
+                                                    {t("taskFullView.delegateTask")}
                                                 </button>
                                             )}
                                             <button
@@ -704,7 +706,7 @@ export default function TaskFullView({
                                                     }
                                                 }}
                                             >
-                                                Delete
+                                                {t("taskFullView.delete")}
                                             </button>
                                         </div>
                                     </>

@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import Modal from '../shared/Modal'
 import { FaSave } from 'react-icons/fa'
 import { useFormattedDate } from '../../hooks/useFormattedDate'
@@ -23,6 +24,7 @@ export default function CreateActivityFormModal({
   parentListNames = {},
   currentUserId = null,
 }) {
+  const { t } = useTranslation()
   const usersLoadedRef = useRef(false)
   // Normalize parentListNames keys to numbers for robust lookup (parents may store keys as strings)
   const normalizedParentListNames = {};
@@ -305,7 +307,7 @@ export default function CreateActivityFormModal({
   const handleSave = () => {
     // Validate required field
     if (!title || !(title || '').trim()) {
-      alert('Please enter an activity title');
+      alert(t('createActivityModal.titleRequired'));
       return;
     }
 
@@ -370,7 +372,7 @@ export default function CreateActivityFormModal({
           onMouseDown={handleMouseDown}
         >
           <h3 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xl font-semibold text-slate-900">
-            Add Activity
+            {t('createActivityModal.title')}
           </h3>
           <div className="flex items-center justify-end gap-2">
             <button
@@ -379,7 +381,7 @@ export default function CreateActivityFormModal({
               className="rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold px-3 py-1.5 text-sm inline-flex items-center gap-1.5"
             >
               <FaSave className="text-xs" />
-              Save
+              {t('createActivityModal.save')}
             </button>
             <button type="button" className="p-2 rounded-md text-slate-600 hover:text-slate-800 hover:bg-slate-100" aria-label="Close" onClick={onCancel}>
               ✕
@@ -403,14 +405,14 @@ export default function CreateActivityFormModal({
           .no-calendar::-moz-focus-inner { border: 0; }
         `}</style>
         <div className="mb-4">
-          <label className="text-sm font-medium text-slate-700" htmlFor="ka-activity-title">Activity name</label>
+          <label className="text-sm font-medium text-slate-700" htmlFor="ka-activity-title">{t('createActivityModal.activityNameLabel')}</label>
           <input
             id="ka-activity-title"
             autoFocus
             required
             name="title"
             className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 mt-0.5"
-            placeholder="Activity name"
+            placeholder={t('createActivityModal.activityNamePlaceholder')}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
           />
@@ -419,18 +421,18 @@ export default function CreateActivityFormModal({
         <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-y-4 md:gap-x-6">
           <div className="grid grid-rows-6 gap-0 md:col-span-1">
             <div>
-              <label className="text-sm font-medium text-slate-700">Description</label>
+              <label className="text-sm font-medium text-slate-700">{t('createActivityModal.descLabel')}</label>
               <input
                 name="description"
                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 mt-0"
-                placeholder="Brief description"
+                placeholder={t('createActivityModal.descPlaceholder')}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
               />
             </div>
 
             <div>
-              <label className="text-sm font-medium text-slate-700">Start date</label>
+              <label className="text-sm font-medium text-slate-700">{t('createActivityModal.startDateLabel')}</label>
               <div className="relative mt-0">
                 <input
                   name="start_date"
@@ -451,7 +453,7 @@ export default function CreateActivityFormModal({
             </div>
 
             <div>
-              <label className="text-sm font-medium text-slate-700">End date</label>
+              <label className="text-sm font-medium text-slate-700">{t('createActivityModal.endDateLabel')}</label>
               <div className="relative mt-0">
                 <input
                   name="end_date"
@@ -474,7 +476,7 @@ export default function CreateActivityFormModal({
             </div>
 
             <div>
-              <label className="text-sm font-medium text-slate-700">Deadline</label>
+              <label className="text-sm font-medium text-slate-700">{t('createActivityModal.deadlineLabel')}</label>
               <div className="relative mt-0.5">
                 <input
                   name="deadline"
@@ -495,7 +497,7 @@ export default function CreateActivityFormModal({
             </div>
 
             <div>
-              <label className="text-sm font-medium text-slate-700">Duration</label>
+              <label className="text-sm font-medium text-slate-700">{t('createActivityModal.durationLabel')}</label>
               <input
                 name="duration"
                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 mt-0"
@@ -514,10 +516,10 @@ export default function CreateActivityFormModal({
 
           <div className="grid grid-rows-6 gap-0 md:col-span-1">
             <div>
-              <label className="text-sm font-medium text-slate-700">Key Area</label>
+              <label className="text-sm font-medium text-slate-700">{t('createActivityModal.keyAreaLabel')}</label>
               <div className="relative mt-0">
                 <select name="key_area_id" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" value={keyAreaId} onChange={(e) => setKeyAreaId(e.target.value)} required>
-                  <option value="">— Select Key Area —</option>
+                  <option value="">{t('createActivityModal.selectKeyArea')}</option>
                   {keyAreas.map((ka, idx) => (<option key={ka.id} value={ka.id}>{formatKeyAreaLabel(ka, idx)}</option>))}
                 </select>
                 <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
@@ -526,10 +528,10 @@ export default function CreateActivityFormModal({
             </div>
 
             <div>
-              <label className="text-sm font-medium text-slate-700">List</label>
+              <label className="text-sm font-medium text-slate-700">{t('createActivityModal.listLabel')}</label>
               <div className="relative mt-0">
                 <select name="list_index" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" value={listIndex} onChange={(e) => setListIndex(e.target.value)} disabled={!keyAreaId} required>
-                  {!keyAreaId ? (<option value="">— Select Key Area first —</option>) : (<option value="">— Select List —</option>)}
+                  {!keyAreaId ? (<option value="">{t('createActivityModal.selectKeyAreaFirst')}</option>) : (<option value="">{t('createActivityModal.selectList')}</option>)}
                   {keyAreaId && localAvailableLists.map((n) => {
                     const label = (localListNames && localListNames[n]) || (normalizedParentListNames && (normalizedParentListNames[n] || normalizedParentListNames[String(n)])) || (parentListNames && parentListNames[n]) || `List ${n}`;
                     return (<option key={n} value={n}>{label}</option>);
@@ -541,10 +543,10 @@ export default function CreateActivityFormModal({
             </div>
 
             <div>
-              <label className="text-sm font-medium text-slate-700">Task</label>
+              <label className="text-sm font-medium text-slate-700">{t('createActivityModal.taskLabel')}</label>
               <div className="relative mt-0">
                 <select name="task_id" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" value={taskId} onChange={(e) => setTaskId(e.target.value)} disabled={!keyAreaId || !listIndex}>
-                  {!keyAreaId ? (<option value="">— Select Key Area first —</option>) : (!listIndex ? (<option value="">— Select List first —</option>) : (<option value="">— Select Task —</option>))}
+                  {!keyAreaId ? (<option value="">{t('createActivityModal.selectKeyAreaFirst')}</option>) : (!listIndex ? (<option value="">{t('createActivityModal.selectListFirst')}</option>) : (<option value="">{t('createActivityModal.selectTask')}</option>))}
                   {keyAreaId && listIndex && filteredTasks.map((t) => {
                     const label = t.title || t.name || t.activity_name || t.text || String(t.id);
                     return (<option key={t.id} value={t.id}>{label}</option>);
@@ -555,10 +557,10 @@ export default function CreateActivityFormModal({
             </div>
 
             <div>
-              <label className="text-sm font-medium text-slate-700">Responsible</label>
+              <label className="text-sm font-medium text-slate-700">{t('createActivityModal.responsibleLabel')}</label>
               <div className="relative mt-0">
                 <select name="assignee" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" value={assignee} onChange={(e) => setAssignee(e.target.value)}>
-                  <option value="">— Unassigned —</option>
+                  <option value="">{t('createActivityModal.unassigned')}</option>
                   {usersList.map((u) => (
                     <option key={u.id} value={u.id}>
                       {u.name || u.firstname} {u.lastname || ''}
@@ -570,7 +572,7 @@ export default function CreateActivityFormModal({
             </div>
 
             <div>
-              <label className="text-sm font-medium text-slate-700">Priority</label>
+              <label className="text-sm font-medium text-slate-700">{t('createActivityModal.priorityLabel')}</label>
               <div className="relative mt-0">
                 <select
                   name="priority"
@@ -578,19 +580,19 @@ export default function CreateActivityFormModal({
                   value={priority}
                   onChange={(e) => setPriority(e.target.value)}
                 >
-                  <option value="high">High</option>
-                  <option value="normal">Normal</option>
-                  <option value="low" style={{ color: "#6b7280" }}>Low</option>
+                  <option value="high">{t('createActivityModal.highOpt')}</option>
+                  <option value="normal">{t('createActivityModal.normalOpt')}</option>
+                  <option value="low" style={{ color: "#6b7280" }}>{t('createActivityModal.lowOpt')}</option>
                 </select>
                 <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
               </div>
             </div>
 
             <div>
-              <label className="text-sm font-medium text-slate-700">Goal</label>
+              <label className="text-sm font-medium text-slate-700">{t('createActivityModal.goalLabel')}</label>
               <div className="relative mt-0">
                 <select name="goal" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" value={goalId} onChange={(e) => setGoalId(e.target.value)}>
-                  <option value="">— Select Goal —</option>
+                  <option value="">{t('createActivityModal.selectGoal')}</option>
                   {(localGoals && localGoals.length ? localGoals : goals).map((g) => (
                     <option key={g.id} value={g.id}>{g.title}</option>
                   ))}

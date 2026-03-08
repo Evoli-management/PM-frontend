@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import Modal from "../shared/Modal";
 import { useToast } from "../shared/ToastProvider.jsx";
 import { useDraggable } from "../../hooks/useDraggable";
@@ -33,6 +34,7 @@ export default function CreateTaskModal({
     renderInline = false,
     taskId = null  // For edit mode
 }) {
+    const { t } = useTranslation();
     const { addToast } = useToast();
     const [keyAreas, setKeyAreas] = useState([]);
     const [goals, setGoals] = useState([]);
@@ -204,12 +206,12 @@ export default function CreateTaskModal({
         e.preventDefault();
         
         if (!form.title.trim()) {
-            addToast({ title: "Task title is required", variant: "error" });
+            addToast({ title: t("createTaskModal.titleRequired"), variant: "error" });
             return;
         }
 
         if (!form.keyAreaId) {
-            addToast({ title: "Please select a key area", variant: "error" });
+            addToast({ title: t("createTaskModal.keyAreaRequired"), variant: "error" });
             return;
         }
 
@@ -237,16 +239,16 @@ export default function CreateTaskModal({
             if (isEditMode) {
                 const svc = await getTaskService();
                 result = await svc.update(taskId, taskData);
-                addToast({ 
-                    title: "Task updated successfully", 
-                    variant: "success" 
+                addToast({
+                    title: t("createTaskModal.taskUpdated"),
+                    variant: "success"
                 });
             } else {
                 const svc = await getTaskService();
                 result = await svc.create(taskData);
-                addToast({ 
-                    title: "Task created successfully", 
-                    variant: "success" 
+                addToast({
+                    title: t("createTaskModal.taskCreated"),
+                    variant: "success"
                 });
             }
             
@@ -256,7 +258,7 @@ export default function CreateTaskModal({
         } catch (error) {
             console.error(`Failed to ${isEditMode ? 'update' : 'create'} task:`, error);
             addToast({ 
-                title: error.response?.data?.message || `Failed to ${isEditMode ? 'update' : 'create'} task`, 
+                title: error.response?.data?.message || t(isEditMode ? "createTaskModal.failedUpdate" : "createTaskModal.failedCreate"),
                 variant: "error" 
             });
         } finally {
@@ -266,7 +268,7 @@ export default function CreateTaskModal({
 
     const handleDelete = async () => {
         if (!isEditMode || !taskId) return;
-        if (!window.confirm("Delete this task?")) return;
+        if (!window.confirm(t("createTaskModal.deleteConfirm"))) return;
         try {
             if (typeof onDelete === "function") {
                 await onDelete(taskId);
@@ -274,11 +276,11 @@ export default function CreateTaskModal({
                 const svc = await getTaskService();
                 await svc.remove(taskId);
             }
-            addToast({ title: "Task deleted", variant: "success" });
+            addToast({ title: t("createTaskModal.taskDeleted"), variant: "success" });
             onClose();
         } catch (error) {
             console.error("Failed to delete task:", error);
-            addToast({ title: "Failed to delete task", variant: "error" });
+            addToast({ title: t("createTaskModal.failedDelete"), variant: "error" });
         }
     };
 
@@ -302,7 +304,7 @@ export default function CreateTaskModal({
                     onMouseDown={handleMouseDown}
                 >
                     <div className="relative">
-                        <span>{isEditMode ? "Edit Task" : "Add Task"}</span>
+                        <span>{isEditMode ? t("createTaskModal.editTitle") : t("createTaskModal.addTitle")}</span>
                         <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-2">
                             <button
                                 type="submit"
@@ -310,7 +312,7 @@ export default function CreateTaskModal({
                                 className="rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold px-3 py-1.5 text-sm inline-flex items-center gap-1.5"
                             >
                                 <FaSave className="text-xs" />
-                                Save
+                                {t("createTaskModal.save")}
                             </button>
                             {isEditMode && (
                                 <button
@@ -330,31 +332,31 @@ export default function CreateTaskModal({
                 </div>
                 <form id="create-task-legacy-form" className="pm-notched-form p-4 md:p-6 overflow-y-auto flex-1" onSubmit={handleSubmit}>
                     <div className="mb-4">
-                        <label className="text-sm font-medium text-slate-700" htmlFor="ka-task-title">Task name</label>
-                        <input autoFocus id="ka-task-title" required className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50" placeholder="Task name" value={form.title} name="title" onChange={handleInputChange} />
+                        <label className="text-sm font-medium text-slate-700" htmlFor="ka-task-title">{t("createTaskModal.taskNameLabel")}</label>
+                        <input autoFocus id="ka-task-title" required className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50" placeholder={t("createTaskModal.taskNamePlaceholder")} value={form.title} name="title" onChange={handleInputChange} />
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                         <div className="grid gap-3 content-start">
                             <div className="flex flex-col">
-                                <label className="text-sm font-medium text-slate-700">Description</label>
-                                <input className="mt-0 h-9 rounded-lg border border-slate-300 px-3 text-sm shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50" placeholder="Brief description" value={form.description} name="description" onChange={handleInputChange} />
+                                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.descLabel")}</label>
+                                <input className="mt-0 h-9 rounded-lg border border-slate-300 px-3 text-sm shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50" placeholder={t("createTaskModal.descPlaceholder")} value={form.description} name="description" onChange={handleInputChange} />
                             </div>
                             <div className="flex flex-col">
-                                <label className="text-sm font-medium text-slate-700">Start date</label>
+                                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.startDateLabel")}</label>
                                 <div className="relative mt-0">
                                     <input ref={startDateRef} className="h-9 w-full rounded-lg border border-slate-300 pr-10 pl-3 text-sm shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 hide-native-date-icon" type="date" value={form.date} name="date" onChange={handleInputChange} />
                                     <span role="button" tabIndex={0} aria-label="Open date picker" className="absolute inset-y-0 right-2 grid place-items-center text-base cursor-pointer select-none" onClick={() => openPicker(startDateRef)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openPicker(startDateRef); }}>📅</span>
                                 </div>
                             </div>
                             <div className="flex flex-col">
-                                <label className="text-sm font-medium text-slate-700">End date</label>
+                                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.endDateLabel")}</label>
                                 <div className="relative mt-0">
                                     <input ref={endDateRef} className="h-9 w-full rounded-lg border border-slate-300 pr-10 pl-3 text-sm shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 hide-native-date-icon" type="date" value={form.endDate} name="endDate" onChange={handleInputChange} />
                                     <span role="button" tabIndex={0} aria-label="Open date picker" className="absolute inset-y-0 right-2 grid place-items-center text-base cursor-pointer select-none" onClick={() => openPicker(endDateRef)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openPicker(endDateRef); }}>📅</span>
                                 </div>
                             </div>
                             <div className="flex flex-col">
-                                <label className="text-sm font-medium text-slate-700">Deadline</label>
+                                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.deadlineLabel")}</label>
                                 <div className="relative mt-0.5">
                                     <input ref={dueDateRef} className="h-9 w-full rounded-lg border border-slate-300 pr-10 pl-3 text-sm shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 hide-native-date-icon" type="date" value={form.dueDate} name="dueDate" onChange={handleInputChange} />
                                     <span role="button" tabIndex={0} aria-label="Open date picker" className="absolute inset-y-0 right-2 grid place-items-center text-base cursor-pointer select-none" onClick={() => openPicker(dueDateRef)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openPicker(dueDateRef); }}>📅</span>
@@ -362,7 +364,7 @@ export default function CreateTaskModal({
                                 <p className="mt-1 text-[11px] text-slate-500" aria-hidden="true">&nbsp;</p>
                             </div>
                             <div className="flex flex-col">
-                                <label className="text-sm font-medium text-slate-700">Duration</label>
+                                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.durationLabel")}</label>
                                 <div className="relative mt-0">
                                     <input className="h-9 w-full rounded-lg border border-slate-300 pr-10 pl-3 text-sm shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50" type="time" step="60" value={form.duration || ""} name="duration" onChange={handleInputChange} />
                                     <span className="absolute inset-y-0 right-2 grid place-items-center text-base">🕒</span>
@@ -371,16 +373,16 @@ export default function CreateTaskModal({
                         </div>
                         <div className="grid gap-3 content-start">
                             <div className="flex flex-col">
-                                <label className="text-sm font-medium text-slate-700">Key Area</label>
+                                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.keyAreaLabel")}</label>
                                 <select name="keyAreaId" className="mt-0 h-10 rounded-lg border border-slate-300 px-3 text-sm bg-white shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50" value={form.keyAreaId} onChange={handleInputChange}>
-                                    <option value="">— Select key area —</option>
+                                    <option value="">{t("createTaskModal.selectKeyArea")}</option>
                                     {keyAreas.map((area, idx) => (
                                         <option key={area.id} value={area.id}>{formatKeyAreaLabel(area, idx)}</option>
                                     ))}
                                 </select>
                             </div>
                             <div className="flex flex-col">
-                                <label className="text-sm font-medium text-slate-700">List</label>
+                                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.listLabel")}</label>
                                 <select
                                     name="list_index"
                                     className="mt-0 h-10 rounded-lg border border-slate-300 px-3 text-sm bg-white shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50"
@@ -390,40 +392,40 @@ export default function CreateTaskModal({
                                 >
                                     {availableLists.map((idx) => (
                                         <option key={idx} value={idx}>
-                                            {listNames[idx] || `List ${idx}`}
+                                            {listNames[idx] || t("createTaskModal.listFallback", { n: idx })}
                                         </option>
                                     ))}
                                 </select>
                             </div>
                             <div className="flex flex-col">
-                                <label className="text-sm font-medium text-slate-700">Assignee</label>
+                                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.assigneeLabel")}</label>
                                 <select name="assignee" className="mt-0 h-10 rounded-lg border border-slate-300 px-3 text-sm bg-white shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50" value={form.assignee} onChange={handleInputChange}>
-                                    <option value="">— Unassigned —</option>
-                                    <option value="Me">Me</option>
+                                    <option value="">{t("createTaskModal.unassigned")}</option>
+                                    <option value="Me">{t("createTaskModal.meOption")}</option>
                                 </select>
                             </div>
                             <div className="flex flex-col">
-                                <label className="text-sm font-medium text-slate-700">Priority</label>
+                                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.priorityLabel")}</label>
                                 <select
                                     name="priority"
                                     className="mt-0 h-10 rounded-lg border border-slate-300 px-3 text-sm bg-white shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50"
                                     value={form.priority}
                                     onChange={handleInputChange}
                                 >
-                                    <option value="high">High</option>
-                                    <option value="normal">Normal</option>
-                                    <option value="low" style={{ color: "#6b7280" }}>Low</option>
+                                    <option value="high">{t("createTaskModal.highOpt")}</option>
+                                    <option value="normal">{t("createTaskModal.normalOpt")}</option>
+                                    <option value="low" style={{ color: "#6b7280" }}>{t("createTaskModal.lowOpt")}</option>
                                 </select>
                             </div>
                             <div className="flex flex-col">
-                                <label className="text-sm font-medium text-slate-700">Goal</label>
-                                <select 
-                                    className="mt-0 h-10 rounded-lg border border-slate-300 px-3 text-sm bg-white shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50" 
-                                    value={form.goal || ""} 
-                                    name="goal" 
+                                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.goalLabel")}</label>
+                                <select
+                                    className="mt-0 h-10 rounded-lg border border-slate-300 px-3 text-sm bg-white shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50"
+                                    value={form.goal || ""}
+                                    name="goal"
                                     onChange={handleInputChange}
                                 >
-                                    <option value="">— Select Goal —</option>
+                                    <option value="">{t("createTaskModal.selectGoal")}</option>
                                     {goals.map((goal) => (
                                         <option key={goal.id} value={goal.id}>
                                             {goal.title}

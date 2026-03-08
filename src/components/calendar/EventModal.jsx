@@ -4,6 +4,7 @@ import { useToast } from "../shared/ToastProvider.jsx";
 import { useCalendarPreferences } from "../../hooks/useCalendarPreferences";
 import TimePicker from "../ui/TimePicker.jsx";
 import { formatKeyAreaLabel } from "../../utils/keyAreaDisplay";
+import { useTranslation } from "react-i18next";
 // Load keyAreaService on demand so it can be code-split
 let _keyAreaService = null;
 const getKeyAreaService = async () => {
@@ -15,6 +16,7 @@ const getKeyAreaService = async () => {
 // Business hours checks removed — full-day calendar now supported
 
 const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEventDeleted }) => {
+    const { t } = useTranslation();
     if (!event) return null;
     const { addToast } = useToast();
     const { formatTime, formatDate, use24Hour } = useCalendarPreferences();
@@ -68,13 +70,13 @@ const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEv
 
     const kinds = useMemo(
         () => [
-            { value: "meeting", label: "Meeting" },
-            { value: "focus", label: "Focus" },
-            { value: "custom", label: "Custom" },
-            { value: "green", label: "Green" },
-            { value: "red", label: "Red" },
+            { value: "meeting", label: t("eventModal.meeting") },
+            { value: "focus", label: t("eventModal.focus") },
+            { value: "custom", label: t("eventModal.custom") },
+            { value: "green", label: t("eventModal.green") },
+            { value: "red", label: t("eventModal.red") },
         ],
-        [],
+        [t],
     );
 
     const combineLocal = (ymd, hm) => {
@@ -104,17 +106,17 @@ const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEv
     const onConfirm = async () => {
         try {
             if (!title.trim()) {
-                addToast({ title: "Title is required", variant: "error" });
+                addToast({ title: t("eventModal.titleRequired"), variant: "error" });
                 return;
             }
             const s = combineLocal(startDate, startTime);
             const e = combineLocal(endDate, endTime);
             if (!s || !e) {
-                addToast({ title: "Start and End are required", variant: "error" });
+                addToast({ title: t("eventModal.startEndRequired"), variant: "error" });
                 return;
             }
             if (s > e) {
-                addToast({ title: "Start must be before End", variant: "error" });
+                addToast({ title: t("eventModal.startBeforeEnd"), variant: "error" });
                 return;
             }
             setSaving(true);
@@ -131,10 +133,10 @@ const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEv
             const updated = await calendarService.updateEvent(event.id, payload);
             onEventUpdated && onEventUpdated(updated);
             setIsEditing(false);
-            addToast({ title: "Event updated", variant: "success" });
+            addToast({ title: t("eventModal.eventUpdated"), variant: "success" });
         } catch (e) {
             console.warn("Failed to save event", e);
-            addToast({ title: "Failed to save", description: String(e?.message || e), variant: "error" });
+            addToast({ title: t("eventModal.failedSave"), description: String(e?.message || e), variant: "error" });
         } finally {
             setSaving(false);
         }
@@ -153,10 +155,10 @@ const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEv
                 end: newEnd ? newEnd.toISOString() : null,
             });
             onEventUpdated && onEventUpdated(updated);
-            addToast({ title: "Event moved", variant: "success" });
+            addToast({ title: t("eventModal.eventMoved"), variant: "success" });
         } catch (e) {
             console.warn("Failed to update event", e);
-            addToast({ title: "Failed to move event", description: String(e?.message || e), variant: "error" });
+            addToast({ title: t("eventModal.failedMoveEvent"), description: String(e?.message || e), variant: "error" });
         }
     };
 
@@ -172,22 +174,22 @@ const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEv
                 end: newEnd.toISOString(),
             });
             onEventUpdated && onEventUpdated(updated);
-            addToast({ title: "Event resized", variant: "success" });
+            addToast({ title: t("eventModal.eventResized"), variant: "success" });
         } catch (e) {
             console.warn("Failed to resize event", e);
-            addToast({ title: "Failed to resize", description: String(e?.message || e), variant: "error" });
+            addToast({ title: t("eventModal.failedResize"), description: String(e?.message || e), variant: "error" });
         }
     };
     const remove = async () => {
         try {
-            if (!window.confirm("Delete this event?")) return;
+            if (!window.confirm(t("eventModal.confirmDelete"))) return;
             await calendarService.deleteEvent(event.id);
             onEventDeleted && onEventDeleted(event.id);
             onClose && onClose();
-            addToast({ title: "Event deleted", variant: "success" });
+            addToast({ title: t("eventModal.eventDeleted"), variant: "success" });
         } catch (e) {
             console.warn("Failed to delete event", e);
-            addToast({ title: "Failed to delete", description: String(e?.message || e), variant: "error" });
+            addToast({ title: t("eventModal.failedDelete"), description: String(e?.message || e), variant: "error" });
         }
     };
 
@@ -207,24 +209,24 @@ const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEv
                             {startStr}
                             {endStr ? ` - ${endStr}` : ""}
                         </div>
-                        <div className="mb-2 text-xs text-gray-400">Timezone: {timezone}</div>
+                        <div className="mb-2 text-xs text-gray-400">{t("eventModal.timezone")} {timezone}</div>
                         <div className="mb-4 text-gray-600">{event.description || ""}</div>
                         <div className="flex flex-wrap gap-2">
                             {event.taskId && (
-                                <button className="bg-blue-600 text-white px-3 py-1 rounded text-xs">View Task</button>
+                                <button className="bg-blue-600 text-white px-3 py-1 rounded text-xs">{t("eventModal.viewTask")}</button>
                             )}
                             <button
                                 className="bg-gray-200 text-gray-700 px-3 py-1 rounded text-xs"
                                 onClick={() => setIsEditing(true)}
                             >
-                                Edit
+                                {t("eventModal.edit")}
                             </button>
                             <button className="bg-red-500 text-white px-3 py-1 rounded text-xs" onClick={remove}>
-                                Delete
+                                {t("eventModal.delete")}
                             </button>
                             <div className="w-full h-px bg-gray-100 my-1"></div>
                             <div className="flex items-center gap-2">
-                                <span className="text-[11px] text-gray-500">Move:</span>
+                                <span className="text-[11px] text-gray-500">{t("eventModal.moveLabel")}</span>
                                 <button
                                     className="bg-slate-100 text-slate-700 px-2 py-1 rounded text-xs"
                                     onClick={() => shift(-30)}
@@ -240,7 +242,7 @@ const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEv
                             </div>
                             {event.end && (
                                 <div className="flex items-center gap-2">
-                                    <span className="text-[11px] text-gray-500">Resize:</span>
+                                    <span className="text-[11px] text-gray-500">{t("eventModal.resizeLabel")}</span>
                                     <button
                                         className="bg-slate-100 text-slate-700 px-2 py-1 rounded text-xs"
                                         onClick={() => resize(-30)}
@@ -259,9 +261,9 @@ const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEv
                     </>
                 ) : (
                     <>
-                        <h2 className="text-xl font-bold mb-3">Edit</h2>
+                        <h2 className="text-xl font-bold mb-3">{t("eventModal.editHeading")}</h2>
                         {/* Title */}
-                        <label className="block text-xs font-semibold text-slate-600 mb-1">Title*</label>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">{t("eventModal.titleField")}</label>
                         <input
                             type="text"
                             className="w-full border rounded px-2 py-1 mb-3"
@@ -273,7 +275,7 @@ const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEv
                         {/* Start/Key area Row */}
                                 <div className="grid grid-cols-3 gap-2 mb-3">
                             <div>
-                                <label className="block text-xs font-semibold text-slate-600 mb-1">Start Date*</label>
+                                <label className="block text-xs font-semibold text-slate-600 mb-1">{t("eventModal.startDateField")}</label>
                                 <input
                                     type="date"
                                     className="w-full border rounded px-2 py-1"
@@ -282,17 +284,17 @@ const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEv
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-semibold text-slate-600 mb-1">Start Time*</label>
+                                <label className="block text-xs font-semibold text-slate-600 mb-1">{t("eventModal.startTimeField")}</label>
                                 <TimePicker value={startTime} onChange={(v)=>setStartTime(v)} use24Hour={use24Hour} className="w-full" />
                             </div>
                             <div>
-                                <label className="block text-xs font-semibold text-slate-600 mb-1">Key area</label>
+                                <label className="block text-xs font-semibold text-slate-600 mb-1">{t("eventModal.keyAreaField")}</label>
                                 <select
                                     className="w-full border rounded px-2 py-1"
                                     value={keyAreaId}
                                     onChange={(e) => setKeyAreaId(e.target.value)}
                                 >
-                                    <option value="">None</option>
+                                    <option value="">{t("eventModal.noneOption")}</option>
                                     {keyAreas.map((ka, idx) => (
                                         <option key={ka.id} value={ka.id}>
                                             {formatKeyAreaLabel(ka, idx)}
@@ -305,7 +307,7 @@ const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEv
                         {/* End/Goal Row */}
                         <div className="grid grid-cols-3 gap-2 mb-3">
                             <div>
-                                <label className="block text-xs font-semibold text-slate-600 mb-1">End Date*</label>
+                                <label className="block text-xs font-semibold text-slate-600 mb-1">{t("eventModal.endDateField")}</label>
                                 <input
                                     type="date"
                                     className="w-full border rounded px-2 py-1"
@@ -314,17 +316,17 @@ const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEv
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-semibold text-slate-600 mb-1">End Time*</label>
+                                <label className="block text-xs font-semibold text-slate-600 mb-1">{t("eventModal.endTimeField")}</label>
                                 <TimePicker value={endTime} onChange={(v)=>setEndTime(v)} use24Hour={use24Hour} className="w-full" />
                             </div>
                             <div>
-                                <label className="block text-xs font-semibold text-slate-600 mb-1">Goal</label>
+                                <label className="block text-xs font-semibold text-slate-600 mb-1">{t("eventModal.goalField")}</label>
                                 <select
                                     className="w-full border rounded px-2 py-1"
                                     value={goalId}
                                     onChange={(e) => setGoalId(e.target.value)}
                                 >
-                                    <option value="">None</option>
+                                    <option value="">{t("eventModal.noneOption")}</option>
                                     {goals.map((g) => (
                                         <option key={g.id} value={g.id}>
                                             {g.title || g.name || g.text || g.id}
@@ -336,7 +338,7 @@ const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEv
 
                         {/* Priority (mapped to kind) */}
                         <div className="mb-3">
-                            <label className="block text-xs font-semibold text-slate-600 mb-1">Priority</label>
+                            <label className="block text-xs font-semibold text-slate-600 mb-1">{t("eventModal.priorityField")}</label>
                             <select
                                 className="w-full border rounded px-2 py-1"
                                 value={kind}
@@ -352,7 +354,7 @@ const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEv
 
                         {/* Notes */}
                         <div className="mb-3">
-                            <label className="block text-xs font-semibold text-slate-600 mb-1">Notes</label>
+                            <label className="block text-xs font-semibold text-slate-600 mb-1">{t("eventModal.notesField")}</label>
                             <textarea
                                 className="w-full border rounded px-2 py-1"
                                 rows={3}
@@ -371,7 +373,7 @@ const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEv
                                     onChange={(e) => setRecurring(e.target.checked)}
                                     disabled
                                 />
-                                ⟳ Make recurring (coming soon)
+                                {t("eventModal.makeRecurring")}
                             </label>
                         </div>
 
@@ -381,14 +383,14 @@ const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEv
                                 onClick={() => setIsEditing(false)}
                                 disabled={saving}
                             >
-                                Cancel
+                                {t("eventModal.cancel")}
                             </button>
                             <button
                                 className="px-3 py-1.5 rounded bg-blue-600 text-white disabled:opacity-50"
                                 onClick={onConfirm}
                                 disabled={saving}
                             >
-                                {saving ? "Saving..." : "Confirm"}
+                                {saving ? t("eventModal.saving") : t("eventModal.confirm")}
                             </button>
                         </div>
                     </>

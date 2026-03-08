@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FaUserCheck, FaTimes, FaHistory, FaCheck, FaBan } from 'react-icons/fa';
 import taskDelegationService from '../../services/taskDelegationService';
 import { useToast } from '../shared/ToastProvider.jsx';
@@ -19,6 +20,7 @@ export default function DelegatedTasksPanel({ onTaskClick }) {
     const [keyAreas, setKeyAreas] = useState([]);
     const [selectedKeyArea, setSelectedKeyArea] = useState('');
 
+    const { t } = useTranslation();
     const { addToast } = useToast ? useToast() : { addToast: () => {} };
 
     useEffect(() => {
@@ -33,7 +35,7 @@ export default function DelegatedTasksPanel({ onTaskClick }) {
         } catch (error) {
             console.error('Failed to load delegated tasks:', error);
             addToast({
-                title: 'Failed to load delegated tasks',
+                title: t('delegatedTasksPanel.failedLoadTasks'),
                 variant: 'error',
             });
         } finally {
@@ -49,7 +51,7 @@ export default function DelegatedTasksPanel({ onTaskClick }) {
         } catch (error) {
             console.error('Failed to load delegation history:', error);
             addToast({
-                title: 'Failed to load delegation history',
+                title: t('delegatedTasksPanel.failedLoadHistory'),
                 variant: 'error',
             });
         }
@@ -63,7 +65,7 @@ export default function DelegatedTasksPanel({ onTaskClick }) {
         } catch (error) {
             console.error('Failed to load key areas:', error);
             addToast({
-                title: 'Failed to load key areas',
+                title: t('delegatedTasksPanel.failedLoadKeyAreas'),
                 variant: 'error',
             });
         }
@@ -80,7 +82,7 @@ export default function DelegatedTasksPanel({ onTaskClick }) {
     const confirmAcceptDelegation = async () => {
         if (!selectedKeyArea) {
             addToast({
-                title: 'Please select a Key Area',
+                title: t('delegatedTasksPanel.pleaseSelectKeyArea'),
                 variant: 'error',
             });
             return;
@@ -104,8 +106,8 @@ export default function DelegatedTasksPanel({ onTaskClick }) {
             );
             
             addToast({
-                title: 'Task accepted successfully',
-                description: 'Task has been added to your selected Key Area',
+                title: t('delegatedTasksPanel.taskAccepted'),
+                description: t('delegatedTasksPanel.taskAddedToKeyArea'),
                 variant: 'success',
             });
             
@@ -115,8 +117,8 @@ export default function DelegatedTasksPanel({ onTaskClick }) {
         } catch (error) {
             console.error('Failed to accept delegation:', error);
             addToast({
-                title: 'Failed to accept delegation',
-                description: error.response?.data?.message || 'Please try again',
+                title: t('delegatedTasksPanel.failedAccept'),
+                description: error.response?.data?.message || t('delegatedTasksPanel.pleaseRetry'),
                 variant: 'error',
             });
         } finally {
@@ -140,14 +142,14 @@ export default function DelegatedTasksPanel({ onTaskClick }) {
             );
             
             addToast({
-                title: 'Task rejected successfully',
+                title: t('delegatedTasksPanel.taskRejected'),
                 variant: 'success',
             });
         } catch (error) {
             console.error('Failed to reject delegation:', error);
             addToast({
-                title: 'Failed to reject delegation',
-                description: error.response?.data?.message || 'Please try again',
+                title: t('delegatedTasksPanel.failedReject'),
+                description: error.response?.data?.message || t('delegatedTasksPanel.pleaseRetry'),
                 variant: 'error',
             });
         } finally {
@@ -167,11 +169,11 @@ export default function DelegatedTasksPanel({ onTaskClick }) {
                 <div className="flex items-center gap-2 mb-4">
                     <FaUserCheck className="text-blue-600" />
                     <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                        Delegated to Me
+                        {t('delegatedTasksPanel.delegatedToMe')}
                     </h2>
                 </div>
                 <div className="text-center text-gray-500 dark:text-gray-400">
-                    Loading delegated tasks...
+                    {t('delegatedTasksPanel.loading')}
                 </div>
             </div>
         );
@@ -185,7 +187,7 @@ export default function DelegatedTasksPanel({ onTaskClick }) {
                         <div className="flex items-center gap-2">
                             <FaUserCheck className="text-blue-600" />
                             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                                Delegated to Me
+                                {t('delegatedTasksPanel.delegatedToMe')}
                             </h2>
                             {delegatedTasks.length > 0 && (
                                 <span className="ml-2 px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
@@ -197,7 +199,7 @@ export default function DelegatedTasksPanel({ onTaskClick }) {
                             onClick={loadDelegatedTasks}
                             className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400"
                         >
-                            Refresh
+                            {t('delegatedTasksPanel.refresh')}
                         </button>
                     </div>
 
@@ -213,10 +215,10 @@ export default function DelegatedTasksPanel({ onTaskClick }) {
                                         : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
                                 }`}
                             >
-                                {status === 'pending' && `⏳ Pending (${delegatedTasks.filter(t => t.delegationStatus === 'pending').length})`}
-                                {status === 'accepted' && `✓ Accepted (${delegatedTasks.filter(t => t.delegationStatus === 'accepted').length})`}
-                                {status === 'rejected' && `✗ Rejected (${delegatedTasks.filter(t => t.delegationStatus === 'rejected').length})`}
-                                {status === 'all' && `All (${delegatedTasks.length})`}
+                                {status === 'pending' && t('delegatedTasksPanel.pending', { n: delegatedTasks.filter(task => task.delegationStatus === 'pending').length })}
+                                {status === 'accepted' && t('delegatedTasksPanel.accepted', { n: delegatedTasks.filter(task => task.delegationStatus === 'accepted').length })}
+                                {status === 'rejected' && t('delegatedTasksPanel.rejected', { n: delegatedTasks.filter(task => task.delegationStatus === 'rejected').length })}
+                                {status === 'all' && t('delegatedTasksPanel.all', { n: delegatedTasks.length })}
                             </button>
                         ))}
                     </div>
@@ -227,7 +229,7 @@ export default function DelegatedTasksPanel({ onTaskClick }) {
                         <div className="text-center py-8">
                             <FaUserCheck className="mx-auto text-4xl text-gray-300 dark:text-gray-600 mb-3" />
                             <p className="text-gray-500 dark:text-gray-400">
-                                {delegatedTasks.length === 0 ? 'No tasks delegated to you' : `No ${filterStatus} tasks`}
+                                {delegatedTasks.length === 0 ? t('delegatedTasksPanel.noTasksDelegated') : t('delegatedTasksPanel.noFilterTasks', { status: filterStatus })}
                             </p>
                         </div>
                     ) : (
@@ -251,7 +253,7 @@ export default function DelegatedTasksPanel({ onTaskClick }) {
                                             <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
                                                 {task.delegatedByUser && (
                                                     <div className="flex items-center gap-1">
-                                                        <span>Delegated by:</span>
+                                                        <span>{t('delegatedTasksPanel.delegatedBy')}</span>
                                                         <span className="font-medium">
                                                             {task.delegatedByUser.firstName} {task.delegatedByUser.lastName}
                                                         </span>
@@ -335,7 +337,7 @@ export default function DelegatedTasksPanel({ onTaskClick }) {
                             <div className="flex items-center gap-2">
                                 <FaHistory className="text-blue-600" />
                                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                                    Delegation History
+                                    {t('delegatedTasksPanel.delegationHistory')}
                                 </h2>
                             </div>
                             <button
@@ -361,7 +363,7 @@ export default function DelegatedTasksPanel({ onTaskClick }) {
 
                             {history.length === 0 ? (
                                 <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                                    No delegation history found
+                                    {t('delegatedTasksPanel.noHistoryFound')}
                                 </div>
                             ) : (
                                 <div className="space-y-3">
@@ -412,7 +414,7 @@ export default function DelegatedTasksPanel({ onTaskClick }) {
                             <div className="flex items-center gap-2">
                                 <FaCheck className="text-green-600" />
                                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                                    Accept Delegation
+                                    {t('delegatedTasksPanel.acceptDelegation')}
                                 </h2>
                             </div>
                             <button
@@ -431,7 +433,7 @@ export default function DelegatedTasksPanel({ onTaskClick }) {
                         <div className="p-4">
                             {acceptingTask && (
                                 <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg mb-4">
-                                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Task:</p>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">{t('delegatedTasksPanel.taskLabel')}</p>
                                     <p className="font-medium text-blue-900 dark:text-blue-100">
                                         {acceptingTask.title}
                                     </p>
@@ -440,10 +442,10 @@ export default function DelegatedTasksPanel({ onTaskClick }) {
 
                             <div className="mb-4">
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                    Select Key Area <span className="text-red-500">*</span>
+                                    {t('delegatedTasksPanel.selectKeyArea')} <span className="text-red-500">*</span>
                                 </label>
                                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                                    Choose which Key Area to add this task to
+                                    {t('delegatedTasksPanel.selectKeyAreaHint')}
                                 </p>
                                 <select
                                     value={selectedKeyArea}
@@ -452,7 +454,7 @@ export default function DelegatedTasksPanel({ onTaskClick }) {
                                              rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white
                                              focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 >
-                                    <option value="">-- Select a Key Area --</option>
+                                    <option value="">{t('delegatedTasksPanel.selectKeyAreaOption')}</option>
                                     {keyAreas.map((area, idx) => (
                                         <option key={area.id} value={area.id}>
                                             {formatKeyAreaLabel(area, idx)}
@@ -473,7 +475,7 @@ export default function DelegatedTasksPanel({ onTaskClick }) {
                                 className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 
                                          hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition"
                             >
-                                Cancel
+                                {t('delegatedTasksPanel.cancel')}
                             </button>
                             <button
                                 onClick={confirmAcceptDelegation}
@@ -481,7 +483,7 @@ export default function DelegatedTasksPanel({ onTaskClick }) {
                                 className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 
                                          rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                {respondingTaskId ? 'Accepting...' : 'Accept Task'}
+                                {respondingTaskId ? t('delegatedTasksPanel.accepting') : t('delegatedTasksPanel.acceptTask')}
                             </button>
                         </div>
                     </div>

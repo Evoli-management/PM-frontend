@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
+import { useTranslation } from 'react-i18next';
 import { FaEdit, FaTrash, FaPlus, FaTimes, FaImage } from "react-icons/fa";
 
 export function CultureAndValues({ showToast }) {
+  const { t } = useTranslation();
   const [values, setValues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -36,15 +38,15 @@ export function CultureAndValues({ showToast }) {
   };
 
   const handleDeleteValue = async (valueId) => {
-    if (!confirm("Are you sure you want to delete this value?")) return;
+    if (!confirm(t("cultureAndValues.confirmDelete"))) return;
 
     try {
       const cultureService = await import("../../services/cultureService");
       await cultureService.default.deleteValue(valueId);
-      showToast?.("Value deleted successfully");
+      showToast?.(t("cultureAndValues.deleteSuccess"));
       loadValues();
     } catch (e) {
-      showToast?.(e?.response?.data?.message || "Failed to delete value", "error");
+      showToast?.(e?.response?.data?.message || t("cultureAndValues.deleteValue"), "error");
     }
   };
 
@@ -52,33 +54,33 @@ export function CultureAndValues({ showToast }) {
     <div className="bg-white rounded-lg border border-gray-200">
       <div className="p-4 border-b flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold">Culture and Values</h3>
+          <h3 className="text-lg font-semibold">{t("cultureAndValues.title")}</h3>
           <p className="text-sm text-gray-600">
-            These values and behaviors are used in Recognition Cards
+            {t("cultureAndValues.description")}
           </p>
         </div>
         <button
           onClick={handleCreateValue}
           disabled={values.length >= 12}
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg text-sm"
-          title={values.length >= 12 ? "Maximum 12 values allowed" : "Add new value"}
+          title={values.length >= 12 ? t("cultureAndValues.maxBehaviorsTitle") : t("cultureAndValues.addBehaviorTitle")}
         >
-          Add new
+          {t("cultureAndValues.addNew")}
         </button>
       </div>
 
       {loading ? (
-        <div className="p-4 text-sm text-gray-600">Loading values...</div>
+        <div className="p-4 text-sm text-gray-600">{t("cultureAndValues.loading")}</div>
       ) : values.length === 0 ? (
         <div className="p-4 text-sm text-gray-600">
-          No values defined yet. Add your company's core values to get started.
+          {t("cultureAndValues.noValues")}
         </div>
       ) : (
         <div>
           {values.length >= 12 && (
             <div className="p-3 m-4 mb-0 bg-amber-50 border border-amber-200 rounded-lg">
               <p className="text-sm text-amber-800">
-                ⚠️ Maximum limit reached: You can have up to 12 culture values. Delete a value to add new ones.
+                {t("cultureAndValues.maxReached")}
               </p>
             </div>
           )}
@@ -104,7 +106,7 @@ export function CultureAndValues({ showToast }) {
                       {value.behaviors && value.behaviors.length > 0 && (
                         <div className="mt-2">
                           <p className="text-xs font-medium text-gray-700 mb-1">
-                            Describe behaviors:
+                            {t("cultureAndValues.describeBehaviors")}
                           </p>
                           <ul className="space-y-1">
                             {value.behaviors.map((behavior, idx) => (
@@ -121,14 +123,14 @@ export function CultureAndValues({ showToast }) {
                     <button
                       onClick={() => handleEditValue(value)}
                       className="p-2 text-blue-600 hover:bg-blue-50 rounded"
-                      title="Edit value"
+                      title={t("cultureAndValues.modalTitleEdit")}
                     >
                       <FaEdit />
                     </button>
                     <button
                       onClick={() => handleDeleteValue(value.id)}
                       className="p-2 text-red-600 hover:bg-red-50 rounded"
-                      title="Delete value"
+                      title={t("cultureAndValues.deleteValue")}
                     >
                       <FaTrash />
                     </button>
@@ -167,6 +169,7 @@ export function CultureAndValues({ showToast }) {
 }
 
 function ValueModal({ value, onClose, onSuccess, showToast }) {
+  const { t } = useTranslation();
   const isEdit = !!value;
   const [heading, setHeading] = useState(value?.heading || "");
   const [tooltip, setTooltip] = useState(value?.tooltip || "");
@@ -176,7 +179,7 @@ function ValueModal({ value, onClose, onSuccess, showToast }) {
 
   const handleAddBehavior = () => {
     if (behaviors.length >= 4) {
-      showToast?.("Maximum 4 behaviors allowed per value", "error");
+      showToast?.(t("cultureAndValues.maxBehaviors"), "error");
       return;
     }
     setBehaviors([...behaviors, { description: "" }]);
@@ -195,7 +198,7 @@ function ValueModal({ value, onClose, onSuccess, showToast }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!heading.trim()) {
-      showToast?.("Value heading is required", "error");
+      showToast?.(t("cultureAndValues.headingRequired"), "error");
       return;
     }
 
@@ -211,10 +214,10 @@ function ValueModal({ value, onClose, onSuccess, showToast }) {
 
       if (isEdit) {
         await cultureService.default.updateValue(value.id, data);
-        showToast?.("Value updated successfully");
+        showToast?.(t("cultureAndValues.updateSuccess"));
       } else {
         await cultureService.default.createValue(data);
-        showToast?.("Value created successfully");
+        showToast?.(t("cultureAndValues.createSuccess"));
       }
       onSuccess();
     } catch (e) {
@@ -234,7 +237,7 @@ function ValueModal({ value, onClose, onSuccess, showToast }) {
 
       <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg shadow-2xl max-w-3xl w-[min(1100px,90%)] overflow-visible flex flex-col z-10 p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">{isEdit ? "Edit Value" : "Add New Value"}</h3>
+          <h3 className="text-lg font-semibold">{isEdit ? t("cultureAndValues.modalTitleEdit") : t("cultureAndValues.modalTitleAdd")}</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <FaTimes />
           </button>
@@ -243,34 +246,34 @@ function ValueModal({ value, onClose, onSuccess, showToast }) {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Value Heading *
+              {t("cultureAndValues.valueHeading")}
             </label>
             <input
               type="text"
               value={heading}
               onChange={(e) => setHeading(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="e.g., Commitment, Responsibility, Loyalty"
+              placeholder={t("cultureAndValues.headingPlaceholder")}
               required
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Screen Tooltip / Description
+              {t("cultureAndValues.tooltipLabel")}
             </label>
             <input
               type="text"
               value={tooltip}
               onChange={(e) => setTooltip(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Short description shown as tooltip"
+              placeholder={t("cultureAndValues.tooltipPlaceholder")}
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Image URL <FaImage className="inline ml-1" />
+              {t("cultureAndValues.imageUrl")} <FaImage className="inline ml-1" />
             </label>
             <input
               type="url"
@@ -295,7 +298,7 @@ function ValueModal({ value, onClose, onSuccess, showToast }) {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Describe Behaviors
+              {t("cultureAndValues.describeBehaviorsLabel")}
             </label>
             <div className="space-y-2">
               {behaviors.map((behavior, index) => (
@@ -305,7 +308,7 @@ function ValueModal({ value, onClose, onSuccess, showToast }) {
                     value={behavior.description}
                     onChange={(e) => handleBehaviorChange(index, e.target.value)}
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="e.g., Committed to work, Putting your heart and mind on it"
+                    placeholder={t("cultureAndValues.behaviorPlaceholder")}
                   />
                   {behaviors.length > 1 && (
                     <button
@@ -324,9 +327,9 @@ function ValueModal({ value, onClose, onSuccess, showToast }) {
               onClick={handleAddBehavior}
               disabled={behaviors.length >= 4}
               className="mt-2 text-sm text-blue-600 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              title={behaviors.length >= 4 ? "Maximum 4 behaviors allowed" : "Add another behavior"}
+              title={behaviors.length >= 4 ? t("cultureAndValues.maxBehaviorsTitle") : t("cultureAndValues.addBehaviorTitle")}
             >
-              + Add another behavior {behaviors.length >= 4 && "(max 4)"}
+              {behaviors.length >= 4 ? t("cultureAndValues.addBehaviorMax") : t("cultureAndValues.addBehavior")}
             </button>
           </div>
 
@@ -336,14 +339,14 @@ function ValueModal({ value, onClose, onSuccess, showToast }) {
               onClick={onClose}
               className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
             >
-              Cancel
+              {t("cultureAndValues.cancel")}
             </button>
             <button
               type="submit"
               disabled={saving}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-lg"
             >
-              {saving ? "Saving..." : isEdit ? "Save Changes" : "Add Value"}
+              {saving ? t("cultureAndValues.saving") : isEdit ? t("cultureAndValues.saveChanges") : t("cultureAndValues.addValue")}
             </button>
           </div>
         </form>
