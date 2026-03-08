@@ -178,6 +178,22 @@ export const createGoal = async (goalData) => {
             cleanData.parentGoalId = goalData.parentGoalId;
         }
 
+        // Handle teamId
+        if (goalData.teamId) {
+            cleanData.teamId = goalData.teamId;
+        }
+
+        // Handle RACI members
+        if (goalData.responsible && Array.isArray(goalData.responsible) && goalData.responsible.length > 0) {
+            cleanData.responsible = goalData.responsible;
+        }
+        if (goalData.consulted && Array.isArray(goalData.consulted) && goalData.consulted.length > 0) {
+            cleanData.consulted = goalData.consulted;
+        }
+        if (goalData.informed && Array.isArray(goalData.informed) && goalData.informed.length > 0) {
+            cleanData.informed = goalData.informed;
+        }
+
         // Handle milestones - REQUIRED by backend
         if (goalData.milestones && Array.isArray(goalData.milestones) && goalData.milestones.length > 0) {
             cleanData.milestones = goalData.milestones
@@ -187,6 +203,8 @@ export const createGoal = async (goalData) => {
                     weight: parseFloat(m.weight) || 1.0,
                     startDate: m.startDate ? new Date(m.startDate).toISOString() : null,
                     dueDate: m.dueDate ? new Date(m.dueDate).toISOString() : null,
+                    target: m.target != null ? parseFloat(m.target) : undefined,
+                    performance: m.performance != null ? parseFloat(m.performance) : undefined,
                     // NOTE: 'done' property not allowed in create milestone DTO
                 }));
         } else {
@@ -571,6 +589,9 @@ export const updateGoal = async (goalId, updateData) => {
         if (updateData.parentGoalId !== undefined) {
             cleanUpdateData.parentGoalId = updateData.parentGoalId || null;
         }
+        if (updateData.teamId !== undefined) {
+            cleanUpdateData.teamId = updateData.teamId || null;
+        }
 
         // Progress field
         if (updateData.progressPercent !== undefined) {
@@ -734,5 +755,51 @@ export const bulkUpdateGoals = async (goalIds, updates) => {
         return response.data;
     } catch (error) {
         handleError("bulk updating goals", error);
+    }
+};
+
+/**
+ * Fetch RACI members for a goal.
+ * @param {string} goalId
+ * @returns {Promise<Array>} Array of { id, userId, role } entries
+ */
+export const getGoalRaci = async (goalId) => {
+    try {
+        const response = await apiClient.get(`/goals/${goalId}/raci`);
+        return response.data;
+    } catch (error) {
+        handleError(`fetching RACI for goal ${goalId}`, error);
+    }
+};
+
+/**
+ * Set members for a specific RACI role on a goal (full replace).
+ * @param {string} goalId
+ * @param {'responsible'|'consulted'|'informed'} role
+ * @param {string[]} memberIds - Array of user UUIDs
+ * @returns {Promise<Array>} Updated RACI entries for this role
+ */
+export const setGoalRaciRole = async (goalId, role, memberIds) => {
+    try {
+        const response = await apiClient.put(`/goals/${goalId}/raci/${role}`, {
+            members: memberIds,
+        });
+        return response.data;
+    } catch (error) {
+        handleError(`setting RACI role ${role} for goal ${goalId}`, error);
+    }
+};
+
+/**
+ * Fetch all goals for a team.
+ * @param {string} teamId
+ * @returns {Promise<Array>}
+ */
+export const getTeamGoals = async (teamId) => {
+    try {
+        const response = await apiClient.get(`/goals/team/${teamId}`);
+        return response.data;
+    } catch (error) {
+        handleError(`fetching goals for team ${teamId}`, error);
     }
 };
