@@ -66,6 +66,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
 
   const [raci, setRaci] = useState({ responsible: [], consulted: [], informed: [] });
   const [orgMembers, setOrgMembers] = useState([]);
+  const [userTeams, setUserTeams] = useState([]);
   const [availableGoals, setAvailableGoals] = useState([]);
   const [parentGoalSearch, setParentGoalSearch] = useState('');
   const [showParentGoalDropdown, setShowParentGoalDropdown] = useState(false);
@@ -89,6 +90,21 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
         const svc = mod.default || mod;
         const members = await svc.list();
         if (mounted) setOrgMembers(Array.isArray(members) ? members : []);
+      } catch { /* optional */ }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  // Load user's teams for Team Goal selector
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const mod = await import('../../services/teamsService');
+        const svc = mod.default || mod;
+        const result = await svc.getTeams();
+        const teams = Array.isArray(result) ? result : (result?.teams || result?.data || []);
+        if (mounted) setUserTeams(teams);
       } catch { /* optional */ }
     })();
     return () => { mounted = false; };
@@ -545,6 +561,27 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
                     <option value="medium">{t("goalForm.mediumOpt")}</option>
                     <option value="high">{t("goalForm.highOpt")}</option>
                   </select>
+                </div>
+
+                {/* Team Goal selector */}
+                <div>
+                  <label className="text-sm font-medium text-slate-700">
+                    Team Goal{" "}
+                    <span className="text-gray-400 font-normal text-xs">(optional)</span>
+                  </label>
+                  <select
+                    value={formData.teamId || ""}
+                    onChange={(e) => handleInputChange("teamId", e.target.value || null)}
+                    className="mt-0.5 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:border-purple-500 appearance-none"
+                  >
+                    <option value="">Personal goal (no team)</option>
+                    {userTeams.map((team) => (
+                      <option key={team.id} value={team.id}>{team.name}</option>
+                    ))}
+                  </select>
+                  {formData.teamId && (
+                    <p className="text-xs text-indigo-600 mt-0.5">This goal will be visible to the selected team.</p>
+                  )}
                 </div>
 
                 {/* Parent Goal Picker */}
