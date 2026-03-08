@@ -598,6 +598,14 @@ export const updateGoal = async (goalId, updateData) => {
             cleanUpdateData.progressPercent = Math.min(100, Math.max(0, Number(updateData.progressPercent)));
         }
 
+        // Priority and tags
+        if (updateData.priority !== undefined) {
+            cleanUpdateData.priority = updateData.priority;
+        }
+        if (updateData.tags !== undefined) {
+            cleanUpdateData.tags = updateData.tags;
+        }
+
         console.log("Sending clean data to backend:", cleanUpdateData);
 
         // Validate dates before sending

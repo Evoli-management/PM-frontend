@@ -110,14 +110,34 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
     return () => { mounted = false; };
   }, []);
 
-  // Load available goals for parent picker
+  // Load available goals for parent picker (own goals + team goals)
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        const { getGoals } = await import('../../services/goalService');
-        const list = await getGoals({ status: 'active' });
-        if (mounted) setAvailableGoals(Array.isArray(list) ? list : []);
+        const { getGoals, getTeamGoals } = await import('../../services/goalService');
+        const [ownList, teamsModule] = await Promise.all([
+          getGoals({ status: 'active' }),
+          import('../../services/teamsService'),
+        ]);
+        const own = Array.isArray(ownList) ? ownList : [];
+
+        // Also fetch team goals so personal goals can be linked to team goals
+        let teamGoalsList = [];
+        try {
+          const svc = teamsModule.default || teamsModule;
+          const teamsResult = await svc.getTeams();
+          const teams = Array.isArray(teamsResult) ? teamsResult : (teamsResult?.teams || teamsResult?.data || []);
+          const fetched = await Promise.all(teams.map((t) => getTeamGoals(t.id).catch(() => [])));
+          teamGoalsList = fetched.flat();
+        } catch { /* team goals optional */ }
+
+        // Merge, dedup by id
+        const merged = [...own];
+        const ownIds = new Set(own.map((g) => g.id));
+        teamGoalsList.forEach((g) => { if (!ownIds.has(g.id)) merged.push(g); });
+
+        if (mounted) setAvailableGoals(merged);
       } catch { /* optional */ }
     })();
     return () => { mounted = false; };
@@ -303,7 +323,18 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
       informed: raci.informed,
     };
     try {
-      await onGoalCreated(goalData);
+      const saved = await onGoalCreated(goalData);
+      // When editing, persist RACI changes separately via dedicated endpoints
+      if (isEditing && goal?.id) {
+        try {
+          const { setGoalRaciRole } = await import('../../services/goalService');
+          await Promise.all([
+            setGoalRaciRole(goal.id, 'responsible', raci.responsible),
+            setGoalRaciRole(goal.id, 'consulted', raci.consulted),
+            setGoalRaciRole(goal.id, 'informed', raci.informed),
+          ]);
+        } catch { /* RACI update non-fatal */ }
+      }
       onClose();
     } catch (err) {
       setErrors({ general: err.message || t("goalForm.errSave") });
