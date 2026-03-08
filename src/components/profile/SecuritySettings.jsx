@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Section, Toggle, PasswordField, LoadingButton } from './UIComponents';
 import securityService from '../../services/securityService';
 
 export const SecuritySettings = ({ showToast }) => {
+    const { t } = useTranslation();
     const [changeMode, setChangeMode] = useState(null); // 'password' | 'email' | null
     const [showPw, setShowPw] = useState({ old: false, new1: false, new2: false });
     const [isLoading, setIsLoading] = useState(false);
@@ -95,7 +97,7 @@ export const SecuritySettings = ({ showToast }) => {
             setLoginHistory(updatedHistory);
         } catch (error) {
             console.error('Failed to load security data:', error);
-            showToast('Failed to load security settings', 'error');
+            showToast(t('securitySettings.loadError'), 'error');
         } finally {
             setIsLoading(false);
             setLoginLoading(false);
@@ -155,10 +157,10 @@ export const SecuritySettings = ({ showToast }) => {
             setTwoFASecret(response.manualEntryKey || response.secret);
             setTwoFAQrCodeUrl(response.qrCodeUrl || null);
             setTwoFASetupMode("verify");
-            showToast('Scan the QR code with your authenticator app, then enter the code.');
+            showToast(t('securitySettings.scanToast'));
         } catch (error) {
             console.error('Failed to start 2FA setup:', error);
-            showToast('Failed to start 2FA setup', 'error');
+            showToast(t('securitySettings.startSetupError'), 'error');
         } finally {
             setIsLoading(false);
         }
@@ -167,7 +169,7 @@ export const SecuritySettings = ({ showToast }) => {
     const verifyTwoFACode = async () => {
         const code = twoFACodeInput.replace(/\s+/g, "");
         if (!code || code.length !== 6) {
-            showToast('Please enter a valid 6-digit code', 'error');
+            showToast(t('securitySettings.invalidCode'), 'error');
             return false;
         }
 
@@ -179,11 +181,11 @@ export const SecuritySettings = ({ showToast }) => {
             setBackupCodes(response.backupCodes || []);
             setCodeDigits(Array(6).fill(""));
             setTwoFACodeInput("");
-            showToast('Two-factor authentication enabled successfully!');
+            showToast(t('securitySettings.twoFaEnabledSuccess'));
             return true;
         } catch (error) {
             console.error('Failed to verify 2FA code:', error);
-            showToast('Invalid verification code. Please try again.', 'error');
+            showToast(t('securitySettings.verifyError'), 'error');
             return false;
         } finally {
             setIsLoading(false);
@@ -193,7 +195,7 @@ export const SecuritySettings = ({ showToast }) => {
     const disableTwoFA = async () => {
         const code = twoFADisableDigits.join('');
         if (!code || code.length !== 6) {
-            showToast('Please enter a valid 6-digit code', 'error');
+            showToast(t('securitySettings.invalidCode'), 'error');
             return;
         }
 
@@ -207,10 +209,10 @@ export const SecuritySettings = ({ showToast }) => {
             setTwoFACodeInput("");
             setTwoFADisableMode(false);
             setTwoFADisableDigits(Array(6).fill(""));
-            showToast('Two-factor authentication disabled successfully');
+            showToast(t('securitySettings.disableSuccess'));
         } catch (error) {
             console.error('Failed to disable 2FA:', error);
-            showToast('Failed to disable 2FA. Please check your code.', 'error');
+            showToast(t('securitySettings.disableError'), 'error');
         } finally {
             setIsLoading(false);
         }
@@ -218,7 +220,7 @@ export const SecuritySettings = ({ showToast }) => {
 
     const generateBackupCodes = async () => {
         if (!regenCodeInput.trim()) {
-            showToast('Please enter your current 2FA code to regenerate backup codes', 'error');
+            showToast(t('securitySettings.regenRequired'), 'error');
             return;
         }
         try {
@@ -228,10 +230,10 @@ export const SecuritySettings = ({ showToast }) => {
             setBackupCodesRemaining(response.backupCodes?.length || 0);
             setRegenCodeInput("");
             setShowRegenPrompt(false);
-            showToast('New backup codes generated. Save them somewhere safe!');
+            showToast(t('securitySettings.regenSuccess'));
         } catch (error) {
             console.error('Failed to generate backup codes:', error);
-            showToast('Invalid code. Please try again.', 'error');
+            showToast(t('securitySettings.regenError'), 'error');
         } finally {
             setIsLoading(false);
         }
@@ -259,7 +261,7 @@ export const SecuritySettings = ({ showToast }) => {
         try {
             if (navigator.clipboard && window.isSecureContext) {
                 await navigator.clipboard.writeText(text);
-                showToast('Backup codes copied to clipboard');
+                showToast(t('securitySettings.copySuccess'));
             } else {
                 // Fallback for older browsers
                 const textArea = document.createElement("textarea");
@@ -272,11 +274,11 @@ export const SecuritySettings = ({ showToast }) => {
                 textArea.select();
                 document.execCommand('copy');
                 textArea.remove();
-                showToast('Backup codes copied to clipboard');
+                showToast(t('securitySettings.copySuccess'));
             }
         } catch (err) {
             console.error('Failed to copy backup codes:', err);
-            showToast('Failed to copy backup codes', 'error');
+            showToast(t('securitySettings.copyError'), 'error');
         }
     };
 
@@ -289,17 +291,17 @@ export const SecuritySettings = ({ showToast }) => {
         const newErrors = {};
         
         if (!passwordDraft.current) {
-            newErrors.current = "Current password is required";
+            newErrors.current = t("securitySettings.currentPasswordRequired");
         }
-        
+
         if (!passwordDraft.next) {
-            newErrors.next = "New password is required";
+            newErrors.next = t("securitySettings.newPasswordRequired");
         } else if (passwordDraft.next.length < 8) {
-            newErrors.next = "Password must be at least 8 characters";
+            newErrors.next = t("securitySettings.passwordMinLength");
         }
-        
+
         if (passwordDraft.next !== passwordDraft.confirm) {
-            newErrors.confirm = "Passwords do not match";
+            newErrors.confirm = t("securitySettings.passwordsDoNotMatch");
         }
 
         setErrors(newErrors);
@@ -310,13 +312,13 @@ export const SecuritySettings = ({ showToast }) => {
         const newErrors = {};
         
         if (!emailDraft.current) {
-            newErrors.currentPassword = "Current password is required";
+            newErrors.currentPassword = t("securitySettings.currentPasswordForEmailRequired");
         }
-        
+
         if (!emailDraft.next) {
-            newErrors.newEmail = "New email is required";
+            newErrors.newEmail = t("securitySettings.newEmailRequired");
         } else if (!/\S+@\S+\.\S+/.test(emailDraft.next)) {
-            newErrors.newEmail = "Invalid email format";
+            newErrors.newEmail = t("securitySettings.invalidEmailFormat");
         }
 
         setErrors(newErrors);
@@ -335,10 +337,10 @@ export const SecuritySettings = ({ showToast }) => {
             
             setPasswordDraft({ current: "", next: "", confirm: "" });
             setChangeMode(null);
-            showToast('Password change verification email sent! Please check your email to confirm the change.');
+            showToast(t('securitySettings.passwordChangeSuccess'));
         } catch (error) {
             console.error('Failed to request password change:', error);
-            const errorMessage = error.response?.data?.message || 'Failed to request password change';
+            const errorMessage = error.response?.data?.message || t('securitySettings.passwordChangeError');
             showToast(errorMessage, 'error');
         } finally {
             setIsLoading(false);
@@ -358,10 +360,10 @@ export const SecuritySettings = ({ showToast }) => {
             setChangeMode(null);
             setEmailDraft({ current: "", next: "" });
             setErrors({});
-            showToast('Email change verification sent to your new email address! Please check and confirm.');
+            showToast(t('securitySettings.emailChangeSuccess'));
         } catch (error) {
             console.error('Failed to request email change:', error);
-            const errorMessage = error.response?.data?.message || 'Failed to request email change';
+            const errorMessage = error.response?.data?.message || t('securitySettings.emailChangeError');
             showToast(errorMessage, 'error');
         } finally {
             setIsLoading(false);
@@ -372,10 +374,10 @@ export const SecuritySettings = ({ showToast }) => {
         try {
             await securityService.revokeSession(sessionId);
             setLoginHistory(prev => prev.filter(session => session.id !== sessionId));
-            showToast('Session revoked successfully');
+            showToast(t('securitySettings.revokeSuccess'));
         } catch (error) {
             console.error('Failed to revoke session:', error);
-            showToast('Failed to revoke session', 'error');
+            showToast(t('securitySettings.revokeError'), 'error');
         }
     };
 
@@ -385,10 +387,10 @@ export const SecuritySettings = ({ showToast }) => {
             await securityService.logoutAllSessions();
             // Reload login history to reflect changes
             await loadSecurityData();
-            showToast('All sessions logged out successfully');
+            showToast(t('securitySettings.logoutAllSuccess'));
         } catch (error) {
             console.error('Failed to logout all sessions:', error);
-            showToast('Failed to logout all sessions', 'error');
+            showToast(t('securitySettings.logoutAllError'), 'error');
         } finally {
             setIsLoading(false);
             setShowLogoutModal(false);
@@ -412,35 +414,35 @@ export const SecuritySettings = ({ showToast }) => {
         <div className="space-y-6">
             {/* Two-Factor Authentication */}
             <Section
-                title="Two-Factor Authentication"
-                description="Add an extra layer of security using Google Authenticator, Microsoft Authenticator, or any TOTP app"
+                title={t("securitySettings.twoFaTitle")}
+                description={t("securitySettings.twoFaDesc")}
             >
                 {twoFAEnabled ? (
                     <div className="space-y-4">
                         <div className="flex items-center gap-2 text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm">
                             <span className="text-base">✅</span>
-                            <span className="font-medium">Two-factor authentication is enabled</span>
+                            <span className="font-medium">{t("securitySettings.twoFaEnabled")}</span>
                         </div>
 
                         {/* Backup codes info */}
                         <div className="text-sm text-gray-600">
-                            Backup codes remaining: <span className={backupCodesRemaining <= 2 ? "text-red-600 font-semibold" : "font-medium"}>{backupCodesRemaining}</span>
-                            {backupCodesRemaining <= 2 && <span className="text-red-600"> — generate new codes soon</span>}
+                            {t("securitySettings.backupCodesRemaining")} <span className={backupCodesRemaining <= 2 ? "text-red-600 font-semibold" : "font-medium"}>{backupCodesRemaining}</span>
+                            {backupCodesRemaining <= 2 && <span className="text-red-600"> {t("securitySettings.generateSoon")}</span>}
                         </div>
 
                         {/* Show newly generated backup codes */}
                         {backupCodes.length > 0 && (
                             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                                <p className="text-sm font-semibold text-yellow-800 mb-2">Save these backup codes — they won't be shown again:</p>
+                                <p className="text-sm font-semibold text-yellow-800 mb-2">{t("securitySettings.saveBackupCodes")}</p>
                                 <div className="grid grid-cols-3 gap-2 mb-3">
                                     {backupCodes.map((code, i) => (
                                         <code key={i} className="bg-white border border-yellow-300 rounded px-2 py-1 text-xs font-mono text-center tracking-widest">{code}</code>
                                     ))}
                                 </div>
                                 <div className="flex gap-2">
-                                    <button onClick={copyBackupCodes} className="text-xs px-3 py-1.5 bg-yellow-100 hover:bg-yellow-200 border border-yellow-300 rounded">Copy</button>
-                                    <button onClick={downloadBackupCodes} className="text-xs px-3 py-1.5 bg-yellow-100 hover:bg-yellow-200 border border-yellow-300 rounded">Download</button>
-                                    <button onClick={() => setBackupCodes([])} className="text-xs px-3 py-1.5 text-gray-500 hover:text-gray-700 underline ml-auto">Dismiss</button>
+                                    <button onClick={copyBackupCodes} className="text-xs px-3 py-1.5 bg-yellow-100 hover:bg-yellow-200 border border-yellow-300 rounded">{t("securitySettings.copy")}</button>
+                                    <button onClick={downloadBackupCodes} className="text-xs px-3 py-1.5 bg-yellow-100 hover:bg-yellow-200 border border-yellow-300 rounded">{t("securitySettings.download")}</button>
+                                    <button onClick={() => setBackupCodes([])} className="text-xs px-3 py-1.5 text-gray-500 hover:text-gray-700 underline ml-auto">{t("securitySettings.dismiss")}</button>
                                 </div>
                             </div>
                         )}
@@ -451,11 +453,11 @@ export const SecuritySettings = ({ showToast }) => {
                                 onClick={() => setShowRegenPrompt(true)}
                                 className="text-sm text-blue-600 hover:underline"
                             >
-                                Regenerate backup codes
+                                {t("securitySettings.regenerateCodes")}
                             </button>
                         ) : (
                             <div className="space-y-2">
-                                <p className="text-sm text-gray-600">Enter your current 2FA code to generate new backup codes:</p>
+                                <p className="text-sm text-gray-600">{t("securitySettings.enterCodeToRegen")}</p>
                                 <div className="flex gap-2">
                                     <input
                                         type="text"
@@ -467,8 +469,8 @@ export const SecuritySettings = ({ showToast }) => {
                                         className="w-32 border border-gray-300 rounded px-3 py-1.5 text-sm font-mono text-center tracking-widest"
                                         autoFocus
                                     />
-                                    <LoadingButton onClick={generateBackupCodes} loading={isLoading} variant="primary">Generate</LoadingButton>
-                                    <button onClick={() => { setShowRegenPrompt(false); setRegenCodeInput(""); }} className="text-sm text-gray-500 hover:text-gray-700 underline">Cancel</button>
+                                    <LoadingButton onClick={generateBackupCodes} loading={isLoading} variant="primary">{t("securitySettings.generate")}</LoadingButton>
+                                    <button onClick={() => { setShowRegenPrompt(false); setRegenCodeInput(""); }} className="text-sm text-gray-500 hover:text-gray-700 underline">{t("securitySettings.cancel")}</button>
                                 </div>
                             </div>
                         )}
@@ -479,11 +481,11 @@ export const SecuritySettings = ({ showToast }) => {
                                 onClick={() => setTwoFADisableMode(true)}
                                 className="text-sm text-red-600 hover:underline"
                             >
-                                Disable two-factor authentication
+                                {t("securitySettings.disableTwoFa")}
                             </button>
                         ) : (
                             <div className="space-y-3 border border-red-200 bg-red-50 rounded-lg p-4">
-                                <p className="text-sm font-medium text-red-800">Enter your 2FA code to confirm disabling:</p>
+                                <p className="text-sm font-medium text-red-800">{t("securitySettings.enterCodeToDisable")}</p>
                                 <div className="flex gap-1">
                                     {twoFADisableDigits.map((d, i) => (
                                         <input
@@ -510,8 +512,8 @@ export const SecuritySettings = ({ showToast }) => {
                                     ))}
                                 </div>
                                 <div className="flex gap-2">
-                                    <LoadingButton onClick={disableTwoFA} loading={isLoading} variant="danger">Disable 2FA</LoadingButton>
-                                    <button onClick={() => { setTwoFADisableMode(false); setTwoFADisableDigits(Array(6).fill("")); }} className="text-sm text-gray-500 hover:text-gray-700 underline">Cancel</button>
+                                    <LoadingButton onClick={disableTwoFA} loading={isLoading} variant="danger">{t("securitySettings.disable2fa")}</LoadingButton>
+                                    <button onClick={() => { setTwoFADisableMode(false); setTwoFADisableDigits(Array(6).fill("")); }} className="text-sm text-gray-500 hover:text-gray-700 underline">{t("securitySettings.cancel")}</button>
                                 </div>
                             </div>
                         )}
@@ -519,17 +521,17 @@ export const SecuritySettings = ({ showToast }) => {
                 ) : twoFASetupMode === "verify" ? (
                     <div className="space-y-4">
                         <p className="text-sm text-gray-600">
-                            Scan this QR code with <strong>Google Authenticator</strong>, <strong>Microsoft Authenticator</strong>, <strong>Authy</strong>, or any TOTP app:
+                            {t("securitySettings.scanInstructions")}
                         </p>
                         {twoFAQrCodeUrl && (
                             <img src={twoFAQrCodeUrl} alt="2FA QR Code" className="w-48 h-48 border border-gray-200 rounded-lg p-2 bg-white" />
                         )}
                         <div className="text-xs text-gray-500">
-                            <p>Can't scan? Enter this key manually:</p>
+                            <p>{t("securitySettings.cantScan")}</p>
                             <code className="block mt-1 bg-gray-100 px-3 py-2 rounded font-mono tracking-widest break-all">{twoFASecret}</code>
                         </div>
                         <div>
-                            <p className="text-sm font-medium text-gray-700 mb-2">Enter the 6-digit code from your app to confirm setup:</p>
+                            <p className="text-sm font-medium text-gray-700 mb-2">{t("securitySettings.confirmSetup")}</p>
                             <div className="flex gap-1 mb-3">
                                 {codeDigits.map((d, i) => (
                                     <input
@@ -557,8 +559,8 @@ export const SecuritySettings = ({ showToast }) => {
                                 ))}
                             </div>
                             <div className="flex gap-2">
-                                <LoadingButton onClick={verifyTwoFACode} loading={isLoading} variant="primary">Verify & Enable</LoadingButton>
-                                <button onClick={() => { setTwoFASetupMode(null); setCodeDigits(Array(6).fill("")); setTwoFACodeInput(""); }} className="text-sm text-gray-500 hover:text-gray-700 underline">Cancel</button>
+                                <LoadingButton onClick={verifyTwoFACode} loading={isLoading} variant="primary">{t("securitySettings.verifyEnable")}</LoadingButton>
+                                <button onClick={() => { setTwoFASetupMode(null); setCodeDigits(Array(6).fill("")); setTwoFACodeInput(""); }} className="text-sm text-gray-500 hover:text-gray-700 underline">{t("securitySettings.cancel")}</button>
                             </div>
                         </div>
                     </div>
@@ -566,34 +568,34 @@ export const SecuritySettings = ({ showToast }) => {
                     <div className="space-y-4">
                         <div className="flex items-center gap-2 text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm">
                             <span className="text-base">✅</span>
-                            <span className="font-medium">Two-factor authentication enabled successfully!</span>
+                            <span className="font-medium">{t("securitySettings.twoFaEnabledSuccess")}</span>
                         </div>
-                        <p className="text-sm font-semibold text-gray-800">Save these backup codes — they won't be shown again:</p>
+                        <p className="text-sm font-semibold text-gray-800">{t("securitySettings.saveBackupCodes")}</p>
                         <div className="grid grid-cols-3 gap-2">
                             {backupCodes.map((code, i) => (
                                 <code key={i} className="bg-gray-100 border border-gray-200 rounded px-2 py-1 text-xs font-mono text-center tracking-widest">{code}</code>
                             ))}
                         </div>
                         <div className="flex gap-2">
-                            <button onClick={copyBackupCodes} className="text-sm px-3 py-1.5 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded">Copy codes</button>
-                            <button onClick={downloadBackupCodes} className="text-sm px-3 py-1.5 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded">Download</button>
-                            <button onClick={() => { setTwoFASetupMode(null); setBackupCodes([]); }} className="text-sm px-3 py-1.5 bg-blue-600 text-white hover:bg-blue-700 rounded ml-auto">Done</button>
+                            <button onClick={copyBackupCodes} className="text-sm px-3 py-1.5 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded">{t("securitySettings.copyCodes")}</button>
+                            <button onClick={downloadBackupCodes} className="text-sm px-3 py-1.5 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded">{t("securitySettings.download")}</button>
+                            <button onClick={() => { setTwoFASetupMode(null); setBackupCodes([]); }} className="text-sm px-3 py-1.5 bg-blue-600 text-white hover:bg-blue-700 rounded ml-auto">{t("securitySettings.done")}</button>
                         </div>
                     </div>
                 ) : (
                     <div className="space-y-3">
-                        <p className="text-sm text-gray-600">Protect your account with a time-based one-time password from your phone. Works with Google Authenticator, Microsoft Authenticator, Authy, 1Password, and more.</p>
+                        <p className="text-sm text-gray-600">{t("securitySettings.enableDesc")}</p>
                         <LoadingButton onClick={startTwoFASetup} loading={isLoading} variant="primary">
-                            Enable Two-Factor Authentication
+                            {t("securitySettings.enableTwoFa")}
                         </LoadingButton>
                     </div>
                 )}
             </Section>
 
             {/* Password Change */}
-            <Section 
-                title="Password & Authentication" 
-                description="Manage your password and authentication settings"
+            <Section
+                title={t("securitySettings.passwordTitle")}
+                description={t("securitySettings.passwordDesc")}
             >
                 <div className="space-y-4">
                     {changeMode === 'password' ? (
@@ -603,7 +605,7 @@ export const SecuritySettings = ({ showToast }) => {
                                     <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                                     </svg>
-                                    Current Password
+                                    {t("securitySettings.currentPassword")}
                                 </label>
                                 <div className="relative">
                                     <input
@@ -611,7 +613,7 @@ export const SecuritySettings = ({ showToast }) => {
                                         value={passwordDraft.current}
                                         onChange={handlePasswordChange('current')}
                                         className="w-full px-2 py-1.5 text-sm border-b border-gray-200 bg-gray-50 focus:bg-white focus:border-gray-400 focus:outline-none pr-8"
-                                        placeholder="Current password"
+                                        placeholder={t("securitySettings.currentPasswordPlaceholder")}
                                     />
                                     <button
                                         type="button"
@@ -631,7 +633,7 @@ export const SecuritySettings = ({ showToast }) => {
                                     <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                                     </svg>
-                                    New Password
+                                    {t("securitySettings.newPassword")}
                                 </label>
                                 <div className="relative">
                                     <input
@@ -639,7 +641,7 @@ export const SecuritySettings = ({ showToast }) => {
                                         value={passwordDraft.next}
                                         onChange={handlePasswordChange('next')}
                                         className="w-full px-2 py-1.5 text-sm border-b border-gray-200 bg-gray-50 focus:bg-white focus:border-gray-400 focus:outline-none pr-8"
-                                        placeholder="New password"
+                                        placeholder={t("securitySettings.newPasswordPlaceholder")}
                                     />
                                     <button
                                         type="button"
@@ -659,7 +661,7 @@ export const SecuritySettings = ({ showToast }) => {
                                     <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
-                                    Confirm New Password
+                                    {t("securitySettings.confirmPassword")}
                                 </label>
                                 <div className="relative">
                                     <input
@@ -667,7 +669,7 @@ export const SecuritySettings = ({ showToast }) => {
                                         value={passwordDraft.confirm}
                                         onChange={handlePasswordChange('confirm')}
                                         className="w-full px-2 py-1.5 text-sm border-b border-gray-200 bg-gray-50 focus:bg-white focus:border-gray-400 focus:outline-none pr-8"
-                                        placeholder="Confirm new password"
+                                        placeholder={t("securitySettings.confirmPasswordPlaceholder")}
                                     />
                                     <button
                                         type="button"
@@ -688,7 +690,7 @@ export const SecuritySettings = ({ showToast }) => {
                                     loading={isLoading}
                                     variant="primary"
                                 >
-                                    Change Password
+                                    {t("securitySettings.changePassword")}
                                 </LoadingButton>
                                 <button
                                     onClick={() => {
@@ -699,7 +701,7 @@ export const SecuritySettings = ({ showToast }) => {
                                     className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50"
                                     disabled={isLoading}
                                 >
-                                    Cancel
+                                    {t("securitySettings.cancel")}
                                 </button>
                             </div>
                         </div>
@@ -708,16 +710,16 @@ export const SecuritySettings = ({ showToast }) => {
                             onClick={() => setChangeMode('password')}
                             className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
                         >
-                            Change Password
+                            {t("securitySettings.changePassword")}
                         </button>
                     )}
                 </div>
             </Section>
 
             {/* Email Change */}
-            <Section 
-                title="Email Address" 
-                description="Change your email address used for login"
+            <Section
+                title={t("securitySettings.emailTitle")}
+                description={t("securitySettings.emailDesc")}
             >
                 <div className="space-y-4">
                     {changeMode === 'email' ? (
@@ -727,14 +729,14 @@ export const SecuritySettings = ({ showToast }) => {
                                     <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                                     </svg>
-                                    Current Password
+                                    {t("securitySettings.currentPasswordForEmail")}
                                 </label>
                                 <input
                                     type="password"
                                     value={emailDraft.current}
                                     onChange={handleEmailChange('current')}
                                     className="w-full px-2 py-1.5 text-sm border-b border-gray-200 bg-gray-50 focus:bg-white focus:border-gray-400 focus:outline-none"
-                                    placeholder="Enter your current password"
+                                    placeholder={t("securitySettings.currentPasswordForEmailPlaceholder")}
                                 />
                                 {errors.currentPassword && (
                                     <p className="text-sm text-red-600 mt-1">{errors.currentPassword}</p>
@@ -746,14 +748,14 @@ export const SecuritySettings = ({ showToast }) => {
                                     <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                                     </svg>
-                                    New Email Address
+                                    {t("securitySettings.newEmail")}
                                 </label>
                                 <input
                                     type="email"
                                     value={emailDraft.next}
                                     onChange={handleEmailChange('next')}
                                     className="w-full px-2 py-1.5 text-sm border-b border-gray-200 bg-gray-50 focus:bg-white focus:border-gray-400 focus:outline-none"
-                                    placeholder="Enter your new email address"
+                                    placeholder={t("securitySettings.newEmailPlaceholder")}
                                 />
                                 {errors.newEmail && (
                                     <p className="text-sm text-red-600 mt-1">{errors.newEmail}</p>
@@ -766,7 +768,7 @@ export const SecuritySettings = ({ showToast }) => {
                                     loading={isLoading}
                                     variant="primary"
                                 >
-                                    Change Email
+                                    {t("securitySettings.changeEmail")}
                                 </LoadingButton>
                                 <button
                                     onClick={() => {
@@ -777,7 +779,7 @@ export const SecuritySettings = ({ showToast }) => {
                                     className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50"
                                     disabled={isLoading}
                                 >
-                                    Cancel
+                                    {t("securitySettings.cancel")}
                                 </button>
                             </div>
                         </div>
@@ -786,23 +788,23 @@ export const SecuritySettings = ({ showToast }) => {
                             onClick={() => setChangeMode('email')}
                             className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
                         >
-                            Change Email
+                            {t("securitySettings.changeEmail")}
                         </button>
                     )}
                 </div>
             </Section>
 
             {/* Login History */}
-            <Section 
-                title="Login History & Sessions" 
-                description="Manage your active sessions and view login history"
+            <Section
+                title={t("securitySettings.loginHistory")}
+                description={t("securitySettings.loginHistoryDesc")}
             >
                 <div className="space-y-4">
                     <div className="space-y-2">
                         {loginLoading ? (
-                            <div className="p-4 text-sm text-gray-600">Loading login history...</div>
+                            <div className="p-4 text-sm text-gray-600">{t("securitySettings.loadingHistory")}</div>
                         ) : loginHistory.length === 0 ? (
-                            <div className="p-4 text-sm text-gray-600">No login history or active sessions found.</div>
+                            <div className="p-4 text-sm text-gray-600">{t("securitySettings.noHistory")}</div>
                         ) : (
                             loginHistory.map((session) => (
                                 <div
@@ -814,7 +816,7 @@ export const SecuritySettings = ({ showToast }) => {
                                             <span className="text-sm font-medium">{session.device}</span>
                                             {session.current && (
                                                 <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
-                                                    Current
+                                                    {t("securitySettings.current")}
                                                 </span>
                                             )}
                                         </div>
@@ -827,7 +829,7 @@ export const SecuritySettings = ({ showToast }) => {
                                             onClick={() => revokeSession(session.id)}
                                             className="px-3 py-1 text-xs text-red-600 border border-red-300 rounded hover:bg-red-50"
                                         >
-                                            Revoke
+                                            {t("securitySettings.revoke")}
                                         </button>
                                     )}
                                 </div>
@@ -839,7 +841,7 @@ export const SecuritySettings = ({ showToast }) => {
                         onClick={() => setShowLogoutModal(true)}
                         className="px-4 py-2 text-sm text-red-600 border border-red-300 rounded hover:bg-red-50"
                     >
-                        Log out all sessions
+                        {t("securitySettings.logoutAll")}
                     </button>
                 </div>
             </Section>
@@ -851,9 +853,9 @@ export const SecuritySettings = ({ showToast }) => {
                         <div className="flex items-start gap-3">
                             <div className="text-2xl">🔒</div>
                             <div className="flex-1">
-                                <h3 className="text-lg font-semibold mb-2">Log out of all sessions?</h3>
+                                <h3 className="text-lg font-semibold mb-2">{t("securitySettings.logoutAllTitle")}</h3>
                                 <p className="text-sm text-gray-600 mb-4">
-                                    You will be signed out on all devices and need to log in again everywhere.
+                                    {t("securitySettings.logoutAllDesc")}
                                 </p>
                                 <div className="flex gap-2 justify-end">
                                     <button
@@ -861,14 +863,14 @@ export const SecuritySettings = ({ showToast }) => {
                                         className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50"
                                         disabled={isLoading}
                                     >
-                                        Cancel
+                                        {t("securitySettings.cancel")}
                                     </button>
                                     <LoadingButton
                                         onClick={handleLogoutAllSessions}
                                         loading={isLoading}
                                         variant="danger"
                                     >
-                                        Log Out All Sessions
+                                        {t("securitySettings.logoutAllBtn")}
                                     </LoadingButton>
                                 </div>
                             </div>

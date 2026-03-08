@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from 'react-i18next';
 import organizationService from "../../services/organizationService";
 
 export function OrganizationMembers({ showToast }) {
+  const { t } = useTranslation();
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -13,7 +15,7 @@ export function OrganizationMembers({ showToast }) {
         const rows = await organizationService.getOrganizationMembers();
         setMembers(rows);
       } catch (e) {
-        showToast?.(e?.response?.data?.message || e.message || "Failed to load members", "error");
+        showToast?.(e?.response?.data?.message || e.message || t("organizationMembers.loadError"), "error");
       } finally {
         setLoading(false);
       }
@@ -24,12 +26,12 @@ export function OrganizationMembers({ showToast }) {
   return (
     <div className="bg-white rounded-lg border border-gray-200">
       <div className="p-4 border-b">
-        <h3 className="text-lg font-semibold">Members</h3>
+        <h3 className="text-lg font-semibold">{t("organizationMembers.title")}</h3>
       </div>
       {loading ? (
-        <div className="p-4 text-sm text-gray-600">Loading...</div>
+        <div className="p-4 text-sm text-gray-600">{t("organizationMembers.loading")}</div>
       ) : members.length === 0 ? (
-        <div className="p-4 text-sm text-gray-600">No members found.</div>
+        <div className="p-4 text-sm text-gray-600">{t("organizationMembers.noMembers")}</div>
       ) : (
         <ul className="divide-y">
           {members.map((m) => (
