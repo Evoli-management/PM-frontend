@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from 'react-i18next';
 import { FaClock, FaCheckCircle, FaExclamationTriangle, FaRocket } from "react-icons/fa";
 
 /**
@@ -6,6 +7,7 @@ import { FaClock, FaCheckCircle, FaExclamationTriangle, FaRocket } from "react-i
  * Shows trial information and days remaining
  */
 export function TrialStatusBanner({ trial, canManage, onStartTrial }) {
+  const { t } = useTranslation();
   const [isStarting, setIsStarting] = useState(false);
 
   if (!trial) return null;
@@ -29,10 +31,10 @@ export function TrialStatusBanner({ trial, canManage, onStartTrial }) {
             <FaRocket className="text-green-600" size={20} />
             <div className="flex-1">
               <div className="font-semibold text-green-900">
-                Try Business Plan Free for 14 Days
+                {t("trialStatusBanner.tryBusiness")}
               </div>
               <div className="text-sm text-green-700">
-                Unlock 15 members and 3 teams with a free trial. No credit card required.
+                {t("trialStatusBanner.trialDesc")}
               </div>
             </div>
           </div>
@@ -41,7 +43,7 @@ export function TrialStatusBanner({ trial, canManage, onStartTrial }) {
             disabled={isStarting}
             className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white rounded-lg font-medium whitespace-nowrap"
           >
-            {isStarting ? 'Starting...' : 'Start Trial'}
+            {isStarting ? t("trialStatusBanner.starting") : t("trialStatusBanner.startTrial")}
           </button>
         </div>
       </div>
@@ -63,19 +65,19 @@ export function TrialStatusBanner({ trial, canManage, onStartTrial }) {
           <FaClock className={isWarning ? 'text-amber-600' : 'text-blue-600'} size={20} />
           <div className="flex-1">
             <div className={`font-semibold ${isWarning ? 'text-amber-900' : 'text-blue-900'}`}>
-              Trial Period Active
+              {t("trialStatusBanner.trialActive")}
             </div>
             <div className={`text-sm ${isWarning ? 'text-amber-700' : 'text-blue-700'}`}>
               {trial.daysRemaining === 0 ? (
-                <span>Your trial ends today!</span>
+                <span>{t("trialStatusBanner.trialEndsToday")}</span>
               ) : trial.daysRemaining === 1 ? (
-                <span>1 day remaining</span>
+                <span>{t("trialStatusBanner.trialDay1")}</span>
               ) : (
-                <span>{trial.daysRemaining} days remaining</span>
+                <span>{t("trialStatusBanner.trialDays", { days: trial.daysRemaining })}</span>
               )}
               {isWarning && (
                 <span className="ml-2">
-                  - Please upgrade or reduce to FREE plan limits before trial expires.
+                  {t("trialStatusBanner.upgradeWarning")}
                 </span>
               )}
             </div>
@@ -93,11 +95,10 @@ export function TrialStatusBanner({ trial, canManage, onStartTrial }) {
           <FaExclamationTriangle className="text-red-600" size={20} />
           <div className="flex-1">
             <div className="font-semibold text-red-900">
-              Trial Period Expired
+              {t("trialStatusBanner.trialExpired")}
             </div>
             <div className="text-sm text-red-700">
-              Your trial has ended. Please reduce to FREE plan limits (3 members, 1 team) to avoid automatic downgrade.
-              Remove excess members or teams before your account is downgraded.
+              {t("trialStatusBanner.trialExpiredDesc")}
             </div>
           </div>
         </div>
@@ -113,11 +114,10 @@ export function TrialStatusBanner({ trial, canManage, onStartTrial }) {
           <FaCheckCircle className="text-gray-600" size={20} />
           <div className="flex-1">
             <div className="font-semibold text-gray-900">
-              Account Downgraded
+              {t("trialStatusBanner.accountDowngraded")}
             </div>
             <div className="text-sm text-gray-700">
-              Your trial period ended and your account was downgraded to the FREE plan.
-              Upgrade to BUSINESS plan to access more features.
+              {t("trialStatusBanner.accountDowngradedDesc")}
             </div>
           </div>
         </div>

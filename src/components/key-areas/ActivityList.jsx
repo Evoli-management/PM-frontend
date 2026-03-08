@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import EmptyState from '../../components/goals/EmptyState.jsx';
 import ActivityRow from './ActivityRow';
 import { normalizeActivity, mapUiStatusToServer } from '../../utils/keyareasHelpers';
@@ -26,6 +27,7 @@ export default function ActivityList({
     users = [],
     currentUserId = null,
 }) {
+    const { t } = useTranslation();
     if (!task || !task.id) return null;
     const taskKey = String(task.id);
     const list = (activitiesByTask[taskKey] || []).slice();
@@ -54,11 +56,11 @@ export default function ActivityList({
                     });
                     const norm = normalizeActivity(updated || {});
                     setList((prev) => prev.map((a) => (a.id === id ? { ...a, ...norm } : a)));
-                    addToast && addToast({ title: 'Saved', variant: 'success' });
+                    addToast && addToast({ title: t('activityList.saved'), variant: 'success' });
                 } catch (err) {
                     console.error('Failed to update activity assignee', err);
                     setList(prevList);
-                    addToast && addToast({ title: 'Failed to update assignee', variant: 'error' });
+                    addToast && addToast({ title: t('activityList.failedUpdateAssignee'), variant: 'error' });
                 }
                 return;
             }
@@ -89,13 +91,13 @@ export default function ActivityList({
             // normalize & replace
             const norm = normalizeActivity(updated || {});
             setList((prev) => prev.map((a) => (a.id === id ? { ...a, ...norm } : a)));
-            addToast && addToast({ title: 'Saved', variant: 'success' });
+            addToast && addToast({ title: t('activityList.saved'), variant: 'success' });
         } catch (e) {
             // print server validation response when available
             // eslint-disable-next-line no-console
             console.error('Failed to update activity', e?.response?.data || e?.message || e);
             setList(prevList);
-            addToast && addToast({ title: 'Failed to update activity', variant: 'error' });
+            addToast && addToast({ title: t('activityList.failedUpdateActivity'), variant: 'error' });
         } finally {
             setSavingActivityIds((s) => {
                 const copy = new Set(s);
@@ -117,11 +119,11 @@ export default function ActivityList({
             const svc = await getActivityService();
             const item = next.find((a) => a.id === id);
             await svc.update(id, { completed: !!item.completed, completionDate: item.completed ? new Date().toISOString() : null });
-            addToast && addToast({ title: item.completed ? 'Marked completed' : 'Marked incomplete', variant: 'success' });
+            addToast && addToast({ title: item.completed ? t('activityList.markedCompleted') : t('activityList.markedIncomplete'), variant: 'success' });
         } catch (e) {
             console.error('Failed to update activity completion', e);
             setList(prev);
-            addToast && addToast({ title: 'Failed to update activity', variant: 'error' });
+            addToast && addToast({ title: t('activityList.failedUpdateActivity'), variant: 'error' });
         } finally {
             setSavingActivityIds((s) => {
                 const copy = new Set(s);
@@ -170,7 +172,7 @@ export default function ActivityList({
     return (
         <div className="space-y-2">
             {list.length === 0 ? (
-                <EmptyState title="No activities for this task yet." hint="Add a new activity below." />
+                <EmptyState title={t('activityList.emptyTitle')} hint={t('activityList.emptyHint')} />
             ) : (
                 <div>
                     {list.map((a, index) => (

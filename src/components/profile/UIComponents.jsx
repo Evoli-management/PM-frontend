@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from 'react-i18next';
 
 // Enhanced Toggle Component
 export const Toggle = ({ checked, onChange, disabled = false }) => (
@@ -74,18 +75,19 @@ export const PasswordField = ({ value, onChange, placeholder, open, toggle, erro
 );
 
 // Enhanced Field Component
-export const Field = ({ 
-    label, 
-    children, 
+export const Field = ({
+    label,
+    children,
     value,
     isEditing,
     onChange,
     type = "text",
     placeholder,
-    error, 
+    error,
     required = false,
     inline = false
 }) => {
+    const { t } = useTranslation();
     // If value, isEditing, onChange are provided, render input directly
     if (value !== undefined && isEditing !== undefined && onChange) {
         return (
@@ -111,7 +113,7 @@ export const Field = ({
                             />
                         ) : (
                             <p className="text-sm text-gray-900 font-medium">
-                                {value || "Not provided"}
+                                {value || t("uiComponents.notProvided")}
                             </p>
                         )}
                     </div>
@@ -136,7 +138,7 @@ export const Field = ({
                             />
                         ) : (
                             <p className="p-3 bg-gray-50 rounded-lg text-sm text-gray-900 min-h-[48px] flex items-center">
-                                {value || "Not provided"}
+                                {value || t("uiComponents.notProvided")}
                             </p>
                         )}
                     </>
@@ -197,14 +199,15 @@ export const Toast = ({ visible, message, type = 'success', onClose }) => {
 };
 
 // Loading Button Component
-export const LoadingButton = ({ 
-    children, 
-    loading = false, 
-    onClick, 
+export const LoadingButton = ({
+    children,
+    loading = false,
+    onClick,
     variant = 'primary',
     disabled = false,
-    ...props 
+    ...props
 }) => {
+    const { t } = useTranslation();
     const baseClasses = "px-4 py-2 text-sm font-medium rounded transition-colors";
     const variants = {
         primary: "bg-blue-600 hover:bg-blue-700 text-white",
@@ -224,7 +227,7 @@ export const LoadingButton = ({
             {loading ? (
                 <div className="flex items-center gap-2">
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    Loading...
+                    {t("uiComponents.loading")}
                 </div>
             ) : (
                 children

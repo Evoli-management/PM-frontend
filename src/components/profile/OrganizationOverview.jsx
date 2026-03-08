@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from "react";
+import { useTranslation } from 'react-i18next';
 import organizationService from "../../services/organizationService";
 import userProfileService from "../../services/userProfileService";
 
 export function OrganizationOverview({ onLeave, showToast, onTransferOwnership }) {
+  const { t } = useTranslation();
   const [org, setOrg] = useState(null);
   const [loading, setLoading] = useState(true);
   const [leaving, setLeaving] = useState(false);
@@ -42,26 +44,26 @@ export function OrganizationOverview({ onLeave, showToast, onTransferOwnership }
     setCreating(true);
     try {
       const res = await organizationService.createSelfOrganization();
-      showToast?.("Organization created successfully");
+      showToast?.(t("organizationOverview.createSuccess"));
       setOrg(res.organization);
     } catch (e) {
-      showToast?.(e?.response?.data?.message || e.message || "Failed to create organization", "error");
+      showToast?.(e?.response?.data?.message || e.message || t("organizationOverview.createError"), "error");
     } finally {
       setCreating(false);
     }
   };
 
   const handleLeave = async () => {
-    if (!confirm("Leave this organization and create your own?")) return;
+    if (!confirm(t("organizationOverview.confirmLeave"))) return;
     setLeaving(true);
     setLeaveError('');
     try {
       const res = await organizationService.leaveOrganization();
-      showToast?.("Left organization successfully");
+      showToast?.(t("organizationOverview.leaveSuccess"));
       onLeave?.(res.organization);
       setOrg(res.organization);
     } catch (e) {
-      const message = e?.response?.data?.message || e.message || "Failed to leave organization";
+      const message = e?.response?.data?.message || e.message || t("organizationOverview.leaveError");
       setLeaveError(message);
       showToast?.(message, "error");
     } finally {
@@ -71,17 +73,17 @@ export function OrganizationOverview({ onLeave, showToast, onTransferOwnership }
 
   const handleSaveName = async () => {
     if (!editingName || !editingName.trim()) {
-      showToast?.('Please enter a valid organization name', 'error');
+      showToast?.(t("organizationOverview.nameRequired"), 'error');
       return;
     }
     setSaving(true);
     try {
       await organizationService.updateOrganizationSettings({ name: editingName.trim() });
-      showToast?.('Organization name updated');
+      showToast?.(t("organizationOverview.nameUpdated"));
       const data = await organizationService.getCurrentOrganization();
       setOrg(data);
     } catch (e) {
-      const msg = e?.response?.data?.message || e.message || 'Failed to update organization name';
+      const msg = e?.response?.data?.message || e.message || t("organizationOverview.nameUpdateError");
       showToast?.(msg, 'error');
     } finally {
       setSaving(false);
@@ -90,20 +92,20 @@ export function OrganizationOverview({ onLeave, showToast, onTransferOwnership }
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg border border-gray-200 p-6">Loading organization...</div>
+      <div className="bg-white rounded-lg border border-gray-200 p-6">{t("organizationOverview.loading")}</div>
     );
   }
 
   if (!org) {
     return (
       <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <p className="text-gray-700 mb-4">You don't have an organization yet.</p>
+        <p className="text-gray-700 mb-4">{t("organizationOverview.noOrg")}</p>
         <button
           onClick={handleCreate}
           disabled={creating}
           className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-lg"
         >
-          {creating ? "Creating..." : "Create my organization"}
+          {creating ? t("organizationOverview.creating") : t("organizationOverview.createOrg")}
         </button>
       </div>
     );
@@ -122,7 +124,7 @@ export function OrganizationOverview({ onLeave, showToast, onTransferOwnership }
                   onClick={onTransferOwnership}
                   className="px-3 py-1.5 text-xs rounded bg-red-600 text-white hover:bg-red-700"
                 >
-                  Transfer ownership
+                  {t("organizationOverview.transferOwnership")}
                 </button>
               )}
               <button
@@ -130,7 +132,7 @@ export function OrganizationOverview({ onLeave, showToast, onTransferOwnership }
                 onClick={() => setLeaveError('')}
                 className="px-2 py-1 text-xs rounded border border-red-200 text-red-700 hover:bg-red-100"
               >
-                Dismiss
+                {t("organizationOverview.dismiss")}
               </button>
             </div>
           </div>
@@ -151,7 +153,7 @@ export function OrganizationOverview({ onLeave, showToast, onTransferOwnership }
                   disabled={saving}
                   className="px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-md"
                 >
-                  {saving ? 'Saving...' : 'Save'}
+                  {saving ? t("organizationOverview.saving") : t("organizationOverview.save")}
                 </button>
               </div>
             ) : (
@@ -165,7 +167,7 @@ export function OrganizationOverview({ onLeave, showToast, onTransferOwnership }
           disabled={leaving}
           className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white rounded-lg"
         >
-          {leaving ? "Leaving..." : "Leave Organization"}
+          {leaving ? t("organizationOverview.leaving") : t("organizationOverview.leaveOrg")}
         </button>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef } from "react";
+import { useTranslation } from 'react-i18next';
 import { useDraggable } from "../../hooks/useDraggable";
 import { useResizable } from "../../hooks/useResizable";
 import calendarService from "../../services/calendarService";
@@ -292,6 +293,8 @@ const buildRecurringPattern = ({
         // callback invoked after modal performs a delete (deleted id)
         onDeleted = null,
     }) => {
+
+    const { t } = useTranslation();
 
     // Derived flags and initial date values
     const isEdit = Boolean(event && (event.id || event.start || event.startAt || event.start_at));
@@ -645,7 +648,7 @@ const buildRecurringPattern = ({
         let submitKindLabel = "appointment";
         try {
             if (!title.trim()) {
-                addToast({ title: "Title required", variant: "error" });
+                addToast({ title: t("appointmentModal.titleRequired"), variant: "error" });
                 return;
             }
 
@@ -653,7 +656,7 @@ const buildRecurringPattern = ({
             const eRaw = combineDateTime(endDateStr, endTimeStr);
 
             if (!sRaw || !eRaw) {
-                addToast({ title: "Start & End required", variant: "error" });
+                addToast({ title: t("appointmentModal.startEndRequired"), variant: "error" });
                 return;
             }
 
@@ -667,7 +670,7 @@ const buildRecurringPattern = ({
                 : eRaw;
 
             if (s >= e) {
-                addToast({ title: "End must be after start", variant: "error" });
+                addToast({ title: t("appointmentModal.endAfterStart"), variant: "error" });
                 return;
             }
 
@@ -679,7 +682,7 @@ const buildRecurringPattern = ({
                 if (recurrenceEndType === "until") {
                     if (!recurrenceUntilDate) {
                         addToast({
-                            title: "Recurrence end date required",
+                            title: t("appointmentModal.recurrenceEndRequired"),
                             variant: "error",
                         });
                         return;
@@ -687,8 +690,7 @@ const buildRecurringPattern = ({
                     const untilDt = new Date(`${recurrenceUntilDate}T00:00:00`);
                     if (isNaN(untilDt.getTime()) || untilDt <= s) {
                         addToast({
-                            title:
-                                "Recurrence end must be after the appointment start date",
+                            title: t("appointmentModal.recurrenceEndAfterStart"),
                             variant: "error",
                         });
                         return;
@@ -698,7 +700,7 @@ const buildRecurringPattern = ({
                 if (recurrenceEndType === "count") {
                     if (!recurrenceCount || Number(recurrenceCount) <= 0) {
                         addToast({
-                            title: "Number of occurrences must be greater than 0",
+                            title: t("appointmentModal.occurrencesMustBePositive"),
                             variant: "error",
                         });
                         return;
@@ -1057,8 +1059,8 @@ const buildRecurringPattern = ({
                 >
                     <h3 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xl font-semibold text-slate-900">
                         {isEdit
-                            ? `Edit ${modalEntityLabel}`
-                            : `Create ${modalEntityLabel}`}
+                            ? t("appointmentModal.editTitle")
+                            : t("appointmentModal.createTitle")}
                     </h3>
                     <div className="flex items-center justify-end gap-2">
                         <button
@@ -1069,7 +1071,7 @@ const buildRecurringPattern = ({
                             onMouseDown={(e) => e.stopPropagation()}
                         >
                             <FaSave className="text-xs" />
-                            {saving ? "Saving..." : "Save"}
+                            {saving ? t("appointmentModal.saving") : t("appointmentModal.save")}
                         </button>
                         {isEdit ? (
                             <button
@@ -1109,7 +1111,7 @@ const buildRecurringPattern = ({
                             className="text-sm font-medium text-slate-700"
                             htmlFor="appointment-title"
                         >
-                            Title
+                            {t("appointmentModal.titleField")}
                         </label>
                         <input
                             id="appointment-title"
@@ -1128,7 +1130,7 @@ const buildRecurringPattern = ({
                         <div className="grid grid-rows-4 gap-0 md:col-span-1">
                             <div className="min-h-16">
                                 <label className="text-sm font-medium text-slate-700">
-                                    Start date
+                                    {t("appointmentModal.startDateField")}
                                 </label>
                                 <div className="relative mt-0">
                                     <input
@@ -1160,7 +1162,7 @@ const buildRecurringPattern = ({
 
                             <div className="min-h-16">
                                 <label className="text-sm font-medium text-slate-700">
-                                    End date
+                                    {t("appointmentModal.endDateField")}
                                 </label>
                                 <div className="relative mt-0">
                                     <input
@@ -1192,26 +1194,26 @@ const buildRecurringPattern = ({
 
                             <>
                                 <div className="min-h-16">
-                                    <label className="text-sm font-medium text-slate-700">Start time</label>
+                                    <label className="text-sm font-medium text-slate-700">{t("appointmentModal.startTimeField")}</label>
                                     <TimePicker
                                         value={startTimeStr}
                                         onChange={(v) => setStartTimeStr(v)}
                                         use24Hour={use24Hour}
                                         outerClassName="appointment-time-control mt-0 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50"
                                         innerClassName="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
-                                        label="Start time"
+                                        label={t("appointmentModal.startTimeField")}
                                     />
                                 </div>
 
                                 <div className="min-h-16">
-                                    <label className="text-sm font-medium text-slate-700">End time</label>
+                                    <label className="text-sm font-medium text-slate-700">{t("appointmentModal.endTimeField")}</label>
                                     <TimePicker
                                         value={endTimeStr}
                                         onChange={(v) => setEndTimeStr(v)}
                                         use24Hour={use24Hour}
                                         outerClassName="appointment-time-control mt-0 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50"
                                         innerClassName="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
-                                        label="End time"
+                                        label={t("appointmentModal.endTimeField")}
                                     />
                                 </div>
 
@@ -1227,12 +1229,12 @@ const buildRecurringPattern = ({
                         <div className="grid grid-rows-4 gap-0 md:col-span-1">
                             <div className="min-h-16">
                                 <label className="text-sm font-medium text-slate-700">
-                                    Description
+                                    {t("appointmentModal.descriptionField")}
                                 </label>
                                 <input
                                     name="description"
                                     className="mt-0 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500"
-                                    placeholder="Brief description"
+                                    placeholder={t("appointmentModal.briefDescription")}
                                     value={description}
                                     onChange={(e) => setDescription(e.target.value)}
                                 />
@@ -1240,7 +1242,7 @@ const buildRecurringPattern = ({
 
                             <div className="min-h-16">
                                 <label className="text-sm font-medium text-slate-700">
-                                    Key area
+                                    {t("appointmentModal.keyAreaField")}
                                 </label>
                                 <div className="relative mt-0">
                                     <select
@@ -1249,7 +1251,7 @@ const buildRecurringPattern = ({
                                         value={keyAreaId}
                                         onChange={(e) => setKeyAreaId(e.target.value)}
                                     >
-                                        <option value="">— No key area —</option>
+                                        <option value="">{t("appointmentModal.noKeyArea")}</option>
                                         {Array.isArray(keyAreas) && keyAreas.map((k, idx) => (
                                             <option key={k.id || k.keyAreaId || k._id} value={k.id || k.keyAreaId || k._id}>
                                                 {formatKeyAreaLabel(k, idx)}
@@ -1271,7 +1273,7 @@ const buildRecurringPattern = ({
 
                             <div className="min-h-16">
                                 <label className="text-sm font-medium text-slate-700">
-                                    Assignee
+                                    {t("appointmentModal.assigneeField")}
                                 </label>
                                 <div className="relative mt-0">
                                     <select
@@ -1280,7 +1282,7 @@ const buildRecurringPattern = ({
                                         value={assignee}
                                         onChange={(e) => setAssignee(e.target.value)}
                                     >
-                                        <option value="">— Unassigned —</option>
+                                        <option value="">{t("appointmentModal.unassigned")}</option>
                                         {Array.isArray(users) &&
                                             users.map((u) => (
                                                 <option
@@ -1306,7 +1308,7 @@ const buildRecurringPattern = ({
 
                             <div className="min-h-16">
                                 <label className="text-sm font-medium text-slate-700">
-                                    Link goal
+                                    {t("appointmentModal.linkGoalField")}
                                 </label>
                                 <div className="relative mt-0">
                                     <select
@@ -1315,7 +1317,7 @@ const buildRecurringPattern = ({
                                         value={goalId}
                                         onChange={(e) => setGoalId(e.target.value)}
                                     >
-                                        <option value="">— No goal —</option>
+                                        <option value="">{t("appointmentModal.noGoal")}</option>
                                         {Array.isArray(goals) && goals.map((g) => (
                                             <option key={g.id || g.goalId || g._id} value={g.id || g.goalId || g._id}>
                                                 {g.title || g.name || g.goalTitle || String(g.id)}
@@ -1346,7 +1348,7 @@ const buildRecurringPattern = ({
                             aria-expanded={showRecurrence}
                         >
                             <span aria-hidden className="text-sm">🔁</span>
-                            <span>Recurrence</span>
+                            <span>{t("appointmentModal.recurrenceField")}</span>
                         </button>
                         {showRecurrence && (
                             <div className="mt-3 border-t border-slate-200 pt-3">
@@ -1354,7 +1356,7 @@ const buildRecurringPattern = ({
                                     <div className="flex-1">
                                     <div className="flex items-center gap-3">
                                         <label className="text-sm font-medium text-slate-700">
-                                            Repeat
+                                            {t("appointmentModal.repeatField")}
                                         </label>
 
                                         <select
@@ -1365,11 +1367,11 @@ const buildRecurringPattern = ({
                                                 setRecurrenceTouched(true);
                                             }}
                                         >
-                                            <option value="none">Does not repeat</option>
-                                            <option value="daily">Daily</option>
-                                            <option value="weekly">Weekly</option>
-                                            <option value="monthly">Monthly</option>
-                                            <option value="yearly">Yearly</option>
+                                            <option value="none">{t("appointmentModal.doesNotRepeat")}</option>
+                                            <option value="daily">{t("appointmentModal.daily")}</option>
+                                            <option value="weekly">{t("appointmentModal.weekly")}</option>
+                                            <option value="monthly">{t("appointmentModal.monthly")}</option>
+                                            <option value="yearly">{t("appointmentModal.yearly")}</option>
                                         </select>
                                     </div>
 
@@ -1404,15 +1406,15 @@ const buildRecurringPattern = ({
                                             <div className="mt-2 flex flex-col gap-1">
                                                 <div className="flex items-center gap-2">
                                                     <label className="text-sm text-slate-700">
-                                                        Repeat appointment on day of month
+                                                        {t("appointmentModal.repeatDayOfMonth")}
                                                     </label>
 
                                                     <input
                                                         type="number"
                                                         min="1"
                                                         max="31"
-                                                        aria-label="Repeat appointment on day of month (1-31)"
-                                                        title="Enter a day number between 1 and 31. Use 31 to indicate the last day in some months if supported by backend."
+                                                        aria-label={t("appointmentModal.repeatDayOfMonth")}
+                                                        title={t("appointmentModal.repeatDayOfMonthHint")}
                                                         className="w-20 rounded-md border border-slate-300 px-2 py-1"
                                                             value={recurrenceMonthlyDay}
                                                             onChange={(e) => {
@@ -1425,7 +1427,7 @@ const buildRecurringPattern = ({
                                                 </div>
 
                                                 <p className="text-xs text-slate-500">
-                                                    Enter which day of the month this appointment should repeat on (1–31).
+                                                    {t("appointmentModal.repeatDayOfMonthHint")}
                                                 </p>
                                             </div>
                                         )}
@@ -1433,7 +1435,7 @@ const buildRecurringPattern = ({
                                         {recurrenceType === "yearly" && (
                                             <div className="mt-2 flex items-center gap-2">
                                                 <label className="text-sm text-slate-700">
-                                                    Month
+                                                    {t("appointmentModal.month")}
                                                 </label>
                                                 <select
                                                     className="rounded-md border border-slate-300 px-2 py-1"
@@ -1452,7 +1454,7 @@ const buildRecurringPattern = ({
                                                     ))}
                                                 </select>
                                                 <label className="text-sm text-slate-700">
-                                                    Day
+                                                    {t("appointmentModal.day")}
                                                 </label>
                                                 <input
                                                     type="number"
@@ -1473,7 +1475,7 @@ const buildRecurringPattern = ({
                                             {recurrenceType !== "none" && (
                                             <div className="mt-3 border-t border-slate-200 pt-3">
                                                 <label className="text-sm font-medium text-slate-700">
-                                                    Ends
+                                                    {t("appointmentModal.ends")}
                                                 </label>
                                                 <div className="mt-2 flex flex-wrap items-center gap-4">
                                                     <label className="inline-flex items-center gap-2 text-sm">
@@ -1489,7 +1491,7 @@ const buildRecurringPattern = ({
                                                                 setRecurrenceTouched(true);
                                                             }}
                                                         />
-                                                        <span>No end date</span>
+                                                        <span>{t("appointmentModal.noEndDate")}</span>
                                                     </label>
 
                                                     <label className="inline-flex items-center gap-2 text-sm flex-wrap">
@@ -1507,7 +1509,7 @@ const buildRecurringPattern = ({
                                                                 setRecurrenceTouched(true);
                                                             }}
                                                         />
-                                                        <span>End by</span>
+                                                        <span>{t("appointmentModal.endBy")}</span>
                                                         <div className="relative ml-2">
                                                             <input
                                                                 ref={recurrenceUntilRef}
@@ -1557,7 +1559,7 @@ const buildRecurringPattern = ({
                                                                 setRecurrenceTouched(true);
                                                             }}
                                                         />
-                                                        <span>End after</span>
+                                                        <span>{t("appointmentModal.endAfter")}</span>
                                                         <input
                                                             type="number"
                                                             min="1"
@@ -1574,7 +1576,7 @@ const buildRecurringPattern = ({
                                                                 setRecurrenceTouched(true);
                                                             }}
                                                         />
-                                                        <span>occurrences</span>
+                                                        <span>{t("appointmentModal.occurrences")}</span>
                                                     </label>
                                                 </div>
                                             </div>
@@ -1590,7 +1592,7 @@ const buildRecurringPattern = ({
                     {isRecurringInstance && (
                         <fieldset className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
                             <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                Apply changes to
+                                {t("appointmentModal.applyChangesTo")}
                             </legend>
                             <div className="mt-1 flex flex-col gap-1 text-sm text-slate-700">
                                 <label className="inline-flex items-center gap-2">
@@ -1601,7 +1603,7 @@ const buildRecurringPattern = ({
                                         checked={editScope === "occurrence"}
                                         onChange={(e) => setEditScope(e.target.value)}
                                     />
-                                    <span>Edit this occurrence only</span>
+                                    <span>{t("appointmentModal.editThisOnly")}</span>
                                 </label>
 
                                 <label className="inline-flex items-center gap-2">
@@ -1612,7 +1614,7 @@ const buildRecurringPattern = ({
                                         checked={editScope === "future"}
                                         onChange={(e) => setEditScope(e.target.value)}
                                     />
-                                    <span>Edit this and all future occurrences</span>
+                                    <span>{t("appointmentModal.editThisAndFuture")}</span>
                                 </label>
 
                                 <label className="inline-flex items-center gap-2">
@@ -1623,14 +1625,14 @@ const buildRecurringPattern = ({
                                         checked={editScope === "series"}
                                         onChange={(e) => setEditScope(e.target.value)}
                                     />
-                                    <span>Edit the entire series</span>
+                                    <span>{t("appointmentModal.editEntireSeries")}</span>
                                 </label>
                             </div>
                         </fieldset>
                     )}
                     {clientConflict ? (
                         <div className="mt-3 rounded-md border border-red-200 bg-red-50 p-3">
-                            <div className="font-semibold text-sm text-red-800">Conflicting appointment</div>
+                            <div className="font-semibold text-sm text-red-800">{t("appointmentModal.conflictingAppointment")}</div>
                             <div className="text-sm text-red-700 mt-1">
                                 <div><strong>{clientConflict.title || 'Untitled'}</strong></div>
                                 <div>{clientConflict.start ? new Date(clientConflict.start).toLocaleString() : ''} — {clientConflict.end ? new Date(clientConflict.end).toLocaleString() : ''}</div>
@@ -1642,7 +1644,7 @@ const buildRecurringPattern = ({
                                     className="rounded-md border border-slate-300 px-3 py-1 text-sm"
                                     onClick={() => setClientConflict(null)}
                                 >
-                                    Dismiss
+                                    {t("appointmentModal.dismiss")}
                                 </button>
                             </div>
                         </div>
@@ -1655,7 +1657,7 @@ const buildRecurringPattern = ({
                         <div className="flex w-full items-center justify-end gap-2">
                             <div className="flex items-center gap-2">
                                         <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-                                            <div className="font-semibold text-sm mb-2">Delete recurring appointment</div>
+                                            <div className="font-semibold text-sm mb-2">{t("appointmentModal.deleteRecurring")}</div>
                                             <div className="flex flex-col gap-2 text-sm">
                                                 <label className="inline-flex items-center gap-2">
                                                     <input
@@ -1665,7 +1667,7 @@ const buildRecurringPattern = ({
                                                         checked={deleteScopeChoice === 'occurrence'}
                                                         onChange={() => setDeleteScopeChoice('occurrence')}
                                                     />
-                                                    <span>Delete this occurrence only</span>
+                                                    <span>{t("appointmentModal.deleteThisOnly")}</span>
                                                 </label>
 
                                                 <label className="inline-flex items-center gap-2">
@@ -1676,7 +1678,7 @@ const buildRecurringPattern = ({
                                                         checked={deleteScopeChoice === 'future'}
                                                         onChange={() => setDeleteScopeChoice('future')}
                                                     />
-                                                    <span>Delete this and all future occurrences</span>
+                                                    <span>{t("appointmentModal.deleteThisAndFuture")}</span>
                                                 </label>
 
                                                 <label className="inline-flex items-center gap-2">
@@ -1687,7 +1689,7 @@ const buildRecurringPattern = ({
                                                         checked={deleteScopeChoice === 'series'}
                                                         onChange={() => setDeleteScopeChoice('series')}
                                                     />
-                                                    <span>Delete the entire series</span>
+                                                    <span>{t("appointmentModal.deleteEntireSeries")}</span>
                                                 </label>
 
                                                 <div className="mt-2 flex items-center gap-2">
@@ -1732,7 +1734,7 @@ const buildRecurringPattern = ({
                                                         }}
                                                         disabled={deleting}
                                                     >
-                                                        {deleting ? 'Deleting...' : 'Confirm delete'}
+                                                        {deleting ? t("appointmentModal.deleting") : t("appointmentModal.confirmDelete")}
                                                     </button>
                                                     <button
                                                         type="button"
@@ -1740,7 +1742,7 @@ const buildRecurringPattern = ({
                                                         onClick={() => setShowDeleteConfirm(false)}
                                                         disabled={deleting}
                                                     >
-                                                        Cancel
+                                                        {t("appointmentModal.cancel")}
                                                     </button>
                                                 </div>
                                             </div>

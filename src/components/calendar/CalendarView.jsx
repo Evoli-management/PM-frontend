@@ -1,8 +1,10 @@
 import React, { useState, useEffect, Suspense } from "react";
+import { useTranslation } from 'react-i18next';
 const CreateTaskModal = React.lazy(() => import("../key-areas/CreateTaskModal.jsx"));
 const CreateActivityModal = React.lazy(() => import("../modals/CreateActivityFormModal.jsx"));
 
 const CalendarView = () => {
+    const { t } = useTranslation();
     const [view, setView] = useState("monthly");
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [items, setItems] = useState(dummyItems);
@@ -46,7 +48,7 @@ const CalendarView = () => {
                     type="text"
                     value={elephantInput}
                     onChange={(e) => setElephantInput(e.target.value)}
-                    placeholder="Enter your elephant task..."
+                    placeholder={t("calendarView.elephantPlaceholder")}
                     className="flex-1 px-4 py-3 rounded-lg border border-sky-200 bg-white text-base focus:outline-none focus:ring-2 focus:ring-blue-300"
                 />
                 {elephantInput && (
@@ -54,7 +56,7 @@ const CalendarView = () => {
                         className="bg-sky-500 hover:bg-sky-600 text-white px-5 py-3 rounded-lg font-semibold transition-all duration-150 ml-2 shadow"
                         onClick={handleSaveElephant}
                     >
-                        {elephantTasks[dateKey] ? "Update" : "Save"}
+                        {elephantTasks[dateKey] ? t("calendarView.update") : t("calendarView.save")}
                     </button>
                 )}
                 {elephantTasks[dateKey] && (
@@ -112,7 +114,7 @@ const CalendarView = () => {
                         setModalItem(null);
                     }}
                 >
-                    Add Task
+                    {t("calendarView.addTask")}
                 </button>
                 <button
                     className="px-4 py-2 rounded-md bg-green-600 text-white font-semibold hover:bg-green-700"
@@ -122,7 +124,7 @@ const CalendarView = () => {
                         setModalItem({ attachedTaskId: "10aa745e-e823-45e0-b432-b0e03b6bee6e" });
                     }}
                 >
-                    Add Activity
+                    {t("calendarView.addActivity")}
                 </button>
             </div>
 

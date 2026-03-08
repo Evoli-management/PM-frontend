@@ -316,7 +316,7 @@
     "title": "Začnite",
     "subtitle": "Vnesite e-pošto za ustvarjanje novega računa",
     "emailLabel": "E-poštni naslov",
-    "sending": "Pošiljanje\u2026",
+    "sending": "Pošiljanje…",
     "submit": "Pošlji registracijsko povezavo",
     "or": "ali",
     "alreadyHave": "Že imate račun?",
@@ -327,7 +327,7 @@
     "privacyPolicy": "politiko zasebnosti"
   },
   "verifyEmailChange": {
-    "verifying": "Preverjanje spremembe e-pošte\u2026",
+    "verifying": "Preverjanje spremembe e-pošte…",
     "missingToken": "Manjkajoči žeton za preverjanje",
     "success": "E-poštni naslov je bil uspešno spremenjen! Prijavite se z novim e-poštnim naslovom.",
     "failed": "Preverjanje spremembe e-pošte ni uspelo",
@@ -338,9 +338,9 @@
     "goToLogin": "Na prijavo"
   },
   "verifyPasswordChange": {
-    "verifying": "Preverjanje spremembe gesla\u2026",
+    "verifying": "Preverjanje spremembe gesla…",
     "missingToken": "Manjkajoči žeton za preverjanje",
-    "success": "Geslo je bilo uspešno spremenjeno! Preusmerjanje na prijavo\u2026",
+    "success": "Geslo je bilo uspešno spremenjeno! Preusmerjanje na prijavo…",
     "failed": "Preverjanje spremembe gesla ni uspelo",
     "title": "Preverjanje spremembe gesla",
     "expiredHint": "Preverilna povezava je morda potekla ali že bila uporabljena.",
@@ -994,6 +994,9 @@
     "privacyPolicy": "Politika zasebnosti",
     "termsOfService": "Pogoji storitve",
     "copyright": "Avtorske pravice © {{year}} Evoli management d.o.o."
+  },
+  "dayPopup": {
+    "close": "Zapri"
   },
   "idleWarning": {
     "title": "Seja kmalu poteče",
@@ -2216,7 +2219,9 @@
     "edit": "Uredi",
     "delete": "Izbriši",
     "editAppointment": "Uredi sestanek",
-    "deleteAppointment": "Izbriši sestanek"
+    "deleteAppointment": "Izbriši sestanek",
+    "editEvent": "Uredi dogodek",
+    "deleteEvent": "Izbriši dogodek"
   },
   "debugEventModal": {
     "title": "DEBUG: EventModal Open"
@@ -2225,7 +2230,14 @@
     "title": "Primer integracije koledarja",
     "addTask": "📋 Dodaj nalogo",
     "addActivity": "⚡ Dodaj aktivnost",
-    "howToIntegrate": "🎯 Kako integrirati v vaš koledar"
+    "howToIntegrate": "🎯 Kako integrirati v vaš koledar",
+    "step1Label": "1. Uvozi modal:",
+    "step2Label": "2. Dodaj stanje:",
+    "step3Label": "3. Dodaj gumbe:",
+    "step4Label": "4. Obravnavaj dogodke:",
+    "addTaskTitle": "Dodaj nalogo",
+    "addActivityTitle": "Dodaj aktivnost",
+    "quickIntegrationCode": "📝 Hitra integracijska koda:"
   },
   "cultureAndValues": {
     "title": "Kultura in vrednote",
@@ -2460,7 +2472,9 @@
     "syncCompleted": "Sinhronizacija končana!",
     "syncFailed": "Sinhronizacija ni uspela",
     "googleConnected": "Google povezan! Sinhronizacija poteka…",
-    "microsoftConnected": "Microsoft povezan! Sinhronizacija poteka…"
+    "microsoftConnected": "Microsoft povezan! Sinhronizacija poteka…",
+    "googleDisconnected": "Google odklopljen",
+    "microsoftDisconnected": "Microsoft odklopljen"
   },
   "uiComponents": {
     "notProvided": "Ni navedeno",
@@ -2858,5 +2872,14 @@
       "save": "Shrani",
       "adminOnly": "Samo skrbniki lahko urejajo ključna področja uporabnikov"
     }
+  },
+  "activityList": {
+    "saved": "Shranjeno",
+    "failedUpdateAssignee": "Posodobitev odgovornega ni uspela",
+    "failedUpdateActivity": "Posodobitev aktivnosti ni uspela",
+    "markedCompleted": "Označeno kot dokončano",
+    "markedIncomplete": "Označeno kot nedokončano",
+    "emptyTitle": "Za to nalogo še ni aktivnosti.",
+    "emptyHint": "Dodajte novo aktivnost spodaj."
   }
 }

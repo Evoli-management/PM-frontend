@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Section, Field, Toggle, LoadingButton } from './UIComponents';
 import TimePicker from '../ui/TimePicker';
 import userPreferencesService from '../../services/userPreferencesService';
@@ -18,6 +19,7 @@ const normalizeTimeFormat = (value) => {
 
 // Searchable IANA timezone selector (in-component to avoid adding a new file)
 const IanaTimezoneSelect = ({ value, onChange }) => {
+    const { t } = useTranslation();
     const [query, setQuery] = React.useState('');
     const [zones, setZones] = React.useState([]);
     const [open, setOpen] = React.useState(false);
@@ -141,7 +143,7 @@ const IanaTimezoneSelect = ({ value, onChange }) => {
                 <input
                     ref={inputRef}
                     type="text"
-                    placeholder="Search timezone or type to detect"
+                    placeholder={t('preferences.searchTimezone')}
                     value={query}
                     onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
                     onFocus={() => setOpen(true)}
@@ -156,7 +158,7 @@ const IanaTimezoneSelect = ({ value, onChange }) => {
                     className="text-sm text-blue-600"
                     title={detected ? `Auto-detected: ${detected}` : 'Auto-detected timezone'}
                 >
-                    {detected ? `Auto (Detected: ${detected})` : 'Auto'}
+                    {detected ? t('preferences.autoDetected', { zone: detected }) : t('preferences.auto')}
                 </button>
             </div>
             {open && filtered && filtered.length > 0 && (
@@ -208,12 +210,13 @@ const SimpleToggle = ({ checked, onChange, disabled = false }) => (
 );
 
 export const Preferences = ({ showToast }) => {
+    const { t } = useTranslation();
     // Use calendar preferences hook to get current time format
-    const { 
-        preferences: calendarPrefs, 
-        use24Hour, 
+    const {
+        preferences: calendarPrefs,
+        use24Hour,
         loading: calendarLoading,
-        refreshPreferences 
+        refreshPreferences
     } = useCalendarPreferences();
 
     const [preferences, setPreferences] = useState({
@@ -353,7 +356,7 @@ export const Preferences = ({ showToast }) => {
                     setPreferences(prev => ({ ...prev, ...JSON.parse(saved) }));
                 }
             } catch (localError) {
-                showToast('Failed to load preferences', 'error');
+                showToast(t('preferences.loadError'), 'error');
             }
         } finally {
             setLoading(false);
@@ -429,7 +432,7 @@ export const Preferences = ({ showToast }) => {
                 const startMin = timeToMinutes(workStartTime24h);
                 const endMin = timeToMinutes(workEndTime24h);
                 if (!(startMin < endMin)) {
-                    showToast('Work start time must be before end time', 'error');
+                    showToast(t('preferences.startBeforeEnd'), 'error');
                     return;
                 }
             }
@@ -437,11 +440,11 @@ export const Preferences = ({ showToast }) => {
             // Validate time format before sending to API
             const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
             if (workStartTime24h && !timeRegex.test(workStartTime24h)) {
-                showToast('Work start time must be in HH:MM format', 'error');
+                showToast(t('preferences.startTimeFormat'), 'error');
                 return;
             }
             if (workEndTime24h && !timeRegex.test(workEndTime24h)) {
-                showToast('Work end time must be in HH:MM format', 'error');
+                showToast(t('preferences.endTimeFormat'), 'error');
                 return;
             }
 
@@ -561,11 +564,11 @@ export const Preferences = ({ showToast }) => {
             // backend schema. We keep it locally (applied via the effect above)
             // but do not send it to the API to avoid 400 validation errors.
             
-            showToast('Preferences saved successfully');
+            showToast(t('preferences.saveSuccess'));
         } catch (error) {
             console.error('Error saving preferences:', error);
             const apiMsg = error?.response?.data?.message;
-            const msg = Array.isArray(apiMsg) ? apiMsg.join(', ') : (apiMsg || 'Failed to save preferences');
+            const msg = Array.isArray(apiMsg) ? apiMsg.join(', ') : (apiMsg || t('preferences.saveError'));
             showToast(msg, 'error');
         } finally {
             setSaving(false);
@@ -729,10 +732,10 @@ export const Preferences = ({ showToast }) => {
                 ...defaultPreferences,
             }));
             
-            showToast('Preferences reset to defaults');
+            showToast(t('preferences.resetSuccess'));
         } catch (error) {
             console.error('Error resetting preferences:', error);
-            showToast('Failed to reset preferences', 'error');
+            showToast(t('preferences.resetError'), 'error');
         } finally {
             setSaving(false);
         }
@@ -749,12 +752,12 @@ export const Preferences = ({ showToast }) => {
     return (
         <div className="space-y-6">
             {/* Language & Region - MOVED TO FIRST */}
-            <Section 
-                title="Language & Region" 
-                description="Set your language, timezone, and format preferences"
+            <Section
+                title={t('preferences.languageRegion')}
+                description={t('preferences.languageRegionDesc')}
             >
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Field label="Language">
+                    <Field label={t('preferences.language')}>
                         <select
                             value={preferences.language}
                             onChange={(e) => updatePreference('language', e.target.value)}
@@ -765,21 +768,21 @@ export const Preferences = ({ showToast }) => {
                         </select>
                     </Field>
                     
-                    <Field label="Timezone">
+                    <Field label={t('preferences.timezone')}>
                         <IanaTimezoneSelect
                             value={preferences.timezone}
                             onChange={(val) => updatePreference('timezone', val)}
                         />
                     </Field>
                     
-                    <Field label="Date Format">
+                    <Field label={t('preferences.dateFormat')}>
                         <div>
                             <select
                                 value={preferences.dateFormat}
                                 onChange={(e) => updatePreference('dateFormat', e.target.value)}
                                 className="w-full px-2 py-1.5 text-sm border-b border-gray-200 bg-gray-50 focus:bg-white focus:border-gray-400 focus:outline-none"
                             >
-                                <option value="auto">Auto</option>
+                                <option value="auto">{t('preferences.dateFormatAuto')}</option>
                                 <option value="MM/dd/yyyy">MM/DD/YYYY</option>
                                 <option value="dd/MM/yyyy">DD/MM/YYYY</option>
                                 <option value="yyyy-MM-dd">YYYY-MM-DD</option>
@@ -789,26 +792,26 @@ export const Preferences = ({ showToast }) => {
                         </div>
                     </Field>
                     
-                    <Field label="Time Format">
+                    <Field label={t('preferences.timeFormat')}>
                         <select
                             value={preferences.timeFormat}
                             onChange={(e) => updatePreference('timeFormat', e.target.value)}
                             className="w-full px-2 py-1.5 text-sm border-b border-gray-200 bg-gray-50 focus:bg-white focus:border-gray-400 focus:outline-none"
                         >
-                            <option value="12h">12-Hour (AM/PM)</option>
-                            <option value="24h">24-Hour (00:00-23:59)</option>
+                            <option value="12h">{t('preferences.timeFormat12h')}</option>
+                            <option value="24h">{t('preferences.timeFormat24h')}</option>
                         </select>
                     </Field>
                 </div>
             </Section>
 
             {/* Work Hours Preferences - MOVED TO SECOND */}
-            <Section 
-                title="Work Hours Preferences" 
-                description="Set your preferred working hours. These hours will be used to customize calendar views to show only your working time."
+            <Section
+                title={t('preferences.workHours')}
+                description={t('preferences.workHoursDesc')}
             >
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Field label="Start Time">
+                    <Field label={t('preferences.startTime')}>
                         <TimePicker
                             value={preferences.workStartTime}
                             onChange={(value) => updatePreference('workStartTime', value)}
@@ -817,7 +820,7 @@ export const Preferences = ({ showToast }) => {
                             label="Work Start Time"
                         />
                     </Field>
-                    <Field label="End Time">
+                    <Field label={t('preferences.endTime')}>
                         <TimePicker
                             value={preferences.workEndTime}
                             onChange={(value) => updatePreference('workEndTime', value)}
@@ -833,10 +836,9 @@ export const Preferences = ({ showToast }) => {
                             <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                         </svg>
                         <div>
-                            <p className="text-sm font-medium text-blue-800">Calendar Integration</p>
+                            <p className="text-sm font-medium text-blue-800">{t('preferences.calendarIntegration')}</p>
                             <p className="text-sm text-blue-700 mt-1">
-                                Your working hours will automatically adjust the time range shown in daily and weekly calendar views. 
-                                Instead of showing all 24 hours, the calendar will focus on your working period for a cleaner, more relevant view.
+                                {t('preferences.calendarIntegrationDesc')}
                             </p>
                         </div>
                     </div>
@@ -844,26 +846,26 @@ export const Preferences = ({ showToast }) => {
             </Section>
             
             {/* PracticalManager Reminders - THIRD */}
-            <Section 
-                title="PracticalManager Reminders" 
-                description="Manage system-wide reminder notifications"
+            <Section
+                title={t('preferences.pmReminders')}
+                description={t('preferences.pmRemindersDesc')}
             >
                 <div className="space-y-4">
                     <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
                         <div className="flex-1">
-                            <h4 className="font-medium text-gray-800">PracticalManager Notifications</h4>
-                            <p className="text-sm text-gray-600 mt-1">System reminders and notifications</p>
+                            <h4 className="font-medium text-gray-800">{t('preferences.pmNotifications')}</h4>
+                            <p className="text-sm text-gray-600 mt-1">{t('preferences.pmNotificationsDesc')}</p>
                         </div>
                         <div className="flex items-center space-x-4">
                             <div className="text-center">
-                                <span className="text-xs text-gray-500 block mb-1">Email</span>
+                                <span className="text-xs text-gray-500 block mb-1">{t('preferences.email')}</span>
                                 <SimpleToggle
                                     checked={preferences.pmRemindersEmail}
                                     onChange={(checked) => updatePreference('pmRemindersEmail', checked)}
                                 />
                             </div>
                             <div className="text-center">
-                                <span className="text-xs text-gray-500 block mb-1">Desktop</span>
+                                <span className="text-xs text-gray-500 block mb-1">{t('preferences.desktop')}</span>
                                 <SimpleToggle
                                     checked={preferences.pmRemindersDesktop}
                                     onChange={(checked) => updatePreference('pmRemindersDesktop', checked)}
@@ -871,18 +873,18 @@ export const Preferences = ({ showToast }) => {
                             </div>
                         </div>
                     </div>
-                    <Field label="Reminder Timing">
+                    <Field label={t('preferences.reminderTiming')}>
                         <select
                             value={preferences.pmReminderTiming}
                             onChange={(e) => updatePreference('pmReminderTiming', e.target.value)}
                             className="w-full px-2 py-1.5 text-sm border-b border-gray-200 bg-gray-50 focus:bg-white focus:border-gray-400 focus:outline-none"
                         >
-                            <option value="5min">5 minutes before</option>
-                            <option value="15min">15 minutes before</option>
-                            <option value="30min">30 minutes before</option>
-                            <option value="1hour">1 hour before</option>
-                            <option value="2hours">2 hours before</option>
-                            <option value="1day">1 day before</option>
+                            <option value="5min">{t('preferences.min5')}</option>
+                            <option value="15min">{t('preferences.min15')}</option>
+                            <option value="30min">{t('preferences.min30')}</option>
+                            <option value="1hour">{t('preferences.hour1')}</option>
+                            <option value="2hours">{t('preferences.hours2')}</option>
+                            <option value="1day">{t('preferences.day1')}</option>
                         </select>
                     </Field>
                     <div className="flex items-center justify-end mt-2">
@@ -894,38 +896,38 @@ export const Preferences = ({ showToast }) => {
                                     await rm.testNotification();
                                 } catch (e) {
                                     console.error('Test notification failed', e);
-                                    showToast('Test notification failed', 'error');
+                                    showToast(t('preferences.testNotification') + ' failed', 'error');
                                 }
                             }}
                             className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-sm rounded"
                         >
-                            Test Notification
+                            {t('preferences.testNotification')}
                         </button>
                     </div>
                 </div>
             </Section>
             
             {/* Goal Reminders - FOURTH */}
-            <Section 
-                title="Goal Reminders" 
-                description="Configure goal-related reminder notifications"
+            <Section
+                title={t('preferences.goalReminders')}
+                description={t('preferences.goalRemindersDesc')}
             >
                 <div className="space-y-4">
                     <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
                         <div className="flex-1">
-                            <h4 className="font-medium text-gray-800">Goal Reminder Notifications</h4>
-                            <p className="text-sm text-gray-600 mt-1">Reminders for goals and deadlines</p>
+                            <h4 className="font-medium text-gray-800">{t('preferences.goalNotifications')}</h4>
+                            <p className="text-sm text-gray-600 mt-1">{t('preferences.goalNotificationsDesc')}</p>
                         </div>
                         <div className="flex items-center space-x-4">
                             <div className="text-center">
-                                <span className="text-xs text-gray-500 block mb-1">Email</span>
+                                <span className="text-xs text-gray-500 block mb-1">{t('preferences.email')}</span>
                                 <SimpleToggle
                                     checked={preferences.goalRemindersEmail}
                                     onChange={(checked) => updatePreference('goalRemindersEmail', checked)}
                                 />
                             </div>
                             <div className="text-center">
-                                <span className="text-xs text-gray-500 block mb-1">Desktop</span>
+                                <span className="text-xs text-gray-500 block mb-1">{t('preferences.desktop')}</span>
                                 <SimpleToggle
                                     checked={preferences.goalRemindersDesktop}
                                     onChange={(checked) => updatePreference('goalRemindersDesktop', checked)}
@@ -933,60 +935,60 @@ export const Preferences = ({ showToast }) => {
                             </div>
                         </div>
                     </div>
-                    <Field label="Reminder Timing">
+                    <Field label={t('preferences.reminderTiming')}>
                         <select
                             value={preferences.goalReminderTiming}
                             onChange={(e) => updatePreference('goalReminderTiming', e.target.value)}
                             className="w-full px-2 py-1.5 text-sm border-b border-gray-200 bg-gray-50 focus:bg-white focus:border-gray-400 focus:outline-none"
                         >
-                            <option value="5min">5 minutes before</option>
-                            <option value="15min">15 minutes before</option>
-                            <option value="30min">30 minutes before</option>
-                            <option value="1hour">1 hour before</option>
-                            <option value="2hours">2 hours before</option>
-                            <option value="1day">1 day before</option>
+                            <option value="5min">{t('preferences.min5')}</option>
+                            <option value="15min">{t('preferences.min15')}</option>
+                            <option value="30min">{t('preferences.min30')}</option>
+                            <option value="1hour">{t('preferences.hour1')}</option>
+                            <option value="2hours">{t('preferences.hours2')}</option>
+                            <option value="1day">{t('preferences.day1')}</option>
                         </select>
                     </Field>
                 </div>
             </Section>
 
             {/* Theme & Display - FIFTH (was SIXTH) */}
-            <Section 
-                title="Theme & Display" 
-                description="Customize the appearance of your workspace"
+            <Section
+                title={t('preferences.themeDisplay')}
+                description={t('preferences.themeDisplayDesc')}
             >
                 <div className="space-y-4">
-                    <Field label="Theme">
+                    <Field label={t('preferences.theme')}>
                         <select
                             value={preferences.theme}
                             onChange={(e) => updatePreference('theme', e.target.value)}
                             className="w-full px-2 py-1.5 text-sm border-b border-gray-200 bg-gray-50 focus:bg-white focus:border-gray-400 focus:outline-none"
                         >
-                            <option value="light">Light</option>
-                            <option value="dark">Dark</option>
-                            <option value="auto">Auto (System)</option>
+                            <option value="light">{t('preferences.themeLight')}</option>
+                            <option value="dark">{t('preferences.themeDark')}</option>
+                            <option value="auto">{t('preferences.themeAuto')}</option>
                         </select>
                     </Field>
                 </div>
             </Section>
             
             {/* Reminders Health Check */}
-            <Section 
-                title="Reminders & Notifications" 
-                description="Manage your reminders and test notification settings"
+            <Section
+                title={t('preferences.remindersTitle')}
+                description={t('preferences.remindersDesc')}
             >
                 <div className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Field label="Total Reminders">
+                        <Field label={t('preferences.totalReminders')}>
                             <RemindersHealthCheck />
                         </Field>
                         
-                        <Field label="Notification Settings">
+                        <Field label={t('preferences.notificationSettings')}>
                             <button
                                 onClick={() => setShowRemindersModal(true)}
                                 className="w-full px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg font-medium transition-colors"
                             >
-                                View & Manage Reminders
+                                {t('preferences.viewReminders')}
                             </button>
                         </Field>
                     </div>
@@ -999,15 +1001,15 @@ export const Preferences = ({ showToast }) => {
                     onClick={resetToDefaults}
                     className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium transition-colors duration-200"
                 >
-                    Reset to Defaults
+                    {t('preferences.resetDefaults')}
                 </button>
-                
+
                 <LoadingButton
                     onClick={savePreferences}
                     loading={saving}
                     className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors duration-200"
                 >
-                    Save Preferences
+                    {t('preferences.savePreferences')}
                 </LoadingButton>
             </div>
             
@@ -1019,6 +1021,7 @@ export const Preferences = ({ showToast }) => {
 
 // Reminders Health Check Component
 function RemindersHealthCheck() {
+    const { t } = useTranslation();
     const [remindersCount, setRemindersCount] = useState(0);
     const [pendingCount, setPendingCount] = useState(0);
     const [loading, setLoading] = useState(true);

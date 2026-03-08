@@ -317,7 +317,7 @@
     "title": "Get Started",
     "subtitle": "Enter your email to create a new account",
     "emailLabel": "Email address",
-    "sending": "Sending\u2026",
+    "sending": "Sending…",
     "submit": "Send Registration Link",
     "or": "or",
     "alreadyHave": "Already have an account?",
@@ -328,7 +328,7 @@
     "privacyPolicy": "Privacy Policy"
   },
   "verifyEmailChange": {
-    "verifying": "Verifying email change\u2026",
+    "verifying": "Verifying email change…",
     "missingToken": "Missing verification token",
     "success": "Email address changed successfully! Please log in with your new email address.",
     "failed": "Email change verification failed",
@@ -339,9 +339,9 @@
     "goToLogin": "Go to Login"
   },
   "verifyPasswordChange": {
-    "verifying": "Verifying password change\u2026",
+    "verifying": "Verifying password change…",
     "missingToken": "Missing verification token",
-    "success": "Password changed successfully! Redirecting to login\u2026",
+    "success": "Password changed successfully! Redirecting to login…",
     "failed": "Password change verification failed",
     "title": "Password Change Verification",
     "expiredHint": "The verification link may have expired or already been used.",
@@ -995,6 +995,9 @@
     "privacyPolicy": "Privacy policy",
     "termsOfService": "Terms of service",
     "copyright": "Copyright © {{year}} Evoli management d.o.o."
+  },
+  "dayPopup": {
+    "close": "Close"
   },
   "idleWarning": {
     "title": "Session Expiring Soon",
@@ -2217,7 +2220,9 @@
     "edit": "Edit",
     "delete": "Delete",
     "editAppointment": "Edit appointment",
-    "deleteAppointment": "Delete appointment"
+    "deleteAppointment": "Delete appointment",
+    "editEvent": "Edit event",
+    "deleteEvent": "Delete event"
   },
   "debugEventModal": {
     "title": "DEBUG: EventModal Open"
@@ -2226,7 +2231,14 @@
     "title": "Calendar Integration Example",
     "addTask": "📋 Add Task",
     "addActivity": "⚡ Add Activity",
-    "howToIntegrate": "🎯 How to Integrate into Your Calendar"
+    "howToIntegrate": "🎯 How to Integrate into Your Calendar",
+    "step1Label": "1. Import the Modal:",
+    "step2Label": "2. Add State:",
+    "step3Label": "3. Add Buttons:",
+    "step4Label": "4. Handle Events:",
+    "addTaskTitle": "Add Task",
+    "addActivityTitle": "Add Activity",
+    "quickIntegrationCode": "📝 Quick Integration Code:"
   },
   "cultureAndValues": {
     "title": "Culture and Values",
@@ -2464,7 +2476,9 @@
     "syncCompleted": "Sync completed!",
     "syncFailed": "Sync failed",
     "googleConnected": "Google connected! Syncing now…",
-    "microsoftConnected": "Microsoft connected! Syncing now…"
+    "microsoftConnected": "Microsoft connected! Syncing now…",
+    "googleDisconnected": "Google disconnected",
+    "microsoftDisconnected": "Microsoft disconnected"
   },
   "uiComponents": {
     "notProvided": "Not provided",
@@ -2862,5 +2876,14 @@
       "save": "Save",
       "adminOnly": "Only admins can edit user key areas"
     }
+  },
+  "activityList": {
+    "saved": "Saved",
+    "failedUpdateAssignee": "Failed to update assignee",
+    "failedUpdateActivity": "Failed to update activity",
+    "markedCompleted": "Marked completed",
+    "markedIncomplete": "Marked incomplete",
+    "emptyTitle": "No activities for this task yet.",
+    "emptyHint": "Add a new activity below."
   }
 }

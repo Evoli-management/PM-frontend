@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { FaEdit, FaTrash, FaPlus, FaTimes, FaKey } from "react-icons/fa";
+import { useTranslation } from 'react-i18next';
 import userProfileService from "../../services/userProfileService";
 import { TeamLeadModal } from "./TeamLeadModal";
 
 export function ManageTeams({ showToast }) {
+  const { t } = useTranslation();
   const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -52,7 +54,7 @@ export function ManageTeams({ showToast }) {
     } catch (e) {
       const errorMsg = e?.response?.data?.message || "";
       if (errorMsg.includes("not part of any organization")) {
-        showToast?.("You're not part of an organization. Visit the Overview tab to create or join one.", "error");
+        showToast?.(t("manageTeams.notInOrg"), "error");
       } else {
         console.error("Failed to load teams:", e);
       }
@@ -103,7 +105,7 @@ export function ManageTeams({ showToast }) {
       const membersList = Array.isArray(teamData) ? teamData : (teamData?.members || []);
       setSelectedTeamMembers(membersList);
     } catch (error) {
-      showToast?.("Failed to load team members", "error");
+      showToast?.(t("manageTeams.loadMembersError"), "error");
       return;
     }
 
@@ -111,15 +113,15 @@ export function ManageTeams({ showToast }) {
   };
 
   const handleDeleteTeam = async (teamId) => {
-    if (!confirm("Are you sure you want to delete this team?")) return;
-    
+    if (!confirm(t("manageTeams.confirmDelete"))) return;
+
     try {
       const teamsService = await import("../../services/teamsService");
       await teamsService.default.deleteTeam(teamId);
-      showToast?.("Team deleted successfully");
+      showToast?.(t("manageTeams.deleteSuccess"));
       loadTeams();
     } catch (e) {
-      showToast?.(e?.response?.data?.message || "Failed to delete team", "error");
+      showToast?.(e?.response?.data?.message || t("manageTeams.deleteError"), "error");
     }
   };
 
@@ -127,15 +129,15 @@ export function ManageTeams({ showToast }) {
     <div className="bg-white rounded-lg border border-gray-200">
       <div className="p-4 border-b">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-lg font-semibold">Manage Teams</h3>
+          <h3 className="text-lg font-semibold">{t("manageTeams.title")}</h3>
           {canManage && (
             <button
               onClick={handleCreateTeam}
               disabled={usage && !usage.canAddTeams}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg text-sm"
-              title={usage && !usage.canAddTeams ? `Team limit reached (${usage.currentTeams}/${usage.maxTeams} on ${usage.planName} plan). Upgrade to add more teams.` : "Create a new team"}
+              title={usage && !usage.canAddTeams ? t("manageTeams.teamLimitReached") : t("manageTeams.createNew")}
             >
-              <FaPlus /> Create new team
+              <FaPlus /> {t("manageTeams.createNew")}
             </button>
           )}
         </div>
@@ -158,7 +160,7 @@ export function ManageTeams({ showToast }) {
             </div>
             {!usage.canAddTeams && (
               <span className="text-xs text-amber-700 bg-amber-50 px-2 py-1 rounded border border-amber-200">
-                Team limit reached
+                {t("manageTeams.teamLimitReached")}
               </span>
             )}
           </div>
@@ -166,10 +168,10 @@ export function ManageTeams({ showToast }) {
       </div>
 
       {loading ? (
-        <div className="p-4 text-sm text-gray-600">Loading teams...</div>
+        <div className="p-4 text-sm text-gray-600">{t("manageTeams.loadingTeams")}</div>
       ) : teams.length === 0 ? (
         <div className="p-4 text-sm text-gray-600">
-          No teams found. Create your first team to get started.
+          {t("manageTeams.noTeams")}
         </div>
       ) : (
         <div className="divide-y">
@@ -180,10 +182,10 @@ export function ManageTeams({ showToast }) {
                   {team.name}
                 </div>
                 <div className="text-sm text-gray-600 mt-1">
-                  Members: {team.memberCount || 0}
+                  {t("manageTeams.membersCount", { count: team.memberCount || 0 })}
                   {team.teamLeadName && (
                     <span className="ml-3 inline-block px-2 py-1 bg-amber-100 text-amber-800 rounded text-xs font-semibold">
-                      Lead: {team.teamLeadName}
+                      {t("manageTeams.leadLabel", { name: team.teamLeadName })}
                     </span>
                   )}
                 </div>
@@ -193,21 +195,21 @@ export function ManageTeams({ showToast }) {
                     <button
                       onClick={() => handleAssignTeamLead(team)}
                       className="p-2 text-amber-600 hover:bg-amber-50 rounded"
-                      title="Assign team lead"
+                      title={t("manageTeams.assignLeadTitle")}
                     >
                       <FaKey />
                     </button>
                     <button
                       onClick={() => handleEditTeam(team)}
                       className="p-2 text-blue-600 hover:bg-blue-50 rounded"
-                      title="Edit team"
+                      title={t("manageTeams.editTeamTitle")}
                     >
                       <FaEdit />
                     </button>
                     <button
                       onClick={() => handleDeleteTeam(team.id)}
                       className="p-2 text-red-600 hover:bg-red-50 rounded"
-                      title="Delete team"
+                      title={t("manageTeams.deleteTeamTitle")}
                     >
                       <FaTrash />
                     </button>
@@ -261,6 +263,7 @@ export function ManageTeams({ showToast }) {
 }
 
 function CreateTeamModal({ onClose, onSuccess, showToast, members }) {
+  const { t } = useTranslation();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [leadId, setLeadId] = useState("");
@@ -270,7 +273,7 @@ function CreateTeamModal({ onClose, onSuccess, showToast, members }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name.trim()) {
-      showToast?.("Team name is required", "error");
+      showToast?.(t("manageTeams.createModal.nameRequired"), "error");
       return;
     }
 
@@ -290,11 +293,11 @@ function CreateTeamModal({ onClose, onSuccess, showToast, members }) {
         leadId: leadId || undefined,
         memberIds: memberIds.length > 0 ? memberIds : undefined,
       });
-      
-      showToast?.("Team created successfully");
+
+      showToast?.(t("manageTeams.createModal.createSuccess"));
       onSuccess();
     } catch (e) {
-      showToast?.(e?.response?.data?.message || "Failed to create team", "error");
+      showToast?.(e?.response?.data?.message || t("manageTeams.createModal.createError"), "error");
     } finally {
       setSaving(false);
     }
@@ -321,7 +324,7 @@ function CreateTeamModal({ onClose, onSuccess, showToast, members }) {
         className="bg-white rounded-lg shadow-2xl max-w-3xl w-[min(1100px,90%)] overflow-visible flex flex-col z-10 p-6 max-h-[90vh] overflow-y-auto"
       >
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">Create New Team</h3>
+          <h3 className="text-lg font-semibold">{t("manageTeams.createModal.title")}</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <FaTimes />
           </button>
@@ -330,41 +333,41 @@ function CreateTeamModal({ onClose, onSuccess, showToast, members }) {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Team Name *
+              {t("manageTeams.createModal.teamName")}
             </label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="e.g., CMC, Sales and Marketing"
+              placeholder={t("manageTeams.createModal.teamNamePlaceholder")}
               required
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description
+              {t("manageTeams.createModal.description")}
             </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Team description..."
+              placeholder={t("manageTeams.createModal.descriptionPlaceholder")}
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Team Leader
+              {t("manageTeams.createModal.teamLeader")}
             </label>
             <select
               value={leadId}
               onChange={(e) => setLeadId(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
-              <option value="">Select team leader...</option>
+              <option value="">{t("manageTeams.createModal.selectLeader")}</option>
               {members.map((member) => (
                 <option key={member.id} value={member.id}>
                   {member.firstName} {member.lastName}
@@ -375,7 +378,7 @@ function CreateTeamModal({ onClose, onSuccess, showToast, members }) {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Team Members
+              {t("manageTeams.createModal.teamMembers")}
             </label>
             <div className="border border-gray-300 rounded-lg max-h-48 overflow-y-auto">
               {members.map((member) => {
@@ -395,7 +398,7 @@ function CreateTeamModal({ onClose, onSuccess, showToast, members }) {
                       {member.firstName} {member.lastName}
                     </span>
                     <span className={`text-[10px] px-2 py-0.5 rounded ${isSelected ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
-                      {isSelected ? 'Selected' : 'Not selected'}
+                      {isSelected ? t("manageTeams.createModal.selected") : t("manageTeams.createModal.notSelected")}
                     </span>
                   </label>
                 );
@@ -409,14 +412,14 @@ function CreateTeamModal({ onClose, onSuccess, showToast, members }) {
               onClick={onClose}
               className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
             >
-              Cancel
+              {t("manageTeams.createModal.cancel")}
             </button>
             <button
               type="submit"
               disabled={saving}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-lg"
             >
-              {saving ? "Creating..." : "Create Team"}
+              {saving ? t("manageTeams.createModal.creating") : t("manageTeams.createModal.createTeam")}
             </button>
           </div>
         </form>
@@ -426,6 +429,7 @@ function CreateTeamModal({ onClose, onSuccess, showToast, members }) {
 }
 
 function EditTeamModal({ team, onClose, onSuccess, showToast, members }) {
+  const { t } = useTranslation();
   const [name, setName] = useState(team.name || "");
   const [description, setDescription] = useState(team.description || "");
   const [leadId, setLeadId] = useState(team.leadId || team.teamLeadUserId || "");
@@ -468,7 +472,7 @@ function EditTeamModal({ team, onClose, onSuccess, showToast, members }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name.trim()) {
-      showToast?.("Team name is required", "error");
+      showToast?.(t("manageTeams.editModal.nameRequired"), "error");
       return;
     }
 
@@ -513,10 +517,10 @@ function EditTeamModal({ team, onClose, onSuccess, showToast, members }) {
         }
       }
       
-      showToast?.("Team updated successfully");
+      showToast?.(t("manageTeams.editModal.updateSuccess"));
       onSuccess();
     } catch (e) {
-      showToast?.(e?.response?.data?.message || "Failed to update team", "error");
+      showToast?.(e?.response?.data?.message || t("manageTeams.editModal.updateError"), "error");
     } finally {
       setSaving(false);
     }
@@ -543,7 +547,7 @@ function EditTeamModal({ team, onClose, onSuccess, showToast, members }) {
         className="bg-white rounded-lg shadow-2xl max-w-3xl w-[min(1100px,90%)] overflow-visible flex flex-col z-10 p-6 max-h-[90vh] overflow-y-auto"
       >
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">Edit Team</h3>
+          <h3 className="text-lg font-semibold">{t("manageTeams.editModal.title")}</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <FaTimes />
           </button>
@@ -552,7 +556,7 @@ function EditTeamModal({ team, onClose, onSuccess, showToast, members }) {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Team Name *
+              {t("manageTeams.editModal.teamName")}
             </label>
             <input
               type="text"
@@ -565,7 +569,7 @@ function EditTeamModal({ team, onClose, onSuccess, showToast, members }) {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description
+              {t("manageTeams.editModal.description")}
             </label>
             <textarea
               value={description}
@@ -577,14 +581,14 @@ function EditTeamModal({ team, onClose, onSuccess, showToast, members }) {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Team Leader
+              {t("manageTeams.editModal.teamLeader")}
             </label>
             <select
               value={leadId}
               onChange={(e) => setLeadId(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
-              <option value="">Select team leader...</option>
+              <option value="">{t("manageTeams.editModal.selectLeader")}</option>
               {members.map((member) => (
                 <option key={member.id} value={member.id}>
                   {member.firstName} {member.lastName}
@@ -595,7 +599,7 @@ function EditTeamModal({ team, onClose, onSuccess, showToast, members }) {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Team Members
+              {t("manageTeams.editModal.teamMembers")}
             </label>
             <div className="border border-gray-300 rounded-lg max-h-48 overflow-y-auto">
               {members.map((member) => {
@@ -616,7 +620,7 @@ function EditTeamModal({ team, onClose, onSuccess, showToast, members }) {
                       {member.firstName} {member.lastName}
                     </span>
                     <span className={`text-[10px] px-2 py-0.5 rounded ${isCurrent ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-                      {isCurrent ? 'In team' : 'Not in team'}
+                      {isCurrent ? t("manageTeams.editModal.inTeam") : t("manageTeams.editModal.notInTeam")}
                     </span>
                   </label>
                 );
@@ -630,14 +634,14 @@ function EditTeamModal({ team, onClose, onSuccess, showToast, members }) {
               onClick={onClose}
               className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
             >
-              Cancel
+              {t("manageTeams.editModal.cancel")}
             </button>
             <button
               type="submit"
               disabled={saving}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-lg"
             >
-              {saving ? "Saving..." : "Save Changes"}
+              {saving ? t("manageTeams.editModal.saving") : t("manageTeams.editModal.saveChanges")}
             </button>
           </div>
         </form>

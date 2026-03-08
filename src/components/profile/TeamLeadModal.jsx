@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from "react";
+import { useTranslation } from 'react-i18next';
 import { FaTimes, FaKey } from "react-icons/fa";
 
 /**
  * Modal for assigning team lead to a team
  */
 export function TeamLeadModal({ team, teamMembers, onClose, onSuccess, showToast }) {
+  const { t } = useTranslation();
   const [selectedLeadId, setSelectedLeadId] = useState(team?.teamLeadUserId || "");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -29,14 +31,14 @@ export function TeamLeadModal({ team, teamMembers, onClose, onSuccess, showToast
 
   const handleAssignLead = async () => {
     if (!selectedLeadId) {
-      showToast?.("Please select a team lead", "error");
+      showToast?.(t("teamLeadModal.selectRequired"), "error");
       return;
     }
 
     // Check if selected user is a team member
     const isMember = teamMembers?.some(m => m.id === selectedLeadId);
     if (!isMember) {
-      showToast?.("Team lead must be a team member", "error");
+      showToast?.(t("teamLeadModal.mustBeMember"), "error");
       return;
     }
 
@@ -44,11 +46,11 @@ export function TeamLeadModal({ team, teamMembers, onClose, onSuccess, showToast
     try {
       const teamsService = await import("../../services/teamsService");
       await teamsService.default.assignTeamLead(team.id, selectedLeadId);
-      showToast?.("Team lead assigned successfully", "success");
+      showToast?.(t("teamLeadModal.assignSuccess"), "success");
       onSuccess?.();
       onClose();
     } catch (error) {
-      const errorMsg = error?.response?.data?.message || "Failed to assign team lead";
+      const errorMsg = error?.response?.data?.message || t("teamLeadModal.assignError");
       showToast?.(errorMsg, "error");
     } finally {
       setIsLoading(false);
@@ -61,7 +63,7 @@ export function TeamLeadModal({ team, teamMembers, onClose, onSuccess, showToast
         <div className="sticky top-0 flex items-center justify-between p-6 border-b bg-white">
           <div className="flex items-center gap-2">
             <FaKey className="text-amber-600" />
-            <h2 className="text-lg font-semibold">Assign Team Lead</h2>
+            <h2 className="text-lg font-semibold">{t("teamLeadModal.title")}</h2>
           </div>
           <button
             onClick={onClose}
@@ -75,24 +77,24 @@ export function TeamLeadModal({ team, teamMembers, onClose, onSuccess, showToast
         <div className="p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Team: <span className="font-semibold">{team?.name}</span>
+              {t("teamLeadModal.teamLabel")} <span className="font-semibold">{team?.name}</span>
             </label>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Select Team Lead
+              {t("teamLeadModal.selectLead")}
             </label>
             <select
               value={selectedLeadId}
               onChange={(e) => setSelectedLeadId(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
             >
-              <option value="">-- Select a team member --</option>
+              <option value="">{t("teamLeadModal.selectPlaceholder")}</option>
               {teamMembers?.map((member) => (
                 <option key={member.id} value={member.id}>
                   {member.firstName} {member.lastName}
-                  {member.id === team?.teamLeadUserId && " (current lead)"}
+                  {member.id === team?.teamLeadUserId && ` ${t("teamLeadModal.currentLead")}`}
                 </option>
               ))}
             </select>
@@ -100,7 +102,7 @@ export function TeamLeadModal({ team, teamMembers, onClose, onSuccess, showToast
 
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
             <p className="text-sm text-blue-800">
-              <strong>Team Lead Role:</strong> Can edit team details, manage team members, and access team-specific reports.
+              {t("teamLeadModal.roleDescription")}
             </p>
           </div>
 
@@ -110,14 +112,14 @@ export function TeamLeadModal({ team, teamMembers, onClose, onSuccess, showToast
               disabled={isLoading}
               className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg disabled:opacity-60"
             >
-              Cancel
+              {t("teamLeadModal.cancel")}
             </button>
             <button
               onClick={handleAssignLead}
               disabled={isLoading || !selectedLeadId}
               className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-400 text-white rounded-lg font-medium"
             >
-              {isLoading ? "Assigning..." : "Assign Lead"}
+              {isLoading ? t("teamLeadModal.assigning") : t("teamLeadModal.assignLead")}
             </button>
           </div>
         </div>

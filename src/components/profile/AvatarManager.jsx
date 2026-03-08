@@ -1,13 +1,15 @@
 import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { LoadingButton } from './UIComponents';
+import { useTranslation } from 'react-i18next';
 
-export const AvatarManager = ({ 
-    avatarPreview, 
-    setAvatarPreview, 
+export const AvatarManager = ({
+    avatarPreview,
+    setAvatarPreview,
     onAvatarChange,
     showToast,
     avatarSeed: avatarSeedProp
 }) => {
+    const { t } = useTranslation();
     const [avatarOriginal, setAvatarOriginal] = useState(null);
     const [showCropper, setShowCropper] = useState(false);
     const [cropZoom, setCropZoom] = useState(1);
@@ -105,7 +107,7 @@ export const AvatarManager = ({
             setIsCapturing(false);
         } catch (e) {
             console.error('Failed to capture from camera', e);
-            if (showToast) showToast('Failed to capture image from camera', 'error');
+            if (showToast) showToast(t('avatarManager.captureError'), 'error');
             setIsCapturing(false);
         }
     };
@@ -234,7 +236,7 @@ export const AvatarManager = ({
             setPreviewImage(null);
         } catch (e) {
             console.error('Camera start error', e);
-            if (showToast) showToast('Unable to access camera. Please grant permission or use file upload.', 'error');
+            if (showToast) showToast(t('avatarManager.cameraError'), 'error');
         }
     };
 
@@ -320,7 +322,7 @@ export const AvatarManager = ({
         const file = e.target.files[0];
         if (file) {
             if (file.size > 5 * 1024 * 1024) {
-                showToast('File size must be less than 5MB', 'error');
+                showToast(t('avatarManager.fileSizeError'), 'error');
                 return;
             }
             const reader = new FileReader();
@@ -353,12 +355,12 @@ export const AvatarManager = ({
                         setShowCropper(true);
                     } catch (err) {
                         console.error('Error processing uploaded image', err);
-                        if (showToast) showToast('Failed to process image', 'error');
+                        if (showToast) showToast(t('avatarManager.processError'), 'error');
                     }
                 };
                 img.onerror = (err) => {
                     console.error('Image load error', err);
-                    if (showToast) showToast('Invalid image file', 'error');
+                    if (showToast) showToast(t('avatarManager.invalidImage'), 'error');
                 };
                 img.src = e.target.result;
             };
@@ -447,7 +449,7 @@ export const AvatarManager = ({
                     onClick={() => fileRef.current?.click()}
                     className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
                 >
-                    📁 Upload
+                    📁 {t('avatarManager.upload')}
                 </button>
 
                 <button
@@ -456,7 +458,7 @@ export const AvatarManager = ({
                     className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
                     aria-label="Open camera"
                 >
-                    📷 Camera
+                    📷 {t('avatarManager.camera')}
                 </button>
 
                 <button
@@ -464,7 +466,7 @@ export const AvatarManager = ({
                     onClick={() => setShowAvatarModal(true)}
                     className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
                 >
-                    🎨 Generate
+                    🎨 {t('avatarManager.generate')}
                 </button>
             </div>
 
@@ -481,7 +483,7 @@ export const AvatarManager = ({
             {showCropper && avatarOriginal && (
                 <div className="fixed inset-0 z-50 bg-black bg-opacity-75 flex items-center justify-center">
                     <div className="bg-white rounded-lg p-4 max-w-lg w-full mx-4">
-                        <h3 className="text-lg font-semibold mb-4">Crop Image</h3>
+                        <h3 className="text-lg font-semibold mb-4">{t('avatarManager.cropTitle')}</h3>
                         <div className="relative mb-4" style={{ height: '300px' }}>
                             <div
                                 className="w-full h-full relative overflow-hidden touch-none"
@@ -513,7 +515,7 @@ export const AvatarManager = ({
                         </div>
                         <div className="mb-4">
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Zoom: {cropZoom}x
+                                {t('avatarManager.zoom')} {cropZoom}x
                             </label>
                             <input
                                 type="range"
@@ -530,13 +532,13 @@ export const AvatarManager = ({
                                 onClick={() => setShowCropper(false)}
                                 className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
                             >
-                                Cancel
+                                {t('avatarManager.cancel')}
                             </button>
                             <LoadingButton
                                 onClick={saveCroppedAndReturn}
                                 variant="primary"
                             >
-                                Save
+                                {t('avatarManager.save')}
                             </LoadingButton>
                         </div>
                     </div>
@@ -548,7 +550,7 @@ export const AvatarManager = ({
                 <div className="fixed inset-0 z-50 bg-black bg-opacity-75 flex items-center justify-center">
                     <div className="bg-white rounded-lg p-4 max-w-xl w-full mx-4">
                         <div className="flex items-center justify-between mb-3">
-                            <h3 className="text-lg font-semibold">Take Photo</h3>
+                            <h3 className="text-lg font-semibold">{t('avatarManager.takePhoto')}</h3>
                             <div className="flex items-center gap-2">
                                 <button
                                     onClick={() => {
@@ -609,7 +611,7 @@ export const AvatarManager = ({
                         </div>
 
                         <div className="mb-3">
-                            <label className="block text-sm text-gray-600 mb-1">Zoom</label>
+                            <label className="block text-sm text-gray-600 mb-1">{t('avatarManager.cameraZoom')}</label>
                             <input
                                 aria-label="Camera zoom"
                                 type="range"
@@ -621,12 +623,12 @@ export const AvatarManager = ({
                                 className="w-full"
                             />
                             <div className="flex items-center justify-between mt-2">
-                                <div className="text-sm text-muted-foreground">Zoom: {cameraZoom.toFixed(2)}x</div>
+                                <div className="text-sm text-muted-foreground">{t('avatarManager.cameraZoom')}: {cameraZoom.toFixed(2)}x</div>
                                 <div className="flex gap-2">
                                     {torchAvailable && (
-                                        <button onClick={toggleTorch} className={`px-2 py-1 border rounded text-sm ${torchOn ? 'bg-yellow-200' : ''}`}>{torchOn ? 'Torch On' : 'Torch'}</button>
+                                        <button onClick={toggleTorch} className={`px-2 py-1 border rounded text-sm ${torchOn ? 'bg-yellow-200' : ''}`}>{torchOn ? t('avatarManager.torchOn') : t('avatarManager.torch')}</button>
                                     )}
-                                    <button onClick={() => setCameraZoom(1)} className="px-2 py-1 border rounded text-sm">Reset</button>
+                                    <button onClick={() => setCameraZoom(1)} className="px-2 py-1 border rounded text-sm">{t('avatarManager.reset')}</button>
                                 </div>
                             </div>
                         </div>
@@ -634,14 +636,14 @@ export const AvatarManager = ({
                         <div className="flex gap-2 justify-end">
                             {showPreview ? (
                                 <>
-                                    <button onClick={retake} className="px-4 py-2 border rounded">Retake</button>
-                                    <LoadingButton onClick={confirmPreview} variant="primary">Use Photo</LoadingButton>
+                                    <button onClick={retake} className="px-4 py-2 border rounded">{t('avatarManager.retake')}</button>
+                                    <LoadingButton onClick={confirmPreview} variant="primary">{t('avatarManager.usePhoto')}</LoadingButton>
                                 </>
                             ) : (
                                 <>
-                                    <button onClick={() => { stopCamera(); }} className="px-4 py-2 border rounded">Cancel</button>
+                                    <button onClick={() => { stopCamera(); }} className="px-4 py-2 border rounded">{t('avatarManager.cancel')}</button>
                                     <LoadingButton onClick={captureFromCamera} variant="primary">
-                                        {isCapturing ? 'Capturing…' : 'Capture'}
+                                        {isCapturing ? t('avatarManager.capturing') : t('avatarManager.capture')}
                                     </LoadingButton>
                                 </>
                             )}
@@ -655,7 +657,7 @@ export const AvatarManager = ({
                 <div className="fixed inset-0 z-50 bg-black bg-opacity-75 flex items-center justify-center">
                     <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
                         <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-lg font-semibold">Generate Avatar</h3>
+                            <h3 className="text-lg font-semibold">{t('avatarManager.generateTitle')}</h3>
                             <button
                                 onClick={() => setShowAvatarModal(false)}
                                 className="text-gray-500 hover:text-gray-700"
@@ -667,10 +669,10 @@ export const AvatarManager = ({
                             <div className="space-y-4">
                             {/* Avatar Type Selector */}
                             <div className="flex gap-2 items-center">
-                                <label className="text-sm font-medium">Type</label>
+                                <label className="text-sm font-medium">{t('avatarManager.typeLabel')}</label>
                                 <div className="flex gap-2">
-                                    <button onClick={() => setAvatarMode('initial')} className={`px-2 py-1 border rounded ${avatarMode==='initial'?'border-blue-500':''}`}>Initial</button>
-                                    <button onClick={() => setAvatarMode('emoji')} className={`px-2 py-1 border rounded ${avatarMode==='emoji'?'border-blue-500':''}`}>Emoji</button>
+                                    <button onClick={() => setAvatarMode('initial')} className={`px-2 py-1 border rounded ${avatarMode==='initial'?'border-blue-500':''}`}>{t('avatarManager.initial')}</button>
+                                    <button onClick={() => setAvatarMode('emoji')} className={`px-2 py-1 border rounded ${avatarMode==='emoji'?'border-blue-500':''}`}>{t('avatarManager.emoji')}</button>
                                 </div>
                             </div>
                             {/* Avatar Preview */}
@@ -694,24 +696,24 @@ export const AvatarManager = ({
                             {/* Seed Input */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Avatar Seed
+                                    {t('avatarManager.avatarSeed')}
                                 </label>
                                     <input
                                         type="text"
                                         value={avatarSeed}
                                         onChange={(e) => setAvatarSeed(e.target.value)}
                                         className="w-full px-2 py-1.5 text-sm border-b border-gray-200 bg-gray-50 focus:bg-white focus:border-gray-400 focus:outline-none"
-                                        placeholder="Enter name or text"
+                                        placeholder={t('avatarManager.seedPlaceholder')}
                                     />
                                     {avatarMode === 'emoji' && (
-                                        <div className="mt-2 text-sm">Tip: enter a character to influence the emoji choice, or click Random.</div>
+                                        <div className="mt-2 text-sm">{t('avatarManager.emojiTip')}</div>
                                     )}
                             </div>
 
                             {/* Color Palette */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Color Palette
+                                    {t('avatarManager.colorPalette')}
                                 </label>
                                 <div className="flex gap-2">
                                     {avatarPalettes.map((palette, index) => (
@@ -733,7 +735,7 @@ export const AvatarManager = ({
                                     onClick={() => setAvatarSeed(Math.random().toString(36).substring(7))}
                                     className="flex-1 px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
                                 >
-                                    🎲 Random
+                                    🎲 {t('avatarManager.random')}
                                 </button>
                                     <LoadingButton
                                     onClick={() => {
@@ -768,7 +770,7 @@ export const AvatarManager = ({
                                         if (dataUrl) {
                                             setAvatarPreview(dataUrl);
                                             localStorage.setItem('pm:avatar', dataUrl);
-                                            if (showToast) showToast('Avatar generated successfully!');
+                                            if (showToast) showToast(t('avatarManager.generateSuccess'));
                                             if (onAvatarChange) onAvatarChange(dataUrl);
                                             setShowAvatarModal(false);
                                         }
@@ -776,7 +778,7 @@ export const AvatarManager = ({
                                     variant="primary"
                                     className="flex-1"
                                 >
-                                    Generate Avatar
+                                    {t('avatarManager.generateAvatar')}
                                 </LoadingButton>
                             </div>
                         </div>
@@ -789,7 +791,7 @@ export const AvatarManager = ({
                 <div className="fixed inset-0 z-60 bg-black bg-opacity-85 flex items-center justify-center p-4">
                     <div className="bg-white rounded-lg max-w-3xl w-full overflow-hidden">
                         <div className="flex items-center justify-between p-4 border-b">
-                            <h3 className="text-lg font-semibold">Profile Image</h3>
+                            <h3 className="text-lg font-semibold">{t('avatarManager.profileImage')}</h3>
                             <div className="flex items-center gap-2">
                                 <button
                                     onClick={() => {
@@ -803,13 +805,13 @@ export const AvatarManager = ({
                                     }}
                                     className="px-3 py-1 border rounded"
                                 >
-                                    Download
+                                    {t('avatarManager.download')}
                                 </button>
                                 <button
                                     onClick={() => setShowImageViewer(false)}
                                     className="px-3 py-1 border rounded"
                                 >
-                                    Close
+                                    {t('avatarManager.close')}
                                 </button>
                             </div>
                         </div>
