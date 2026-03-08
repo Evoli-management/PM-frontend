@@ -48,6 +48,14 @@ const getGoalService = async () => {
     return _goalService;
 };
 
+let _calendarService = null;
+const getCalendarService = async () => {
+    if (_calendarService) return _calendarService;
+    const mod = await import("../services/calendarService");
+    _calendarService = mod.default || mod;
+    return _calendarService;
+};
+
 // Note: activityService loader removed for DontForget (no activity fetching)
 
 export default function DontForget() {
@@ -61,6 +69,9 @@ export default function DontForget() {
 
     // Don’t Forget tasks: now server-backed (tasks without keyAreaId)
     const [tasks, setTasks] = useState([]);
+    // Auto-refresh when external sync is active
+    const [syncActive, setSyncActive] = useState(false);
+    const [refreshTick, setRefreshTick] = useState(0);
     // DF header list names (local-only)
     const [dfListNames, setDfListNames] = useState(() => {
         try {
@@ -251,6 +262,28 @@ export default function DontForget() {
     // Assignment modal state
     const [assignModal, setAssignModal] = useState({ open: false, task: null, kaId: "", listIndex: 1 });
 
+    // Check if external sync is active so we can auto-refresh tasks
+    useEffect(() => {
+        let ignore = false;
+        (async () => {
+            try {
+                const svc = await getCalendarService();
+                const status = await svc.getSyncStatus();
+                if (!ignore) setSyncActive(!!(status?.syncToGoogle || status?.syncToOutlook));
+            } catch (_) {
+                if (!ignore) setSyncActive(false);
+            }
+        })();
+        return () => { ignore = true; };
+    }, []);
+
+    // Poll every 15s when external sync is active
+    useEffect(() => {
+        if (!syncActive) return;
+        const id = setInterval(() => setRefreshTick((t) => t + 1), 15000);
+        return () => clearInterval(id);
+    }, [syncActive]);
+
     // Load DF tasks from backend on mount (and keep once-updated list for the page)
     useEffect(() => {
         let cancelled = false;
@@ -295,7 +328,7 @@ export default function DontForget() {
         return () => {
             cancelled = true;
         };
-    }, []);
+    }, [refreshTick]);
 
     // Listen for global "open-create-modal" events so DontForget can open its
     // local composer without relying on ModalManager. This lets the Navbar's

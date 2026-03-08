@@ -84,6 +84,14 @@ const getUserProfileService = async () => {
     return _userProfileService;
 };
 
+let _calendarService = null;
+const getCalendarService = async () => {
+    if (_calendarService) return _calendarService;
+    const mod = await import('../services/calendarService');
+    _calendarService = mod.default || mod;
+    return _calendarService;
+};
+
 const api = {
     async listKeyAreas() {
         try {
@@ -538,6 +546,8 @@ export default function KeyAreas() {
     const [activeFilter, setActiveFilter] = useState(initialActiveFilter);
     const isGlobalTasksView = viewTab === 'delegated' || viewTab === 'todo' || viewTab === 'activity-trap';
     const [allTasks, setAllTasks] = useState([]);
+    const [syncActive, setSyncActive] = useState(false);
+    const [refreshTick, setRefreshTick] = useState(0);
     const [pendingDelegations, setPendingDelegations] = useState([]); // For DELEGATED tab - pending only
     const [pendingDelegationsLoading, setPendingDelegationsLoading] = useState(false);
     const [savingIds, setSavingIds] = useState(new Set());
@@ -1149,6 +1159,28 @@ export default function KeyAreas() {
         }
     }, [viewTab, activeFilter]);
 
+    // Check if external sync is active so we can auto-refresh tasks
+    useEffect(() => {
+        let ignore = false;
+        (async () => {
+            try {
+                const svc = await getCalendarService();
+                const status = await svc.getSyncStatus();
+                if (!ignore) setSyncActive(!!(status?.syncToGoogle || status?.syncToOutlook));
+            } catch (_) {
+                if (!ignore) setSyncActive(false);
+            }
+        })();
+        return () => { ignore = true; };
+    }, []);
+
+    // Poll every 15s when external sync is active
+    useEffect(() => {
+        if (!syncActive) return;
+        const id = setInterval(() => setRefreshTick((t) => t + 1), 15000);
+        return () => clearInterval(id);
+    }, [syncActive]);
+
     // Reload tasks when viewTab or activeFilter changes
     useEffect(() => {
         // Handle MY FOCUS tab - navigate to separate page
@@ -1328,7 +1360,7 @@ export default function KeyAreas() {
                 // ignore activity load failures
             }
         })();
-    }, [viewTab, activeFilter, selectedKA?.id, currentUserId, navigate]);
+    }, [viewTab, activeFilter, selectedKA?.id, currentUserId, navigate, refreshTick]);
     
     // Listen for 'task-created' events from ModalManager (navbar quick actions)
     // When a task is created via the quick actions with a key area, add it to allTasks
