@@ -80,7 +80,7 @@ const CalendarContainer = () => {
 
     const handleElephantTaskSaved = () => {
         loadElephantTasks();
-        loadEvents(); // Reload calendar events to show new elephant bites
+        setRefreshTick((t) => t + 1); // Reload calendar events to show new elephant bites
         setElephantTaskModalOpen(false);
         setSelectedTaskForElephant(null);
     };
@@ -995,10 +995,10 @@ const CalendarContainer = () => {
                 const opts = {};
                 if (deleteScopeChoice === 'occurrence') {
                     opts.editScope = 'occurrence';
-                    opts.occurrenceStart = event.start;
+                    opts.occurrenceStart = event.start ? new Date(event.start).toISOString() : undefined;
                 } else if (deleteScopeChoice === 'future') {
                     opts.editScope = 'future';
-                    opts.occurrenceStart = event.start;
+                    opts.occurrenceStart = event.start ? new Date(event.start).toISOString() : undefined;
                 } else if (deleteScopeChoice === 'series') {
                     opts.editScope = 'series';
                 }
@@ -1014,8 +1014,17 @@ const CalendarContainer = () => {
                 try {
                     // If series delete, remove all with same seriesId
                     if (deleteScopeChoice === 'series' && event.seriesId && e.seriesId === event.seriesId) return false;
-                    // If occurrence/future, remove occurrence matches
-                    if ((deleteScopeChoice === 'occurrence' || deleteScopeChoice === 'future') && event.seriesId && event.start) {
+                    // If future delete, remove this occurrence AND all subsequent ones in the series
+                    if (deleteScopeChoice === 'future' && event.seriesId && event.start) {
+                        if (e.seriesId === event.seriesId) {
+                            const eStartMs = e.start ? new Date(e.start).getTime() : Infinity;
+                            const occStartMs = new Date(event.start).getTime();
+                            if (eStartMs >= occStartMs) return false;
+                        }
+                        if (typeof e.id === 'string' && e.id === `${event.seriesId}_${event.start}`) return false;
+                    }
+                    // If occurrence delete, remove just this occurrence
+                    if (deleteScopeChoice === 'occurrence' && event.seriesId && event.start) {
                         if (e.seriesId === event.seriesId && (e.occurrenceStart === event.start || e.start === event.start)) return false;
                         if (typeof e.id === 'string' && e.id === `${event.seriesId}_${event.start}`) return false;
                     }
@@ -1041,10 +1050,10 @@ const CalendarContainer = () => {
             const opts = {};
             if (updateScopeChoice === 'occurrence') {
                 opts.editScope = 'occurrence';
-                opts.occurrenceStart = event.start;
+                opts.occurrenceStart = event.start ? new Date(event.start).toISOString() : undefined;
             } else if (updateScopeChoice === 'future') {
                 opts.editScope = 'future';
-                opts.occurrenceStart = event.start;
+                opts.occurrenceStart = event.start ? new Date(event.start).toISOString() : undefined;
             } else if (updateScopeChoice === 'series') {
                 opts.editScope = 'series';
             }
@@ -1058,29 +1067,34 @@ const CalendarContainer = () => {
             };
 
             const updated = await calendarService.updateAppointment(event.id, payload);
-            setEvents((prev) => {
-                // Remove the original occurrence representation if the backend
-                // returned a new exception row for the same series/occurrence.
-                const filtered = prev.filter((e) => {
-                    try {
-                        if (updated.seriesId && updated.occurrenceStart) {
-                            if (e.seriesId === updated.seriesId && (e.occurrenceStart === updated.occurrenceStart || e.start === updated.occurrenceStart)) {
+            if (updateScopeChoice === 'series' || updateScopeChoice === 'future') {
+                // series/future changes affect multiple occurrence bars — reload from server.
+                setRefreshTick((t) => t + 1);
+            } else {
+                setEvents((prev) => {
+                    // Remove the original occurrence representation if the backend
+                    // returned a new exception row for the same series/occurrence.
+                    const filtered = prev.filter((e) => {
+                        try {
+                            if (updated.seriesId && updated.occurrenceStart) {
+                                if (e.seriesId === updated.seriesId && (e.occurrenceStart === updated.occurrenceStart || e.start === updated.occurrenceStart)) {
+                                    return false;
+                                }
+                                if (typeof e.id === 'string' && e.id === `${updated.seriesId}_${updated.occurrenceStart}`) {
+                                    return false;
+                                }
+                            }
+                            if (event && event.id && event.id !== updated.id && e.id === event.id) {
                                 return false;
                             }
-                            if (typeof e.id === 'string' && e.id === `${updated.seriesId}_${updated.occurrenceStart}`) {
-                                return false;
-                            }
-                        }
-                        if (event && event.id && event.id !== updated.id && e.id === event.id) {
-                            return false;
-                        }
-                    } catch (__) {}
-                    return true;
-                });
+                        } catch (__) {}
+                        return true;
+                    });
 
-                const found = filtered.some((e) => e.id === updated.id);
-                return found ? filtered.map((e) => (e.id === updated.id ? updated : e)) : [...filtered, updated];
-            });
+                    const found = filtered.some((e) => e.id === updated.id);
+                    return found ? filtered.map((e) => (e.id === updated.id ? updated : e)) : [...filtered, updated];
+                });
+            }
             addToast({ title: 'Appointment updated', variant: 'success' });
             setUpdatePopoverVisible(false);
             setUpdateTargetEvent(null);
@@ -2095,7 +2109,13 @@ const CalendarContainer = () => {
                         setAppointmentInitialAllDay(false);
                     }}
                     onCreated={(created) => {
-                        setEvents((prev) => [...prev, created]);
+                        if (created?.recurringPattern) {
+                            // Recurring series: the API returns the series master only.
+                            // Fetch fresh data so all generated occurrences appear immediately.
+                            setRefreshTick((t) => t + 1);
+                        } else {
+                            setEvents((prev) => [...prev, created]);
+                        }
                         addToast({
                             title:
                                 String(created?.kind || "").toLowerCase() === "event"
@@ -2122,7 +2142,18 @@ const CalendarContainer = () => {
                         setModalOpenSource(null);
                     }}
                     onUpdated={(updated) => {
-                        if (updated && updated.id) {
+                        const scope = updated?._editScope;
+                        const needsFullRefresh =
+                            scope === 'series' ||
+                            scope === 'future' ||
+                            // Non-scoped update on a recurring event (e.g. plain series master edit)
+                            (!scope && (updated?.recurringPattern || selectedEvent?.recurringPattern || selectedEvent?.seriesId));
+
+                        if (needsFullRefresh) {
+                            // series/future edits affect multiple occurrence bars — a full
+                            // server fetch is the only reliable way to show correct data.
+                            setRefreshTick((t) => t + 1);
+                        } else if (updated && updated.id) {
                             setEvents((prev) => {
                                 // Remove the previous occurrence representation when the
                                 // server returned a new exception row (new id). Match by
@@ -2130,10 +2161,6 @@ const CalendarContainer = () => {
                                 // modal's selectedEvent id as a fallback.
                                 const filtered = prev.filter((e) => {
                                     try {
-                                        // If updated contains seriesId and occurrenceStart,
-                                        // filter out any event that represents that same
-                                        // occurrence (either stored as occurrenceStart or
-                                        // as a generated id like `${seriesId}_${occurrenceStart}`).
                                         if (updated.seriesId && updated.occurrenceStart) {
                                             if (e.seriesId === updated.seriesId && (e.occurrenceStart === updated.occurrenceStart || e.start === updated.occurrenceStart)) {
                                                 return false;
@@ -2142,10 +2169,6 @@ const CalendarContainer = () => {
                                                 return false;
                                             }
                                         }
-
-                                        // If the modal was opened for `selectedEvent`, remove
-                                        // that original id when it's different from the
-                                        // returned updated.id to avoid duplicate bars.
                                         if (selectedEvent && selectedEvent.id && selectedEvent.id !== updated.id && e.id === selectedEvent.id) {
                                             return false;
                                         }
@@ -2188,8 +2211,17 @@ const CalendarContainer = () => {
                                         if (scope === 'series' && sid) {
                                             if (e.seriesId === sid) return false;
                                         }
-                                        // If deleting occurrence/future, remove matches for the specific occurrence
-                                        if ((scope === 'occurrence' || scope === 'future') && sid && occ) {
+                                        // If deleting this and all future, remove this occurrence and all after it
+                                        if (scope === 'future' && sid && occ) {
+                                            if (e.seriesId === sid) {
+                                                const eStartMs = e.start ? new Date(e.start).getTime() : Infinity;
+                                                const occStartMs = new Date(occ).getTime();
+                                                if (eStartMs >= occStartMs) return false;
+                                            }
+                                            if (typeof e.id === 'string' && e.id === `${sid}_${occ}`) return false;
+                                        }
+                                        // If deleting just this occurrence, remove only the matching one
+                                        if (scope === 'occurrence' && sid && occ) {
                                             if (e.seriesId === sid && (e.occurrenceStart === occ || e.start === occ)) return false;
                                             if (typeof e.id === 'string' && e.id === `${sid}_${occ}`) return false;
                                         }
