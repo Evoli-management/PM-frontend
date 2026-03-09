@@ -1673,6 +1673,24 @@ export default function KeyAreas() {
             if (key === 'priority') {
                 try { return { ...t, priority: getPriorityLevel(value) }; } catch (e) { return { ...t, priority: value }; }
             }
+            if (key === 'assignee') {
+                const selectedUser = (users || []).find((u) => String(u.id) === String(value));
+                if (selectedUser) {
+                    const displayName =
+                        currentUserId && String(selectedUser.id) === String(currentUserId)
+                            ? 'Me'
+                            : (selectedUser.name || `${selectedUser.firstname || ''} ${selectedUser.lastname || ''}`.trim() || t.assignee || '');
+                    return {
+                        ...t,
+                        assignee: displayName,
+                        delegatedToUserId:
+                            currentUserId && String(selectedUser.id) === String(currentUserId)
+                                ? null
+                                : selectedUser.id,
+                    };
+                }
+                return { ...t, assignee: value || '', delegatedToUserId: null };
+            }
             return { ...t, [key]: value };
         };
         setAllTasks((prev) => prev.map(optimistic));
@@ -1686,7 +1704,23 @@ export default function KeyAreas() {
         
         if (key === 'name') patch.title = value;
         else if (key === 'notes') patch.description = value;
-        else if (key === 'assignee') patch.assignee = value;
+        else if (key === 'assignee') {
+            const selectedUser = (users || []).find((u) => String(u.id) === String(value));
+            if (selectedUser) {
+                const selectedUserId = selectedUser.id;
+                patch.assignee =
+                    currentUserId && String(selectedUserId) === String(currentUserId)
+                        ? 'Me'
+                        : (selectedUser.name || `${selectedUser.firstname || ''} ${selectedUser.lastname || ''}`.trim() || null);
+                patch.delegatedToUserId =
+                    currentUserId && String(selectedUserId) === String(currentUserId)
+                        ? null
+                        : selectedUserId;
+            } else {
+                patch.assignee = value || null;
+                patch.delegatedToUserId = null;
+            }
+        }
         else if (key === 'start_date') patch.startDate = value ? new Date(value).toISOString() : null;
         else if (key === 'end_date') patch.endDate = value ? new Date(value).toISOString() : null;
         else if (key === 'dueDate' || key === 'deadline') patch.dueDate = value ? new Date(value).toISOString() : null;
@@ -4959,6 +4993,7 @@ export default function KeyAreas() {
                                             onTaskUpdate={async (id, updatedTask) => {
                                                 try {
                                                     if (updatedTask.delegatedToUserId) {
+                                                        await api.updateTask(id, updatedTask);
                                                         const svc = await getTaskService();
                                                         const delegatedToMe = await svc.list({ delegatedTo: true });
                                                         setAllTasks(delegatedToMe || []);
@@ -5041,6 +5076,7 @@ export default function KeyAreas() {
                                             try {
                                                 // If delegation happened, refresh the task list for the current view
                                                 if (updatedTask.delegatedToUserId) {
+                                                    await api.updateTask(id, updatedTask);
                                                     // Task was delegated, reload the appropriate view
                                                     if (viewTab === 'todo') {
                                                         const svc = await getTaskService();

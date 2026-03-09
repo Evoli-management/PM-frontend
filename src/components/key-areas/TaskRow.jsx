@@ -254,9 +254,7 @@ const TaskRow = ({
             })()}
             onChange={async (e) => {
               const sel = e.target.value;
-              const user = (users || []).find((u) => String(u.id) === String(sel));
-              const valueToSave = user ? ((currentUserId && String(user.id) === String(currentUserId)) ? 'Me' : (user.name || '')) : '';
-              try { await updateField && updateField(t.id, 'assignee', valueToSave); } catch (err) {}
+              try { await updateField && updateField(t.id, 'assignee', sel || null); } catch (err) {}
             }}
           >
             <option value="">—</option>
