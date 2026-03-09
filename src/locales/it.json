@@ -1,0 +1,23 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "calendar": "Calendario",
+    "dontForget": "Non dimenticare",
+    "goals": "Obiettivi e monitoraggio",
+    "keyAreas": "Aree chiave",
+    "giveStrokes": "Dai riconoscimento",
+    "team": "Team"
+  },
+  "common": {
+    "save": "Salva",
+    "cancel": "Annulla",
+    "delete": "Elimina",
+    "edit": "Modifica",
+    "add": "Aggiungi",
+    "close": "Chiudi",
+    "loading": "Caricamento...",
+    "error": "Qualcosa è andato storto",
+    "success": "Successo",
+    "logout": "Esci"
+  }
+}

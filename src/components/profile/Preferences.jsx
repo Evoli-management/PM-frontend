@@ -765,6 +765,10 @@ export const Preferences = ({ showToast }) => {
                         >
                             <option value="en">English</option>
                             <option value="sl">Slovenian</option>
+                            <option value="pl">Polish</option>
+                            <option value="da">Danish</option>
+                            <option value="nl">Dutch</option>
+                            <option value="it">Italian</option>
                         </select>
                     </Field>
                     

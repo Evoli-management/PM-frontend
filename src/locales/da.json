@@ -1,0 +1,23 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "calendar": "Kalender",
+    "dontForget": "Glem ikke",
+    "goals": "Mål og sporing",
+    "keyAreas": "Nøgleområder",
+    "giveStrokes": "Giv anerkendelse",
+    "team": "Hold"
+  },
+  "common": {
+    "save": "Gem",
+    "cancel": "Annuller",
+    "delete": "Slet",
+    "edit": "Rediger",
+    "add": "Tilføj",
+    "close": "Luk",
+    "loading": "Indlæser...",
+    "error": "Noget gik galt",
+    "success": "Succes",
+    "logout": "Log ud"
+  }
+}

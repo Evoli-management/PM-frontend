@@ -62,6 +62,8 @@ export default function Navbar() {
     }, [open, openQuick, openActiveMenu]);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [currentLang, setCurrentLang] = useState(() => localStorage.getItem('preferred_language') || 'en');
+    const [langDropdownOpen, setLangDropdownOpen] = useState(false);
+    const langDropdownRef = useRef(null);
     const location = useLocation();
     const navigate = useNavigate();
     const [openWidgets, setOpenWidgets] = useState(false);
@@ -567,6 +569,16 @@ export default function Navbar() {
         };
         window.addEventListener('languageChanged', handler);
         return () => window.removeEventListener('languageChanged', handler);
+    }, []);
+
+    useEffect(() => {
+        const handler = (e) => {
+            if (langDropdownRef.current && !langDropdownRef.current.contains(e.target)) {
+                setLangDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
     }, []);
 
     const handleLangToggle = async (lang) => {
@@ -1308,23 +1320,36 @@ export default function Navbar() {
                         onSave={handleGlobalReminderSave}
                     />
 
-                    {/* Language toggle */}
-                    <div className="flex items-center text-xs font-semibold gap-0.5">
+                    {/* Language selector */}
+                    <div ref={langDropdownRef} className="relative">
                         <button
-                            onClick={() => handleLangToggle('en')}
-                            className={`px-1.5 py-0.5 rounded transition ${currentLang === 'en' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:text-slate-900'}`}
-                            title="English"
+                            onClick={() => setLangDropdownOpen((o) => !o)}
+                            className="text-xs font-semibold text-slate-600 border border-slate-300 rounded px-1.5 py-0.5 cursor-pointer hover:border-slate-400 focus:outline-none flex items-center gap-0.5"
+                            title="Select language"
                         >
-                            EN
+                            {currentLang.toUpperCase()}
+                            <span className="text-slate-400 text-[10px]">▾</span>
                         </button>
-                        <span className="text-slate-400">|</span>
-                        <button
-                            onClick={() => handleLangToggle('sl')}
-                            className={`px-1.5 py-0.5 rounded transition ${currentLang === 'sl' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:text-slate-900'}`}
-                            title="Slovenščina"
-                        >
-                            SL
-                        </button>
+                        {langDropdownOpen && (
+                            <div className="absolute right-0 mt-1 bg-white border border-slate-200 rounded shadow-lg z-50 py-1 min-w-[52px]">
+                                {[
+                                    { code: 'en', label: 'EN' },
+                                    { code: 'sl', label: 'SL' },
+                                    { code: 'pl', label: 'PL' },
+                                    { code: 'da', label: 'DA' },
+                                    { code: 'nl', label: 'NL' },
+                                    { code: 'it', label: 'IT' },
+                                ].map(({ code, label }) => (
+                                    <button
+                                        key={code}
+                                        onClick={() => { handleLangToggle(code); setLangDropdownOpen(false); }}
+                                        className={`w-full text-left px-3 py-1 text-xs font-semibold hover:bg-slate-100 ${currentLang === code ? 'text-blue-600' : 'text-slate-600'}`}
+                                    >
+                                        {label}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
                     {/* Organization Switcher - for multi-org users */}

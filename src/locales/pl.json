@@ -1,0 +1,23 @@
+{
+  "nav": {
+    "dashboard": "Panel",
+    "calendar": "Kalendarz",
+    "dontForget": "Nie zapomnij",
+    "goals": "Cele i śledzenie",
+    "keyAreas": "Kluczowe obszary",
+    "giveStrokes": "Daj uznanie",
+    "team": "Zespół"
+  },
+  "common": {
+    "save": "Zapisz",
+    "cancel": "Anuluj",
+    "delete": "Usuń",
+    "edit": "Edytuj",
+    "add": "Dodaj",
+    "close": "Zamknij",
+    "loading": "Ładowanie...",
+    "error": "Coś poszło nie tak",
+    "success": "Sukces",
+    "logout": "Wyloguj"
+  }
+}
