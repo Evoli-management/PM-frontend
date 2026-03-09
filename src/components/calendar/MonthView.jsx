@@ -5,6 +5,7 @@ import React, {
   useState,
   useMemo,
 } from "react";
+import { useTranslation } from 'react-i18next';
 import { useCalendarPreferences } from "../../hooks/useCalendarPreferences";
 import { FaChevronLeft, FaChevronRight, FaChevronDown } from "react-icons/fa";
 import { FaEdit, FaTrash } from "react-icons/fa";
@@ -36,6 +37,7 @@ const EventOverlayItem = React.memo(function EventOverlayItem({
     return null;
   }
 
+  const { t } = useTranslation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef(null);
   useEffect(() => {
@@ -143,7 +145,7 @@ const EventOverlayItem = React.memo(function EventOverlayItem({
                 }}
               >
                 <FaEdit className="w-2.5 h-2.5" />
-                <span>Edit</span>
+                <span>{t("monthView.edit")}</span>
               </button>
               <button
                 type="button"
@@ -155,7 +157,7 @@ const EventOverlayItem = React.memo(function EventOverlayItem({
                 }}
               >
                 <FaTrash className="w-2.5 h-2.5" />
-                <span>Delete</span>
+                <span>{t("monthView.delete")}</span>
               </button>
             </div>
           )}
@@ -170,7 +172,7 @@ const EventOverlayItem = React.memo(function EventOverlayItem({
               onEventClick && onEventClick(ev, "edit-month");
             }}
             aria-label={`Edit ${ev.title}`}
-            title="Edit appointment"
+            title={t("monthView.editAppointment")}
           >
             <FaEdit className="w-2.5 h-2.5 text-blue-600" />
           </button>
@@ -182,7 +184,7 @@ const EventOverlayItem = React.memo(function EventOverlayItem({
               onEventClick && onEventClick(ev, "delete");
             }}
             aria-label={`Delete ${ev.title}`}
-            title="Delete appointment"
+            title={t("monthView.deleteAppointment")}
           >
             <FaTrash className="w-2.5 h-2.5 text-red-600" />
           </button>
@@ -325,6 +327,7 @@ export default function MonthView({
   onToggleSlotSize,
   elephantTaskRow = null,
 }) {
+  const { t } = useTranslation();
   const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   const {
@@ -2328,7 +2331,7 @@ export default function MonthView({
                             if (typeof onEventClick === "function") onEventClick(run.item.task, "edit-month");
                           }}
                           aria-label={`Edit ${run.item?.task?.title || "event"}`}
-                          title="Edit event"
+                          title={t("monthView.editEvent")}
                         >
                           <FaEdit className="w-2.5 h-2.5 text-blue-600" />
                         </button>
@@ -2340,7 +2343,7 @@ export default function MonthView({
                             if (typeof onEventClick === "function") onEventClick(run.item.task, "delete");
                           }}
                           aria-label={`Delete ${run.item?.task?.title || "event"}`}
-                          title="Delete event"
+                          title={t("monthView.deleteEvent")}
                         >
                           <FaTrash className="w-2.5 h-2.5 text-red-600" />
                         </button>
@@ -2434,7 +2437,7 @@ export default function MonthView({
                                         if (typeof onEventClick === "function") onEventClick(it.task, "edit-month");
                                       }}
                                       aria-label={`Edit ${title}`}
-                                      title="Edit event"
+                                      title={t("monthView.editEvent")}
                                     >
                                       <FaEdit className="w-2.5 h-2.5 text-blue-600" />
                                     </button>
@@ -2447,7 +2450,7 @@ export default function MonthView({
                                         if (typeof onEventClick === "function") onEventClick(it.task, "delete");
                                       }}
                                       aria-label={`Delete ${title}`}
-                                      title="Delete event"
+                                      title={t("monthView.deleteEvent")}
                                     >
                                       <FaTrash className="w-2.5 h-2.5 text-red-600" />
                                     </button>

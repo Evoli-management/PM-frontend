@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FaTimes, FaCheck, FaSpinner } from 'react-icons/fa';
 import remindersService from '../../services/remindersService';
 import { useFormattedDate } from '../../hooks/useFormattedDate';
@@ -12,6 +13,7 @@ export default function ReminderModal({
   defaultKeyAreaId = null,
   inline = false,
 }) {
+  const { t } = useTranslation();
   const { formatDate } = useFormattedDate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -73,13 +75,13 @@ export default function ReminderModal({
     try {
       // Validate required fields
       if (!formData.title.trim()) {
-        setError('Title is required');
+        setError(t("reminderModal.errTitleRequired"));
         setLoading(false);
         return;
       }
 
       if (!formData.reminderDateTime) {
-        setError('Reminder date and time is required');
+        setError(t("reminderModal.errDateRequired"));
         setLoading(false);
         return;
       }
@@ -109,7 +111,7 @@ export default function ReminderModal({
 
       onClose();
     } catch (err) {
-      setError(err?.response?.data?.message || err.message || 'Failed to save reminder');
+      setError(err?.response?.data?.message || err.message || t("reminderModal.errSave"));
     } finally {
       setLoading(false);
     }
@@ -126,7 +128,7 @@ export default function ReminderModal({
         <div className="bg-white rounded-lg shadow-lg max-w-md w-[min(720px,90%)] overflow-visible pointer-events-auto z-10">
           {/* Header */}
           <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-            <h2 className="text-xl font-bold text-gray-900">{reminder ? 'Edit Reminder' : 'Create Reminder'}</h2>
+            <h2 className="text-xl font-bold text-gray-900">{reminder ? t("reminderModal.editTitle") : t("reminderModal.createTitle")}</h2>
             <button
               onClick={onClose}
               disabled={loading}
@@ -147,14 +149,14 @@ export default function ReminderModal({
             {/* Title */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Title *
+                {t("reminderModal.titleLabel")}
               </label>
               <input
                 type="text"
                 name="title"
                 value={formData.title}
                 onChange={handleInputChange}
-                placeholder="e.g., Meeting with team"
+                placeholder={t("reminderModal.titlePlaceholder")}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 disabled={loading}
               />
@@ -164,13 +166,13 @@ export default function ReminderModal({
             {/* Description */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Description
+                {t("reminderModal.descLabel")}
               </label>
               <textarea
                 name="description"
                 value={formData.description}
                 onChange={handleInputChange}
-                placeholder="Optional reminder details"
+                placeholder={t("reminderModal.descPlaceholder")}
                 rows="3"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 disabled={loading}
@@ -180,7 +182,7 @@ export default function ReminderModal({
             {/* Reminder Date & Time */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Reminder Date & Time *
+                {t("reminderModal.dateTimeLabel")}
               </label>
               <input
                 type="datetime-local"
@@ -195,7 +197,7 @@ export default function ReminderModal({
             {/* Recurrence Pattern */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Repeat
+                {t("reminderModal.repeat")}
               </label>
               <select
                 name="recurrencePattern"
@@ -216,7 +218,7 @@ export default function ReminderModal({
             {formData.recurrencePattern !== 'none' && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Stop Repeating On
+                  {t("reminderModal.stopRepeat")}
                 </label>
                 <input
                   type="date"
@@ -231,7 +233,7 @@ export default function ReminderModal({
 
             {/* Notification Settings */}
             <div className="bg-gray-50 p-3 rounded-md space-y-3">
-              <h3 className="text-sm font-semibold text-gray-700">Notifications</h3>
+              <h3 className="text-sm font-semibold text-gray-700">{t("reminderModal.notifications")}</h3>
               
               <label className="flex items-center">
                 <input
@@ -242,7 +244,7 @@ export default function ReminderModal({
                   disabled={loading}
                   className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                 />
-                <span className="ml-2 text-sm text-gray-700">Browser notification</span>
+                <span className="ml-2 text-sm text-gray-700">{t("reminderModal.browserNotif")}</span>
               </label>
 
               <label className="flex items-center">
@@ -254,7 +256,7 @@ export default function ReminderModal({
                   disabled={loading}
                   className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                 />
-                <span className="ml-2 text-sm text-gray-700">Email notification</span>
+                <span className="ml-2 text-sm text-gray-700">{t("reminderModal.emailNotif")}</span>
               </label>
             </div>
 
@@ -429,7 +431,7 @@ export default function ReminderModal({
               disabled={loading}
               className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 disabled:opacity-50"
             >
-              Cancel
+              {t("reminderModal.cancel")}
             </button>
             <button
               type="submit"
@@ -437,7 +439,7 @@ export default function ReminderModal({
               className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {loading ? <FaSpinner className="animate-spin" /> : <FaCheck />}
-              {reminder ? 'Update' : 'Create'}
+              {reminder ? t("reminderModal.update") : t("reminderModal.create")}
             </button>
           </div>
         </form>

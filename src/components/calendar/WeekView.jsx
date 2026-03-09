@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { FixedSizeList } from "react-window";
+import { useTranslation } from 'react-i18next';
 import AvailabilityBlock from "./AvailabilityBlock";
 import { useCalendarPreferences } from "../../hooks/useCalendarPreferences";
 import { generateTimeSlots } from "../../utils/timeUtils";
@@ -73,6 +74,7 @@ const WeekView = ({
   onToggleSlotSize = null,
   elephantTaskRow = null,
 }) => {
+  const { t } = useTranslation();
   const [slotSize, setSlotSize] = useState(slotSizeMinutes || defaultSlotSize);
   const {
     timeSlots,
@@ -945,7 +947,7 @@ const WeekView = ({
                 } catch {}
               }}
             >
-              Today
+              {t("weekView.today")}
             </button>
           </div>
 
@@ -953,7 +955,7 @@ const WeekView = ({
             {weekLabel}
             {(loading || prefsLoading) && (
               <span className="text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-0.5">
-                Loading
+                {t("weekView.loading")}
               </span>
             )}
           </h2>
@@ -991,7 +993,7 @@ const WeekView = ({
                 }`}
                 title="5 day week (Mon-Fri)"
               >
-                <span className="sr-only">Show 5 day week</span>
+                <span className="sr-only">{t("weekView.show5Day")}</span>
                 <span aria-hidden>5d</span>
               </button>
 
@@ -1004,7 +1006,7 @@ const WeekView = ({
                 }`}
                 title="7 day week (Mon-Sun)"
               >
-                <span className="sr-only">Show 7 day week</span>
+                <span className="sr-only">{t("weekView.show7Day")}</span>
                 <span aria-hidden>7d</span>
               </button>
             </div>
@@ -1023,7 +1025,7 @@ const WeekView = ({
                 aria-label="Time label interval"
                 title={`Time labels: ${slotSize}m`}
               >
-                <span>Time</span>
+                <span>{t("weekView.time")}</span>
                 <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
                   {slotSize}m
                 </span>
@@ -1064,7 +1066,7 @@ const WeekView = ({
                 aria-haspopup="menu"
                 aria-expanded={showViewMenu ? "true" : "false"}
               >
-                <span>View</span>
+                <span>{t("weekView.view")}</span>
                 <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
                   {view?.charAt(0).toUpperCase() + view?.slice(1)}
                 </span>
@@ -1602,7 +1604,7 @@ const WeekView = ({
                                           }}
                                           title={`Show all-day items (${d.dayItems.length})`}
                                         >
-                                          +show more
+                                          {t("weekView.showMore")}
                                         </button>
 
                                         {isOpen && (
@@ -1612,7 +1614,7 @@ const WeekView = ({
                                             style={{ pointerEvents: "auto" }}
                                           >
                                             <div className="px-3 py-2 border-b border-slate-100 text-xs text-slate-700 flex items-center justify-between">
-                                              <span className="font-semibold">Events</span>
+                                              <span className="font-semibold">{t("weekView.events")}</span>
                                               <button
                                                 type="button"
                                                 className="text-gray-500 hover:text-gray-700"

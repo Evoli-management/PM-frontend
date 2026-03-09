@@ -1,7 +1,9 @@
 import React, { useEffect, useState, useRef } from "react";
 import { FaTrash, FaPlus, FaTimes, FaImage, FaUpload } from "react-icons/fa";
+import { useTranslation } from 'react-i18next';
 
 export function CultureAndValues({ showToast }) {
+  const { t } = useTranslation();
   const [values, setValues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedValueId, setSelectedValueId] = useState(null);
@@ -55,23 +57,23 @@ export function CultureAndValues({ showToast }) {
       return;
     }
 
-    if (!confirm("Are you sure you want to delete this culture value?\nIts behaviors will be deleted too!")) return;
+    if (!confirm(t("cultureAndValuesSplitPanel.confirmDelete"))) return;
 
     try {
       const cultureService = await import("../../services/cultureService");
       await cultureService.default.deleteValue(valueId);
-      showToast?.("Value deleted successfully");
+      showToast?.(t("cultureAndValuesSplitPanel.deleteSuccess"));
       await loadValues();
       setSelectedValueId(values.length > 1 ? values[0].id : null);
     } catch (e) {
-      showToast?.(e?.response?.data?.message || "Failed to delete value", "error");
+      showToast?.(e?.response?.data?.message || t("cultureAndValuesSplitPanel.deleteError"), "error");
     }
   };
 
   if (loading) {
     return (
       <div className="bg-white rounded-lg border border-gray-200 p-8">
-        <div className="text-center text-gray-600">Loading culture values...</div>
+        <div className="text-center text-gray-600">{t("cultureAndValuesSplitPanel.loadingValues")}</div>
       </div>
     );
   }
@@ -79,9 +81,9 @@ export function CultureAndValues({ showToast }) {
   return (
     <div className="bg-white rounded-lg border border-gray-200">
       <div className="p-4 border-b">
-        <h3 className="text-lg font-semibold">Edit your organisation's culture</h3>
+        <h3 className="text-lg font-semibold">{t("cultureAndValuesSplitPanel.editCulture")}</h3>
         <p className="text-sm text-gray-600 mt-1">
-          Please select a value from the list to edit title, image and behaviours.
+          {t("cultureAndValuesSplitPanel.editDescription")}
         </p>
       </div>
 
@@ -104,7 +106,7 @@ export function CultureAndValues({ showToast }) {
                 className="w-full mt-2 p-3 border-2 border-dashed border-gray-300 hover:border-blue-500 hover:bg-blue-50 rounded-lg text-center text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors"
               >
                 <FaPlus className="inline mr-2" />
-                ADD NEW
+                {t("cultureAndValuesSplitPanel.addNew")}
               </button>
             )}
           </div>
@@ -121,14 +123,14 @@ export function CultureAndValues({ showToast }) {
                   const cultureService = await import("../../services/cultureService");
                   if (selectedValue.id === "new") {
                     await cultureService.default.createValue(data);
-                    showToast?.("Value created successfully");
+                    showToast?.(t("cultureAndValuesSplitPanel.createSuccess"));
                   } else {
                     await cultureService.default.updateValue(selectedValue.id, data);
-                    showToast?.("Value updated successfully");
+                    showToast?.(t("cultureAndValuesSplitPanel.updateSuccess"));
                   }
                   await loadValues();
                 } catch (e) {
-                  showToast?.(e?.response?.data?.message || "Failed to save value", "error");
+                  showToast?.(e?.response?.data?.message || t("cultureAndValuesSplitPanel.saveError"), "error");
                 } finally {
                   setSaving(false);
                 }
@@ -139,7 +141,7 @@ export function CultureAndValues({ showToast }) {
             />
           ) : (
             <div className="flex items-center justify-center h-full text-gray-500">
-              Select a value to edit or create a new one
+              {t("cultureAndValuesSplitPanel.selectOrCreate")}
             </div>
           )}
         </div>
@@ -149,6 +151,7 @@ export function CultureAndValues({ showToast }) {
 }
 
 function ValueListItem({ value, isSelected, onClick, onDelete }) {
+  const { t } = useTranslation();
   return (
     <div
       className={`relative group p-3 rounded-lg cursor-pointer transition-all mb-1 ${
@@ -160,7 +163,7 @@ function ValueListItem({ value, isSelected, onClick, onDelete }) {
     >
       <div className="flex items-center justify-between">
         <span className={`font-medium ${isSelected ? "text-blue-700" : "text-gray-900"}`}>
-          {value.heading || "New Value"}
+          {value.heading || t("cultureAndValuesSplitPanel.newValue")}
         </span>
         <button
           onClick={(e) => {
@@ -178,6 +181,7 @@ function ValueListItem({ value, isSelected, onClick, onDelete }) {
 }
 
 function ValueEditForm({ value, onSave, saving, showToast, fileInputRef }) {
+  const { t } = useTranslation();
   const [heading, setHeading] = useState(value?.heading || "");
   const [tooltip, setTooltip] = useState(value?.tooltip || "");
   const [imageUrl, setImageUrl] = useState(value?.imageUrl || "/strokes/no-image.png");
@@ -208,7 +212,7 @@ function ValueEditForm({ value, onSave, saving, showToast, fileInputRef }) {
 
   const handleAddBehavior = () => {
     if (behaviors.length >= 4) {
-      showToast?.("Maximum 4 behaviors allowed per value", "error");
+      showToast?.(t("cultureAndValuesSplitPanel.maxBehaviors"), "error");
       return;
     }
     setBehaviors([...behaviors, { name: "", tooltip: "" }]);
@@ -216,7 +220,7 @@ function ValueEditForm({ value, onSave, saving, showToast, fileInputRef }) {
 
   const handleRemoveBehavior = (index) => {
     if (behaviors.length === 1) {
-      showToast?.("At least one behavior is required", "error");
+      showToast?.(t("cultureAndValuesSplitPanel.minBehaviors"), "error");
       return;
     }
     setBehaviors(behaviors.filter((_, i) => i !== index));
@@ -250,9 +254,9 @@ function ValueEditForm({ value, onSave, saving, showToast, fileInputRef }) {
 
       const data = await response.json();
       setImageUrl(data.imageUrl);
-      showToast?.("Image uploaded successfully");
+      showToast?.(t("cultureAndValuesSplitPanel.imageUploadSuccess"));
     } catch (error) {
-      showToast?.(error.message || "Failed to upload image", "error");
+      showToast?.(error.message || t("cultureAndValuesSplitPanel.imageUploadError"), "error");
     } finally {
       setUploading(false);
       if (fileInputRef.current) {
@@ -265,19 +269,19 @@ function ValueEditForm({ value, onSave, saving, showToast, fileInputRef }) {
     e.preventDefault();
 
     if (!heading.trim()) {
-      showToast?.("Culture name is required", "error");
+      showToast?.(t("cultureAndValuesSplitPanel.cultureRequired"), "error");
       return;
     }
 
     const hasEmptyBehaviorName = behaviors.some((b) => !b.name.trim());
     if (hasEmptyBehaviorName) {
-      showToast?.("Fill in all behavior names", "error");
+      showToast?.(t("cultureAndValuesSplitPanel.behaviorNamesRequired"), "error");
       return;
     }
 
     const hasEmptyBehaviorTooltip = behaviors.some((b) => !b.tooltip.trim());
     if (hasEmptyBehaviorTooltip) {
-      showToast?.("Fill in all behavior tooltips", "error");
+      showToast?.(t("cultureAndValuesSplitPanel.behaviorTooltipsRequired"), "error");
       return;
     }
 
@@ -315,14 +319,14 @@ function ValueEditForm({ value, onSave, saving, showToast, fileInputRef }) {
         </div>
         <div className="flex-1">
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Value Heading *
+            {t("cultureAndValuesSplitPanel.valueHeading")}
           </label>
           <input
             type="text"
             value={heading}
             onChange={(e) => setHeading(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="Value heading"
+            placeholder={t("cultureAndValuesSplitPanel.valuePlaceholder")}
             required
           />
         </div>
@@ -337,31 +341,31 @@ function ValueEditForm({ value, onSave, saving, showToast, fileInputRef }) {
           className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg text-sm"
         >
           <FaUpload />
-          {uploading ? "Uploading..." : "Upload Image"}
+          {uploading ? t("cultureAndValuesSplitPanel.uploading") : t("cultureAndValuesSplitPanel.uploadImage")}
         </button>
         <span className="text-xs text-gray-500 flex items-center">
-          Max 5MB • JPG, PNG, GIF, WebP
+          {t("cultureAndValuesSplitPanel.imageSizeHint")}
         </span>
       </div>
 
       {/* Tooltip/Description */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Screen Tooltip / Description
+          {t("cultureAndValuesSplitPanel.tooltipLabel")}
         </label>
         <input
           type="text"
           value={tooltip}
           onChange={(e) => setTooltip(e.target.value)}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          placeholder="Optional description shown as tooltip"
+          placeholder={t("cultureAndValuesSplitPanel.tooltipPlaceholder")}
         />
       </div>
 
       {/* Behaviors */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Describe Behaviors
+          {t("cultureAndValuesSplitPanel.describeBehaviors")}
         </label>
         <div className="space-y-4">
           {behaviors.map((behavior, index) => (
@@ -378,27 +382,27 @@ function ValueEditForm({ value, onSave, saving, showToast, fileInputRef }) {
               <div className="space-y-3 pr-8">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Behavior Name
+                    {t("cultureAndValuesSplitPanel.behaviorName")}
                   </label>
                   <input
                     type="text"
                     value={behavior.name}
                     onChange={(e) => handleBehaviorChange(index, "name", e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                    placeholder="e.g., Goes the extra mile"
+                    placeholder={t("cultureAndValuesSplitPanel.behaviorNamePlaceholder")}
                     maxLength={100}
                   />
                 </div>
 
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Behavior Tooltip
+                    {t("cultureAndValuesSplitPanel.behaviorTooltip")}
                   </label>
                   <textarea
                     value={behavior.tooltip}
                     onChange={(e) => handleBehaviorChange(index, "tooltip", e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm resize-none"
-                    placeholder="Detailed description of the behavior"
+                    placeholder={t("cultureAndValuesSplitPanel.behaviorTooltipPlaceholder")}
                     rows={2}
                     maxLength={255}
                   />
@@ -414,7 +418,7 @@ function ValueEditForm({ value, onSave, saving, showToast, fileInputRef }) {
             onClick={handleAddBehavior}
             className="mt-3 text-sm text-blue-600 hover:text-blue-700 font-medium"
           >
-            + Add Behavior {behaviors.length >= 4 && "(max 4)"}
+            {t("cultureAndValuesSplitPanel.addBehavior")}
           </button>
         )}
       </div>
@@ -426,7 +430,7 @@ function ValueEditForm({ value, onSave, saving, showToast, fileInputRef }) {
           disabled={saving}
           className="px-6 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg font-medium"
         >
-          {saving ? "Saving..." : "Save"}
+          {saving ? t("cultureAndValuesSplitPanel.saving") : t("cultureAndValuesSplitPanel.save")}
         </button>
       </div>
     </form>

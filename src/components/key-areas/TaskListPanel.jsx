@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { FaPlus } from 'react-icons/fa';
 
 /**
@@ -14,6 +15,7 @@ export default function TaskListPanel({
     tasksLoading = false,
     header,
 }) {
+    const { t } = useTranslation();
     return (
         <div className="flex flex-col h-full">
             {/* Header */}
@@ -27,7 +29,7 @@ export default function TaskListPanel({
             <div className="flex-1 overflow-y-auto overflow-x-hidden bg-white">
                 {tasksLoading ? (
                     <div className="flex items-center justify-center h-full">
-                        <div className="text-slate-500 text-sm">Loading tasks...</div>
+                        <div className="text-slate-500 text-sm">{t("taskListPanel.loading")}</div>
                     </div>
                 ) : (
                     children

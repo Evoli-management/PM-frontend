@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 
 export default function AppointmentActionPopup({
   anchorRect,
@@ -9,6 +10,7 @@ export default function AppointmentActionPopup({
   isMobile,
   ariaLabelledBy = "appointment-action-menu",
 }) {
+  const { t } = useTranslation();
   const popupRef = useRef(null);
 
   // Close on outside click
@@ -72,24 +74,24 @@ export default function AppointmentActionPopup({
         tabIndex={-1}
         className="appointment-action-popup"
       >
-        <div id={ariaLabelledBy} className="font-semibold text-base mb-2">Appointment Actions</div>
+        <div id={ariaLabelledBy} className="font-semibold text-base mb-2">{t("appointmentActionPopup.title")}</div>
         <button
           type="button"
           className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-blue-50 focus:bg-blue-100 focus:outline-none text-blue-700 font-medium"
           onClick={onEdit}
-          aria-label="Edit Appointment"
+          aria-label={t("appointmentActionPopup.edit")}
           tabIndex={0}
         >
-          <span role="img" aria-label="Edit">✎</span> Edit Appointment
+          <span role="img" aria-label={t("appointmentActionPopup.edit")}>✎</span> {t("appointmentActionPopup.edit")}
         </button>
         <button
           type="button"
           className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-red-50 focus:bg-red-100 focus:outline-none text-red-700 font-medium mt-1"
           onClick={onDelete}
-          aria-label="Delete Appointment"
+          aria-label={t("appointmentActionPopup.delete")}
           tabIndex={0}
         >
-          <span role="img" aria-label="Delete">🗑️</span> Delete Appointment
+          <span role="img" aria-label={t("appointmentActionPopup.delete")}>🗑️</span> {t("appointmentActionPopup.delete")}
         </button>
       </div>
     </>

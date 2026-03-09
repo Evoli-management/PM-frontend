@@ -3,6 +3,7 @@ import { useCalendarPreferences } from "../../hooks/useCalendarPreferences";
 import calendarService from "../../services/calendarService";
 import ResizablePanels from "../key-areas/ResizablePanels";
 import CalendarViewTopSection from "./CalendarViewTopSection";
+import { useTranslation } from "react-i18next";
 
 // Load activityService on demand to keep it out of the main chunk
 let _activityService = null;
@@ -107,6 +108,7 @@ export default function DayView({
   elephantTaskRow = null,
 }) {
 
+  const { t: tr } = useTranslation();
   // Always render the full 24-hour grid; non-working slots will be greyed
   // Always render the full 24-hour grid; non-working slots will be greyed
   const {
@@ -639,7 +641,7 @@ export default function DayView({
       <div className="md:pr-px">
         <div className="w-full inline-flex items-center justify-between gap-2 px-3 py-2 rounded-md border border-slate-300 bg-white text-slate-800 font-medium mb-1">
           <span className="inline-flex items-center gap-2">
-            <span>Tasks</span>
+            <span>{tr("dayView.tasks")}</span>
             <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" className="w-4 h-4 text-[#4DC3D8] shrink-0" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
               <path d="M400 32H48C21.5 32 0 53.5 0 80v352c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48V80c0-26.5-21.5-48-48-48z"></path>
             </svg>
@@ -648,8 +650,8 @@ export default function DayView({
             type="button"
             onClick={() => onAddTaskOrActivity && onAddTaskOrActivity(currentDate || new Date(), { defaultTab: 'task' })}
             className="inline-flex items-center justify-center w-6 h-6 rounded border border-slate-300 text-slate-700 hover:bg-slate-100"
-            title="Add task"
-            aria-label="Add task"
+            title={tr("dayView.addTask")}
+            aria-label={tr("dayView.addTask")}
           >
             <FaPlus className="w-3 h-3" />
           </button>
@@ -658,7 +660,7 @@ export default function DayView({
 
   <div className="w-full bg-slate-50 p-2 overflow-visible flex-1">
         {loadingSidebar ? (
-          <div className="text-[11px] text-slate-500 text-center">Loading…</div>
+          <div className="text-[11px] text-slate-500 text-center">{tr("dayView.loading")}</div>
         ) : (((Array.isArray(todos) && todos.length) || (sideTodos && sideTodos.length)) ? (
           <div className="flex flex-col gap-0">
             {(Array.isArray(todos) && todos.length ? todos : sideTodos).slice(0,12).map((t) => {
@@ -723,7 +725,7 @@ export default function DayView({
                           onTaskComplete(t);
                         }}
                         className="p-1 hover:bg-green-100 rounded transition-colors"
-                        title="Mark complete"
+                        title={tr("dayView.markComplete")}
                       >
                         <FaCheck className="w-3 h-3 text-green-600" />
                       </button>
@@ -735,7 +737,7 @@ export default function DayView({
                           onTaskEdit(t);
                         }}
                         className="p-1 hover:bg-slate-100 rounded transition-colors"
-                        title="Edit"
+                        title={tr("dayView.edit")}
                       >
                         <FaEdit className="w-3 h-3 text-slate-600" />
                       </button>
@@ -747,7 +749,7 @@ export default function DayView({
                           onTaskDelete(t);
                         }}
                         className="p-1 hover:bg-red-100 rounded transition-colors"
-                        title="Delete"
+                        title={tr("dayView.delete")}
                       >
                         <FaTrash className="w-3 h-3 text-red-600" />
                       </button>
@@ -758,7 +760,7 @@ export default function DayView({
             })}
           </div>
         ) : (
-          <div className="text-[11px] text-slate-500 text-center">No tasks</div>
+          <div className="text-[11px] text-slate-500 text-center">{tr("dayView.noTasks")}</div>
         ))}
       </div>
     </div>
@@ -770,7 +772,7 @@ export default function DayView({
       <div className="md:pl-px">
         <div className="w-full inline-flex items-center justify-between gap-2 px-3 py-2 rounded-md border border-slate-300 bg-white text-slate-800 font-medium mb-1">
           <span className="inline-flex items-center gap-2">
-            <span>Activities</span>
+            <span>{tr("dayView.activities")}</span>
             <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" className="w-4 h-4 text-[#4DC3D8] shrink-0" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
               <path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z" />
             </svg>
@@ -779,8 +781,8 @@ export default function DayView({
             type="button"
             onClick={() => onAddTaskOrActivity && onAddTaskOrActivity(currentDate || new Date(), { defaultTab: 'activity' })}
             className="inline-flex items-center justify-center w-6 h-6 rounded border border-slate-300 text-slate-700 hover:bg-slate-100"
-            title="Add activity"
-            aria-label="Add activity"
+            title={tr("dayView.addActivity")}
+            aria-label={tr("dayView.addActivity")}
           >
             <FaPlus className="w-3 h-3" />
           </button>
@@ -789,7 +791,7 @@ export default function DayView({
 
       <div className="w-full bg-slate-50 p-2 overflow-visible flex-1">
       {loadingSidebar ? (
-        <div className="text-[11px] text-slate-500 text-center">Loading…</div>
+        <div className="text-[11px] text-slate-500 text-center">{tr("dayView.loading")}</div>
       ) : (
         <>
           {(sideActivities && sideActivities.length) || (Array.isArray(unattachedActivities) && unattachedActivities.length) ? (
@@ -842,7 +844,7 @@ export default function DayView({
                             onActivityComplete(a);
                           }}
                           className="p-1 hover:bg-green-100 rounded transition-colors"
-                          title="Mark complete"
+                          title={tr("dayView.markComplete")}
                         >
                           <FaCheck className="w-3 h-3 text-green-600" />
                         </button>
@@ -854,7 +856,7 @@ export default function DayView({
                             onActivityEdit(a);
                           }}
                           className="p-1 hover:bg-slate-100 rounded transition-colors"
-                          title="Edit"
+                          title={tr("dayView.edit")}
                         >
                           <FaEdit className="w-3 h-3 text-slate-600" />
                         </button>
@@ -866,7 +868,7 @@ export default function DayView({
                             onActivityDelete(a);
                           }}
                           className="p-1 hover:bg-red-100 rounded transition-colors"
-                          title="Delete"
+                          title={tr("dayView.delete")}
                         >
                           <FaTrash className="w-3 h-3 text-red-600" />
                         </button>
@@ -877,7 +879,7 @@ export default function DayView({
               })}
             </div>
           ) : (
-            <div className="text-[11px] text-slate-500 text-center">No activities</div>
+            <div className="text-[11px] text-slate-500 text-center">{tr("dayView.noActivities")}</div>
           )}
         </>
       )}
@@ -947,10 +949,10 @@ export default function DayView({
           <button
             onClick={goToday}
             className="day-header-btn px-2 py-0.5 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
-            aria-label="Today"
+            aria-label={tr("dayView.today")}
             style={{ minWidth: 34, minHeight: 34 }}
           >
-            Today
+            {tr("dayView.today")}
           </button>
         </div>}
         center={<h2 className="text-base font-bold flex items-center gap-2">{headerDate}</h2>}
@@ -969,7 +971,7 @@ export default function DayView({
               title={`Time labels: ${slotSizeMinutes}m`}
               style={{ minWidth: 48, minHeight: 34 }}
             >
-              <span>Time</span>
+              <span>{tr("dayView.time")}</span>
               <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
                 {slotSizeMinutes}m
               </span>
@@ -1009,7 +1011,7 @@ export default function DayView({
               aria-expanded={showViewMenu ? "true" : "false"}
               style={{ minWidth: 34, minHeight: 34 }}
             >
-              <span>View</span>
+              <span>{tr("dayView.view")}</span>
               <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
                 {view?.charAt(0).toUpperCase() + view?.slice(1)}
               </span>

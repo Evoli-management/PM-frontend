@@ -1,9 +1,11 @@
 // src/components/teams/AdminRoleManager.jsx
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import organizationService from '../../services/organizationService';
 import styles from './AdminRoleManager.module.css';
 
 export const AdminRoleManager = ({ member, onSuccess }) => {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -35,9 +37,9 @@ export const AdminRoleManager = ({ member, onSuccess }) => {
       <button
         className={styles.toggleBtn}
         onClick={() => setIsOpen(!isOpen)}
-        title="Manage admin role"
+        title={t("adminRoleManager.manageTitle")}
       >
-        {isAdmin ? 'Admin' : 'User'}
+        {isAdmin ? t("adminRoleManager.admin") : t("adminRoleManager.user")}
       </button>
 
       {isOpen && (
@@ -61,7 +63,7 @@ export const AdminRoleManager = ({ member, onSuccess }) => {
                 onClick={() => handleRoleChange('admin')}
                 disabled={loading}
               >
-                {loading ? 'Promoting...' : 'Promote to Admin'}
+                {loading ? t("adminRoleManager.promoting") : t("adminRoleManager.promoteToAdmin")}
               </button>
             ) : (
               <button
@@ -69,13 +71,13 @@ export const AdminRoleManager = ({ member, onSuccess }) => {
                 onClick={() => handleRoleChange('user')}
                 disabled={loading}
               >
-                {loading ? 'Demoting...' : 'Demote to User'}
+                {loading ? t("adminRoleManager.demoting") : t("adminRoleManager.demoteToUser")}
               </button>
             )}
           </div>
 
           <small className={styles.hint}>
-            Current role: <strong>{isAdmin ? 'Admin' : 'User'}</strong>
+            {t("adminRoleManager.currentRole")} <strong>{isAdmin ? t("adminRoleManager.admin") : t("adminRoleManager.user")}</strong>
           </small>
         </div>
       )}

@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { FaEdit, FaTrash, FaEye, FaUserPlus, FaTimes, FaBullseye, FaThLarge, FaUsers, FaKey } from "react-icons/fa";
+import { useTranslation } from 'react-i18next';
 import userProfileService from "../../services/userProfileService";
 import { SubscriptionManagerModal } from "./SubscriptionManagerModal";
 import { TrialStatusBanner } from "./TrialStatusBanner";
 
 export function ManageMembers({ showToast }) {
+  const { t } = useTranslation();
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -90,7 +92,7 @@ export function ManageMembers({ showToast }) {
     } catch (e) {
       const errorMsg = e?.response?.data?.message || "Failed to load members";
       if (errorMsg.includes("not part of any organization")) {
-        showToast?.("You're not part of an organization. Visit the Overview tab to create or join one.", "error");
+        showToast?.(t("manageMembers.notInOrg"), "error");
       } else {
         showToast?.(errorMsg, "error");
       }
@@ -126,15 +128,15 @@ export function ManageMembers({ showToast }) {
   };
 
   const handleDeleteMember = async (memberId) => {
-    if (!confirm("Are you sure you want to remove this user from the organization?")) return;
+    if (!confirm(t("manageMembers.confirmDelete"))) return;
 
     try {
       const orgService = await import("../../services/organizationService");
       await orgService.default.removeMember(memberId);
-      showToast?.("Member removed successfully");
+      showToast?.(t("manageMembers.removeSuccess"));
       loadMembers();
     } catch (e) {
-      showToast?.(e?.response?.data?.message || "Failed to remove member", "error");
+      showToast?.(e?.response?.data?.message || t("manageMembers.removeError"), "error");
     }
   };
 
@@ -142,11 +144,11 @@ export function ManageMembers({ showToast }) {
     try {
       const orgService = await import("../../services/organizationService");
       const { inviteUrl } = await orgService.default.inviteUser(email);
-      showToast?.("Invitation sent successfully");
+      showToast?.(t("manageMembers.inviteSuccess"));
       loadUsage(); // Reload usage stats
       return { inviteUrl };
     } catch (e) {
-      showToast?.(e?.response?.data?.message || "Failed to send invitation", "error");
+      showToast?.(e?.response?.data?.message || t("manageMembers.inviteError"), "error");
       throw e;
     }
   };
@@ -155,12 +157,12 @@ export function ManageMembers({ showToast }) {
     try {
       const orgService = await import("../../services/organizationService");
       await orgService.default.startTrial();
-      showToast?.("Trial started successfully! You now have 14 days of Business plan access.");
+      showToast?.(t("manageMembers.trialStartSuccess"));
       // Reload trial status and usage
       loadTrialStatus();
       loadUsage();
     } catch (e) {
-      showToast?.(e?.response?.data?.message || "Failed to start trial", "error");
+      showToast?.(e?.response?.data?.message || t("manageMembers.trialStartError"), "error");
     }
   };
 
@@ -179,7 +181,7 @@ export function ManageMembers({ showToast }) {
       
       <div className="p-4 border-b">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-lg font-semibold">Manage Members/Users</h3>
+          <h3 className="text-lg font-semibold">{t("manageMembers.title")}</h3>
             <div className="flex items-center gap-2">
               {canManage && (
                 <button
@@ -187,7 +189,7 @@ export function ManageMembers({ showToast }) {
                   className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm"
                   title="Assign subscription manager"
                 >
-                  <FaKey /> Subscription Manager
+                  <FaKey /> {t("manageMembers.subscriptionManagerBtn")}
                 </button>
               )}
               {canInvite && (
@@ -201,9 +203,9 @@ export function ManageMembers({ showToast }) {
                   }}
                   className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg text-sm"
                   disabled={usage && !usage.canAddMembers}
-                  title={usage && !usage.canAddMembers ? `Member limit reached (${usage.currentMembers}/${usage.maxMembers} on ${usage.planName} plan). Upgrade to add more members.` : "Invite new user"}
+                  title={usage && !usage.canAddMembers ? t("manageMembers.memberLimitReached") : t("manageMembers.inviteUser")}
                 >
-                  <FaUserPlus /> Invite new user
+                  <FaUserPlus /> {t("manageMembers.inviteUser")}
                 </button>
               )}
             </div>
@@ -218,7 +220,7 @@ export function ManageMembers({ showToast }) {
                 <strong>{usage.currentMembers}/{usage.maxMembers}</strong> members
               </span>
               {!usage.canAddMembers && (
-                <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded">Limit reached</span>
+                <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded">{t("manageMembers.memberLimitReached")}</span>
               )}
             </div>
             <div className={`flex items-center gap-2 ${usage.canAddTeams ? 'text-gray-600' : 'text-red-600'}`}>
@@ -235,9 +237,9 @@ export function ManageMembers({ showToast }) {
       </div>
 
       {loading ? (
-        <div className="p-4 text-sm text-gray-600">Loading members...</div>
+        <div className="p-4 text-sm text-gray-600">{t("manageMembers.loadingMembers")}</div>
       ) : members.length === 0 ? (
-        <div className="p-4 text-sm text-gray-600">No members found.</div>
+        <div className="p-4 text-sm text-gray-600">{t("manageMembers.noMembers")}</div>
       ) : (
         <div className="divide-y">
           {members.map((member) => (
@@ -247,7 +249,7 @@ export function ManageMembers({ showToast }) {
                   {member.firstName} {member.lastName}
                   {currentSubscriptionManager?.id === member.id && (
                     <span className="inline-block px-2 py-1 bg-amber-100 text-amber-800 text-xs font-semibold rounded">
-                      Subscription Manager
+                      {t("manageMembers.subscriptionManagerBadge")}
                     </span>
                   )}
                 </div>
@@ -261,21 +263,21 @@ export function ManageMembers({ showToast }) {
                     <button
                       onClick={() => handleViewDetails(member)}
                       className="p-2 text-green-600 hover:bg-green-50 rounded"
-                      title="View details"
+                      title={t("manageMembers.viewDetails")}
                     >
                       <FaEye />
                     </button>
                     <button
                       onClick={() => handleEditMember(member)}
                       className="p-2 text-blue-600 hover:bg-blue-50 rounded"
-                      title="Edit member"
+                      title={t("manageMembers.editMember")}
                     >
                       <FaEdit />
                     </button>
                     <button
                       onClick={() => handleDeleteMember(member.id)}
                       className="p-2 text-red-600 hover:bg-red-50 rounded"
-                      title="Remove member"
+                      title={t("manageMembers.removeMember")}
                     >
                       <FaTrash />
                     </button>
@@ -336,6 +338,7 @@ export function ManageMembers({ showToast }) {
 }
 
 function EditMemberModal({ member, teams, onClose, onSuccess, showToast }) {
+  const { t } = useTranslation();
   const [firstName, setFirstName] = useState(member.firstName || "");
   const [lastName, setLastName] = useState(member.lastName || "");
   const [role, setRole] = useState(member.role || "member");
@@ -354,10 +357,10 @@ function EditMemberModal({ member, teams, onClose, onSuccess, showToast }) {
         role,
         teamIds: selectedTeams,
       });
-      showToast?.("Member updated successfully");
+      showToast?.(t("manageMembers.editModal.updateSuccess"));
       onSuccess();
     } catch (e) {
-      showToast?.(e?.response?.data?.message || "Failed to update member", "error");
+      showToast?.(e?.response?.data?.message || t("manageMembers.editModal.updateError"), "error");
     } finally {
       setSaving(false);
     }
@@ -373,7 +376,7 @@ function EditMemberModal({ member, teams, onClose, onSuccess, showToast }) {
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">Edit Member</h3>
+          <h3 className="text-lg font-semibold">{t("manageMembers.editModal.title")}</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <FaTimes />
           </button>
@@ -383,7 +386,7 @@ function EditMemberModal({ member, teams, onClose, onSuccess, showToast }) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                First Name
+                {t("manageMembers.editModal.firstName")}
               </label>
               <input
                 type="text"
@@ -395,7 +398,7 @@ function EditMemberModal({ member, teams, onClose, onSuccess, showToast }) {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Last Name
+                {t("manageMembers.editModal.lastName")}
               </label>
               <input
                 type="text"
@@ -408,28 +411,28 @@ function EditMemberModal({ member, teams, onClose, onSuccess, showToast }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t("manageMembers.editModal.role")}</label>
             <select
               value={role}
               onChange={(e) => setRole(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
-              <option value="member">Member</option>
-              <option value="admin">Admin</option>
-              <option value="owner">Owner</option>
+              <option value="member">{t("manageMembers.editModal.roleMember")}</option>
+              <option value="admin">{t("manageMembers.editModal.roleAdmin")}</option>
+              <option value="owner">{t("manageMembers.editModal.roleOwner")}</option>
             </select>
             <p className="text-xs text-gray-500 mt-1">
-              Role defines member's permissions in the organization
+              {t("manageMembers.editModal.roleHint")}
             </p>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Manage User's Teams
+              {t("manageMembers.editModal.manageTeams")}
             </label>
             <div className="border border-gray-300 rounded-lg max-h-48 overflow-y-auto">
               {teams.length === 0 ? (
-                <div className="px-3 py-2 text-sm text-gray-500">No teams available</div>
+                <div className="px-3 py-2 text-sm text-gray-500">{t("manageMembers.editModal.noTeams")}</div>
               ) : (
                 teams.map((team) => (
                   <label
@@ -455,14 +458,14 @@ function EditMemberModal({ member, teams, onClose, onSuccess, showToast }) {
               onClick={onClose}
               className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
             >
-              Cancel
+              {t("manageMembers.editModal.cancel")}
             </button>
             <button
               type="submit"
               disabled={saving}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-lg"
             >
-              {saving ? "Saving..." : "Save Changes"}
+              {saving ? t("manageMembers.editModal.saving") : t("manageMembers.editModal.saveChanges")}
             </button>
           </div>
         </form>
@@ -472,6 +475,7 @@ function EditMemberModal({ member, teams, onClose, onSuccess, showToast }) {
 }
 
 function UserDetailModal({ member, teams, isAdmin, currentUserProfile, onClose, onRefresh, showToast }) {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('teams');
   const [userTeams, setUserTeams] = useState([]);
   const [userGoals, setUserGoals] = useState([]);
@@ -549,35 +553,35 @@ function UserDetailModal({ member, teams, isAdmin, currentUserProfile, onClose, 
 
   const handleUpdateGoal = async (goalId, updates) => {
     if (!isAdmin) {
-      showToast?.("Only admins can edit user goals", "error");
+      showToast?.(t("manageMembers.editGoalForm.adminOnly"), "error");
       return;
     }
 
     try {
       const goalService = await import("../../services/goalService");
       await goalService.updateGoal(goalId, updates);
-      showToast?.("Goal updated successfully");
+      showToast?.(t("manageMembers.detailModal.goalUpdateSuccess"));
       setEditingGoal(null);
       loadUserGoals();
     } catch (e) {
-      showToast?.(e?.response?.data?.message || "Failed to update goal", "error");
+      showToast?.(e?.response?.data?.message || t("manageMembers.detailModal.goalUpdateError"), "error");
     }
   };
 
   const handleUpdateKeyArea = async (keyAreaId, updates) => {
     if (!isAdmin) {
-      showToast?.("Only admins can edit user key areas", "error");
+      showToast?.(t("manageMembers.editKeyAreaForm.adminOnly"), "error");
       return;
     }
 
     try {
       const keyAreaService = await import("../../services/keyAreaService");
       await keyAreaService.default.update(keyAreaId, updates);
-      showToast?.("Key area updated successfully");
+      showToast?.(t("manageMembers.detailModal.keyAreaUpdateSuccess"));
       setEditingKeyArea(null);
       loadUserKeyAreas();
     } catch (e) {
-      showToast?.(e?.response?.data?.message || "Failed to update key area", "error");
+      showToast?.(e?.response?.data?.message || t("manageMembers.detailModal.keyAreaUpdateError"), "error");
     }
   };
 
@@ -608,7 +612,7 @@ function UserDetailModal({ member, teams, isAdmin, currentUserProfile, onClose, 
                   : 'border-transparent text-gray-600 hover:text-gray-900'
               }`}
             >
-              <FaUsers /> Teams
+              <FaUsers /> {t("manageMembers.detailModal.teamsTab")}
             </button>
             <button
               onClick={() => setActiveTab('goals')}
@@ -618,7 +622,7 @@ function UserDetailModal({ member, teams, isAdmin, currentUserProfile, onClose, 
                   : 'border-transparent text-gray-600 hover:text-gray-900'
               }`}
             >
-              <FaBullseye /> Goals {!isAdmin && '(Public Only)'}
+              <FaBullseye /> {t("manageMembers.detailModal.goalsTab")} {!isAdmin && t("manageMembers.detailModal.publicOnly")}
             </button>
             <button
               onClick={() => setActiveTab('keyareas')}
@@ -628,7 +632,7 @@ function UserDetailModal({ member, teams, isAdmin, currentUserProfile, onClose, 
                   : 'border-transparent text-gray-600 hover:text-gray-900'
               }`}
             >
-              <FaThLarge /> Key Areas
+              <FaThLarge /> {t("manageMembers.detailModal.keyAreasTab")}
             </button>
           </div>
         </div>
@@ -638,12 +642,12 @@ function UserDetailModal({ member, teams, isAdmin, currentUserProfile, onClose, 
           {activeTab === 'teams' && (
             <div className="space-y-3">
               <div className="flex items-center justify-between mb-4">
-                <h4 className="text-sm font-semibold text-gray-700">Team Memberships</h4>
-                <span className="text-xs text-gray-500">{userTeams.length} team(s)</span>
+                <h4 className="text-sm font-semibold text-gray-700">{t("manageMembers.detailModal.teamMemberships")}</h4>
+                <span className="text-xs text-gray-500">{t("manageMembers.detailModal.teamCount", { count: userTeams.length })}</span>
               </div>
               {userTeams.length === 0 ? (
                 <p className="text-sm text-gray-500 text-center py-8">
-                  This user is not a member of any teams
+                  {t("manageMembers.detailModal.noTeams")}
                 </p>
               ) : (
                 <div className="space-y-2">
@@ -662,7 +666,7 @@ function UserDetailModal({ member, teams, isAdmin, currentUserProfile, onClose, 
                         </div>
                         {team.userRole === 'lead' && (
                           <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">
-                            Team Lead
+                            {t("manageMembers.detailModal.teamLeadBadge")}
                           </span>
                         )}
                       </div>
@@ -677,15 +681,15 @@ function UserDetailModal({ member, teams, isAdmin, currentUserProfile, onClose, 
             <div className="space-y-3">
               <div className="flex items-center justify-between mb-4">
                 <h4 className="text-sm font-semibold text-gray-700">
-                  Goals {!isAdmin && '(Public Only)'}
+                  {t("manageMembers.detailModal.goalsTab")} {!isAdmin && t("manageMembers.detailModal.publicOnly")}
                 </h4>
-                <span className="text-xs text-gray-500">{userGoals.length} goal(s)</span>
+                <span className="text-xs text-gray-500">{t("manageMembers.detailModal.goalsCount", { count: userGoals.length })}</span>
               </div>
               {loading ? (
-                <p className="text-sm text-gray-500 text-center py-8">Loading goals...</p>
+                <p className="text-sm text-gray-500 text-center py-8">{t("manageMembers.detailModal.loadingGoals")}</p>
               ) : userGoals.length === 0 ? (
                 <p className="text-sm text-gray-500 text-center py-8">
-                  No {!isAdmin && 'public '}goals found
+                  {!isAdmin ? t("manageMembers.detailModal.noPublicGoals") : t("manageMembers.detailModal.noGoals")}
                 </p>
               ) : (
                 <div className="space-y-2">
@@ -717,10 +721,10 @@ function UserDetailModal({ member, teams, isAdmin, currentUserProfile, onClose, 
                                   {goal.status}
                                 </span>
                                 {goal.progressPercent !== undefined && (
-                                  <span>Progress: {goal.progressPercent}%</span>
+                                  <span>{t("manageMembers.detailModal.progressLabel", { percent: goal.progressPercent })}</span>
                                 )}
                                 {goal.dueDate && (
-                                  <span>Due: {new Date(goal.dueDate).toLocaleDateString()}</span>
+                                  <span>{t("manageMembers.detailModal.dueLabel", { date: new Date(goal.dueDate).toLocaleDateString() })}</span>
                                 )}
                                 <span className={`px-2 py-1 rounded ${
                                   goal.visibility === 'public' 
@@ -749,7 +753,7 @@ function UserDetailModal({ member, teams, isAdmin, currentUserProfile, onClose, 
               )}
               {!isAdmin && (
                 <p className="text-xs text-gray-500 italic mt-4">
-                  You can only view public goals. Admin access is required to see private goals and make edits.
+                  {t("manageMembers.detailModal.adminGoalNote")}
                 </p>
               )}
             </div>
@@ -758,8 +762,8 @@ function UserDetailModal({ member, teams, isAdmin, currentUserProfile, onClose, 
           {activeTab === 'keyareas' && (
             <div className="space-y-3">
               <div className="flex items-center justify-between mb-4">
-                <h4 className="text-sm font-semibold text-gray-700">Key Areas</h4>
-                <span className="text-xs text-gray-500">{userKeyAreas.length} key area(s)</span>
+                <h4 className="text-sm font-semibold text-gray-700">{t("manageMembers.detailModal.keyAreasTab")}</h4>
+                <span className="text-xs text-gray-500">{t("manageMembers.detailModal.keyAreasCount", { count: userKeyAreas.length })}</span>
               </div>
               {loading ? (
                 <p className="text-sm text-gray-500 text-center py-8">Loading key areas...</p>

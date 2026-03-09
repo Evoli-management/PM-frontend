@@ -1,5 +1,6 @@
 // src/components/goals/GoalsControlBar.jsx
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { FaSearch, FaPlus, FaThLarge, FaListUl } from "react-icons/fa";
 
 const GoalsControlBar = ({
@@ -13,6 +14,7 @@ const GoalsControlBar = ({
     setViewMode,
     onCreateClick,
 }) => {
+    const { t } = useTranslation();
     return (
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 mb-8">
             <div className="flex flex-col lg:flex-row lg:items-center gap-4">
@@ -22,7 +24,7 @@ const GoalsControlBar = ({
                         <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
                         <input
                             type="text"
-                            placeholder="Search goals..."
+                            placeholder={t("goalsControlBar.searchPlaceholder")}
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -34,10 +36,10 @@ const GoalsControlBar = ({
                         onChange={(e) => setStatusFilter(e.target.value)}
                         className="px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
-                        <option value="all">All Status</option>
-                        <option value="active">Active</option>
-                        <option value="completed">Completed</option>
-                        <option value="archived">Archived</option>
+                        <option value="all">{t("goalsControlBar.allStatus")}</option>
+                        <option value="active">{t("goalsControlBar.active")}</option>
+                        <option value="completed">{t("goalsControlBar.completed")}</option>
+                        <option value="archived">{t("goalsControlBar.archived")}</option>
                     </select>
 
                     <select
@@ -45,10 +47,10 @@ const GoalsControlBar = ({
                         onChange={(e) => setSortBy(e.target.value)}
                         className="px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
-                        <option value="dueDate">Sort by Due Date</option>
-                        <option value="title">Sort by Title</option>
-                        <option value="priority">Sort by Priority</option>
-                        <option value="progress">Sort by Progress</option>
+                        <option value="dueDate">{t("goalsControlBar.sortDueDate")}</option>
+                        <option value="title">{t("goalsControlBar.sortTitle")}</option>
+                        <option value="priority">{t("goalsControlBar.sortPriority")}</option>
+                        <option value="progress">{t("goalsControlBar.sortProgress")}</option>
                     </select>
                 </div>
 
@@ -62,7 +64,7 @@ const GoalsControlBar = ({
                                     ? "bg-white text-blue-600 shadow-sm"
                                     : "text-slate-600 hover:text-slate-900"
                             }`}
-                            title="Grid view"
+                            title={t("goalsControlBar.gridView")}
                         >
                             <FaThLarge className="w-4 h-4" />
                         </button>
@@ -73,7 +75,7 @@ const GoalsControlBar = ({
                                     ? "bg-white text-blue-600 shadow-sm"
                                     : "text-slate-600 hover:text-slate-900"
                             }`}
-                            title="List view"
+                            title={t("goalsControlBar.listView")}
                         >
                             <FaListUl className="w-4 h-4" />
                         </button>
@@ -84,7 +86,7 @@ const GoalsControlBar = ({
                         className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl"
                     >
                         <FaPlus className="w-4 h-4" />
-                        New Goal
+                        {t("goalsControlBar.newGoal")}
                     </button>
                 </div>
             </div>

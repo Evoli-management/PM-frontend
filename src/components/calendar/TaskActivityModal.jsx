@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useToast } from "../shared/ToastProvider.jsx";
+import { useTranslation } from 'react-i18next';
 import { formatKeyAreaLabel } from "../../utils/keyAreaDisplay";
 // Load keyAreaService and taskService on demand so they can be code-split
 let _keyAreaService = null;
@@ -18,6 +19,7 @@ const getTaskService = async () => {
 };
 
 export default function TaskActivityModal({ item, onClose, onSave, onDelete }) {
+    const { t } = useTranslation();
     const { addToast } = useToast();
     // item may contain: { type, title, date, time, description }
     const [activeTab, setActiveTab] = useState(item?.type === "activity" ? "activity" : "task");
@@ -149,7 +151,7 @@ export default function TaskActivityModal({ item, onClose, onSave, onDelete }) {
             >
                 <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
                     <h2 className="text/base font-semibold text-slate-800">
-                        {item?.id ? (item?.type === "activity" ? "Edit Activity" : "Edit Task") : "Add Task / Activity"}
+                        {item?.id ? (item?.type === "activity" ? t("taskActivityModal.editActivityTitle") : t("taskActivityModal.editTaskTitle")) : t("taskActivityModal.addTitle")}
                     </h2>
                     <button type="button" onClick={onClose} className="text-slate-500 hover:text-slate-700">
                         ✕
@@ -162,43 +164,43 @@ export default function TaskActivityModal({ item, onClose, onSave, onDelete }) {
                             className={`px-3 py-2 text-sm font-semibold ${activeTab === "task" ? "text-blue-700 border-b-2 border-blue-600" : "text-slate-600"}`}
                             onClick={() => setActiveTab("task")}
                         >
-                            Task
+                            {t("taskActivityModal.taskTab")}
                         </button>
                         <button
                             type="button"
                             className={`px-3 py-2 text-sm font-semibold ${activeTab === "activity" ? "text-blue-700 border-b-2 border-blue-600" : "text-slate-600"}`}
                             onClick={() => setActiveTab("activity")}
                         >
-                            Activity
+                            {t("taskActivityModal.activityTab")}
                         </button>
                     </div>
 
                     {activeTab === "task" ? (
                         <div className="space-y-2">
                             <div>
-                                <label className="block text-xs text-slate-600 mb-1">Title</label>
+                                <label className="block text-xs text-slate-600 mb-1">{t("taskActivityModal.titleField")}</label>
                                 <input
                                     name="title"
                                     value={taskForm.title}
                                     onChange={handleTaskChange}
-                                    placeholder="Task title"
+                                    placeholder={t("taskActivityModal.taskTitlePlaceholder")}
                                     className="w-full px-3 py-2 border rounded"
                                     required
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs text-slate-600 mb-1">Description</label>
+                                <label className="block text-xs text-slate-600 mb-1">{t("taskActivityModal.descriptionField")}</label>
                                 <textarea
                                     name="description"
                                     value={taskForm.description}
                                     onChange={handleTaskChange}
-                                    placeholder="Optional"
+                                    placeholder={t("taskActivityModal.optionalPlaceholder")}
                                     className="w-full px-3 py-2 border rounded"
                                 />
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
-                                    <label className="block text-xs text-slate-600 mb-1">Start date</label>
+                                    <label className="block text-xs text-slate-600 mb-1">{t("taskActivityModal.startDateField")}</label>
                                     <input
                                         type="date"
                                         name="date"
@@ -208,7 +210,7 @@ export default function TaskActivityModal({ item, onClose, onSave, onDelete }) {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs text-slate-600 mb-1">Time</label>
+                                    <label className="block text-xs text-slate-600 mb-1">{t("taskActivityModal.timeField")}</label>
                                     <input
                                         type="time"
                                         name="time"
@@ -223,7 +225,7 @@ export default function TaskActivityModal({ item, onClose, onSave, onDelete }) {
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
-                                    <label className="block text-xs text-slate-600 mb-1">Due date</label>
+                                    <label className="block text-xs text-slate-600 mb-1">{t("taskActivityModal.dueDateField")}</label>
                                     <input
                                         type="date"
                                         name="dueDate"
@@ -233,7 +235,7 @@ export default function TaskActivityModal({ item, onClose, onSave, onDelete }) {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs text-slate-600 mb-1">End date</label>
+                                    <label className="block text-xs text-slate-600 mb-1">{t("taskActivityModal.endDateField")}</label>
                                     <input
                                         type="date"
                                         name="endDate"
@@ -245,14 +247,14 @@ export default function TaskActivityModal({ item, onClose, onSave, onDelete }) {
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
-                                    <label className="block text-xs text-slate-600 mb-1">Key Area</label>
+                                    <label className="block text-xs text-slate-600 mb-1">{t("taskActivityModal.keyAreaField")}</label>
                                     <select
                                         name="keyAreaId"
                                         value={taskForm.keyAreaId}
                                         onChange={handleTaskChange}
                                         className="w-full px-3 py-2 border rounded"
                                     >
-                                        <option value="">— Select key area —</option>
+                                        <option value="">{t("taskActivityModal.selectKeyArea")}</option>
                                         {keyAreas.map((ka, idx) => (
                                             <option key={ka.id} value={ka.id}>
                                                 {formatKeyAreaLabel(ka, idx)}
@@ -261,7 +263,7 @@ export default function TaskActivityModal({ item, onClose, onSave, onDelete }) {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-xs text-slate-600 mb-1">List</label>
+                                    <label className="block text-xs text-slate-600 mb-1">{t("taskActivityModal.listField")}</label>
                                     <select
                                         name="list_index"
                                         value={taskForm.list_index || 1}
@@ -272,15 +274,15 @@ export default function TaskActivityModal({ item, onClose, onSave, onDelete }) {
                                             const kaId = taskForm.keyAreaId;
                                             const names = kaId ? (listNames[String(kaId)] || {}) : {};
                                             const namedLists = Object.keys(names).map(Number).filter(Boolean);
-                                            const listsWithTasks = kaId 
+                                            const listsWithTasks = kaId
                                                 ? Array.from(new Set((allTasks || [])
-                                                    .filter(t => String(t.keyAreaId || t.key_area_id) === String(kaId))
-                                                    .map(t => t.list_index || 1)))
+                                                    .filter(task => String(task.keyAreaId || task.key_area_id) === String(kaId))
+                                                    .map(task => task.list_index || 1)))
                                                 : [];
                                             const allNumbers = Array.from(new Set([1, ...namedLists, ...listsWithTasks])).sort((a, b) => a - b);
                                             return allNumbers.map((n) => (
                                                 <option key={n} value={n}>
-                                                    {names[String(n)] || `List ${n}`}
+                                                    {names[String(n)] || t("taskActivityModal.listN", { n })}
                                                 </option>
                                             ));
                                         })()}
@@ -289,26 +291,26 @@ export default function TaskActivityModal({ item, onClose, onSave, onDelete }) {
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
-                                    <label className="block text-xs text-slate-600 mb-1">Assignee</label>
+                                    <label className="block text-xs text-slate-600 mb-1">{t("taskActivityModal.assigneeField")}</label>
                                     <input
                                         name="assignee"
                                         value={taskForm.assignee}
                                         onChange={handleTaskChange}
-                                        placeholder="Optional"
+                                        placeholder={t("taskActivityModal.optionalPlaceholder")}
                                         className="w-full px-3 py-2 border rounded"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs text-slate-600 mb-1">Priority</label>
+                                    <label className="block text-xs text-slate-600 mb-1">{t("taskActivityModal.priorityField")}</label>
                                     <select
                                         name="priority"
                                         value={taskForm.priority}
                                         onChange={handleTaskChange}
                                         className="w-full px-3 py-2 border rounded"
                                     >
-                                        <option value="high">High</option>
-                                        <option value="medium">Medium</option>
-                                        <option value="low" style={{ color: "#6b7280" }}>Low</option>
+                                        <option value="high">{t("taskActivityModal.high")}</option>
+                                        <option value="medium">{t("taskActivityModal.medium")}</option>
+                                        <option value="low" style={{ color: "#6b7280" }}>{t("taskActivityModal.low")}</option>
                                     </select>
                                 </div>
                             </div>
@@ -316,12 +318,12 @@ export default function TaskActivityModal({ item, onClose, onSave, onDelete }) {
                     ) : (
                         <div className="space-y-2">
                             <div>
-                                <label className="block text-xs text-slate-600 mb-1">Text</label>
+                                <label className="block text-xs text-slate-600 mb-1">{t("taskActivityModal.textField")}</label>
                                 <input
                                     name="text"
                                     value={activityForm.text}
                                     onChange={handleActivityChange}
-                                    placeholder="What did you do?"
+                                    placeholder={t("taskActivityModal.activityPlaceholder")}
                                     className="w-full px-3 py-2 border rounded"
                                     required
                                 />
@@ -329,7 +331,7 @@ export default function TaskActivityModal({ item, onClose, onSave, onDelete }) {
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
                                     <label className="block text-xs text-slate-600 mb-1">
-                                        Key Area (optional)
+                                        {t("taskActivityModal.keyAreaOptional")}
                                     </label>
                                     <select
                                         name="keyAreaId"
@@ -337,7 +339,7 @@ export default function TaskActivityModal({ item, onClose, onSave, onDelete }) {
                                         onChange={handleActivityChange}
                                         className="w-full px-3 py-2 border rounded"
                                     >
-                                        <option value="">— None —</option>
+                                        <option value="">{t("taskActivityModal.noneOption")}</option>
                                         {keyAreas.map((ka, idx) => (
                                             <option key={ka.id} value={ka.id}>
                                                 {formatKeyAreaLabel(ka, idx)}
@@ -346,7 +348,7 @@ export default function TaskActivityModal({ item, onClose, onSave, onDelete }) {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-xs text-slate-600 mb-1">List</label>
+                                    <label className="block text-xs text-slate-600 mb-1">{t("taskActivityModal.listField")}</label>
                                     <select
                                         name="list_index"
                                         value={activityForm.list_index || 1}
@@ -357,17 +359,17 @@ export default function TaskActivityModal({ item, onClose, onSave, onDelete }) {
                                         {(() => {
                                             const kaId = activityForm.keyAreaId;
                                             if (!kaId) {
-                                                return <option value="1">— Select key area first —</option>;
+                                                return <option value="1">{t("taskActivityModal.selectKeyAreaFirst")}</option>;
                                             }
                                             const names = listNames[String(kaId)] || {};
                                             const namedLists = Object.keys(names).map(Number).filter(Boolean);
                                             const listsWithTasks = Array.from(new Set((allTasks || [])
-                                                .filter(t => String(t.keyAreaId || t.key_area_id) === String(kaId))
-                                                .map(t => t.list_index || 1)));
+                                                .filter(task => String(task.keyAreaId || task.key_area_id) === String(kaId))
+                                                .map(task => task.list_index || 1)));
                                             const allNumbers = Array.from(new Set([1, ...namedLists, ...listsWithTasks])).sort((a, b) => a - b);
                                             return allNumbers.map((n) => (
                                                 <option key={n} value={n}>
-                                                    {names[String(n)] || `List ${n}`}
+                                                    {names[String(n)] || t("taskActivityModal.listN", { n })}
                                                 </option>
                                             ));
                                         })()}
@@ -375,7 +377,7 @@ export default function TaskActivityModal({ item, onClose, onSave, onDelete }) {
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-xs text-slate-600 mb-1">Attach to Task (optional)</label>
+                                <label className="block text-xs text-slate-600 mb-1">{t("taskActivityModal.attachTask")}</label>
                                 <select
                                     name="taskId"
                                     value={activityForm.taskId}
@@ -384,20 +386,20 @@ export default function TaskActivityModal({ item, onClose, onSave, onDelete }) {
                                     onMouseDown={(e) => {
                                         if (!activityForm.keyAreaId) {
                                             e.preventDefault();
-                                            addToast?.({ title: "Select a key area first", variant: "warning" });
+                                            addToast?.({ title: t("taskActivityModal.selectKeyAreaFirstToast"), variant: "warning" });
                                         }
                                     }}
                                 >
                                     {!activityForm.keyAreaId ? (
                                         <option value="" disabled>
-                                            — Select key area first —
+                                            {t("taskActivityModal.selectKeyAreaFirst")}
                                         </option>
                                     ) : (
                                         <>
-                                            <option value="">— None —</option>
-                                            {tasks.map((t) => (
-                                                <option key={t.id} value={t.id}>
-                                                    {t.title}
+                                            <option value="">{t("taskActivityModal.noneOption")}</option>
+                                            {tasks.map((task) => (
+                                                <option key={task.id} value={task.id}>
+                                                    {task.title}
                                                 </option>
                                             ))}
                                         </>
@@ -405,7 +407,7 @@ export default function TaskActivityModal({ item, onClose, onSave, onDelete }) {
                                 </select>
                                 {!activityForm.keyAreaId && (
                                     <div className="text-[11px] text-slate-500 mt-1">
-                                        Select a key area to load its tasks.
+                                        {t("taskActivityModal.selectKeyAreaFirstDesc")}
                                     </div>
                                 )}
                             </div>
@@ -418,10 +420,10 @@ export default function TaskActivityModal({ item, onClose, onSave, onDelete }) {
                             type="button"
                             className="px-3 py-2 rounded border border-red-300 text-red-700 bg-red-50 hover:bg-red-100"
                             onClick={() => {
-                                if (confirm("Delete this item?")) onDelete();
+                                if (confirm(t("taskActivityModal.confirmDelete"))) onDelete();
                             }}
                         >
-                            Delete
+                            {t("taskActivityModal.delete")}
                         </button>
                     ) : (
                         <span />
@@ -431,13 +433,13 @@ export default function TaskActivityModal({ item, onClose, onSave, onDelete }) {
                         className="px-3 py-2 rounded border border-slate-300 bg-white hover:bg-slate-50"
                         onClick={onClose}
                     >
-                        Cancel
+                        {t("taskActivityModal.cancel")}
                     </button>
                     <button
                         type="submit"
                         className="px-3 py-2 rounded bg-blue-600 text-white font-semibold hover:bg-blue-700"
                     >
-                        {item?.id ? "Update" : "Save"}
+                        {item?.id ? t("taskActivityModal.update") : t("taskActivityModal.save")}
                     </button>
                 </div>
             </form>

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useTranslation } from 'react-i18next';
 import { FaTimes } from "react-icons/fa";
 import organizationService from "../../services/organizationService";
 
@@ -8,6 +9,7 @@ import organizationService from "../../services/organizationService";
  * Only one subscription manager per organization
  */
 export function SubscriptionManagerModal({ members, currentManager, onClose, onSuccess, showToast }) {
+  const { t } = useTranslation();
   const [selectedMemberId, setSelectedMemberId] = useState(currentManager?.id || "");
   const [saving, setSaving] = useState(false);
   const [loadingCurrentManager, setLoadingCurrentManager] = useState(!currentManager);
@@ -27,7 +29,7 @@ export function SubscriptionManagerModal({ members, currentManager, onClose, onS
       }
     } catch (error) {
       console.error("Failed to load current manager:", error);
-      showToast?.("Failed to load current subscription manager", "error");
+      showToast?.(t("subscriptionManagerModal.loadError"), "error");
     } finally {
       setLoadingCurrentManager(false);
     }
@@ -37,12 +39,12 @@ export function SubscriptionManagerModal({ members, currentManager, onClose, onS
     e.preventDefault();
 
     if (!selectedMemberId) {
-      showToast?.("Please select a member to assign as subscription manager", "error");
+      showToast?.(t("subscriptionManagerModal.selectRequired"), "error");
       return;
     }
 
     if (selectedMemberId === currentManager?.id) {
-      showToast?.("This member is already the subscription manager", "info");
+      showToast?.(t("subscriptionManagerModal.alreadyManager"), "info");
       onClose();
       return;
     }
@@ -50,10 +52,10 @@ export function SubscriptionManagerModal({ members, currentManager, onClose, onS
     setSaving(true);
     try {
       await organizationService.assignSubscriptionManager(selectedMemberId);
-      showToast?.("Subscription manager assigned successfully", "success");
+      showToast?.(t("subscriptionManagerModal.assignSuccess"), "success");
       onSuccess?.();
     } catch (error) {
-      const errorMsg = error?.response?.data?.message || "Failed to assign subscription manager";
+      const errorMsg = error?.response?.data?.message || t("subscriptionManagerModal.assignError");
       showToast?.(errorMsg, "error");
     } finally {
       setSaving(false);
@@ -65,10 +67,9 @@ export function SubscriptionManagerModal({ members, currentManager, onClose, onS
       <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-lg font-semibold">Assign Subscription Manager</h3>
+            <h3 className="text-lg font-semibold">{t("subscriptionManagerModal.title")}</h3>
             <p className="text-xs text-gray-500 mt-1">
-              The subscription manager can view billing information and manage payment methods.
-              Only one member can have this role at a time.
+              {t("subscriptionManagerModal.description")}
             </p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
@@ -77,13 +78,13 @@ export function SubscriptionManagerModal({ members, currentManager, onClose, onS
         </div>
 
         {loadingCurrentManager ? (
-          <div className="py-8 text-center text-gray-500">Loading...</div>
+          <div className="py-8 text-center text-gray-500">{t("subscriptionManagerModal.loading")}</div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Current Manager Display */}
             {currentManager && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <p className="text-xs font-medium text-blue-900 mb-1">Current Subscription Manager</p>
+                <p className="text-xs font-medium text-blue-900 mb-1">{t("subscriptionManagerModal.currentManager")}</p>
                 <p className="text-sm text-blue-800 font-medium">
                   {currentManager.firstName} {currentManager.lastName}
                 </p>
@@ -94,7 +95,7 @@ export function SubscriptionManagerModal({ members, currentManager, onClose, onS
             {/* Member Selection */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Assign to Member
+                {t("subscriptionManagerModal.assignToMember")}
               </label>
               <select
                 value={selectedMemberId}
@@ -102,7 +103,7 @@ export function SubscriptionManagerModal({ members, currentManager, onClose, onS
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 disabled={saving}
               >
-                <option value="">Select a member...</option>
+                <option value="">{t("subscriptionManagerModal.selectMember")}</option>
                 {members.map((member) => (
                   <option key={member.id} value={member.id}>
                     {member.firstName} {member.lastName} ({member.email})
@@ -110,7 +111,7 @@ export function SubscriptionManagerModal({ members, currentManager, onClose, onS
                 ))}
               </select>
               <p className="text-xs text-gray-500 mt-1">
-                Select the member who will manage subscriptions and payments
+                {t("subscriptionManagerModal.selectHint")}
               </p>
             </div>
 
@@ -118,7 +119,7 @@ export function SubscriptionManagerModal({ members, currentManager, onClose, onS
             {selectedMemberId && selectedMemberId !== currentManager?.id && (
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                 <p className="text-xs text-amber-800">
-                  ⚠️ This will remove the subscription manager role from the current manager.
+                  ⚠️ {t("subscriptionManagerModal.warning")}
                 </p>
               </div>
             )}
@@ -131,14 +132,14 @@ export function SubscriptionManagerModal({ members, currentManager, onClose, onS
                 className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium text-gray-700"
                 disabled={saving}
               >
-                Cancel
+                {t("subscriptionManagerModal.cancel")}
               </button>
               <button
                 type="submit"
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
                 disabled={saving || !selectedMemberId}
               >
-                {saving ? "Assigning..." : "Assign Manager"}
+                {saving ? t("subscriptionManagerModal.assigning") : t("subscriptionManagerModal.assignManager")}
               </button>
             </div>
           </form>

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 /**
  * eNPS (Employee Net Promoter Score) Widget
@@ -15,6 +16,7 @@ const EnpsWidget = ({
         enableOrgReports: true,
     },
 }) => {
+    const { t } = useTranslation();
     const [selectedScore, setSelectedScore] = useState(null);
     const [submitted, setSubmitted] = useState(false);
     const [feedback, setFeedback] = useState("");
@@ -46,9 +48,9 @@ const EnpsWidget = ({
     };
 
     const getScoreCategory = (score) => {
-        if (score >= 9) return { label: "Promoter", color: "text-green-600", bg: "bg-green-50" };
-        if (score >= 7) return { label: "Passive", color: "text-yellow-600", bg: "bg-yellow-50" };
-        return { label: "Detractor", color: "text-red-600", bg: "bg-red-50" };
+        if (score >= 9) return { label: t("enpsWidget.categoryPromoter"), color: "text-green-600", bg: "bg-green-50" };
+        if (score >= 7) return { label: t("enpsWidget.categoryPassive"), color: "text-yellow-600", bg: "bg-yellow-50" };
+        return { label: t("enpsWidget.categoryDetractor"), color: "text-red-600", bg: "bg-red-50" };
     };
 
     if (submitted) {
@@ -56,14 +58,13 @@ const EnpsWidget = ({
             <div className="bg-white rounded-lg shadow p-6">
                 <div className="text-center">
                     <div className="text-4xl mb-4">✅</div>
-                    <h3 className="text-lg font-semibold text-green-600 mb-2">Thank you!</h3>
+                    <h3 className="text-lg font-semibold text-green-600 mb-2">{t("enpsWidget.thankyouTitle")}</h3>
                     <p className="text-sm text-gray-600 mb-4">
-                        Your anonymous feedback has been recorded and will help improve our workplace.
+                        {t("enpsWidget.thankyouBody")}
                     </p>
                     <div className="bg-blue-50 border border-blue-200 rounded p-3">
                         <p className="text-xs text-blue-700">
-                            🔒 <strong>Privacy Protected:</strong> Your response is completely anonymous and cannot be
-                            traced back to you.
+                            🔒 <strong>{t("enpsWidget.privacyLabel")}</strong> {t("enpsWidget.privacyText")}
                         </p>
                     </div>
                 </div>
@@ -76,9 +77,9 @@ const EnpsWidget = ({
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
                 <div>
-                    <h3 className="text-lg font-semibold text-gray-800">Employee Net Promoter Score</h3>
+                    <h3 className="text-lg font-semibold text-gray-800">{t("enpsWidget.title")}</h3>
                     <p className="text-sm text-gray-600">
-                        How likely are you to recommend this company as a place to work?
+                        {t("enpsWidget.subtitle")}
                     </p>
                 </div>
                 <div className="text-2xl">📊</div>
@@ -89,8 +90,7 @@ const EnpsWidget = ({
                 <div className="flex items-start gap-2">
                     <span className="text-green-600">🔒</span>
                     <div className="text-xs text-green-700">
-                        <strong>100% Anonymous:</strong> Your response cannot be traced back to you. We only collect the
-                        score and optional feedback.
+                        <strong>{t("enpsWidget.anonymousLabel")}</strong> {t("enpsWidget.anonymousText")}
                     </div>
                 </div>
             </div>
@@ -101,8 +101,8 @@ const EnpsWidget = ({
                     {/* Score Scale */}
                     <div className="mb-6">
                         <div className="flex justify-between text-xs text-gray-500 mb-2">
-                            <span>Not likely</span>
-                            <span>Extremely likely</span>
+                            <span>{t("enpsWidget.notLikely")}</span>
+                            <span>{t("enpsWidget.extremelyLikely")}</span>
                         </div>
                         <div className="grid grid-cols-11 gap-1">
                             {[...Array(11)].map((_, i) => {
@@ -144,16 +144,16 @@ const EnpsWidget = ({
                     {/* Optional Feedback */}
                     <div className="mb-6">
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Additional feedback (optional)
+                            {t("enpsWidget.feedbackLabel")}
                         </label>
                         <textarea
                             value={feedback}
                             onChange={(e) => setFeedback(e.target.value)}
-                            placeholder="What could we improve? (This will remain anonymous)"
+                            placeholder={t("enpsWidget.feedbackPlaceholder")}
                             className="w-full h-20 px-3 py-2 border border-gray-300 rounded-md text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             maxLength={500}
                         />
-                        <div className="text-xs text-gray-500 mt-1">{feedback.length}/500 characters</div>
+                        <div className="text-xs text-gray-500 mt-1">{t("enpsWidget.characters", { n: feedback.length })}</div>
                     </div>
 
                     {/* Submit Button */}
@@ -169,7 +169,7 @@ const EnpsWidget = ({
                             }
                         `}
                     >
-                        Submit Anonymous Response
+                        {t("enpsWidget.submitBtn")}
                     </button>
                 </div>
             ) : (
@@ -182,42 +182,41 @@ const EnpsWidget = ({
                                     <div className="text-2xl font-bold text-green-600">
                                         {aggregatedData.promoters || 0}
                                     </div>
-                                    <div className="text-sm text-green-700">Promoters (9-10)</div>
+                                    <div className="text-sm text-green-700">{t("enpsWidget.promoters")}</div>
                                 </div>
                                 <div className="text-center p-4 bg-yellow-50 rounded-lg">
                                     <div className="text-2xl font-bold text-yellow-600">
                                         {aggregatedData.passives || 0}
                                     </div>
-                                    <div className="text-sm text-yellow-700">Passives (7-8)</div>
+                                    <div className="text-sm text-yellow-700">{t("enpsWidget.passives")}</div>
                                 </div>
                                 <div className="text-center p-4 bg-red-50 rounded-lg">
                                     <div className="text-2xl font-bold text-red-600">
                                         {aggregatedData.detractors || 0}
                                     </div>
-                                    <div className="text-sm text-red-700">Detractors (0-6)</div>
+                                    <div className="text-sm text-red-700">{t("enpsWidget.detractors")}</div>
                                 </div>
                             </div>
 
                             <div className="text-center p-4 bg-blue-50 rounded-lg">
                                 <div className="text-3xl font-bold text-blue-600">{aggregatedData.enpsScore || 0}</div>
-                                <div className="text-sm text-blue-700">Overall eNPS Score</div>
+                                <div className="text-sm text-blue-700">{t("enpsWidget.overallScore")}</div>
                                 <div className="text-xs text-gray-500 mt-1">
-                                    Based on {aggregatedData.totalResponses || 0} anonymous responses
+                                    {t("enpsWidget.basedOn", { n: aggregatedData.totalResponses || 0 })}
                                 </div>
                             </div>
 
                             <div className="bg-yellow-50 border border-yellow-200 rounded p-3">
                                 <div className="text-xs text-yellow-800">
-                                    <strong>Privacy Note:</strong> All data shown is aggregated and anonymous.
-                                    Individual responses cannot be identified.
+                                    <strong>{t("enpsWidget.privacyNote")}</strong> {t("enpsWidget.privacyNoteText")}
                                 </div>
                             </div>
                         </div>
                     ) : (
                         <div className="text-center text-gray-500 py-8">
                             <div className="text-4xl mb-4">📊</div>
-                            <p>No eNPS data available yet.</p>
-                            <p className="text-sm mt-2">Minimum 5 responses required for reporting.</p>
+                            <p>{t("enpsWidget.noData")}</p>
+                            <p className="text-sm mt-2">{t("enpsWidget.minResponses")}</p>
                         </div>
                     )}
                 </div>

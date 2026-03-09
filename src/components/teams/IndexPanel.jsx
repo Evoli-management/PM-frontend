@@ -1,13 +1,15 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 export function IndexPanel({ title, metrics, highlightedMetric }) {
+    const { t } = useTranslation();
     return (
         <div className="bg-white rounded-lg border border-gray-200 p-4">
             <h3 className="text-sm font-semibold mb-3 text-gray-800">{title}</h3>
             
             <div className="space-y-2">
                 {metrics.length === 0 ? (
-                    <div className="text-xs text-gray-500">No data yet.</div>
+                    <div className="text-xs text-gray-500">{t("indexPanel.noData")}</div>
                 ) : metrics.map((metric, index) => {
                     const isHighlighted = highlightedMetric === metric.key;
                     const percentage = metric.value || 0;

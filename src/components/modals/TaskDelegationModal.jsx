@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FaUserPlus, FaTimes } from 'react-icons/fa';
 import organizationService from '../../services/organizationService';
 import taskDelegationService from '../../services/taskDelegationService';
 import { useToast } from '../shared/ToastProvider.jsx';
 
 export default function TaskDelegationModal({ isOpen, onClose, task, onDelegated }) {
+    const { t } = useTranslation();
     const { addToast } = useToast ? useToast() : { addToast: () => {} };
     const [members, setMembers] = useState([]);
     const [selectedUserId, setSelectedUserId] = useState('');
@@ -28,7 +30,7 @@ export default function TaskDelegationModal({ isOpen, onClose, task, onDelegated
         } catch (error) {
             console.error('Failed to load members:', error);
             addToast({
-                title: 'Failed to load team members',
+                title: t("taskDelegation.toastLoadFailed"),
                 variant: 'error',
             });
         } finally {
@@ -39,7 +41,7 @@ export default function TaskDelegationModal({ isOpen, onClose, task, onDelegated
     const handleDelegate = async () => {
         if (!selectedUserId) {
             addToast({
-                title: 'Please select a team member',
+                title: t("taskDelegation.toastSelectMember"),
                 variant: 'warning',
             });
             return;
@@ -53,7 +55,7 @@ export default function TaskDelegationModal({ isOpen, onClose, task, onDelegated
             });
 
             addToast({
-                title: 'Task delegated successfully',
+                title: t("taskDelegation.toastDelegated"),
                 variant: 'success',
             });
 
@@ -62,7 +64,7 @@ export default function TaskDelegationModal({ isOpen, onClose, task, onDelegated
         } catch (error) {
             console.error('Failed to delegate task:', error);
             addToast({
-                title: error.response?.data?.message || 'Failed to delegate task',
+                title: error.response?.data?.message || t("taskDelegation.toastFailed"),
                 variant: 'error',
             });
         } finally {
@@ -82,7 +84,7 @@ export default function TaskDelegationModal({ isOpen, onClose, task, onDelegated
                     <div className="flex items-center gap-2">
                         <FaUserPlus className="text-blue-600" />
                         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                            Delegate Task
+                            {t("taskDelegation.title")}
                         </h2>
                     </div>
                     <button
@@ -110,11 +112,11 @@ export default function TaskDelegationModal({ isOpen, onClose, task, onDelegated
                     {/* Team Member Selection */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Delegate to:
+                            {t("taskDelegation.delegateTo")}
                         </label>
                         {loadingMembers ? (
                             <div className="text-sm text-gray-500 dark:text-gray-400">
-                                Loading team members...
+                                {t("taskDelegation.loadingMembers")}
                             </div>
                         ) : (
                             <select
@@ -124,7 +126,7 @@ export default function TaskDelegationModal({ isOpen, onClose, task, onDelegated
                                          bg-white dark:bg-gray-700 text-gray-900 dark:text-white
                                          focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             >
-                                <option value="">Select team member...</option>
+                                <option value="">{t("taskDelegation.selectMember")}</option>
                                 {members.map((member) => {
                                     const value = member.userId || member.id;
                                     return (
@@ -141,12 +143,12 @@ export default function TaskDelegationModal({ isOpen, onClose, task, onDelegated
                     {/* Notes */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Notes (optional):
+                            {t("taskDelegation.notesLabel")}
                         </label>
                         <textarea
                             value={notes}
                             onChange={(e) => setNotes(e.target.value)}
-                            placeholder="Add any context or instructions..."
+                            placeholder={t("taskDelegation.notesPlaceholder")}
                             rows={3}
                             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
                                      bg-white dark:bg-gray-700 text-gray-900 dark:text-white
@@ -159,7 +161,7 @@ export default function TaskDelegationModal({ isOpen, onClose, task, onDelegated
                     {selectedMember && (
                         <div className="bg-gray-50 dark:bg-gray-900 p-3 rounded-lg">
                             <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
-                                Delegating to:
+                                {t("taskDelegation.delegateTo")}
                             </p>
                             <div className="flex items-center gap-2">
                                 {selectedMember.avatarUrl ? (
@@ -195,7 +197,7 @@ export default function TaskDelegationModal({ isOpen, onClose, task, onDelegated
                                  hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg
                                  disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        Cancel
+                        {t("taskDelegation.cancel")}
                     </button>
                     <button
                         onClick={handleDelegate}
@@ -208,12 +210,12 @@ export default function TaskDelegationModal({ isOpen, onClose, task, onDelegated
                         {loading ? (
                             <>
                                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                Delegating...
+                                {t("taskDelegation.delegating")}
                             </>
                         ) : (
                             <>
                                 <FaUserPlus />
-                                Delegate Task
+                                {t("taskDelegation.title")}
                             </>
                         )}
                     </button>

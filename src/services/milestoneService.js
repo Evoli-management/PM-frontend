@@ -49,6 +49,16 @@ export const createMilestone = async (goalId, milestoneData) => {
             }
         }
 
+        // KPI fields
+        if (milestoneData.target != null) {
+            const t = parseFloat(milestoneData.target);
+            if (!isNaN(t)) cleanData.target = t;
+        }
+        if (milestoneData.performance != null) {
+            const p = parseFloat(milestoneData.performance);
+            if (!isNaN(p)) cleanData.performance = p;
+        }
+
         // NOTE: don't include 'done' in create operation - it's not allowed
 
         // Include goalId in the payload and post to the top-level /milestones endpoint
@@ -104,6 +114,14 @@ export const updateMilestone = async (milestoneId, updateData) => {
             } else {
                 cleanData.startDate = null;
             }
+        }
+
+        // KPI fields
+        if (updateData.target !== undefined) {
+            cleanData.target = updateData.target != null ? parseFloat(updateData.target) : null;
+        }
+        if (updateData.performance !== undefined) {
+            cleanData.performance = updateData.performance != null ? parseFloat(updateData.performance) : null;
         }
 
         // Try PATCH first for 'done' updates (most likely scenario)

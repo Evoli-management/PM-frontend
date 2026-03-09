@@ -1,9 +1,11 @@
 // src/components/goals/GoalList.jsx
 import React from "react";
+import { useTranslation } from "react-i18next";
 import GoalCard from "./GoalCard";
 import EmptyState from "./EmptyState";
 
 const GoalList = ({ goals, onGoalOpen, onGoalEdit, onUpdate, onDelete, selectedGoals = new Set(), onToggleSelection }) => {
+    const { t } = useTranslation();
     if (!goals || goals.length === 0) {
         return <EmptyState onCreateClick={() => { }} />;
     }
@@ -56,7 +58,7 @@ const GoalList = ({ goals, onGoalOpen, onGoalEdit, onUpdate, onDelete, selectedG
     };
 
     const handleDelete = async (goalId) => {
-        if (window.confirm("Are you sure you want to delete this goal?")) {
+        if (window.confirm(t("goalList.deleteConfirm"))) {
             if (onDelete) {
                 try {
                     await onDelete(goalId);

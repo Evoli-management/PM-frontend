@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from 'react-i18next';
 
 const STATUS_ICONS = {
     pending: "⏳",
@@ -7,10 +8,11 @@ const STATUS_ICONS = {
 };
 
 export default function DayPopup({ date, items, onClose }) {
+    const { t } = useTranslation();
     return (
         <div className="fixed inset-0 bg-black bg-opacity-20 flex items-center justify-center z-50">
             <div className="bg-white rounded shadow-lg p-4 w-80 relative">
-                <button className="absolute top-2 right-2 text-gray-500" onClick={onClose}>
+                <button className="absolute top-2 right-2 text-gray-500" onClick={onClose} aria-label={t("dayPopup.close")}>
                     ✖
                 </button>
                 <h3 className="text-lg font-bold mb-2">{date}</h3>

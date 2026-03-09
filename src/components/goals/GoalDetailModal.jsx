@@ -1,4 +1,5 @@
 import React, { useState, Suspense, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import {
     FaLock,
     FaEye,
@@ -21,6 +22,7 @@ const GoalDetailModal = ({
     onMilestoneUpdated,
     isPage = false,
 }) => {
+    const { t } = useTranslation();
     const [isEditing, setIsEditing] = useState(false);
     const [localGoal, setLocalGoal] = useState(goal);
     const [updatingMilestone, setUpdatingMilestone] = useState(null);
@@ -700,7 +702,7 @@ const GoalDetailModal = ({
                 <span
                     className="relative text-base md:text-lg font-bold text-black truncate px-1"
                 >
-                    {localGoal?.title || "Untitled goal"}
+                    {localGoal?.title || t("goalDetailModal.untitledGoal")}
                 </span>
             </div>
             {/* Action buttons: align right */}
@@ -711,16 +713,16 @@ const GoalDetailModal = ({
                     className="px-3 py-1 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold"
                     aria-label="Edit goal"
                 >
-                    Edit
+                    {t("goalDetailModal.edit")}
                 </button>
                 {typeof onDelete === 'function' && (
                     <button
                         type="button"
-                        onClick={(e) => { e.stopPropagation(); if (window.confirm('Delete this goal?')) onDelete(goal.id); }}
+                        onClick={(e) => { e.stopPropagation(); if (window.confirm(t("goalDetailModal.deleteConfirm"))) onDelete(goal.id); }}
                         className="px-3 py-1 rounded-md border border-red-600 text-red-600 text-sm bg-white hover:bg-red-50"
                         aria-label="Delete goal"
                     >
-                        Delete
+                        {t("goalDetailModal.delete")}
                     </button>
                 )}
 
@@ -773,16 +775,16 @@ const GoalDetailModal = ({
                         {/* labels + controls in the same grid so labels line up exactly above their inputs */}
                         <div className="grid grid-cols-1 gap-3 md:[grid-template-columns:96px_140px_140px_64px_64px] md:ml-auto">
                             <div className="md:contents hidden md:block text-xs font-semibold text-gray-500 mb-1">
-                                <div className="px-1">Progress</div>
-                                <div className="px-1">Start date</div>
-                                <div className="px-1">Deadline</div>
-                                <div className="px-1">Visibility</div>
-                                <div className="px-1">Status</div>
+                                <div className="px-1">{t("goalDetailModal.colProgress")}</div>
+                                <div className="px-1">{t("goalDetailModal.colStartDate")}</div>
+                                <div className="px-1">{t("goalDetailModal.colDeadline")}</div>
+                                <div className="px-1">{t("goalDetailModal.colVisibility")}</div>
+                                <div className="px-1">{t("goalDetailModal.colStatus")}</div>
                             </div>
                             {/* Progress box */}
                             <div className="flex items-center md:block">
                                 <span className="md:hidden text-xs mr-2 text-gray-500">
-                                    Progress
+                                    {t("goalDetailModal.colProgress")}
                                 </span>
                                 <div
                                     id={`top-goal-status-${goal.id}`}
@@ -795,7 +797,7 @@ const GoalDetailModal = ({
                             {/* Start date */}
                             <div className="flex items-center md:block">
                                 <span className="md:hidden text-xs mr-2 text-gray-500">
-                                    Start
+                                    {t("goalDetailModal.mobileStart")}
                                 </span>
                                 <div className="md:inline-block">
                                     <div className="relative">
@@ -867,7 +869,7 @@ const GoalDetailModal = ({
                             {/* Deadline */}
                             <div className="flex items-center md:block">
                                 <span className="md:hidden text-xs mr-2 text-gray-500">
-                                    Deadline
+                                    {t("goalDetailModal.colDeadline")}
                                 </span>
                                 <div className="md:inline-block">
                                     <div className="relative">
@@ -976,7 +978,7 @@ const GoalDetailModal = ({
                 <div ref={parentGoalPickerRef} className="relative">
                     <div className="flex items-center gap-2 mb-1">
                         <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-gray-500" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M12.293 3.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 9H7a3 3 0 000 6h1a1 1 0 110 2H7A5 5 0 017 7h7.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
-                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Parent Goal</span>
+                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{t("goalDetailModal.parentGoalSection")}</span>
                     </div>
 
                     {localGoal?.parentGoalId ? (
@@ -985,7 +987,7 @@ const GoalDetailModal = ({
                             <span className="flex-1 text-sm text-purple-800 truncate">
                                 {availableGoals.find(g => g.id === localGoal.parentGoalId)?.title
                                     || localGoal.parentGoalTitle
-                                    || 'Linked to parent goal'}
+                                    || t("goalDetailModal.linkedToParent")}
                             </span>
                             <button
                                 type="button"
@@ -994,7 +996,7 @@ const GoalDetailModal = ({
                                 className="text-xs text-purple-500 hover:text-red-600 font-medium disabled:opacity-50 flex-shrink-0"
                                 aria-label="Remove parent goal link"
                             >
-                                {savingParentGoal ? 'Saving…' : '✕ Remove'}
+                                {savingParentGoal ? t("goalDetailModal.saving") : t("goalDetailModal.removeParent")}
                             </button>
                         </div>
                     ) : (
@@ -1002,7 +1004,7 @@ const GoalDetailModal = ({
                         <div>
                             <input
                                 type="text"
-                                placeholder="Search to link a parent goal…"
+                                placeholder={t("goalDetailModal.searchParentPlaceholder")}
                                 value={parentGoalSearch}
                                 onChange={(e) => { setParentGoalSearch(e.target.value); setShowParentGoalDropdown(true); }}
                                 onFocus={() => setShowParentGoalDropdown(true)}
@@ -1025,7 +1027,7 @@ const GoalDetailModal = ({
                                             </button>
                                         ))}
                                     {availableGoals.filter(g => g.id !== goal.id && g.title?.toLowerCase().includes(parentGoalSearch.toLowerCase())).length === 0 && (
-                                        <div className="px-3 py-2 text-sm text-slate-400">No matching goals</div>
+                                        <div className="px-3 py-2 text-sm text-slate-400">{t("goalDetailModal.noMatchingGoals")}</div>
                                     )}
                                 </div>
                             )}
@@ -1075,18 +1077,18 @@ const GoalDetailModal = ({
                             <div className="mb-4">
                                 {/* Use a subtle gray border and neutral text to match date inputs */}
                                 <span className="inline-block border border-slate-300 rounded-lg px-4 py-1.5 text-sm font-semibold text-gray-800 bg-white">
-                                    Milestones
+                                    {t("goalDetailModal.milestonesTitle")}
                                 </span>
                             </div>
 
                             {/* Table header */}
                             <div className="text-xs font-semibold text-gray-600 mb-2 px-1 hidden md:grid grid-cols-12">
                                 <div className="col-span-3">
-                                    Score/Progress
+                                    {t("goalDetailModal.colScore")}
                                 </div>
-                                <div className="col-span-5">Milestone</div>
-                                <div className="col-span-2">Start date</div>
-                                <div className="col-span-2">Deadline</div>
+                                <div className="col-span-5">{t("goalDetailModal.colMilestone")}</div>
+                                <div className="col-span-2">{t("goalDetailModal.colStartDate")}</div>
+                                <div className="col-span-2">{t("goalDetailModal.colDeadline")}</div>
                             </div>
 
                             {/* Milestones list — all milestones inside one shared container */}
@@ -1105,7 +1107,7 @@ const GoalDetailModal = ({
                                                 {/* Score/slider */}
                                                 <div className="md:col-span-3 flex items-center gap-3">
                                                     <span className="text-xs md:hidden text-gray-500">
-                                                        Score
+                                                        {t("goalDetailModal.mobileScore")}
                                                     </span>
                                                     <div className="text-sm w-8 text-right">
                                                         {pct}
@@ -1325,7 +1327,7 @@ const GoalDetailModal = ({
                                                                         }}
                                                                     >
                                                                         {m.title ||
-                                                                            "Untitled milestone"}
+                                                                            t("goalDetailModal.untitledMilestone")}
                                                                     </div>
                                                                 )}
                                                                 {m.description && (
@@ -1343,7 +1345,7 @@ const GoalDetailModal = ({
                                                 {/* Dates */}
                                                 <div className="md:col-span-2">
                                                     <span className="md:hidden text-xs text-gray-500">
-                                                        Start date
+                                                        {t("goalDetailModal.colStartDate")}
                                                     </span>
                                                     <div className="relative">
                                                         <input
@@ -1414,7 +1416,7 @@ const GoalDetailModal = ({
                                                 </div>
                                                 <div className="md:col-span-2">
                                                     <span className="md:hidden text-xs text-gray-500">
-                                                        Deadline
+                                                        {t("goalDetailModal.colDeadline")}
                                                     </span>
                                                     <div className="relative">
                                                         <input
@@ -1508,7 +1510,7 @@ const GoalDetailModal = ({
                                             <div className="md:col-span-5">
                                                 <input
                                                     id={`new-milestone-title-${goal.id}`}
-                                                    placeholder="Add milestone"
+                                                    placeholder={t("goalDetailModal.addMilestonePlaceholder")}
                                                     className="w-full px-3 py-2 rounded-xl text-sm border border-gray-300"
                                                     onKeyDown={async (e) => {
                                                         if (
@@ -1680,7 +1682,7 @@ const GoalDetailModal = ({
                                 <div className="flex items-center gap-2">
                                     <input
                                         id={`new-activity-${goal.id}`}
-                                        placeholder="Add activity"
+                                        placeholder={t("goalDetailModal.addActivityPlaceholder")}
                                         className="flex-1 px-3 py-2 border rounded-md text-sm"
                                     />
                                     <button
@@ -1701,18 +1703,18 @@ const GoalDetailModal = ({
                                         }}
                                         className="px-3 py-2 bg-blue-600 text-white rounded-md"
                                     >
-                                        Add
+                                        {t("goalDetailModal.addActivity")}
                                     </button>
                                 </div>
                             </div>
 
                             {loadingActivities ? (
                                 <div className="py-6 text-center text-sm text-gray-500">
-                                    Loading activities…
+                                    {t("goalDetailModal.loadingActivities")}
                                 </div>
                             ) : activities.length === 0 ? (
                                 <div className="py-6 text-center text-sm text-gray-500">
-                                    No activities for this goal yet.
+                                    {t("goalDetailModal.noActivities")}
                                 </div>
                             ) : (
                                 <div className="space-y-2">
@@ -1752,7 +1754,7 @@ const GoalDetailModal = ({
                                                     }
                                                     className="text-red-600 px-2 py-1 rounded-md"
                                                 >
-                                                    Delete
+                                                    {t("goalDetailModal.deleteActivity")}
                                                 </button>
                                             </div>
                                         </div>

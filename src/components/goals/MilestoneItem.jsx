@@ -1,8 +1,10 @@
 // src/components/goals/MilestoneItem.jsx
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Check, Clock, Scale } from "lucide-react";
 
 const MilestoneItem = ({ milestone, onUpdate }) => {
+    const { t } = useTranslation();
     const [isUpdating, setIsUpdating] = useState(false);
 
     const handleToggleComplete = async () => {
@@ -69,15 +71,15 @@ const MilestoneItem = ({ milestone, onUpdate }) => {
                     {milestone.startDate && (
                         <div className="flex items-center gap-2 text-sm text-slate-600">
                             <Clock className="w-3 h-3" />
-                            <span>Start {new Date(milestone.startDate).toLocaleDateString()}</span>
+                            <span>{t("milestoneItem.startDate", { date: new Date(milestone.startDate).toLocaleDateString() })}</span>
                         </div>
                     )}
                     {milestone.dueDate && (
                         <div className="flex items-center gap-2 text-sm text-slate-600">
                             <Clock className="w-3 h-3" />
-                            <span>Due {new Date(milestone.dueDate).toLocaleDateString()}</span>
+                            <span>{t("milestoneItem.dueDate", { date: new Date(milestone.dueDate).toLocaleDateString() })}</span>
                             {!milestone.done && new Date(milestone.dueDate) < new Date() && (
-                                <span className="text-red-600 font-semibold">(Overdue)</span>
+                                <span className="text-red-600 font-semibold">{t("milestoneItem.overdue")}</span>
                             )}
                         </div>
                     )}
@@ -87,7 +89,7 @@ const MilestoneItem = ({ milestone, onUpdate }) => {
                 {milestone.score && !milestone.done && (
                     <div className="mt-2">
                         <div className="flex items-center justify-between mb-1">
-                            <span className="text-xs text-slate-600">Partial Progress</span>
+                            <span className="text-xs text-slate-600">{t("milestoneItem.partialProgress")}</span>
                             <span className="text-xs font-semibold text-slate-900">
                                 {Math.round(parseFloat(milestone.score) * 100)}%
                             </span>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { formatTimeForDisplay } from '../../utils/timeUtils';
 
 /**
@@ -20,6 +21,7 @@ const TimePicker = ({
     innerClassName = 'w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-purple-500',
     label = 'Time'
 }) => {
+    const { t } = useTranslation();
     const [isOpen, setIsOpen] = useState(false);
     const [hours, setHours] = useState(9);
     const [minutes, setMinutes] = useState(0);
@@ -113,12 +115,12 @@ const TimePicker = ({
             {isOpen && (
                 <div className="absolute z-50 mt-1 w-64 bg-white border border-gray-300 rounded-md shadow-lg">
                     <div className="p-4">
-                        <div className="text-sm font-medium text-gray-700 mb-3">Select Time</div>
+                        <div className="text-sm font-medium text-gray-700 mb-3">{t("timePicker.selectTime")}</div>
                         
                         <div className="grid grid-cols-3 gap-2">
                             {/* Hours */}
                             <div>
-                                <div className="text-xs font-medium text-gray-500 mb-1">Hour</div>
+                                <div className="text-xs font-medium text-gray-500 mb-1">{t("timePicker.hour")}</div>
                                 <select
                                     value={getDisplayHour()}
                                     onChange={(e) => {
@@ -137,7 +139,7 @@ const TimePicker = ({
 
                             {/* Minutes */}
                             <div>
-                                <div className="text-xs font-medium text-gray-500 mb-1">Min</div>
+                                <div className="text-xs font-medium text-gray-500 mb-1">{t("timePicker.minute")}</div>
                                 <select
                                     value={minutes}
                                     onChange={(e) => {
@@ -157,7 +159,7 @@ const TimePicker = ({
                             {/* AM/PM for 12-hour format */}
                             {!use24Hour && (
                                 <div>
-                                    <div className="text-xs font-medium text-gray-500 mb-1">Period</div>
+                                    <div className="text-xs font-medium text-gray-500 mb-1">{t("timePicker.period")}</div>
                                     <select
                                             value={period}
                                             onChange={(e) => {
@@ -179,7 +181,7 @@ const TimePicker = ({
                                 onClick={() => setIsOpen(false)}
                                 className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800"
                             >
-                                Done
+                                {t("timePicker.done")}
                             </button>
                         </div>
                     </div>

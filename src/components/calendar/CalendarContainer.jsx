@@ -1,4 +1,5 @@
 import React, { useState, useEffect, Suspense, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { FaChevronDown } from "react-icons/fa";
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import QuarterView from "./QuarterView";
@@ -51,6 +52,7 @@ const EVENT_CATEGORIES = {
 };
 
 const CalendarContainer = () => {
+    const { t } = useTranslation();
     const { addToast } = useToast();
     const { formatDate, formatTime } = useCalendarPreferences();
     // Elephant Task state
@@ -565,10 +567,10 @@ const CalendarContainer = () => {
                     const updated = await svc.update(taskId, patch);
                     // Update local todos
                     setTodos((prev) => prev.map((t) => (String(t.id) === String(taskId) ? updated : t)));
-                    addToast({ title: "Task updated", description: `Moved to ${formatDate(start)} ${formatTime(`${String(start.getHours()).padStart(2,'0')}:${String(start.getMinutes()).padStart(2,'0')}`)}`, variant: "success" });
+                    addToast({ title: t("calendarContainer.taskUpdated"), description: t("calendarContainer.taskMovedTo", { title: resolvedTask?.title || "", date: `${formatDate(start)} ${formatTime(`${String(start.getHours()).padStart(2,'0')}:${String(start.getMinutes()).padStart(2,'0')}`)}` }), variant: "success" });
                 } catch (err) {
                     console.warn("Failed to update task from drop", err);
-                    addToast({ title: "Failed to update task", description: String(err?.message || err), variant: "error" });
+                    addToast({ title: t("calendarContainer.taskUpdated"), description: String(err?.message || err), variant: "error" });
                 }
                 return;
             }
@@ -668,7 +670,7 @@ const CalendarContainer = () => {
             // event to edit it when they're ready.
             setEvents((prev) => [...prev, createdWithMeta]);
             addToast({
-                title: "Event created",
+                title: t("calendarContainer.eventCreated"),
                 description: `${title} at ${formatTime(`${String(start.getHours()).padStart(2,'0')}:${String(start.getMinutes()).padStart(2,'0')}`)} — click the event to edit`,
                 variant: "success",
             });
@@ -684,7 +686,7 @@ const CalendarContainer = () => {
                     details = String(serverMsg);
                 }
             } catch (_) {}
-            addToast({ title: "Failed to create event", description: details, variant: "error" });
+            addToast({ title: t("calendarContainer.failedCreateEvent"), description: details, variant: "error" });
         } finally {
             try { setLoading(false); } catch (_) {}
         }
@@ -713,10 +715,10 @@ const CalendarContainer = () => {
                     // update local weekActivities and unattachedActivities if present
                     setWeekActivities((prev) => prev.map((a) => (String(a.id) === String(activityId) ? updated : a)));
                     setUnattachedActivities((prev) => prev.map((a) => (String(a.id) === String(activityId) ? updated : a)));
-                    addToast({ title: "Activity updated", description: `Moved to ${formatDate(start)} ${formatTime(`${String(start.getHours()).padStart(2,'0')}:${String(start.getMinutes()).padStart(2,'0')}`)}`, variant: "success" });
+                    addToast({ title: t("calendarContainer.activityCompleted"), description: t("calendarContainer.activityMovedTo", { title: resolvedActivity?.text || resolvedActivity?.title || "", date: `${formatDate(start)} ${formatTime(`${String(start.getHours()).padStart(2,'0')}:${String(start.getMinutes()).padStart(2,'0')}`)}` }), variant: "success" });
                 } catch (err) {
                     console.warn("Failed to update activity from drop", err);
-                    addToast({ title: "Failed to update activity", description: String(err?.message || err), variant: "error" });
+                    addToast({ title: t("calendarContainer.failedCompleteActivity"), description: String(err?.message || err), variant: "error" });
                 }
                 return;
             }
@@ -825,7 +827,7 @@ const CalendarContainer = () => {
             };
             setEvents((prev) => [...prev, createdWithMeta]);
             // Do not open the editor right away; let the user click the event to edit.
-            addToast({ title: "Event created", description: `${title} at ${formatTime(`${String(start.getHours()).padStart(2,'0')}:${String(start.getMinutes()).padStart(2,'0')}`)} — click the event to edit`, variant: "success" });
+            addToast({ title: t("calendarContainer.eventCreated"), description: `${title} at ${formatTime(`${String(start.getHours()).padStart(2,'0')}:${String(start.getMinutes()).padStart(2,'0')}`)} — click the event to edit`, variant: "success" });
         } catch (err) {
             console.warn("Failed to create calendar event from activity drop", err);
             const serverData = err?.response?.data;
@@ -836,7 +838,7 @@ const CalendarContainer = () => {
                     details = String(serverMsg);
                 }
             } catch (_) {}
-            addToast({ title: "Failed to create event", description: details, variant: "error" });
+            addToast({ title: t("calendarContainer.failedCreateEvent"), description: details, variant: "error" });
         }
     };
 
@@ -1131,7 +1133,7 @@ const CalendarContainer = () => {
                 task = await svc.get(taskOrId);
             }
         } catch (e) {
-            addToast({ title: "Task not found", variant: "error" });
+            addToast({ title: t("calendarContainer.taskNotFound"), variant: "error" });
             return;
         }
         const toDateStr = (d) => {
@@ -1244,7 +1246,7 @@ const CalendarContainer = () => {
                 activity = await svc.get(activityOrId);
             }
         } catch (e) {
-            addToast({ title: "Activity not found", variant: "error" });
+            addToast({ title: t("calendarContainer.activityNotFound"), variant: "error" });
             return;
         }
             try { console.debug('[Calendar] openEditActivity - resolved activity (raw)', activityOrId, 'fetched:', activity); } catch (__) {}
@@ -1310,10 +1312,10 @@ const CalendarContainer = () => {
             await svc.update(task.id, { status: 'done' });
             // Update local state
             setTodos((prev) => prev.filter((t) => String(t.id) !== String(task.id)));
-            addToast({ title: "Task completed", variant: "success" });
+            addToast({ title: t("calendarContainer.taskCompleted"), variant: "success" });
         } catch (err) {
             console.error("Failed to complete task", err);
-            addToast({ title: "Failed to complete task", description: String(err?.message || err), variant: "error" });
+            addToast({ title: t("calendarContainer.failedCompleteTask"), description: String(err?.message || err), variant: "error" });
         }
     };
 
@@ -1326,10 +1328,10 @@ const CalendarContainer = () => {
             await svc.remove(task.id);
             // Update local state
             setTodos((prev) => prev.filter((t) => String(t.id) !== String(task.id)));
-            addToast({ title: "Task deleted", variant: "success" });
+            addToast({ title: t("calendarContainer.taskDeleted"), variant: "success" });
         } catch (err) {
             console.error("Failed to delete task", err);
-            addToast({ title: "Failed to delete task", description: String(err?.message || err), variant: "error" });
+            addToast({ title: t("calendarContainer.failedDeleteTask"), description: String(err?.message || err), variant: "error" });
         }
     };
 
@@ -1347,10 +1349,10 @@ const CalendarContainer = () => {
             // Update local state
             setWeekActivities((prev) => prev.filter((a) => String(a.id) !== String(activity.id)));
             setUnattachedActivities((prev) => prev.filter((a) => String(a.id) !== String(activity.id)));
-            addToast({ title: "Activity completed", variant: "success" });
+            addToast({ title: t("calendarContainer.activityCompleted"), variant: "success" });
         } catch (err) {
             console.error("Failed to complete activity", err);
-            addToast({ title: "Failed to complete activity", description: String(err?.message || err), variant: "error" });
+            addToast({ title: t("calendarContainer.failedCompleteActivity"), description: String(err?.message || err), variant: "error" });
         }
     };
 
@@ -1364,10 +1366,10 @@ const CalendarContainer = () => {
             // Update local state
             setWeekActivities((prev) => prev.filter((a) => String(a.id) !== String(activity.id)));
             setUnattachedActivities((prev) => prev.filter((a) => String(a.id) !== String(activity.id)));
-            addToast({ title: "Activity deleted", variant: "success" });
+            addToast({ title: t("calendarContainer.activityDeleted"), variant: "success" });
         } catch (err) {
             console.error("Failed to delete activity", err);
-            addToast({ title: "Failed to delete activity", description: String(err?.message || err), variant: "error" });
+            addToast({ title: t("calendarContainer.failedDeleteActivity"), description: String(err?.message || err), variant: "error" });
         }
     };
 
@@ -1401,7 +1403,7 @@ const CalendarContainer = () => {
                     const svc = await getActivityService();
                     await svc.create({ text: form.text || form.title, taskId: form.taskId || null });
                 }
-                addToast({ title: "Activity added", variant: "success" });
+                addToast({ title: t("calendarContainer.activityAdded"), variant: "success" });
             } else {
                 const toEndOfDayIso = (dateStr) => {
                     if (!dateStr) return null;
@@ -1428,11 +1430,11 @@ const CalendarContainer = () => {
                     priority: "medium",
                     keyAreaId: form.keyAreaId || undefined,
                 });
-                addToast({ title: "Task added", variant: "success" });
+                addToast({ title: t("calendarContainer.taskAdded"), variant: "success" });
             }
             await refreshTodosForRange();
         } catch (e) {
-            addToast({ title: "Failed to add", description: String(e?.message || e), variant: "error" });
+            addToast({ title: t("calendarContainer.failedAdd"), description: String(e?.message || e), variant: "error" });
         }
     };
 
@@ -1551,7 +1553,7 @@ const CalendarContainer = () => {
                 return found ? filtered.map((e) => (e.id === updated.id ? updated : e)) : [...filtered, updated];
             });
             addToast({
-                title: "Event updated",
+                title: t("calendarContainer.eventUpdated"),
                 description: `Moved to ${formatDate(newStartDate)} ${formatTime(`${String(newStartDate.getHours()).padStart(2,'0')}:${String(newStartDate.getMinutes()).padStart(2,'0')}`)}${targetEnd ? ` - ${formatTime(`${String(targetEnd.getHours()).padStart(2,'0')}:${String(targetEnd.getMinutes()).padStart(2,'0')}`)}` : ""}`,
                 variant: "success",
             });
@@ -1569,7 +1571,7 @@ const CalendarContainer = () => {
                     else details = JSON.stringify(respData);
                 }
             } catch (_) {}
-            addToast({ title: "Failed to update event", description: details, variant: "error" });
+            addToast({ title: t("calendarContainer.failedUpdateEvent"), description: details, variant: "error" });
         }
     };
 
@@ -2097,8 +2099,8 @@ const CalendarContainer = () => {
                         addToast({
                             title:
                                 String(created?.kind || "").toLowerCase() === "event"
-                                    ? "Event created"
-                                    : "Appointment created",
+                                    ? t("calendarContainer.eventCreated")
+                                    : t("calendarContainer.eventCreated"),
                             variant: "success",
                         });
                         setAppointmentModalOpen(false);
@@ -2161,8 +2163,8 @@ const CalendarContainer = () => {
                         addToast({
                             title:
                                 String(updated?.kind || selectedEvent?.kind || "").toLowerCase() === "event"
-                                    ? "Event updated"
-                                    : "Appointment updated",
+                                    ? t("calendarContainer.eventUpdated")
+                                    : t("calendarContainer.appointmentUpdated"),
                             variant: "success",
                         });
                     }}
@@ -2203,7 +2205,7 @@ const CalendarContainer = () => {
                         setModalOpen(false);
                         setSelectedEvent(null);
                         setModalOpenSource(null);
-                        addToast({ title: 'Appointment deleted', variant: 'success' });
+                        addToast({ title: t("calendarContainer.appointmentDeleted"), variant: 'success' });
                     }}
                 />
             )}
@@ -2326,7 +2328,7 @@ const CalendarContainer = () => {
                             await refreshTodosForRange();
                             setEditModalOpen(false);
                             setEditItem(null);
-                            addToast({ title: "Task updated", variant: "success" });
+                            addToast({ title: t("calendarContainer.taskUpdated"), variant: "success" });
                         } catch (e) {
                             console.error('Failed to update task from calendar modal', e);
                             addToast({ title: 'Failed to update', description: String(e?.message || e), variant: 'error' });
@@ -2463,7 +2465,7 @@ const CalendarContainer = () => {
                             } catch (__) {}
                             setEditModalOpen(false);
                             setEditItem(null);
-                            addToast({ title: "Activity updated", variant: "success" });
+                            addToast({ title: t("calendarContainer.activityCompleted"), variant: "success" });
                         } catch (e) {
                             try {
                                 // Log richer axios response info when available

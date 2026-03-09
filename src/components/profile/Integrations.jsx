@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Section, LoadingButton } from './UIComponents';
 import calendarService from '../../services/calendarService';
 
@@ -19,6 +20,7 @@ function timeAgo(dateStr) {
 }
 
 export const Integrations = ({ showToast }) => {
+    const { t } = useTranslation();
     const [providers, setProviders] = useState({
         google: { connected: false, email: '', lastSyncAt: null, lastError: null, syncStatus: null },
         microsoft: { connected: false, email: '', lastSyncAt: null, lastError: null, syncStatus: null },
@@ -65,21 +67,21 @@ export const Integrations = ({ showToast }) => {
                 : await calendarService.syncMicrosoftCalendar();
 
             if (result?.success) {
-                showToast && showToast(`${provider === 'google' ? 'Google' : 'Microsoft'} connected! Syncing now…`);
+                showToast && showToast(provider === 'google' ? t("integrations.googleConnected") : t("integrations.microsoftConnected"));
                 await loadStatus();
                 calendarService.triggerSync().catch(e => console.warn('Initial sync failed:', e));
             }
         } catch (error) {
             const errMsg = error?.response?.data?.error || error?.message || '';
             if (error?.response?.status === 400 || /invalid(_grant|_token)/i.test(errMsg) || /token.*expired/i.test(errMsg)) {
-                showToast && showToast('Your connection has expired. Please reconnect.', 'error');
+                showToast && showToast(t("integrations.connectionExpired"), 'error');
                 const apiBase = import.meta.env.VITE_API_BASE_URL ||
                     (import.meta.env.DEV ? '/api' : 'https://practicalmanager-4241d0bfc5ed.herokuapp.com/api');
                 window.location.href = `${apiBase}/auth/${provider === 'google' ? 'google' : 'microsoft'}`;
             } else if (error.message === 'OAuth cancelled by user') {
-                showToast && showToast('Connection cancelled', 'info');
+                showToast && showToast(t("integrations.connectionCancelled"), 'info');
             } else {
-                showToast && showToast(`Failed to connect ${provider}`, 'error');
+                showToast && showToast(t("integrations.connectFailed", { provider }), 'error');
             }
         } finally {
             setConnecting('');
@@ -89,22 +91,22 @@ export const Integrations = ({ showToast }) => {
     const disconnect = async (provider) => {
         try {
             await calendarService.disconnectCalendar(provider);
-            showToast && showToast(`${provider === 'google' ? 'Google' : 'Microsoft'} disconnected`);
+            showToast && showToast(provider === 'google' ? t("integrations.googleDisconnected") : t("integrations.microsoftDisconnected"));
             await loadStatus();
         } catch {
-            showToast && showToast('Failed to disconnect', 'error');
+            showToast && showToast(t("integrations.disconnectFailed"), 'error');
         }
     };
 
     const syncNow = async (provider) => {
         setSyncing(provider);
         try {
-            showToast && showToast('Sync started…');
+            showToast && showToast(t("integrations.syncStarted"));
             await calendarService.triggerSync();
-            showToast && showToast('Sync completed!', 'success');
+            showToast && showToast(t("integrations.syncCompleted"), 'success');
             await loadStatus();
         } catch {
-            showToast && showToast('Sync failed', 'error');
+            showToast && showToast(t("integrations.syncFailed"), 'error');
         } finally {
             setSyncing('');
         }
@@ -133,20 +135,20 @@ export const Integrations = ({ showToast }) => {
                         {config.connected ? (
                             <>
                                 <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full whitespace-nowrap">
-                                    Connected
+                                    {t("integrations.connected")}
                                 </span>
                                 <button
                                     onClick={() => disconnect(provider)}
                                     className="text-sm text-red-600 hover:text-red-800 font-medium whitespace-nowrap"
                                 >
-                                    Disconnect
+                                    {t("integrations.disconnect")}
                                 </button>
                                 <button
                                     onClick={() => syncNow(provider)}
                                     disabled={syncing !== ''}
                                     className="text-sm bg-blue-500 hover:bg-blue-700 disabled:opacity-50 text-white px-3 py-1 rounded-md whitespace-nowrap"
                                 >
-                                    {syncing === provider ? 'Syncing…' : 'Sync Now'}
+                                    {syncing === provider ? t("integrations.syncing") : t("integrations.syncNow")}
                                 </button>
                             </>
                         ) : (
@@ -155,7 +157,7 @@ export const Integrations = ({ showToast }) => {
                                 loading={connecting === provider}
                                 className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md"
                             >
-                                Connect
+                                {t("integrations.connect")}
                             </LoadingButton>
                         )}
                     </div>
@@ -166,14 +168,14 @@ export const Integrations = ({ showToast }) => {
                     <div className="flex items-center gap-3 text-xs">
                         {lastSync ? (
                             <span className="text-gray-400">
-                                🔄 Last synced: <span className="font-medium text-gray-600">{lastSync}</span>
+                                🔄 {t("integrations.lastSynced")} <span className="font-medium text-gray-600">{lastSync}</span>
                             </span>
                         ) : (
-                            <span className="text-gray-400">Never synced — click Sync Now</span>
+                            <span className="text-gray-400">{t("integrations.neverSynced")}</span>
                         )}
                         {hasError && (
                             <span className="text-red-500 bg-red-50 px-2 py-0.5 rounded" title={config.lastError}>
-                                ⚠ Sync error
+                                ⚠ {t("integrations.syncError")}
                             </span>
                         )}
                     </div>
@@ -193,8 +195,8 @@ export const Integrations = ({ showToast }) => {
     return (
         <div className="space-y-6">
             <Section
-                title="Connected Accounts"
-                description="Connect your Google or Microsoft account to sync your calendar events and tasks."
+                title={t("integrations.connectedAccounts")}
+                description={t("integrations.connectedAccountsDesc")}
             >
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     <ProviderCard

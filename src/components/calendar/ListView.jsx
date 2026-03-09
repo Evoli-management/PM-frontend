@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from 'react-router-dom';
 import { FaChevronLeft, FaChevronRight, FaChevronDown } from "react-icons/fa";
 import { useCalendarPreferences } from "../../hooks/useCalendarPreferences";
+import { useTranslation } from "react-i18next";
 
 const ListView = ({
     currentDate,
@@ -15,6 +16,7 @@ const ListView = ({
     filterType,
     onChangeFilter,
 }) => {
+    const { t } = useTranslation();
     const { formatDate, formatTime } = useCalendarPreferences();
     const label = formatDate(new Date(currentDate || Date.now()), { longMonth: true });
     const [showViewMenu, setShowViewMenu] = useState(false);
@@ -100,7 +102,7 @@ const ListView = ({
                                 aria-haspopup="menu"
                                 aria-expanded={showViewMenu ? "true" : "false"}
                             >
-                                <span>View</span>
+                                <span>{t("listView.viewButton")}</span>
                                 <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
                                     {view?.charAt(0).toUpperCase() + view?.slice(1)}
                                 </span>
@@ -143,7 +145,7 @@ const ListView = ({
                         </button>
                     </div>
                 </div>
-                <div className="text-center text-gray-400 py-8">No items in this period.</div>
+                <div className="text-center text-gray-400 py-8">{t("listView.noItems")}</div>
             </>
         );
     }
@@ -168,7 +170,7 @@ const ListView = ({
                             aria-haspopup="menu"
                             aria-expanded={showViewMenu ? "true" : "false"}
                         >
-                            <span>View</span>
+                            <span>{t("listView.viewButton")}</span>
                             <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
                                 {view?.charAt(0).toUpperCase() + view?.slice(1)}
                             </span>
@@ -249,7 +251,7 @@ const ListView = ({
                         </div>
                         <div className="flex-1">
                             <div className="font-semibold text-slate-800 flex items-center gap-2">
-                                {it.type === "event" && <span>Event:</span>}
+                                {it.type === "event" && <span>{t("listView.eventLabel")}</span>}
                                 {it.type === "task" && (() => {
                                     const kaId = it.data?.key_area_id || it.data?.keyAreaId || it.data?.key_area || it.data?.keyArea || null;
                                     if (kaId) {
@@ -306,7 +308,7 @@ const ListView = ({
                                     : { backgroundColor: "#EFF6FF", color: "#1D4ED8", borderColor: "#BFDBFE" }
                             }
                         >
-                            {it.type === "task" ? "Task" : it.kind || "Event"}
+                            {it.type === "task" ? t("listView.taskBadge") : it.kind || t("listView.eventBadge")}
                         </div>
                     </div>
                 ))}

@@ -1,7 +1,9 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 export default function KeyAreasWidget({ keyAreas = [], loading = false, error = null }) {
+    const { t } = useTranslation();
     // Calculate summary stats
     const totalKeyAreas = keyAreas.length;
     const totalTasks = keyAreas.reduce((sum, ka) => sum + (ka.taskCount || 0), 0);
@@ -17,7 +19,7 @@ export default function KeyAreasWidget({ keyAreas = [], loading = false, error =
     if (loading) {
         return (
             <div className="flex items-center justify-center py-8">
-                <div className="text-sm text-[CanvasText] opacity-70">Loading key areas...</div>
+                <div className="text-sm text-[CanvasText] opacity-70">{t("keyAreasWidget.loading")}</div>
             </div>
         );
     }
@@ -25,7 +27,7 @@ export default function KeyAreasWidget({ keyAreas = [], loading = false, error =
     if (error) {
         return (
             <div className="text-sm text-red-600 bg-red-50 p-3 rounded border">
-                Failed to load key areas: {error}
+                {t("keyAreasWidget.error", { error })}
             </div>
         );
     }
@@ -33,7 +35,7 @@ export default function KeyAreasWidget({ keyAreas = [], loading = false, error =
     if (totalKeyAreas === 0) {
         return (
             <div className="text-[CanvasText] opacity-70">
-                No key areas yet. <Link to="/key-areas" className="text-blue-600">Create your first key area</Link>!
+                {t("keyAreasWidget.empty")} <Link to="/key-areas" className="text-blue-600">{t("keyAreasWidget.createFirst")}</Link>!
             </div>
         );
     }
@@ -44,11 +46,11 @@ export default function KeyAreasWidget({ keyAreas = [], loading = false, error =
             <div className="grid grid-cols-2 gap-3 mb-4">
                 <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded border border-blue-200">
                     <div className="text-2xl font-bold text-blue-700">{totalKeyAreas}</div>
-                    <div className="text-xs text-[CanvasText] opacity-70">Key Areas</div>
+                    <div className="text-xs text-[CanvasText] opacity-70">{t("keyAreasWidget.keyAreasCount")}</div>
                 </div>
                 <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded border border-green-200">
                     <div className="text-2xl font-bold text-green-700">{totalTasks}</div>
-                    <div className="text-xs text-[CanvasText] opacity-70">Total Tasks</div>
+                    <div className="text-xs text-[CanvasText] opacity-70">{t("keyAreasWidget.totalTasksCount")}</div>
                 </div>
             </div>
 
@@ -56,7 +58,7 @@ export default function KeyAreasWidget({ keyAreas = [], loading = false, error =
             {topKeyAreas.length > 0 && (
                 <div className="space-y-2">
                     <div className="text-xs font-semibold text-[CanvasText] opacity-80 mb-2">
-                        Top Key Areas
+                        {t("keyAreasWidget.topKeyAreas")}
                     </div>
                     <ul className="space-y-2">
                         {topKeyAreas.map((ka) => (
@@ -75,7 +77,7 @@ export default function KeyAreasWidget({ keyAreas = [], loading = false, error =
                                     </div>
                                     <div className="flex items-center gap-2 flex-shrink-0">
                                         <span className="text-xs bg-gray-100 dark:bg-neutral-700 px-2 py-1 rounded">
-                                            {ka.taskCount || 0} {ka.taskCount === 1 ? 'task' : 'tasks'}
+                                            {ka.taskCount || 0} {ka.taskCount === 1 ? t("keyAreasWidget.task") : t("keyAreasWidget.tasks")}
                                         </span>
                                     </div>
                                 </Link>

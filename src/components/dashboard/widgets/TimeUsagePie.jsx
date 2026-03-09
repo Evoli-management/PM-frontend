@@ -1,6 +1,8 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 
 export default function TimeUsagePie({ productive = 0, trap = 0 }) {
+    const { t } = useTranslation();
     const total = productive + trap || 1;
     const percent = Math.min(100, Math.max(0, (productive / total) * 100));
     return (
@@ -22,11 +24,11 @@ export default function TimeUsagePie({ productive = 0, trap = 0 }) {
             <div className="text-sm text-[CanvasText]/70">
                 <div>
                     <span className="inline-block w-3 h-3 bg-green-500 mr-2" />
-                    Goal-aligned
+                    {t("timeUsagePie.goalAligned")}
                 </div>
                 <div>
                     <span className="inline-block w-3 h-3 bg-red-500 mr-2" />
-                    Trap
+                    {t("timeUsagePie.trap")}
                 </div>
             </div>
         </div>

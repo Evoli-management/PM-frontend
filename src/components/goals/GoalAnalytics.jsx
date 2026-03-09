@@ -1,8 +1,10 @@
 // src/components/goals/GoalsAnalytics.jsx
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { FaTimes, FaChartBar, FaCalendar, FaTrophy, FaClock, FaCheckCircle } from "react-icons/fa";
 
 const GoalsAnalytics = ({ goals, onClose }) => {
+    const { t } = useTranslation();
     // Calculate analytics data
     const completedGoals = goals.filter((g) => g.status === "completed").length;
     const activeGoals = goals.filter((g) => g.status === "active").length;
@@ -31,8 +33,8 @@ const GoalsAnalytics = ({ goals, onClose }) => {
                             <FaChartBar className="w-6 h-6" />
                         </div>
                         <div>
-                            <h2 className="text-2xl font-bold">Goals Analytics</h2>
-                            <p className="text-blue-100">Insights and statistics about your goals</p>
+                            <h2 className="text-2xl font-bold">{t("goalsAnalytics.title")}</h2>
+                            <p className="text-blue-100">{t("goalsAnalytics.subtitle")}</p>
                         </div>
                     </div>
                     <button
@@ -49,26 +51,26 @@ const GoalsAnalytics = ({ goals, onClose }) => {
                         {/* Summary Cards */}
                         <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
                             <div className="flex items-center justify-between mb-4">
-                                <h3 className="font-semibold text-slate-900">Goals Summary</h3>
+                                <h3 className="font-semibold text-slate-900">{t("goalsAnalytics.goalsSummary")}</h3>
                                 <div className="p-2 bg-blue-100 rounded-lg">
                                     <FaTrophy className="w-4 h-4 text-blue-600" />
                                 </div>
                             </div>
                             <div className="space-y-3">
                                 <div className="flex justify-between items-center">
-                                    <span className="text-slate-600">Total Goals</span>
+                                    <span className="text-slate-600">{t("goalsAnalytics.totalGoals")}</span>
                                     <span className="font-semibold text-slate-900">{goals.length}</span>
                                 </div>
                                 <div className="flex justify-between items-center">
-                                    <span className="text-slate-600">Completed</span>
+                                    <span className="text-slate-600">{t("goalsAnalytics.completed")}</span>
                                     <span className="font-semibold text-green-600">{completedGoals}</span>
                                 </div>
                                 <div className="flex justify-between items-center">
-                                    <span className="text-slate-600">Active</span>
+                                    <span className="text-slate-600">{t("goalsAnalytics.active")}</span>
                                     <span className="font-semibold text-blue-600">{activeGoals}</span>
                                 </div>
                                 <div className="flex justify-between items-center">
-                                    <span className="text-slate-600">Overdue</span>
+                                    <span className="text-slate-600">{t("goalsAnalytics.overdue")}</span>
                                     <span className="font-semibold text-red-600">{overdueGoals}</span>
                                 </div>
                             </div>
@@ -77,7 +79,7 @@ const GoalsAnalytics = ({ goals, onClose }) => {
                         {/* Progress Overview */}
                         <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
                             <div className="flex items-center justify-between mb-4">
-                                <h3 className="font-semibold text-slate-900">Average Progress</h3>
+                                <h3 className="font-semibold text-slate-900">{t("goalsAnalytics.avgProgress")}</h3>
                                 <div className="p-2 bg-green-100 rounded-lg">
                                     <FaCheckCircle className="w-4 h-4 text-green-600" />
                                 </div>
@@ -110,13 +112,13 @@ const GoalsAnalytics = ({ goals, onClose }) => {
                                     </div>
                                 </div>
                             </div>
-                            <p className="text-center text-slate-600 text-sm">Average completion across all goals</p>
+                            <p className="text-center text-slate-600 text-sm">{t("goalsAnalytics.avgCompletionText")}</p>
                         </div>
 
                         {/* Priority Distribution */}
                         <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
                             <div className="flex items-center justify-between mb-4">
-                                <h3 className="font-semibold text-slate-900">Priority Distribution</h3>
+                                <h3 className="font-semibold text-slate-900">{t("goalsAnalytics.priorityDistribution")}</h3>
                                 <div className="p-2 bg-amber-100 rounded-lg">
                                     <FaClock className="w-4 h-4 text-amber-600" />
                                 </div>
@@ -149,7 +151,7 @@ const GoalsAnalytics = ({ goals, onClose }) => {
                     {/* Upcoming Deadlines */}
                     <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
                         <div className="flex items-center justify-between mb-6">
-                            <h3 className="font-semibold text-slate-900">Upcoming Deadlines</h3>
+                            <h3 className="font-semibold text-slate-900">{t("goalsAnalytics.upcomingDeadlines")}</h3>
                             <div className="p-2 bg-purple-100 rounded-lg">
                                 <FaCalendar className="w-4 h-4 text-purple-600" />
                             </div>
@@ -164,7 +166,7 @@ const GoalsAnalytics = ({ goals, onClose }) => {
                                         <div className="flex-1">
                                             <h4 className="font-medium text-slate-900">{goal.title}</h4>
                                             <p className="text-sm text-slate-600">
-                                                Due {new Date(goal.dueDate).toLocaleDateString()}
+                                                {t("goalsAnalytics.due", { date: new Date(goal.dueDate).toLocaleDateString() })}
                                             </p>
                                         </div>
                                         <div className="w-16 bg-slate-200 rounded-full h-2">
@@ -177,7 +179,7 @@ const GoalsAnalytics = ({ goals, onClose }) => {
                                 ))}
                             </div>
                         ) : (
-                            <div className="text-center py-8 text-slate-500">No upcoming deadlines</div>
+                            <div className="text-center py-8 text-slate-500">{t("goalsAnalytics.noUpcomingDeadlines")}</div>
                         )}
                     </div>
                 </div>
@@ -188,7 +190,7 @@ const GoalsAnalytics = ({ goals, onClose }) => {
                         onClick={onClose}
                         className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl hover:shadow-lg transition-all"
                     >
-                        Close
+                        {t("goalsAnalytics.close")}
                     </button>
                 </div>
             </div>

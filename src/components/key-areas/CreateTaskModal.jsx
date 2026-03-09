@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FaSave } from 'react-icons/fa';
 import usersService from '../../services/usersService';
 import { useDraggable } from '../../hooks/useDraggable';
@@ -75,6 +76,7 @@ export default function CreateTaskModal({
   // Current user ID for delegation detection
   currentUserId = null,
 }) {
+  const { t } = useTranslation();
   const firstRowRef = useRef(null);
   const [firstRowHeight, setFirstRowHeight] = useState(null);
 
@@ -533,7 +535,7 @@ export default function CreateTaskModal({
           onMouseDown={handleMouseDown}
         >
           <h3 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xl font-semibold text-slate-900">
-            {finalIsDontForget ? "Create Don't forget task" : 'Create Task'}
+            {finalIsDontForget ? t("createTaskModal.createDontForget") : t("createTaskModal.createTask")}
           </h3>
           <div className="flex items-center justify-end gap-2">
             <button
@@ -542,7 +544,7 @@ export default function CreateTaskModal({
               className="rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold px-3 py-1.5 text-sm inline-flex items-center gap-1.5"
             >
               <FaSave className="text-xs" />
-              Save
+              {t("createTaskModal.save")}
             </button>
             <button
               type="button"
@@ -557,7 +559,7 @@ export default function CreateTaskModal({
 
   <form id="create-task-form" onSubmit={onSubmit} className="pm-notched-form px-4 pb-4 pt-2 space-y-2 overflow-y-auto flex-1">
           <div className="mb-4">
-            <label className="text-sm font-medium text-slate-700" htmlFor="ka-task-title">Task name</label>
+            <label className="text-sm font-medium text-slate-700" htmlFor="ka-task-title">{t("createTaskModal.taskNameLabel")}</label>
             <input
               id="ka-task-title"
               name="title"
@@ -572,7 +574,7 @@ export default function CreateTaskModal({
           <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-y-4 md:gap-x-6">
             <div className="grid grid-rows-5 gap-0 md:col-span-1">
               <div ref={firstRowRef} style={rowMinHeight ? { minHeight: rowMinHeight } : undefined}>
-                <label className="text-sm font-medium text-slate-700">Description</label>
+                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.descLabel")}</label>
                 <input
                   name="description"
                   className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 mt-0"
@@ -583,7 +585,7 @@ export default function CreateTaskModal({
               </div>
 
               <div style={rowMinHeight ? { minHeight: rowMinHeight } : undefined}>
-                <label className="text-sm font-medium text-slate-700">Start date</label>
+                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.startDateLabel")}</label>
                 <div className="relative mt-0">
                   <input
                     name="start_date"
@@ -605,7 +607,7 @@ export default function CreateTaskModal({
               </div>
 
               <div style={rowMinHeight ? { minHeight: rowMinHeight } : undefined}>
-                <label className="text-sm font-medium text-slate-700">End date</label>
+                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.endDateLabel")}</label>
                 <div className="relative mt-0">
                   <input
                     name="end_date"
@@ -628,7 +630,7 @@ export default function CreateTaskModal({
               </div>
 
               <div style={rowMinHeight ? { minHeight: rowMinHeight } : undefined}>
-                <label className="text-sm font-medium text-slate-700">Deadline</label>
+                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.deadlineLabel")}</label>
                 <div className="relative mt-0.5">
                   <input
                     name="deadline"
@@ -646,7 +648,7 @@ export default function CreateTaskModal({
               </div>
 
               <div style={rowMinHeight ? { minHeight: rowMinHeight } : undefined}>
-                <label className="text-sm font-medium text-slate-700">Duration</label>
+                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.durationLabel")}</label>
                 <input
                   name="duration"
                   type="time"
@@ -664,7 +666,7 @@ export default function CreateTaskModal({
             </div>
             <div className="grid grid-rows-5 gap-0 md:col-span-1">
               <div style={rowMinHeight ? { minHeight: rowMinHeight } : undefined}>
-                <label className="text-sm font-medium text-slate-700">Key Area</label>
+                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.keyAreaLabel")}</label>
                 <div className="relative mt-0">
                   <select
                     name="key_area_id"
@@ -673,7 +675,7 @@ export default function CreateTaskModal({
                     onChange={(e) => setKeyAreaId(e.target.value)}
                     required={!finalIsDontForget}
                   >
-                    <option value="">— Select Key Area —</option>
+                    <option value="">{t("createTaskModal.selectKeyArea")}</option>
                     {(localKeyAreas && localKeyAreas.length ? localKeyAreas : keyAreas).map((ka, idx) => (
                       <option key={ka.id} value={ka.id}>{formatKeyAreaLabel(ka, idx)}</option>
                     ))}
@@ -683,7 +685,7 @@ export default function CreateTaskModal({
               </div>
 
               <div style={rowMinHeight ? { minHeight: rowMinHeight } : undefined}>
-                <label className="text-sm font-medium text-slate-700">List</label>
+                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.listLabel")}</label>
                 <div className="relative mt-0">
                   <select
                     name="list_index"
@@ -697,7 +699,7 @@ export default function CreateTaskModal({
                         if (!keyAreaId) {
                           const useLists = (availableLists && availableLists.length) ? availableLists : [1];
                           return useLists.map((n) => (
-                            <option key={n} value={n}>{(parentListNames && parentListNames[n]) || (listNames && listNames[n]) || `List ${n}`}</option>
+                            <option key={n} value={n}>{(parentListNames && parentListNames[n]) || (listNames && listNames[n]) || t("createTaskModal.list", { n })}</option>
                           ));
                         }
                         const named = Object.keys(listNames || {}).map(Number).filter((idx) => listNames[idx] && String(listNames[idx]).trim() !== '');
@@ -705,7 +707,7 @@ export default function CreateTaskModal({
                         const combined = [1, ...named, ...listsWithTasks];
                         const uniq = [...new Set(combined)].sort((a, b) => a - b);
                         const toUse = (uniq && uniq.length) ? uniq : (availableLists || [1]);
-                        return toUse.map((n) => (<option key={n} value={n}>{(listNames && listNames[n]) || `List ${n}`}</option>));
+                        return toUse.map((n) => (<option key={n} value={n}>{(listNames && listNames[n]) || t("createTaskModal.list", { n })}</option>));
                       })()
                     }
                   </select>
@@ -714,10 +716,10 @@ export default function CreateTaskModal({
               </div>
 
               <div style={rowMinHeight ? { minHeight: rowMinHeight } : undefined}>
-                <label className="text-sm font-medium text-slate-700">Responsible</label>
+                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.responsibleLabel")}</label>
                 <div className="relative mt-0">
                   <select name="assignee" className={`${selectCls} mt-0 h-9`} value={assignee} onChange={(e) => setAssignee(e.target.value)}>
-                    <option value="">— Unassigned —</option>
+                    <option value="">{t("createTaskModal.unassigned")}</option>
                     {(usersList || []).map((u) => (<option key={u.id} value={u.id}>{u.name}</option>))}
                   </select>
                   <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
@@ -725,7 +727,7 @@ export default function CreateTaskModal({
               </div>
 
               <div style={rowMinHeight ? { minHeight: rowMinHeight } : undefined}>
-                <label className="text-sm font-medium text-slate-700">Priority</label>
+                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.priorityLabel")}</label>
                 <div className="relative mt-0">
                   <select
                     name="priority"
@@ -733,19 +735,19 @@ export default function CreateTaskModal({
                     value={String(priority)}
                     onChange={(e) => setPriority(Number(e.target.value))}
                   >
-                    <option value={3}>High</option>
-                    <option value={2}>Normal</option>
-                    <option value={1} style={{ color: "#6b7280" }}>Low</option>
+                    <option value={3}>{t("createTaskModal.highOpt")}</option>
+                    <option value={2}>{t("createTaskModal.normalOpt")}</option>
+                    <option value={1} style={{ color: "#6b7280" }}>{t("createTaskModal.lowOpt")}</option>
                   </select>
                   <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 </div>
               </div>
 
               <div style={rowMinHeight ? { minHeight: rowMinHeight } : undefined}>
-                <label className="text-sm font-medium text-slate-700">Goal</label>
+                <label className="text-sm font-medium text-slate-700">{t("createTaskModal.goalLabel")}</label>
                 <div className="relative mt-0">
                   <select name="goal" className={selectCls} value={goal} onChange={(e) => setGoal(e.target.value)}>
-                    <option value="">— Select Goal —</option>
+                    <option value="">{t("createTaskModal.selectGoal")}</option>
                     {(localGoals && localGoals.length ? localGoals : goals).map((g) => (<option key={g.id} value={g.id}>{g.title}</option>))}
                   </select>
                   <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />

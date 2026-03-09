@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { useTranslation } from 'react-i18next';
 
 export default function ProfileSetting() {
+    const { t } = useTranslation();
     const [activeTab, setActiveTab] = useState("My Profile");
     const [showPw, setShowPw] = useState({ old: false, new1: false, new2: false });
     const [avatarPreview, setAvatarPreview] = useState(null);
@@ -108,8 +110,8 @@ export default function ProfileSetting() {
     
     return (
         <div className="min-h-screen bg-gray-100 p-4">
-            <h1 className="text-2xl font-bold mb-6">Profile Settings (To Be Componentized)</h1>
-            <p className="text-gray-600">This comprehensive profile will be broken down into reusable components.</p>
+            <h1 className="text-2xl font-bold mb-6">{t("comprehensiveProfile.title")}</h1>
+            <p className="text-gray-600">{t("comprehensiveProfile.description")}</p>
         </div>
     );
 }

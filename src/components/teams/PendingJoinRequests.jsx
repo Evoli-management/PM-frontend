@@ -1,9 +1,11 @@
 // src/components/teams/PendingJoinRequests.jsx
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useTeamJoinRequests } from '../../hooks/useTeamJoinRequests';
 import styles from './PendingJoinRequests.module.css';
 
 export const PendingJoinRequests = ({ teamId, teamName }) => {
+  const { t } = useTranslation();
   const [requests, setRequests] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
   const { getPendingRequests, reviewRequest, loading, error } = useTeamJoinRequests();
@@ -54,7 +56,7 @@ export const PendingJoinRequests = ({ teamId, teamName }) => {
         className={styles.toggleBtn}
         onClick={() => setIsOpen(true)}
       >
-        View Join Requests ({requests.length})
+        {t("pendingJoinRequests.toggleBtn", { n: requests.length })}
       </button>
     );
   }
@@ -62,7 +64,7 @@ export const PendingJoinRequests = ({ teamId, teamName }) => {
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <h4>Join Requests for {teamName}</h4>
+        <h4>{t("pendingJoinRequests.title", { name: teamName })}</h4>
         <button
           className={styles.closeBtn}
           onClick={() => setIsOpen(false)}
@@ -74,7 +76,7 @@ export const PendingJoinRequests = ({ teamId, teamName }) => {
       {error && <div className={styles.error}>{error}</div>}
 
       {requests.length === 0 ? (
-        <p className={styles.empty}>No pending requests</p>
+        <p className={styles.empty}>{t("pendingJoinRequests.noRequests")}</p>
       ) : (
         <div className={styles.requestsList}>
           {requests.map((request) => (
@@ -88,13 +90,13 @@ export const PendingJoinRequests = ({ teamId, teamName }) => {
 
               {request.message && (
                 <div className={styles.message}>
-                  <strong>Message:</strong>
+                  <strong>{t("pendingJoinRequests.messageLabel")}</strong>
                   <p>{request.message}</p>
                 </div>
               )}
 
               <div className={styles.timestamp}>
-                Requested: {new Date(request.createdAt).toLocaleDateString()}
+                {t("pendingJoinRequests.requested", { date: new Date(request.createdAt).toLocaleDateString() })}
               </div>
 
               <div className={styles.actions}>
@@ -103,13 +105,13 @@ export const PendingJoinRequests = ({ teamId, teamName }) => {
                   onClick={() => handleApprove(request.id)}
                   disabled={loading}
                 >
-                  Approve
+                  {t("pendingJoinRequests.approve")}
                 </button>
 
                 <div className={styles.rejectGroup}>
                   <input
                     type="text"
-                    placeholder="Reason (optional)"
+                    placeholder={t("pendingJoinRequests.rejectPlaceholder")}
                     value={rejectionReasons[request.id] || ''}
                     onChange={(e) =>
                       setRejectionReasons((prev) => ({
@@ -124,7 +126,7 @@ export const PendingJoinRequests = ({ teamId, teamName }) => {
                     onClick={() => handleReject(request.id)}
                     disabled={loading}
                   >
-                    Reject
+                    {t("pendingJoinRequests.reject")}
                   </button>
                 </div>
               </div>

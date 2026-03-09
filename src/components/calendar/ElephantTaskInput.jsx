@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import elephantTaskService from "../../services/elephantTaskService";
 import { useToast } from "../shared/ToastProvider";
+import { useTranslation } from 'react-i18next';
 
 const ElephantTaskInput = ({ viewType, dateStart, dateEnd, onTaskChange }) => {
+    const { t } = useTranslation();
     const [elephantTask, setElephantTask] = useState("");
     const [isEditing, setIsEditing] = useState(false);
     const [draft, setDraft] = useState("");
@@ -101,10 +103,10 @@ const ElephantTaskInput = ({ viewType, dateStart, dateEnd, onTaskChange }) => {
                 setDraft("");
                 setElephantTask("");
                 onTaskChange?.();
-                addToast({ title: "Elephant task cleared", variant: "success" });
+                addToast({ title: t("elephantTaskInput.taskCleared"), variant: "success" });
             } catch (error) {
                 console.error("Error deleting elephant task:", error);
-                addToast({ title: "Failed to clear elephant task", description: error.message, variant: "error" });
+                addToast({ title: t("elephantTaskInput.failedClear"), description: error.message, variant: "error" });
             } finally {
                 setSaving(false);
             }
@@ -118,10 +120,10 @@ const ElephantTaskInput = ({ viewType, dateStart, dateEnd, onTaskChange }) => {
             setElephantTask(value);
             setDraft(value);
             onTaskChange?.();
-            addToast({ title: "Elephant task saved", variant: "success" });
+            addToast({ title: t("elephantTaskInput.taskSaved"), variant: "success" });
         } catch (error) {
             console.error("Error saving elephant task:", error);
-            addToast({ title: "Failed to save elephant task", description: error.message, variant: "error" });
+            addToast({ title: t("elephantTaskInput.failedSave"), description: error.message, variant: "error" });
         } finally {
             setSaving(false);
         }
@@ -149,7 +151,7 @@ const ElephantTaskInput = ({ viewType, dateStart, dateEnd, onTaskChange }) => {
             <div className="w-full bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 px-3 py-2 rounded-lg">
                 <div className="flex items-center gap-2">
                     <span className="text-lg">🐘</span>
-                    <span className="text-sm text-gray-500">Loading elephant task...</span>
+                    <span className="text-sm text-gray-500">{t("elephantTaskInput.loadingTask")}</span>
                 </div>
             </div>
         );
@@ -165,7 +167,7 @@ const ElephantTaskInput = ({ viewType, dateStart, dateEnd, onTaskChange }) => {
                     id="vpc-elephant-task-input"
                     type="text"
                     className="vpc-elephant-task-input form-control flex-1 h-[34px] mx-2 px-3 bg-white border border-orange-200 rounded text-[14px] md:text-[15px] leading-tight text-[#7a8790] placeholder:text-gray-400 placeholder:italic outline-none cursor-text"
-                    placeholder="Enter your elephant task..."
+                    placeholder={t("elephantTaskInput.placeholder")}
                     value={isEditing ? draft : (elephantTask || "")}
                     disabled={isLoading}
                     onFocus={() => {
@@ -190,14 +192,14 @@ const ElephantTaskInput = ({ viewType, dateStart, dateEnd, onTaskChange }) => {
                     <div className="w-[170px] sm:w-[220px] self-stretch px-3 py-0.5 text-right flex flex-col justify-center">
                         <div className="text-[13px] md:text-[14px] leading-tight font-semibold text-[#1f2937]">{dayMeta.weekday || "Day"}</div>
                         <div className="text-[12px] md:text-[13px] leading-tight text-[#111827]">
-                            Week: {dayMeta.weekNumber ?? "--"} / Day: {dayMeta.dayOfYear ?? "--"}
+                            {t("elephantTaskInput.weekLabel")} {dayMeta.weekNumber ?? "--"} / {t("elephantTaskInput.dayLabel")} {dayMeta.dayOfYear ?? "--"}
                         </div>
                     </div>
                 ) : null}
                 {isWeekView ? (
                     <div className="w-[120px] sm:w-[160px] self-stretch px-3 py-0.5 text-right flex items-center justify-end">
                         <div className="text-[13px] md:text-[14px] leading-tight font-semibold text-[#1f2937]">
-                            Week: {dayMeta.weekNumber ?? "--"}
+                            {t("elephantTaskInput.weekLabel")} {dayMeta.weekNumber ?? "--"}
                         </div>
                     </div>
                 ) : null}
@@ -233,7 +235,7 @@ const ElephantTaskInput = ({ viewType, dateStart, dateEnd, onTaskChange }) => {
                                     {!isEditing ? (
                                         ((elephantTask || "").trim() === "") ? (
                                             <span className="text-gray-400 italic">
-                                                Click to add your {viewType} planning focus...
+                                                {t("elephantTaskInput.clickToAdd", { viewType })}
                                             </span>
                                         ) : (
                                             elephantTask
@@ -253,7 +255,7 @@ const ElephantTaskInput = ({ viewType, dateStart, dateEnd, onTaskChange }) => {
                                         className="text-xs bg-orange-500 hover:bg-orange-600 text-white px-2 h-[1.5rem] flex items-center rounded disabled:opacity-50"
                                 aria-label="Save elephant task"
                             >
-                                {isSaving ? "Saving..." : "Save"}
+                                {isSaving ? t("elephantTaskInput.saving") : t("elephantTaskInput.save")}
                             </button>
                             <button
                                 onClick={handleCancel}
@@ -261,7 +263,7 @@ const ElephantTaskInput = ({ viewType, dateStart, dateEnd, onTaskChange }) => {
                                         className="text-xs text-gray-500 hover:text-gray-700 px-2 h-[1.5rem] flex items-center rounded disabled:opacity-50"
                                 aria-label="Cancel editing elephant task"
                             >
-                                Cancel
+                                {t("elephantTaskInput.cancel")}
                             </button>
                         </div>
                     </div>

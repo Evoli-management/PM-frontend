@@ -1,4 +1,5 @@
 import React, { useState, useRef, useLayoutEffect, useEffect, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { FaChevronLeft, FaChevronRight, FaChevronDown, FaEdit, FaTrash } from "react-icons/fa";
 import { useCalendarPreferences } from "../../hooks/useCalendarPreferences";
 import CalendarViewTopSection from "./CalendarViewTopSection";
@@ -92,6 +93,7 @@ export default function QuarterView({
     onToggleSlotSize,
     elephantTaskRow = null,
 }) {
+    const { t } = useTranslation();
     const { formatDate } = useCalendarPreferences();
     const [keyAreaMap, setKeyAreaMap] = useState({});
 
@@ -701,7 +703,7 @@ export default function QuarterView({
                         <button
                             className="day-header-btn px-2 py-0.5 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
                             style={{ minWidth: 34, minHeight: 34 }}
-                            aria-label="Today"
+                            aria-label={t("quarterView.today")}
                             onClick={() => {
                                 try {
                                     if (typeof onSetDate === 'function') onSetDate(new Date());
@@ -709,7 +711,7 @@ export default function QuarterView({
                                 setTimeout(() => scrollToDate(new Date()), 80);
                             }}
                         >
-                            Today
+                            {t("quarterView.today")}
                         </button>
                     </div>
                     <span className="text-lg font-semibold">{quarterLabel}</span>

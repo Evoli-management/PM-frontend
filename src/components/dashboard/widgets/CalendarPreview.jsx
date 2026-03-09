@@ -1,6 +1,8 @@
 import React, { useRef } from "react";
+import { useTranslation } from "react-i18next";
 
 export default function CalendarPreview({ events = [], onReorder, getCountdownBadge }) {
+    const { t } = useTranslation();
     const dragIdxRef = useRef(null);
     function onDragStart(i) {
         dragIdxRef.current = i;
@@ -18,7 +20,7 @@ export default function CalendarPreview({ events = [], onReorder, getCountdownBa
         dragIdxRef.current = null;
     }
     if (!events.length) {
-        return <div className="opacity-60 text-[CanvasText]">No appointments today.</div>;
+        return <div className="opacity-60 text-[CanvasText]">{t("calendarPreview.noAppointments")}</div>;
     }
     return (
         <ul className="divide-y text-[CanvasText] h-full min-h-0 overflow-y-auto">
@@ -37,7 +39,7 @@ export default function CalendarPreview({ events = [], onReorder, getCountdownBa
                     </span>
                     <div className="flex-1">
                         <div className="font-medium">{ev.title}</div>
-                        <div className="text-xs opacity-60">ends {ev.end}</div>
+                        <div className="text-xs opacity-60">{t("calendarPreview.ends", { time: ev.end })}</div>
                     </div>
                     {getCountdownBadge &&
                         (() => {

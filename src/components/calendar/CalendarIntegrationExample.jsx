@@ -1,8 +1,10 @@
 import React, { useState } from "react";
+import { useTranslation } from 'react-i18next';
 // import CalendarCreateModal from "../modals/CalendarCreateModal.jsx";
 
 // Example of how to integrate the CalendarCreateModal into your existing calendar
 export default function CalendarIntegrationExample() {
+    const { t } = useTranslation();
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [selectedDate, setSelectedDate] = useState(null);
     const [defaultType, setDefaultType] = useState("task");
@@ -46,7 +48,7 @@ export default function CalendarIntegrationExample() {
         <div className="calendar-container">
             {/* Calendar Header */}
             <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-bold text-slate-800">Calendar Integration Example</h1>
+                <h1 className="text-2xl font-bold text-slate-800">{t("calendarIntegrationExample.title")}</h1>
                 <div className="flex gap-2">
                     <button
                         onClick={() => {
@@ -55,7 +57,7 @@ export default function CalendarIntegrationExample() {
                         }}
                         className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium"
                     >
-                        📋 Add Task
+                        {t("calendarIntegrationExample.addTask")}
                     </button>
                     <button
                         onClick={() => {
@@ -64,7 +66,7 @@ export default function CalendarIntegrationExample() {
                         }}
                         className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm font-medium"
                     >
-                        ⚡ Add Activity
+                        {t("calendarIntegrationExample.addActivity")}
                     </button>
                 </div>
             </div>
@@ -72,20 +74,20 @@ export default function CalendarIntegrationExample() {
             {/* Example Usage Instructions */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
                 <h2 className="text-lg font-semibold text-blue-800 mb-3">
-                    🎯 How to Integrate into Your Calendar
+                    {t("calendarIntegrationExample.howToIntegrate")}
                 </h2>
                 <div className="space-y-3 text-blue-700">
                     <p>
-                        <strong>1. Import the Modal:</strong> Add <code className="bg-blue-100 px-1 rounded">import CalendarCreateModal from "../modals/CalendarCreateModal.jsx"</code> to your calendar component
+                        <strong>{t("calendarIntegrationExample.step1Label")}</strong> Add <code className="bg-blue-100 px-1 rounded">import CalendarCreateModal from "../modals/CalendarCreateModal.jsx"</code> to your calendar component
                     </p>
                     <p>
-                        <strong>2. Add State:</strong> Use <code className="bg-blue-100 px-1 rounded">const [showCreateModal, setShowCreateModal] = useState(false)</code>
+                        <strong>{t("calendarIntegrationExample.step2Label")}</strong> Use <code className="bg-blue-100 px-1 rounded">const [showCreateModal, setShowCreateModal] = useState(false)</code>
                     </p>
                     <p>
-                        <strong>3. Add Buttons:</strong> Place "Add Task" and "Add Activity" buttons in your calendar header
+                        <strong>{t("calendarIntegrationExample.step3Label")}</strong> Place "Add Task" and "Add Activity" buttons in your calendar header
                     </p>
                     <p>
-                        <strong>4. Handle Events:</strong> Use the <code className="bg-blue-100 px-1 rounded">onSave</code> callback to refresh your calendar data
+                        <strong>{t("calendarIntegrationExample.step4Label")}</strong> Use the <code className="bg-blue-100 px-1 rounded">onSave</code> callback to refresh your calendar data
                     </p>
                 </div>
             </div>
@@ -125,7 +127,7 @@ export default function CalendarIntegrationExample() {
                                         handleQuickTaskCreate(date);
                                     }}
                                     className="text-xs bg-blue-100 text-blue-700 px-1 py-0.5 rounded mr-1 hover:bg-blue-200"
-                                    title="Add Task"
+                                    title={t("calendarIntegrationExample.addTaskTitle")}
                                 >
                                     📋
                                 </button>
@@ -135,7 +137,7 @@ export default function CalendarIntegrationExample() {
                                         handleQuickActivityCreate(date);
                                     }}
                                     className="text-xs bg-green-100 text-green-700 px-1 py-0.5 rounded hover:bg-green-200"
-                                    title="Add Activity"
+                                    title={t("calendarIntegrationExample.addActivityTitle")}
                                 >
                                     ⚡
                                 </button>
@@ -147,7 +149,7 @@ export default function CalendarIntegrationExample() {
 
             {/* Integration Code Example */}
             <div className="mt-6 bg-slate-50 border border-slate-200 rounded-lg p-4">
-                <h3 className="text-sm font-semibold text-slate-700 mb-2">📝 Quick Integration Code:</h3>
+                <h3 className="text-sm font-semibold text-slate-700 mb-2">{t("calendarIntegrationExample.quickIntegrationCode")}</h3>
                 <pre className="text-xs text-slate-600 overflow-x-auto">
 {`// In your existing calendar component:
 import CalendarCreateModal from "../modals/CalendarCreateModal.jsx";

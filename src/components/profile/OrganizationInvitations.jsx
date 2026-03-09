@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from "react";
+import { useTranslation } from 'react-i18next';
 import organizationService from "../../services/organizationService";
 import userProfileService from "../../services/userProfileService";
 
 export function OrganizationInvitations({ showToast }) {
+  const { t } = useTranslation();
   const [invites, setInvites] = useState([]);
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(null);
@@ -13,7 +15,7 @@ export function OrganizationInvitations({ showToast }) {
       const rows = await organizationService.listInvitations();
       setInvites(rows);
     } catch (e) {
-      showToast?.(e?.response?.data?.message || e.message || "Failed to load invitations", "error");
+      showToast?.(e?.response?.data?.message || e.message || t("organizationInvitations.loadError"), "error");
     } finally {
       setLoading(false);
     }
@@ -40,14 +42,14 @@ export function OrganizationInvitations({ showToast }) {
   }, []);
 
   const handleCancel = async (token) => {
-    if (!confirm("Cancel this invitation?")) return;
+    if (!confirm(t("organizationInvitations.confirmCancel"))) return;
     setCancelling(token);
     try {
       await organizationService.cancelInvitation(token);
-      showToast?.("Invitation cancelled");
+      showToast?.(t("organizationInvitations.cancelSuccess"));
       await load();
     } catch (e) {
-      showToast?.(e?.response?.data?.message || e.message || "Failed to cancel", "error");
+      showToast?.(e?.response?.data?.message || e.message || t("organizationInvitations.cancelError"), "error");
     } finally {
       setCancelling(null);
     }
@@ -56,7 +58,7 @@ export function OrganizationInvitations({ showToast }) {
     if (!canManage) {
       return (
         <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <p className="text-gray-600">You don't have permission to view invitations.</p>
+          <p className="text-gray-600">{t("organizationInvitations.noPermission")}</p>
         </div>
       );
     }
@@ -64,28 +66,28 @@ export function OrganizationInvitations({ showToast }) {
   return (
     <div className="bg-white rounded-lg border border-gray-200">
       <div className="p-4 border-b flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Pending Invitations</h3>
-        <span className="text-sm text-gray-500">{invites.length} total</span>
+        <h3 className="text-lg font-semibold">{t("organizationInvitations.title")}</h3>
+        <span className="text-sm text-gray-500">{t("organizationInvitations.total", { count: invites.length })}</span>
       </div>
       {loading ? (
-        <div className="p-4 text-sm text-gray-600">Loading...</div>
+        <div className="p-4 text-sm text-gray-600">{t("organizationInvitations.loading")}</div>
       ) : invites.length === 0 ? (
-        <div className="p-4 text-sm text-gray-600">No invitations yet.</div>
+        <div className="p-4 text-sm text-gray-600">{t("organizationInvitations.noInvitations")}</div>
       ) : (
         <ul className="divide-y">
           {invites.map((inv) => (
             <li key={inv.id} className="p-4 flex items-center justify-between">
               <div className="space-y-1">
-                <div className="font-medium text-gray-900">{inv.invitedEmail || "(no email specified)"}</div>
-                <div className="text-sm text-gray-600">Token: {inv.token}</div>
-                <div className="text-xs text-gray-500">Status: {inv.status} • Expires: {inv.expiresAt ? new Date(inv.expiresAt).toLocaleString() : "-"}</div>
+                <div className="font-medium text-gray-900">{inv.invitedEmail || t("organizationInvitations.noEmail")}</div>
+                <div className="text-sm text-gray-600">{t("organizationInvitations.token")} {inv.token}</div>
+                <div className="text-xs text-gray-500">{t("organizationInvitations.statusLabel")} {inv.status} • {t("organizationInvitations.expires")} {inv.expiresAt ? new Date(inv.expiresAt).toLocaleString() : "-"}</div>
               </div>
               <button
                 onClick={() => handleCancel(inv.token)}
                 disabled={cancelling === inv.token || inv.status !== 'pending'}
                 className="px-3 py-2 rounded bg-red-600 text-white disabled:opacity-50"
               >
-                {cancelling === inv.token ? "Cancelling..." : inv.status === 'pending' ? "Cancel" : "Processed"}
+                {cancelling === inv.token ? t("organizationInvitations.cancelling") : inv.status === 'pending' ? t("organizationInvitations.cancel") : t("organizationInvitations.processed")}
               </button>
             </li>
           ))}

@@ -1,6 +1,8 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 export function CanWillMatrix({ data, selectedItems, onItemClick }) {
+    const { t } = useTranslation();
     // CAN-WILL Matrix quadrants
     const quadrants = [
         { name: 'High CAN, Low WILL', position: 'top-left', color: 'bg-yellow-100' },
@@ -28,7 +30,7 @@ export function CanWillMatrix({ data, selectedItems, onItemClick }) {
 
     return (
         <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <h3 className="text-sm font-semibold mb-4 text-gray-800">CAN-WILL Matrix</h3>
+            <h3 className="text-sm font-semibold mb-4 text-gray-800">{t("canWillMatrix.title")}</h3>
             
             {/* Matrix Container */}
             <div className="relative w-full" style={{ paddingBottom: '100%', minHeight: '360px' }}>
@@ -45,13 +47,13 @@ export function CanWillMatrix({ data, selectedItems, onItemClick }) {
                     {/* Vertical axis (CAN) */}
                     <div className="absolute left-0 top-0 bottom-0 w-px bg-gray-400"></div>
                     <div className="absolute left-0 bottom-0 -ml-8 text-xs text-gray-600 transform -rotate-90 origin-bottom-left">
-                        CAN
+                        {t("canWillMatrix.can")}
                     </div>
                     
                     {/* Horizontal axis (WILL) */}
                     <div className="absolute left-0 bottom-0 right-0 h-px bg-gray-400"></div>
                     <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-6 text-xs text-gray-600">
-                        WILL
+                        {t("canWillMatrix.will")}
                     </div>
 
                     {/* Center lines */}
@@ -94,15 +96,15 @@ export function CanWillMatrix({ data, selectedItems, onItemClick }) {
             <div className="mt-8 pt-4 border-t flex items-center gap-4 text-xs">
                 <div className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-full bg-purple-500"></div>
-                    <span>Teams</span>
+                    <span>{t("canWillMatrix.teams")}</span>
                 </div>
                 <div className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-full bg-gray-600"></div>
-                    <span>Users</span>
+                    <span>{t("canWillMatrix.users")}</span>
                 </div>
                 <div className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-full bg-blue-600"></div>
-                    <span>Selected</span>
+                    <span>{t("canWillMatrix.selected")}</span>
                 </div>
             </div>
         </div>

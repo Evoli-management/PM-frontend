@@ -1,0 +1,23 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "calendar": "Kalender",
+    "dontForget": "Vergeet niet",
+    "goals": "Doelen en tracking",
+    "keyAreas": "Sleutelgebieden",
+    "giveStrokes": "Geef erkenning",
+    "team": "Team"
+  },
+  "common": {
+    "save": "Opslaan",
+    "cancel": "Annuleren",
+    "delete": "Verwijderen",
+    "edit": "Bewerken",
+    "add": "Toevoegen",
+    "close": "Sluiten",
+    "loading": "Laden...",
+    "error": "Er is iets misgegaan",
+    "success": "Succes",
+    "logout": "Uitloggen"
+  }
+}
