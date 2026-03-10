@@ -649,6 +649,7 @@ export default function KeyAreas() {
     const [selectedActivityCountInPanel, setSelectedActivityCountInPanel] = useState(0);
     const [selectedActivityIdsInPanel, setSelectedActivityIdsInPanel] = useState(new Set());
     const [showActivityMassFieldPicker, setShowActivityMassFieldPicker] = useState(false);
+    const [panelTargetActivityId, setPanelTargetActivityId] = useState(null);
 
     const resolveTaskForUnifiedActivity = useCallback(async (activity) => {
         const normalizedActivity = normalizeActivity(activity || {});
@@ -2077,6 +2078,26 @@ export default function KeyAreas() {
             setActivitiesByTask((prev) => ({ ...prev, [String(taskId)]: [] }));
         }
     };
+
+    const openTaskInKeyAreaPanels = useCallback((task, { activityId = null } = {}) => {
+        if (!task?.id) return;
+
+        const resolvedListIndex = Number(task.list_index ?? task.listIndex ?? 1) || 1;
+        const targetActivityId = activityId ? String(activityId) : null;
+
+        setSelectedTaskFull(null);
+        setTaskTab(resolvedListIndex);
+        setSelectedTaskInPanel(task);
+        setPanelTargetActivityId(targetActivityId);
+
+        const existingActivities = activitiesByTask[String(task.id)];
+        if (!Array.isArray(existingActivities)) {
+            refreshActivitiesForTask(task.id).catch((error) => {
+                console.error('Failed to preload activities for task panel open', error);
+            });
+        }
+    }, [activitiesByTask]);
+
     // Helper: refresh all tasks currently in state
     const refreshAllActivities = async () => {
         if (!Array.isArray(allTasks) || allTasks.length === 0) return;
@@ -2287,6 +2308,34 @@ export default function KeyAreas() {
         setSelectedActivityIdsInPanel(new Set());
         setSelectedActivityCountInPanel(0);
     }, [selectedTaskInPanel?.id]);
+
+    useEffect(() => {
+        if (!selectedTaskInPanel?.id || !panelTargetActivityId) return;
+
+        const taskKey = String(selectedTaskInPanel.id);
+        const list = Array.isArray(activitiesByTask[taskKey]) ? activitiesByTask[taskKey] : [];
+        const hasTarget = list.some((activity) => String(activity.id) === String(panelTargetActivityId));
+        if (!hasTarget) return;
+
+        const selectorId = String(panelTargetActivityId).replace(/"/g, '\\"');
+        const timer = window.setTimeout(() => {
+            const row = document.querySelector(`[data-activity-row-id="${selectorId}"]`);
+            if (row && typeof row.scrollIntoView === 'function') {
+                row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            }
+        }, 80);
+
+        const clearTimer = window.setTimeout(() => {
+            setPanelTargetActivityId((prev) =>
+                String(prev || '') === String(panelTargetActivityId) ? null : prev,
+            );
+        }, 2200);
+
+        return () => {
+            window.clearTimeout(timer);
+            window.clearTimeout(clearTimer);
+        };
+    }, [selectedTaskInPanel?.id, activitiesByTask, panelTargetActivityId]);
 
     useEffect(() => {
         setSelectedActivityCountInPanel(selectedActivityIdsInPanel.size);
@@ -2836,6 +2885,7 @@ export default function KeyAreas() {
         const kaParam = params.get("ka");
         const taskParam = params.get("task");
         const activityParam = params.get("activity");
+        const openPanelTaskParam = params.get("openPanelTask");
         // Back/show-all can briefly leave stale ?ka in URL while selectedKA is already cleared.
         // Suppress auto-open until the query is cleared.
         if (suppressKaParamOpenRef.current) {
@@ -2861,13 +2911,17 @@ export default function KeyAreas() {
             const tId = String(taskParam);
             const hit = (allTasks || []).find((t) => String(t.id) === tId);
             if (hit) {
-                setSelectedTaskFull(hit);
-                if (activityParam) {
-                    setTaskFullInitialTab("activities");
+                if (openPanelTaskParam === '1') {
+                    openTaskInKeyAreaPanels(hit, { activityId: activityParam });
+                } else {
+                    setSelectedTaskFull(hit);
+                    if (activityParam) {
+                        setTaskFullInitialTab("activities");
+                    }
                 }
             }
         }
-    }, [location.search, keyAreas, selectedKA, allTasks, viewTab]);
+    }, [location.search, keyAreas, selectedKA, allTasks, viewTab, openTaskInKeyAreaPanels]);
 
     const openKA = async (ka) => {
         if (!ka?.id) return;
@@ -5221,7 +5275,11 @@ export default function KeyAreas() {
                                                                         </thead>
                                                                         <tbody>
                                                                             {list.map((a) => (
-                                                                                <tr key={a.id} className="bg-white border-b border-slate-100">
+                                                                                <tr
+                                                                                    key={a.id}
+                                                                                    data-activity-row-id={String(a.id)}
+                                                                                    className={`border-b border-slate-100 ${String(panelTargetActivityId || '') === String(a.id) ? 'bg-blue-50 ring-1 ring-inset ring-blue-200' : 'bg-white'}`}
+                                                                                >
                                                                                     <td className="px-3 py-2 align-top w-12">
                                                                                         <div className="relative inline-flex items-center gap-2">
                                                                                             <input

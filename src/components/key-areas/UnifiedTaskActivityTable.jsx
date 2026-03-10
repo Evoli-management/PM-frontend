@@ -69,6 +69,7 @@ export default function UnifiedTaskActivityTable({
     const [respondingTaskId, setRespondingTaskId] = useState(null);
     const [openRowMenuId, setOpenRowMenuId] = useState(null);
     const [rowMenuPos, setRowMenuPos] = useState({ top: 0, left: 0 });
+    const [rowMenuButtonEl, setRowMenuButtonEl] = useState(null);
     const bodyScrollRef = useRef(null);
     const [bodyScrollbarWidth, setBodyScrollbarWidth] = useState(0);
     const [showMassFieldPicker, setShowMassFieldPicker] = useState(false);
@@ -85,6 +86,44 @@ export default function UnifiedTaskActivityTable({
         document.addEventListener('mousedown', onDown);
         return () => document.removeEventListener('mousedown', onDown);
     }, [openRowMenuId]);
+
+    useEffect(() => {
+        if (!openRowMenuId || !rowMenuButtonEl || typeof rowMenuButtonEl.getBoundingClientRect !== 'function') {
+            return;
+        }
+
+        const updateRowMenuPos = () => setRowMenuPos(getRowMenuPosition(rowMenuButtonEl));
+
+        updateRowMenuPos();
+        window.addEventListener('resize', updateRowMenuPos);
+        window.addEventListener('scroll', updateRowMenuPos, true);
+
+        return () => {
+            window.removeEventListener('resize', updateRowMenuPos);
+            window.removeEventListener('scroll', updateRowMenuPos, true);
+        };
+    }, [openRowMenuId, rowMenuButtonEl]);
+
+    const getRowMenuPosition = (buttonEl) => {
+        if (!buttonEl || typeof buttonEl.getBoundingClientRect !== 'function') {
+            return { top: 0, left: 0 };
+        }
+
+        const rect = buttonEl.getBoundingClientRect();
+        const menuHeight = 220;
+        const menuWidth = 170;
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const spaceAbove = rect.top;
+        const openUp = spaceBelow < menuHeight + 12 && spaceAbove > spaceBelow;
+        let left = rect.left;
+        const maxLeft = window.innerWidth - menuWidth - 8;
+        if (left > maxLeft) left = Math.max(8, maxLeft);
+        if (left < 8) left = 8;
+        const top = openUp
+            ? Math.max(8, rect.top - menuHeight - 4)
+            : Math.min(window.innerHeight - menuHeight - 8, rect.bottom + 4);
+        return { top, left };
+    };
 
     // Flatten tasks and activities into single array
     const allItems = useMemo(() => {
@@ -776,6 +815,7 @@ export default function UnifiedTaskActivityTable({
             ka: String(target.kaId),
             openKA: '1',
             task: String(target.taskId),
+            openPanelTask: '1',
         });
         if (target.activityId) {
             params.set('activity', String(target.activityId));
@@ -870,7 +910,7 @@ export default function UnifiedTaskActivityTable({
 
     const renderColGroup = () => (
         <colgroup>
-            <col style={{ width: '3rem' }} />
+            <col style={{ width: viewTab === 'delegated' ? '2.5rem' : '3rem' }} />
             {columns.includes('title') && <col style={{ width: '15rem' }} />}
             {columns.includes('responsible') && <col style={{ width: '6rem' }} />}
             {columns.includes('keyArea') && <col style={{ width: '4rem' }} />}
@@ -1028,7 +1068,7 @@ export default function UnifiedTaskActivityTable({
     };
 
     return (
-        <div className="flex flex-col h-full min-h-0 w-full bg-white border border-slate-200 rounded-lg overflow-hidden">
+        <div className={`flex flex-col h-full min-h-0 w-full bg-white border border-slate-200 rounded-lg overflow-hidden ${viewTab === 'delegated' ? 'delegated-scroll-shell' : ''}`}>
             {/* Filters Row */}
             <div className="shrink-0 flex items-start justify-between gap-3 px-4 py-3 bg-white border-b border-slate-200 flex-wrap">
                 <div className="min-w-0">
@@ -1067,7 +1107,7 @@ export default function UnifiedTaskActivityTable({
                         </div>
                     )}
 
-                    {(!isDelegatedPendingSection || viewTab !== 'delegated') && (
+                    {(viewTab !== 'delegated' || isDelegatedAcceptedSection) && (
                         <select
                             value={keyAreaFilter}
                             onChange={(e) => setKeyAreaFilter(e.target.value)}
@@ -1135,7 +1175,7 @@ export default function UnifiedTaskActivityTable({
 
             <div
                 ref={bodyScrollRef}
-                className={`flex-1 min-h-0 overflow-x-auto overflow-y-auto hover-scrollbar-y ${sortedItems.length === 0 ? 'overflow-y-hidden' : ''}`}
+                className={`flex-1 min-h-0 overflow-x-auto overflow-y-auto ${viewTab === 'delegated' ? 'delegated-scroll-body' : 'hover-scrollbar-y'} ${sortedItems.length === 0 ? 'overflow-y-hidden' : ''}`}
             >
                 {sortedItems.length > 0 ? (
                     <table className="min-w-[1200px] w-full table-fixed text-sm whitespace-nowrap">
@@ -1176,7 +1216,7 @@ export default function UnifiedTaskActivityTable({
                                     key={item.itemId}
                                     className={`border-t border-slate-200 hover:bg-slate-50 cursor-pointer transition-colors ${isCompleted ? 'bg-slate-50/70' : ''}`}
                                 >
-                                    <td className="w-12 px-2 sm:px-3 py-2 align-top text-center">
+                                    <td className={`align-top text-center ${viewTab === 'delegated' ? 'w-10 px-2 py-2' : 'w-12 px-2 sm:px-3 py-2'}`}>
                                         <div className="relative inline-flex items-center gap-2">
                                             <input
                                                 aria-label={`Select ${titleValue || 'item'}`}
@@ -1201,24 +1241,16 @@ export default function UnifiedTaskActivityTable({
                                                         e.stopPropagation();
                                                         const btnEl = e.currentTarget;
                                                         setOpenRowMenuId((prev) => {
-                                                            if (prev === item.itemId) return null;
+                                                            if (prev === item.itemId) {
+                                                                setRowMenuButtonEl(null);
+                                                                return null;
+                                                            }
                                                             if (!btnEl || typeof btnEl.getBoundingClientRect !== 'function') {
+                                                                setRowMenuButtonEl(null);
                                                                 return item.itemId;
                                                             }
-                                                            const rect = btnEl.getBoundingClientRect();
-                                                            const menuHeight = 220;
-                                                            const menuWidth = 170;
-                                                            const spaceBelow = window.innerHeight - rect.bottom;
-                                                            const spaceAbove = rect.top;
-                                                            const openUp = spaceBelow < menuHeight + 12 && spaceAbove > spaceBelow;
-                                                            let left = rect.left;
-                                                            const maxLeft = window.innerWidth - menuWidth - 8;
-                                                            if (left > maxLeft) left = Math.max(8, maxLeft);
-                                                            if (left < 8) left = 8;
-                                                            const top = openUp
-                                                                ? Math.max(8, rect.top - menuHeight - 4)
-                                                                : Math.min(window.innerHeight - menuHeight - 8, rect.bottom + 4);
-                                                            setRowMenuPos({ top, left });
+                                                            setRowMenuPos(getRowMenuPosition(btnEl));
+                                                            setRowMenuButtonEl(btnEl);
                                                             return item.itemId;
                                                         });
                                                     }}
@@ -1228,13 +1260,27 @@ export default function UnifiedTaskActivityTable({
                                                 {openRowMenuId === item.itemId && createPortal(
                                                     <div
                                                         data-row-actions-menu="true"
-                                                        style={{ position: 'fixed', top: rowMenuPos.top, left: rowMenuPos.left, zIndex: 6000, minWidth: 170 }}
-                                                        className="rounded-md border border-slate-200 bg-white shadow-lg"
+                                                        style={{ position: 'fixed', top: rowMenuPos.top, left: rowMenuPos.left, zIndex: 1000, minWidth: 160 }}
+                                                        className="bg-white border border-slate-200 rounded shadow"
                                                         onMouseDown={(e) => e.stopPropagation()}
                                                     >
+                                                        {getDelegatedShortcutTarget(item) && (
+                                                            <button
+                                                                type="button"
+                                                                className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex items-center gap-2"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setOpenRowMenuId(null);
+                                                                    openDelegatedShortcut(item, e);
+                                                                }}
+                                                            >
+                                                                <FaExternalLinkAlt size={12} />
+                                                                Open in Key Areas
+                                                            </button>
+                                                        )}
                                                         <button
                                                             type="button"
-                                                            className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2"
+                                                            className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex items-center gap-2"
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
                                                                 setOpenRowMenuId(null);
@@ -1247,7 +1293,7 @@ export default function UnifiedTaskActivityTable({
                                                         </button>
                                                         <button
                                                             type="button"
-                                                            className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                                            className="block w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
                                                                 handleDelete(item, e);
@@ -1261,7 +1307,7 @@ export default function UnifiedTaskActivityTable({
                                                             <>
                                                                 <button
                                                                     type="button"
-                                                                    className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2"
+                                                                    className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex items-center gap-2"
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
                                                                         handleCompleteToggle(item, e);
@@ -1273,7 +1319,7 @@ export default function UnifiedTaskActivityTable({
                                                                 </button>
                                                                 <button
                                                                     type="button"
-                                                                    className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2"
+                                                                    className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex items-center gap-2"
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
                                                                         handleTogglePrivate(item, e);
@@ -1292,25 +1338,15 @@ export default function UnifiedTaskActivityTable({
                                     </td>
                                     {columns.includes('title') && (
                                         <td 
-                                            className="w-[240px] px-3 py-2 align-top overflow-hidden"
+                                            className={`w-[240px] py-2 align-top overflow-hidden ${viewTab === 'delegated' ? 'pl-1 pr-2' : 'px-3'}`}
                                             onDoubleClick={(e) => {
                                                 e.stopPropagation();
                                                 startEdit(item, 'title', titleValue);
                                             }}
                                         >
-                                            <div className="flex items-start gap-2">
+                                            <div className={`flex items-start ${viewTab === 'delegated' ? 'gap-1' : 'gap-2'}`}>
                                                 {viewTab === 'delegated' ? (
                                                     <>
-                                                      {getDelegatedShortcutTarget(item) && (
-                                                        <button
-                                                            type="button"
-                                                            className="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded text-slate-500 hover:bg-slate-100 hover:text-slate-700"
-                                                            title="Open in Key Areas"
-                                                            onClick={(e) => openDelegatedShortcut(item, e)}
-                                                        >
-                                                            <FaExternalLinkAlt size={11} />
-                                                        </button>
-                                                      )}
                                                       {item.type === 'task' ? (
                                                         <FaSquare title="Task" className="text-blue-600 flex-shrink-0" />
                                                       ) : (
@@ -1591,10 +1627,12 @@ export default function UnifiedTaskActivityTable({
                     <div className="flex min-h-[220px] items-start justify-center px-4 pt-8 pb-10 overflow-visible">
                         <div className="text-center overflow-visible">
                             <h3 className="mb-2 text-xl font-bold text-slate-900">
-                                No items found
+                                {isDelegatedPendingSection ? 'No pending delegations' : 'No items found'}
                             </h3>
                             <p className="text-slate-600 leading-6">
-                                Try adjusting your filters.
+                                {isDelegatedPendingSection
+                                    ? 'There are no pending delegated items right now.'
+                                    : 'Try adjusting your filters.'}
                             </p>
                         </div>
                     </div>

@@ -136,6 +136,41 @@ body {
     border-radius: 999px;
 }
 
+/* Delegated tables reveal the body scrollbar when hovering anywhere on the section */
+.delegated-scroll-body {
+    scrollbar-width: none;
+    scrollbar-color: transparent transparent;
+    scrollbar-gutter: stable;
+}
+
+.delegated-scroll-body::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+}
+
+.delegated-scroll-shell:hover .delegated-scroll-body {
+    scrollbar-color: #b9c0cd transparent;
+}
+
+.delegated-scroll-shell:hover .delegated-scroll-body::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.delegated-scroll-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.delegated-scroll-body::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 999px;
+}
+
+.delegated-scroll-shell:hover .delegated-scroll-body::-webkit-scrollbar-thumb {
+    background: #b9c0cd;
+    border-radius: 999px;
+}
+
 /* Horizontal-only hover scrollbar */
 .hover-scrollbar-x {
     scrollbar-width: none;
