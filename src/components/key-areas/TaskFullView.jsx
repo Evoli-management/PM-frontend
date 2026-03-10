@@ -66,6 +66,7 @@ export default function TaskFullView({
     allTasks = [],
     savingActivityIds: savingActivityIdsProp = undefined,
     setSavingActivityIds: setSavingActivityIdsProp = undefined,
+    initialActivityId = null,
 }) {
     // derive a key-area color to use for inline icons (fallback matches previous hardcoded color)
     const { t } = useTranslation();
@@ -170,6 +171,7 @@ export default function TaskFullView({
     const [editingDate, setEditingDate] = useState({ id: null, field: null });
     const lastNotifiedRef = useRef(null);
     const [delegateModalOpen, setDelegateModalOpen] = useState(false);
+    const openedInitialActivityRef = useRef(null);
 
     useEffect(() => {
         setTab(initialTab || "activities");
@@ -579,6 +581,25 @@ export default function TaskFullView({
         // open activity modal in editable mode when toggled from the edit action
         setActivityModal({ open: true, item: activity, readOnly: false });
     };
+
+    useEffect(() => {
+        if (!initialActivityId || !task?.id) {
+            openedInitialActivityRef.current = null;
+            return;
+        }
+
+        const targetKey = `${String(task.id)}:${String(initialActivityId)}`;
+        if (openedInitialActivityRef.current === targetKey) return;
+
+        const hasActivity = Array.isArray(list)
+            ? list.some((activity) => String(activity.id) === String(initialActivityId))
+            : false;
+
+        if (!hasActivity) return;
+
+        openedInitialActivityRef.current = targetKey;
+        toggleRow(String(initialActivityId));
+    }, [initialActivityId, list, task]);
 
     const closeOnHoverDifferent = (id) => {};
     const updateField = (id, field, value) => { setList(list.map((a) => (a.id === id ? { ...a, [field]: value } : a))); };

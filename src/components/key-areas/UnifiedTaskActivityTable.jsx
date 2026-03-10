@@ -2,7 +2,8 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import { format } from 'date-fns';
-import { FaCheck, FaTimes, FaTrash, FaLock, FaLockOpen, FaStop, FaAlignJustify, FaBan, FaSquare, FaListUl, FaEllipsisV, FaEdit } from 'react-icons/fa';
+import { useNavigate } from 'react-router-dom';
+import { FaCheck, FaTimes, FaTrash, FaLock, FaLockOpen, FaStop, FaAlignJustify, FaBan, FaSquare, FaListUl, FaEllipsisV, FaEdit, FaExternalLinkAlt } from 'react-icons/fa';
 import { toDateOnly } from '../../utils/keyareasHelpers';
 import taskDelegationService from '../../services/taskDelegationService';
 import activityDelegationService from '../../services/activityDelegationService';
@@ -43,8 +44,10 @@ export default function UnifiedTaskActivityTable({
     hideSearch = false,
     delegationActionsEnabled = false,
     onDelegationRefresh,
+    delegatedSection = null,
 }) {
     const { t } = useTranslation();
+    const navigate = useNavigate();
     const [selectedItems, setSelectedItems] = useState(new Set());
     const selectAllRef = useRef(null);
     const [sortField, setSortField] = useState(null);
@@ -115,6 +118,9 @@ export default function UnifiedTaskActivityTable({
     }, [tasks, activities, showTasks, showActivities, viewTab]);
 
     const normalizeText = (v) => String(v || '').trim().toLowerCase();
+    const isDelegatedPendingSection = viewTab === 'delegated' && delegatedSection === 'pending';
+    const isDelegatedAcceptedSection = viewTab === 'delegated' && delegatedSection === 'accepted';
+    const showDelegatedShortcut = isDelegatedAcceptedSection;
     const getResolvedResponsibleId = (item) => {
         const directId =
             item.assigneeId ||
@@ -175,6 +181,10 @@ export default function UnifiedTaskActivityTable({
         // Responsible filter
         if (responsibleFilter) {
             filtered = filtered.filter(item => {
+                if (viewTab === 'delegated') {
+                    const delegatorId = item.delegatedByUserId || item.delegated_by_user_id || '';
+                    return String(delegatorId || '') === String(responsibleFilter);
+                }
                 const assignee = item.assignee || item.responsible || '';
                 const assigneeId = getResolvedResponsibleId(item);
                 return String(assigneeId || '') === String(responsibleFilter) || String(assignee) === String(responsibleFilter);
@@ -191,7 +201,7 @@ export default function UnifiedTaskActivityTable({
         }
         
         return filtered;
-    }, [allItems, keyAreaFilter, responsibleFilter, searchQuery]);
+    }, [allItems, keyAreaFilter, responsibleFilter, searchQuery, viewTab]);
 
     const selectedEntries = useMemo(
         () => allItems.filter((item) => selectedItems.has(item.itemId)),
@@ -684,6 +694,9 @@ export default function UnifiedTaskActivityTable({
     // Column configuration based on viewTab
     const columns = useMemo(() => {
         if (viewTab === 'delegated') {
+            if (isDelegatedPendingSection) {
+                return ['title', 'responsible', 'priority', 'deadline'];
+            }
             return ['title', 'responsible', 'keyArea', 'priority', 'deadline'];
         } else if (viewTab === 'todo') {
             return ['title', 'responsible', 'keyArea', 'tab', 'priority', 'startDate', 'endDate', 'deadline'];
@@ -691,7 +704,33 @@ export default function UnifiedTaskActivityTable({
             return ['title', 'keyArea', 'tab', 'goal', 'priority', 'startDate', 'endDate', 'deadline'];
         }
         return ['title', 'responsible', 'keyArea', 'priority', 'startDate', 'endDate', 'deadline'];
-    }, [viewTab]);
+    }, [viewTab, isDelegatedPendingSection]);
+
+    const delegatorOptions = useMemo(() => {
+        if (viewTab !== 'delegated') return [];
+
+        const seen = new Set();
+        return allItems.reduce((acc, item) => {
+            const delegatorId = item.delegatedByUserId || item.delegated_by_user_id || '';
+            if (!delegatorId || seen.has(String(delegatorId))) return acc;
+            seen.add(String(delegatorId));
+
+            let label = '';
+            if (item.delegatedByUser) {
+                label = `${item.delegatedByUser.firstName || ''} ${item.delegatedByUser.lastName || ''}`.trim();
+            }
+            if (!label) {
+                const user = users.find((u) => String(u.id || u.member_id) === String(delegatorId));
+                if (user) {
+                    label = `${user.name || user.firstname || ''} ${user.lastname || ''}`.trim();
+                }
+            }
+            if (!label) label = String(delegatorId);
+
+            acc.push({ value: String(delegatorId), label });
+            return acc;
+        }, []);
+    }, [allItems, users, viewTab]);
 
     const getKeyAreaName = (keyAreaId) => {
         if (!keyAreaId) return '';
@@ -709,6 +748,39 @@ export default function UnifiedTaskActivityTable({
         if (!userId) return '';
         const user = users.find(u => String(u.id || u.member_id) === String(userId));
         return user ? (user.name || `${user.firstname || ''} ${user.lastname || ''}`.trim()) : '';
+    };
+
+    const getDelegatedShortcutTarget = (item) => {
+        if (!showDelegatedShortcut || !item) return null;
+
+        const keyAreaId = item.keyAreaId || item.key_area_id || item.key_area || item.keyArea || null;
+        if (!keyAreaId) return null;
+
+        if (item.type === 'task') {
+            const taskId = item.id || item.taskId || item.task_id || null;
+            if (!taskId) return null;
+            return { kaId: keyAreaId, taskId };
+        }
+
+        const taskId = item.taskId || item.task_id || item.task?.id || item.task?.task_id || null;
+        if (!taskId) return null;
+        return { kaId: keyAreaId, taskId, activityId: item.id || item.activity_id || null };
+    };
+
+    const openDelegatedShortcut = (item, e) => {
+        e.stopPropagation();
+        const target = getDelegatedShortcutTarget(item);
+        if (!target) return;
+
+        const params = new URLSearchParams({
+            ka: String(target.kaId),
+            openKA: '1',
+            task: String(target.taskId),
+        });
+        if (target.activityId) {
+            params.set('activity', String(target.activityId));
+        }
+        navigate({ pathname: '/key-areas', search: `?${params.toString()}` });
     };
 
     const standardHeaderPadding = 'px-2 sm:px-3';
@@ -968,44 +1040,47 @@ export default function UnifiedTaskActivityTable({
                 </div>
 
                 <div className="ml-auto flex items-center justify-end gap-3 flex-wrap">
-                    {/* Task/Activity Toggle Buttons */}
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => setShowTasks(!showTasks)}
-                            className={`inline-flex items-center justify-center w-8 h-8 rounded-md border transition ${
-                                showTasks
-                                    ? 'bg-blue-50 border-blue-200 text-blue-700'
-                                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                            }`}
-                            title="Filter tasks"
-                        >
-                            <FaStop className="text-xs" />
-                        </button>
-                        <button
-                            onClick={() => setShowActivities(!showActivities)}
-                            className={`inline-flex items-center justify-center w-8 h-8 rounded-md border transition ${
-                                showActivities
-                                    ? 'bg-blue-50 border-blue-200 text-blue-700'
-                                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                            }`}
-                            title="Filter activities"
-                        >
-                            <FaAlignJustify className="text-xs" />
-                        </button>
-                    </div>
+                    {viewTab !== 'delegated' && (
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setShowTasks(!showTasks)}
+                                className={`inline-flex items-center justify-center w-8 h-8 rounded-md border transition ${
+                                    showTasks
+                                        ? 'bg-blue-50 border-blue-200 text-blue-700'
+                                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                                }`}
+                                title="Filter tasks"
+                            >
+                                <FaStop className="text-xs" />
+                            </button>
+                            <button
+                                onClick={() => setShowActivities(!showActivities)}
+                                className={`inline-flex items-center justify-center w-8 h-8 rounded-md border transition ${
+                                    showActivities
+                                        ? 'bg-blue-50 border-blue-200 text-blue-700'
+                                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                                }`}
+                                title="Filter activities"
+                            >
+                                <FaAlignJustify className="text-xs" />
+                            </button>
+                        </div>
+                    )}
 
-                    <select
-                        value={keyAreaFilter}
-                        onChange={(e) => setKeyAreaFilter(e.target.value)}
-                        className="h-[32px] rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                    >
-                        <option value="">{t("unifiedTable.keyArea")}</option>
-                        {keyAreas.map((ka, idx) => (
-                            <option key={ka.id} value={ka.id}>
-                                {formatKeyAreaLabel(ka, idx)}
-                            </option>
-                        ))}
-                    </select>
+                    {(!isDelegatedPendingSection || viewTab !== 'delegated') && (
+                        <select
+                            value={keyAreaFilter}
+                            onChange={(e) => setKeyAreaFilter(e.target.value)}
+                            className="h-[32px] rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                        >
+                            <option value="">{t("unifiedTable.keyArea")}</option>
+                            {keyAreas.map((ka, idx) => (
+                                <option key={ka.id} value={ka.id}>
+                                    {formatKeyAreaLabel(ka, idx)}
+                                </option>
+                            ))}
+                        </select>
+                    )}
 
                     {columns.includes('responsible') && (
                         <select
@@ -1013,10 +1088,13 @@ export default function UnifiedTaskActivityTable({
                             onChange={(e) => setResponsibleFilter(e.target.value)}
                             className="h-[32px] rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-200"
                         >
-                            <option value="">{t("unifiedTable.responsible")}</option>
-                            {users.map(user => (
-                                <option key={user.id} value={user.id || user.member_id}>
-                                    {user.name || user.firstname} {user.lastname || ''}
+                            <option value="">{viewTab === 'delegated' ? t("unifiedTable.receivedFrom") : t("unifiedTable.responsible")}</option>
+                            {(viewTab === 'delegated' ? delegatorOptions : users.map((user) => ({
+                                value: user.id || user.member_id,
+                                label: `${user.name || user.firstname || ''} ${user.lastname || ''}`.trim(),
+                            }))).map((option) => (
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
                                 </option>
                             ))}
                         </select>
@@ -1223,6 +1301,16 @@ export default function UnifiedTaskActivityTable({
                                             <div className="flex items-start gap-2">
                                                 {viewTab === 'delegated' ? (
                                                     <>
+                                                      {getDelegatedShortcutTarget(item) && (
+                                                        <button
+                                                            type="button"
+                                                            className="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                                                            title="Open in Key Areas"
+                                                            onClick={(e) => openDelegatedShortcut(item, e)}
+                                                        >
+                                                            <FaExternalLinkAlt size={11} />
+                                                        </button>
+                                                      )}
                                                       {item.type === 'task' ? (
                                                         <FaSquare title="Task" className="text-blue-600 flex-shrink-0" />
                                                       ) : (

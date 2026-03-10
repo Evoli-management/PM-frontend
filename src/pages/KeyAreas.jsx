@@ -2835,6 +2835,7 @@ export default function KeyAreas() {
         const params = new URLSearchParams(location.search);
         const kaParam = params.get("ka");
         const taskParam = params.get("task");
+        const activityParam = params.get("activity");
         // Back/show-all can briefly leave stale ?ka in URL while selectedKA is already cleared.
         // Suppress auto-open until the query is cleared.
         if (suppressKaParamOpenRef.current) {
@@ -2859,7 +2860,12 @@ export default function KeyAreas() {
         if (taskParam && selectedKA && String(selectedKA.id) === String(kaParam)) {
             const tId = String(taskParam);
             const hit = (allTasks || []).find((t) => String(t.id) === tId);
-            if (hit) setSelectedTaskFull(hit);
+            if (hit) {
+                setSelectedTaskFull(hit);
+                if (activityParam) {
+                    setTaskFullInitialTab("activities");
+                }
+            }
         }
     }, [location.search, keyAreas, selectedKA, allTasks, viewTab]);
 
@@ -4391,6 +4397,13 @@ export default function KeyAreas() {
                                         setActivitiesByTask((prev) => ({ ...prev, [id]: nextList }));
                                     }}
                                     initialTab={taskFullInitialTab}
+                                    initialActivityId={(() => {
+                                        const params = new URLSearchParams(location.search);
+                                        const taskParam = params.get('task');
+                                        const activityParam = params.get('activity');
+                                        if (!activityParam || !selectedTaskFull?.id) return null;
+                                        return String(taskParam || '') === String(selectedTaskFull.id) ? activityParam : null;
+                                    })()}
                                 />
                             </div>
                         )}
@@ -5515,6 +5528,7 @@ export default function KeyAreas() {
                                     <UnifiedTaskActivityTable
                                         viewTab={viewTab}
                                         title="Pending Delegations"
+                                        delegatedSection="pending"
                                         tasks={delegatedTasks.filter((item) => {
                                             const status = getDelegationStatus(item);
                                             return !status || status === 'pending';
@@ -5583,6 +5597,7 @@ export default function KeyAreas() {
                                         <UnifiedTaskActivityTable
                                             viewTab={viewTab}
                                             title="Accepted Delegations"
+                                            delegatedSection="accepted"
                                             tasks={acceptedDelegatedTasks}
                                             activities={acceptedDelegatedActivities}
                                             keyAreas={keyAreas}
