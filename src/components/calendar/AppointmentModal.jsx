@@ -804,7 +804,7 @@ const buildRecurringPattern = ({
                               })()
                             : null;
 
-                        payload.occurrenceStart = event?.start || occStartFromId || null;
+                        payload.occurrenceStart = (event?.start ? new Date(event.start).toISOString() : occStartFromId) || null;
 
                         // Ensure seriesId is forwarded (either from event or base id from generated id)
                         if (event?.seriesId) payload.seriesId = event.seriesId;
@@ -859,6 +859,9 @@ const buildRecurringPattern = ({
                         ...updated,
                         kind: updated?.kind || event?.kind || (submitAsEvent ? "event" : "appointment"),
                         recurringPattern: updated.recurringPattern ?? recurringPattern,
+                        // Pass the edit scope so CalendarContainer can decide whether a
+                        // full refresh is needed (series/future change affect multiple bars).
+                        _editScope: isRecurringInstance ? editScope : undefined,
                     });
             } else {
                 const created = submitAsEvent
@@ -1589,7 +1592,7 @@ const buildRecurringPattern = ({
                     </div>
 
                     {/* Apply to: occurrence / future / whole series (edit mode, recurring) */}
-                    {isRecurringInstance && (
+                    {isRecurringInstance && !showDeleteConfirm && (
                         <fieldset className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
                             <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
                                 {t("appointmentModal.applyChangesTo")}
@@ -1702,10 +1705,10 @@ const buildRecurringPattern = ({
                                                                 const opts = {};
                                                                 if (deleteScopeChoice === 'occurrence') {
                                                                     opts.editScope = 'occurrence';
-                                                                    opts.occurrenceStart = event?.start || null;
+                                                                    opts.occurrenceStart = event?.start ? new Date(event.start).toISOString() : null;
                                                                 } else if (deleteScopeChoice === 'future') {
                                                                     opts.editScope = 'future';
-                                                                    opts.occurrenceStart = event?.start || null;
+                                                                    opts.occurrenceStart = event?.start ? new Date(event.start).toISOString() : null;
                                                                 } else if (deleteScopeChoice === 'series') {
                                                                     opts.editScope = 'series';
                                                                 }
