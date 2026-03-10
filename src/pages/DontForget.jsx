@@ -10,6 +10,7 @@ import { FiAlertTriangle, FiClock } from "react-icons/fi";
 import { FaCheck, FaExclamation, FaLongArrowAltDown, FaTimes, FaTrash, FaBars, FaCog, FaSearch } from "react-icons/fa";
 import CreateTaskModal from "../components/key-areas/CreateTaskModal.jsx";
 import EditTaskModal from "../components/key-areas/EditTaskModal.jsx";
+import BulkFieldPickerModal from "../components/shared/BulkFieldPickerModal.jsx";
 import TaskRow from "../components/key-areas/TaskRow.jsx";
 import SyncSourceBadge from "../components/tasks/SyncSourceBadge.jsx";
 import TaskFullView from "../components/key-areas/TaskFullView";
@@ -524,6 +525,8 @@ export default function DontForget() {
     }, [viewMode]);
     // When true, the EditTaskModal is being used to edit multiple selected tasks
     const [massEditingMode, setMassEditingMode] = useState(false);
+    const [showMassFieldPicker, setShowMassFieldPicker] = useState(false);
+    const [massEditField, setMassEditField] = useState(null);
     // Editor modal for DF task details
     const [editModal, setEditModal] = useState({ open: false, id: null, form: null });
 
@@ -944,7 +947,11 @@ export default function DontForget() {
             else next.add(id);
             return next;
         });
-    const clearSelection = () => setSelectedIds(new Set());
+    const clearSelection = () => {
+        setSelectedIds(new Set());
+        setShowMassFieldPicker(false);
+        setMassEditField(null);
+    };
     const toggleSelectAllVisible = () => {
         const all = new Set(selectedIds);
         const visible = dontForgetTasks.map((t) => t.id);
@@ -999,6 +1006,47 @@ export default function DontForget() {
         setTasks((prev) => prev.map((t) => (selectedIds.has(t.id) ? { ...t, priority: p } : t)));
     const massComplete = (val) =>
         setTasks((prev) => prev.map((t) => (selectedIds.has(t.id) ? { ...t, completed: !!val } : t)));
+
+    const handleMassActionChange = async (e) => {
+        const action = e.target.value;
+        e.target.value = "";
+        if (!action || selectedIds.size === 0) return;
+        if (action === "edit") {
+            setShowMassFieldPicker(true);
+            return;
+        }
+        if (action === "delete") {
+            await massDelete();
+        }
+    };
+
+    const handleMassFieldSave = async (field, value) => {
+        const payload = {};
+        if (field === 'assignee') {
+            const selectedUser = users.find((user) => String(user.id || user.member_id) === String(value));
+            payload.assignee = selectedUser
+                ? `${selectedUser.name || selectedUser.firstname || ''} ${selectedUser.lastname || ''}`.trim()
+                : '';
+        } else if (field === 'status') {
+            payload.status = value;
+        } else if (field === 'duration') {
+            payload.duration = value;
+        } else if (field === 'key_area_bundle') {
+            payload.key_area_id = value?.key_area_id;
+            payload.list_index = value?.list_index;
+        } else if (field === 'date') {
+            payload.start_date = value?.start_date;
+            payload.end_date = value?.end_date;
+            payload.deadline = value?.deadline;
+        } else {
+            payload[field] = value;
+        }
+
+        setShowMassFieldPicker(false);
+        setMassEditField(field);
+        setMassEditingMode(true);
+        await handleMassEditSave(payload);
+    };
 
     // Row actions
     const toggleCompleted = async (id) => {
@@ -1478,6 +1526,7 @@ export default function DontForget() {
             ids.forEach((id) => markSaving(id, 800));
             setEditModal({ open: false, id: null, form: null });
             setMassEditingMode(false);
+            setMassEditField(null);
             clearSelection();
         } catch (e) {
             console.error("Mass edit failed (modal)", e);
@@ -1617,12 +1666,32 @@ export default function DontForget() {
                                 />
 
                                 {/* Edit modal must be available while TaskFullView is open */}
+                                <BulkFieldPickerModal
+                                    isOpen={showMassFieldPicker}
+                                    title="Select field"
+                                    fields={[
+                                        { value: 'assignee', label: 'Responsible' },
+                                        { value: 'status', label: 'Status' },
+                                        { value: 'priority', label: 'Priority' },
+                                        { value: 'duration', label: 'Duration' },
+                                        { value: 'key_area_bundle', label: 'Key Area' },
+                                        { value: 'date', label: 'Date' },
+                                    ]}
+                                    users={users}
+                                    keyAreas={dfKeyAreas}
+                                    availableLists={availableDfLists}
+                                    listNames={dfListNames}
+                                    onCancel={() => setShowMassFieldPicker(false)}
+                                    onSave={handleMassFieldSave}
+                                />
+
                                 <EditTaskModal
                                     isOpen={Boolean(editModal.open)}
                                     initialData={_mapEditInitial()}
                                     onCancel={() => {
                                         setEditModal({ open: false, id: null, form: null });
                                         setMassEditingMode(false);
+                                        setMassEditField(null);
                                     }}
                                     onSave={(payload) => {
                                         if (massEditingMode) return handleMassEditSave(payload);
@@ -1635,6 +1704,7 @@ export default function DontForget() {
                                     users={users}
                                     goals={goals}
                                     modalTitle={massEditingMode ? t("dontForget.massEditingTitle", { n: selectedIds.size }) : t("dontForget.editTaskTitle")}
+                                    visibleFields={massEditingMode && massEditField ? [massEditField] : null}
                                     isDontForgetMode={true}
                                 />
                                 {/* Activity composer removed from DontForget */}
@@ -1908,23 +1978,17 @@ export default function DontForget() {
                                                 <span className="text-sm text-gray-600" aria-live="polite">
                                                     {t("dontForget.selected", { n: selectedIds.size })}
                                                 </span>
-                                                <button
-                                                    type="button"
+                                                <select
                                                     disabled={selectedIds.size === 0}
-                                                    className="px-4 py-1 rounded-md text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
-                                                    aria-label="Open mass edit"
-                                                    title="Select tasks to enable mass edit"
-                                                    onClick={() => {
-                                                        if (selectedIds.size === 0) return;
-                                                        // For mass edit we intentionally open the EditTaskModal with
-                                                        // empty initial fields so the user can set values that will
-                                                        // be applied to all selected tasks (don't prefill from first task).
-                                                        setEditModal({ open: true, id: null, form: {} });
-                                                        setMassEditingMode(true);
-                                                    }}
+                                                    defaultValue=""
+                                                    className="h-[32px] rounded-md border border-emerald-700 bg-emerald-600 px-3 text-sm font-semibold text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-300 disabled:opacity-50"
+                                                    aria-label="Mass action"
+                                                    onChange={handleMassActionChange}
                                                 >
-                                                    {t("dontForget.massEdit")}
-                                                </button>
+                                                    <option value="" hidden>{t("dontForget.massEdit")}</option>
+                                                    <option value="edit" className="bg-white text-slate-900">Select field</option>
+                                                    <option value="delete" className="bg-white text-slate-900">Delete</option>
+                                                </select>
                                                 <button
                                                     type="button"
                                                     onClick={() => {
@@ -1940,6 +2004,19 @@ export default function DontForget() {
                                         {/* Mass edit now uses the shared EditTaskModal component. Click "Mass Edit" to open it pre-filled from the first selected task. */}
                                         <div className="flex-1 min-h-0 overflow-x-auto overflow-y-auto hover-scrollbar-y">
                                             <table className="min-w-[1400px] w-full text-sm table-fixed whitespace-nowrap sm:whitespace-normal">
+                                                <colgroup>
+                                                    <col style={{ width: '3rem' }} />
+                                                    <col style={{ width: '15rem' }} />
+                                                    {visibleColumns.responsible && <col style={{ width: '6rem' }} />}
+                                                    <col style={{ width: '6rem' }} />
+                                                    {visibleColumns.priority && <col style={{ width: '6rem' }} />}
+                                                    {visibleColumns.quadrant && <col style={{ width: '6rem' }} />}
+                                                    {visibleColumns.start_date && <col style={{ width: '6rem' }} />}
+                                                    {visibleColumns.end_date && <col style={{ width: '6rem' }} />}
+                                                    {visibleColumns.deadline && <col style={{ width: '6rem' }} />}
+                                                    {visibleColumns.duration && <col style={{ width: '6rem' }} />}
+                                                    {visibleColumns.completed && <col style={{ width: '6rem' }} />}
+                                                </colgroup>
                                                 {dontForgetTasks.length > 0 && (
                                                     <thead key={headerKey} className="bg-slate-50 border border-slate-200 text-slate-700">
                                                         <tr>
@@ -1962,21 +2039,21 @@ export default function DontForget() {
                                                             </th>
                                                             {visibleColumns.responsible && (
                                                                 <th
-                                                                    className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[140px] cursor-pointer hover:bg-slate-100"
+                                                                    className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                     onClick={() => handleDfSort('responsible')}
                                                                 >
                                                                     {t("dontForget.colResponsible")} {dfSortField === 'responsible' && (dfSortDirection === 'asc' ? '↑' : '↓')}
                                                                 </th>
                                                             )}
                                                             <th
-                                                                className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[120px] cursor-pointer hover:bg-slate-100"
+                                                                className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                 onClick={() => handleDfSort('status')}
                                                             >
                                                                 {t("dontForget.colStatus")} {dfSortField === 'status' && (dfSortDirection === 'asc' ? '↑' : '↓')}
                                                             </th>
                                                             {visibleColumns.priority && (
                                                                 <th
-                                                                    className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[100px] cursor-pointer hover:bg-slate-100"
+                                                                    className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                     onClick={() => handleDfSort('priority')}
                                                                 >
                                                                     {t("dontForget.colPriority")} {dfSortField === 'priority' && (dfSortDirection === 'asc' ? '↑' : '↓')}
@@ -1984,7 +2061,7 @@ export default function DontForget() {
                                                             )}
                                                             {visibleColumns.quadrant && (
                                                                 <th
-                                                                    className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[90px] cursor-pointer hover:bg-slate-100"
+                                                                    className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                     onClick={() => handleDfSort('quadrant')}
                                                                 >
                                                                     {t("dontForget.colQuadrant")} {dfSortField === 'quadrant' && (dfSortDirection === 'asc' ? '↑' : '↓')}
@@ -1992,7 +2069,7 @@ export default function DontForget() {
                                                             )}
                                                             {visibleColumns.start_date && (
                                                                 <th
-                                                                    className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[120px] cursor-pointer hover:bg-slate-100"
+                                                                    className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                     onClick={() => handleDfSort('start_date')}
                                                                 >
                                                                     {t("dontForget.colStartDate")} {dfSortField === 'start_date' && (dfSortDirection === 'asc' ? '↑' : '↓')}
@@ -2000,7 +2077,7 @@ export default function DontForget() {
                                                             )}
                                                             {visibleColumns.end_date && (
                                                                 <th
-                                                                    className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[120px] cursor-pointer hover:bg-slate-100"
+                                                                    className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                     onClick={() => handleDfSort('end_date')}
                                                                 >
                                                                     {t("dontForget.colEndDate")} {dfSortField === 'end_date' && (dfSortDirection === 'asc' ? '↑' : '↓')}
@@ -2008,7 +2085,7 @@ export default function DontForget() {
                                                             )}
                                                             {visibleColumns.deadline && (
                                                                 <th
-                                                                    className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[120px] cursor-pointer hover:bg-slate-100"
+                                                                    className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                     onClick={() => handleDfSort('deadline')}
                                                                 >
                                                                     {t("dontForget.colDeadline")} {dfSortField === 'deadline' && (dfSortDirection === 'asc' ? '↑' : '↓')}
@@ -2016,7 +2093,7 @@ export default function DontForget() {
                                                             )}
                                                             {visibleColumns.duration && (
                                                                 <th
-                                                                    className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[90px] cursor-pointer hover:bg-slate-100"
+                                                                    className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                     onClick={() => handleDfSort('duration')}
                                                                 >
                                                                     {t("dontForget.colDuration")} {dfSortField === 'duration' && (dfSortDirection === 'asc' ? '↑' : '↓')}
@@ -2024,7 +2101,7 @@ export default function DontForget() {
                                                             )}
                                                             {visibleColumns.completed && (
                                                                 <th
-                                                                    className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[120px] cursor-pointer hover:bg-slate-100"
+                                                                    className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                     onClick={() => handleDfSort('completed')}
                                                                 >
                                                                     {t("dontForget.colCompleted")} {dfSortField === 'completed' && (dfSortDirection === 'asc' ? '↑' : '↓')}
@@ -2134,12 +2211,32 @@ export default function DontForget() {
                                             currentUserId={null}
                                         />
 
+                                        <BulkFieldPickerModal
+                                            isOpen={showMassFieldPicker}
+                                            title="Select field"
+                                            fields={[
+                                                { value: 'assignee', label: 'Responsible' },
+                                                { value: 'status', label: 'Status' },
+                                                { value: 'priority', label: 'Priority' },
+                                                { value: 'duration', label: 'Duration' },
+                                                { value: 'key_area_bundle', label: 'Key Area' },
+                                                { value: 'date', label: 'Date' },
+                                            ]}
+                                            users={users}
+                                            keyAreas={dfKeyAreas}
+                                            availableLists={availableDfLists}
+                                            listNames={dfListNames}
+                                            onCancel={() => setShowMassFieldPicker(false)}
+                                            onSave={handleMassFieldSave}
+                                        />
+
                                         <EditTaskModal
                                             isOpen={Boolean(editModal.open)}
                                             initialData={_mapEditInitial()}
                                             onCancel={() => {
                                                 setEditModal({ open: false, id: null, form: null });
                                                 setMassEditingMode(false);
+                                                setMassEditField(null);
                                             }}
                                             onSave={(payload) => {
                                                 if (massEditingMode) return handleMassEditSave(payload);
@@ -2152,6 +2249,7 @@ export default function DontForget() {
                                             users={users}
                                             goals={goals}
                                             modalTitle={massEditingMode ? t("dontForget.massEditingTitle", { n: selectedIds.size }) : t("dontForget.editTaskTitle")}
+                                            visibleFields={massEditingMode && massEditField ? [massEditField] : null}
                                             isDontForgetMode={true}
                                         />
 

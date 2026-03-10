@@ -245,16 +245,20 @@ const TaskRow = ({
         </div>
       </td>
       {vc.responsible && (
-        <td className="px-3 py-2 align-top text-slate-800 w-[140px]">
+        <td className="px-3 py-2 align-top text-slate-800 w-[96px]">
+          <div className="w-full">
           {enableInlineEditing ? (
           <select
-            className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-sm w-20"
+            className="w-full min-w-0 rounded-md border border-slate-300 bg-white px-2 py-0.5 text-sm"
             value={(() => {
               if (task.assignee === 'Me' && currentUserId) return String(currentUserId);
               const found = (users || []).find((u) => (u.name || '') === task.assignee);
               return found ? String(found.id) : '';
             })()}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
             onChange={async (e) => {
+              e.stopPropagation();
               const sel = e.target.value;
               const user = (users || []).find((u) => String(u.id) === String(sel));
               const valueToSave = user ? ((currentUserId && String(user.id) === String(currentUserId)) ? 'Me' : (user.name || '')) : '';
@@ -269,15 +273,18 @@ const TaskRow = ({
           ) : (
             task.assignee || '—'
           )}
+          </div>
         </td>
       )}
-      <td className="px-3 py-2 align-top w-[120px]">
-        <div className="flex items-center gap-2">
-          <StatusIndicator status={task.status || "open"} />
-          <div>
+      <td className="px-3 py-2 align-top w-[96px]">
+        <div className="flex w-full items-center gap-2">
+          <div className="shrink-0">
+            <StatusIndicator status={task.status || "open"} />
+          </div>
+          <div className="min-w-0 flex-1">
             <select
               aria-label={`Change status for ${task.title}`}
-              className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-sm w-18"
+              className="w-full min-w-0 rounded-md border border-slate-300 bg-white px-2 py-0.5 text-sm"
               value={String(task.status || "open").toLowerCase()}
               onChange={(e) => onStatusChange && onStatusChange(e.target.value)}
             >
@@ -289,7 +296,8 @@ const TaskRow = ({
         </div>
       </td>
       {vc.priority && (
-        <td className="px-3 py-2 align-top w-[100px]">
+        <td className="px-3 py-2 align-top w-[96px]">
+          <div className="w-full">
           {enableInlineEditing ? (
             (() => {
               const priorityValue = (() => {
@@ -302,7 +310,7 @@ const TaskRow = ({
               })();
               return (
                 <select
-                  className="w-[96px] rounded-md border border-slate-300 bg-white py-0.5 text-sm px-2"
+                  className="w-full min-w-0 rounded-md border border-slate-300 bg-white py-0.5 text-sm px-2"
                   value={priorityValue}
                   onChange={async (e) => {
                     const v = e.target.value;
@@ -330,30 +338,33 @@ const TaskRow = ({
               return <PriorityBadge priority={norm} />;
             })()
           )}
+          </div>
         </td>
       )}
       {vc.quadrant && (
-        <td className="px-3 py-2 align-top w-[90px]">
-        {(() => {
-          let qn = 4;
-          if (typeof q === 'number') qn = Number(q) || 4;
-          else if (typeof q === 'string') {
-            const m = q.match(/^Q?([1-4])$/i);
-            if (m) qn = Number(m[1]);
-          }
-          const qc = getQuadrantColorClass ? getQuadrantColorClass(qn) : { badge: 'bg-slate-100 text-slate-700' };
-          return <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium ${qc.badge}`}>{`Q${qn}`}</span>;
-        })()}
+        <td className="px-3 py-2 align-top w-[96px]">
+        <div className="flex w-full justify-start">
+          {(() => {
+            let qn = 4;
+            if (typeof q === 'number') qn = Number(q) || 4;
+            else if (typeof q === 'string') {
+              const m = q.match(/^Q?([1-4])$/i);
+              if (m) qn = Number(m[1]);
+            }
+            const qc = getQuadrantColorClass ? getQuadrantColorClass(qn) : { badge: 'bg-slate-100 text-slate-700' };
+            return <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium ${qc.badge}`}>{`Q${qn}`}</span>;
+          })()}
+        </div>
         </td>
       )}
       {/* Goal and Tags columns removed per UX request */}
       {vc.start_date && (
-        <td className="px-3 py-2 align-top text-slate-800 w-[120px]">
+        <td className="px-3 py-2 align-top text-slate-800 w-[96px]">
         {enableInlineEditing ? (
-          <div className="relative inline-block">
+          <div className="relative block w-full">
             <button
               type="button"
-              className="hover:bg-slate-100 rounded px-1 flex items-center gap-1"
+              className="flex w-full items-center justify-start gap-1 rounded px-1 text-left hover:bg-slate-100"
               onClick={(e) => {
                 e.stopPropagation();
                 setEditingKey('start_date');
@@ -391,12 +402,12 @@ const TaskRow = ({
         </td>
       )}
       {vc.end_date && (
-        <td className="px-3 py-2 align-top text-slate-800 w-[120px]">
+        <td className="px-3 py-2 align-top text-slate-800 w-[96px]">
         {enableInlineEditing ? (
-          <div className="relative inline-block">
+          <div className="relative block w-full">
             <button
               type="button"
-              className="hover:bg-slate-100 rounded px-1 flex items-center gap-1"
+              className="flex w-full items-center justify-start gap-1 rounded px-1 text-left hover:bg-slate-100"
               onClick={(e) => {
                 e.stopPropagation();
                 setEditingKey('end_date');
@@ -434,12 +445,12 @@ const TaskRow = ({
         </td>
       )}
       {vc.deadline && (
-        <td className="px-3 py-2 align-top text-slate-800 w-[120px]">
+        <td className="px-3 py-2 align-top text-slate-800 w-[96px]">
         {enableInlineEditing ? (
-          <div className="relative inline-block">
+          <div className="relative block w-full">
             <button
               type="button"
-              className="hover:bg-slate-100 rounded px-1 flex items-center gap-1"
+              className="flex w-full items-center justify-start gap-1 rounded px-1 text-left hover:bg-slate-100"
               onClick={(e) => {
                 e.stopPropagation();
                 setEditingKey('deadline');
@@ -477,17 +488,21 @@ const TaskRow = ({
         </td>
       )}
       {vc.duration && (
-        <td className="px-3 py-2 align-top text-slate-800 w-[90px]">
-          {(() => {
-            const raw = task.duration ?? task.duration_minutes ?? '';
-            const val = String(raw).trim();
-            return val || '—';
-          })()}
+        <td className="px-3 py-2 align-top text-slate-800 w-[96px]">
+          <div className="w-full text-left">
+            {(() => {
+              const raw = task.duration ?? task.duration_minutes ?? '';
+              const val = String(raw).trim();
+              return val || '—';
+            })()}
+          </div>
         </td>
       )}
       {vc.completed && (
-        <td className="px-3 py-2 align-top text-slate-800 w-[120px]">
-          {(task.completionDate || task.completion_date) ? <span>{formatDate(task.completionDate || task.completion_date)}</span> : <span className="text-slate-500">—</span>}
+        <td className="px-3 py-2 align-top text-slate-800 w-[96px]">
+          <div className="w-full text-left">
+            {(task.completionDate || task.completion_date) ? <span>{formatDate(task.completionDate || task.completion_date)}</span> : <span className="text-slate-500">—</span>}
+          </div>
         </td>
       )}
       

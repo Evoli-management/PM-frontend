@@ -118,7 +118,6 @@ body {
     height: 0;
 }
 .hover-scrollbar-y:hover {
-    scrollbar-width: thin; /* Firefox: show on hover */
     scrollbar-color: #b9c0cd transparent;
 }
 .hover-scrollbar-y:hover::-webkit-scrollbar {
@@ -133,6 +132,35 @@ body {
     border-radius: 999px;
 }
 .hover-scrollbar-y:hover::-webkit-scrollbar-thumb {
+    background: #b9c0cd;
+    border-radius: 999px;
+}
+
+/* Horizontal-only hover scrollbar */
+.hover-scrollbar-x {
+    scrollbar-width: none;
+    scrollbar-color: transparent transparent;
+}
+.hover-scrollbar-x::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+}
+.hover-scrollbar-x:hover {
+    scrollbar-width: thin;
+    scrollbar-color: #b9c0cd transparent;
+}
+.hover-scrollbar-x:hover::-webkit-scrollbar {
+    width: 0;
+    height: 6px;
+}
+.hover-scrollbar-x::-webkit-scrollbar-track {
+    background: transparent;
+}
+.hover-scrollbar-x::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 999px;
+}
+.hover-scrollbar-x:hover::-webkit-scrollbar-thumb {
     background: #b9c0cd;
     border-radius: 999px;
 }

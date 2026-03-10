@@ -11,6 +11,7 @@ import KeyAreasList from '../components/key-areas/KeyAreasList';
 import CreateActivityFormModal from '../components/modals/CreateActivityFormModal';
 import KeyAreaModal from '../components/key-areas/KeyAreaModal';
 import EditTaskModal from '../components/key-areas/EditTaskModal';
+import BulkFieldPickerModal from '../components/shared/BulkFieldPickerModal';
 import EditActivityModal from '../components/key-areas/EditActivityModal';
 import EmptyState from '../components/goals/EmptyState.jsx';
 import TaskRow from '../components/key-areas/TaskRow';
@@ -19,7 +20,6 @@ import ActivityList from '../components/key-areas/ActivityList';
 import TaskSlideOver from '../components/key-areas/TaskSlideOver';
 import TaskFullView from '../components/key-areas/TaskFullView';
 import UnifiedTaskActivityTable from '../components/key-areas/UnifiedTaskActivityTable';
-import PendingDelegationsSection from '../components/key-areas/PendingDelegationsSection';
 import TripleViewLayout from '../components/key-areas/TripleViewLayout';
 import TaskListPanel from '../components/key-areas/TaskListPanel';
 import ActivityListPanel from '../components/key-areas/ActivityListPanel';
@@ -260,6 +260,9 @@ const api = {
                 return undefined;
             })(),
         };
+        if (Object.prototype.hasOwnProperty.call(task, 'delegatedToUserId') || Object.prototype.hasOwnProperty.call(task, 'delegated_to_user_id')) {
+            payload.delegatedToUserId = task.delegatedToUserId ?? task.delegated_to_user_id ?? null;
+        }
     const updated = await (await getTaskService()).update(id, payload);
         // Normalize BE response back to UI shape
                 const normalized = {
@@ -273,6 +276,11 @@ const api = {
             assignee: updated.assignee ?? payload.assignee ?? null,
             duration: updated.duration ?? null,
             key_area_id: updated.keyAreaId || payload.keyAreaId,
+            delegatedToUserId:
+                updated.delegatedToUserId ??
+                updated.delegated_to_user_id ??
+                payload.delegatedToUserId ??
+                null,
             // Ensure list_index from server response or payload is preserved
             list_index: updated.listIndex ?? updated.list_index ?? payload.listIndex ?? payload.list_index ?? 1,
             listIndex: updated.listIndex ?? updated.list_index ?? payload.listIndex ?? payload.list_index ?? 1,
@@ -346,6 +354,25 @@ const normalizeActivityWithTask = (activity, task) => {
         goalId,
         assignee,
         responsible: norm.responsible ?? assignee ?? null,
+    };
+};
+
+const normalizeTaskForUi = (task, fallbackKeyAreaId = null) => {
+    if (!task) return task;
+    return {
+        ...task,
+        status: task.status || "open",
+        due_date: task.dueDate || task.due_date || null,
+        deadline: task.dueDate || task.due_date || null,
+        start_date: task.startDate || task.start_date || null,
+        end_date: task.endDate || task.end_date || null,
+        completionDate: task.completionDate || task.completion_date || null,
+        assignee: task.assignee ?? null,
+        duration: task.duration ?? null,
+        key_area_id: task.keyAreaId || task.key_area_id || fallbackKeyAreaId,
+        list_index: task.listIndex ?? task.list_index ?? 1,
+        listIndex: task.listIndex ?? task.list_index ?? 1,
+        goal_id: task.goalId ?? task.goal_id ?? null,
     };
 };
 
@@ -548,7 +575,8 @@ export default function KeyAreas() {
     const [allTasks, setAllTasks] = useState([]);
     const [syncActive, setSyncActive] = useState(false);
     const [refreshTick, setRefreshTick] = useState(0);
-    const [pendingDelegations, setPendingDelegations] = useState([]); // For DELEGATED tab - pending only
+    const [delegatedTasks, setDelegatedTasks] = useState([]);
+    const [delegatedActivities, setDelegatedActivities] = useState([]);
     const [pendingDelegationsLoading, setPendingDelegationsLoading] = useState(false);
     const [savingIds, setSavingIds] = useState(new Set());
     // Handler: change a task's status (UI value: open | in_progress | done)
@@ -618,6 +646,235 @@ export default function KeyAreas() {
     const [taskFullInitialTab, setTaskFullInitialTab] = useState("activities");
     // Triple view left panel selected task
     const [selectedTaskInPanel, setSelectedTaskInPanel] = useState(null);
+    const [selectedActivityCountInPanel, setSelectedActivityCountInPanel] = useState(0);
+    const [selectedActivityIdsInPanel, setSelectedActivityIdsInPanel] = useState(new Set());
+    const [showActivityMassFieldPicker, setShowActivityMassFieldPicker] = useState(false);
+
+    const resolveTaskForUnifiedActivity = useCallback(async (activity) => {
+        const normalizedActivity = normalizeActivity(activity || {});
+        const candidateTaskId =
+            normalizedActivity?.taskId ||
+            normalizedActivity?.task_id ||
+            activity?.taskId ||
+            activity?.task_id ||
+            activity?.task?.id ||
+            activity?.task?.task_id ||
+            null;
+
+        if (!candidateTaskId) return null;
+
+        const existingTask = (allTasks || []).find((task) => String(task.id) === String(candidateTaskId));
+        if (existingTask) return existingTask;
+
+        try {
+            const taskService = await getTaskService();
+            const fetchedTask = await taskService.get(String(candidateTaskId));
+            const normalizedTask = normalizeTaskForUi(
+                fetchedTask,
+                normalizedActivity?.key_area_id || selectedKA?.id || null,
+            );
+
+            if (normalizedTask?.id) {
+                setAllTasks((prev) => {
+                    if ((prev || []).some((task) => String(task.id) === String(normalizedTask.id))) {
+                        return prev;
+                    }
+                    return [normalizedTask, ...(Array.isArray(prev) ? prev : [])];
+                });
+            }
+
+            return normalizedTask;
+        } catch (error) {
+            console.error('Failed to resolve parent task for activity', error);
+            return null;
+        }
+    }, [allTasks, selectedKA]);
+
+    const openUnifiedTaskDetails = useCallback((task) => {
+        if (!task) return;
+        setSelectedTaskFull(task);
+        setTaskFullInitialTab("activities");
+    }, []);
+
+    const openUnifiedActivityDetails = useCallback(async (activity) => {
+        const task = await resolveTaskForUnifiedActivity(activity);
+        if (!task) return;
+        setSelectedTaskFull(task);
+        setTaskFullInitialTab("activities");
+    }, [resolveTaskForUnifiedActivity]);
+
+    const editUnifiedTask = useCallback((task) => {
+        if (!task) return;
+
+        setTaskForm({
+            id: task.id || task.taskId || task.task_id || task._id || null,
+            title: task.title || task.name || "",
+            description: task.description || "",
+            list_index: task.list_index || task.listIndex || 1,
+            category: task.category || "Key Areas",
+            goal_id: task.goal_id || task.goalId || "",
+            start_date: toDateOnly(task.start_date) || toDateOnly(task.startDate) || "",
+            deadline: toDateOnly(task.deadline) || toDateOnly(task.dueDate) || "",
+            end_date: toDateOnly(task.end_date) || toDateOnly(task.endDate) || "",
+            status: task.status || "open",
+            priority: (function (p) {
+                const s = String(p || "normal").toLowerCase();
+                if (s === "low" || s === "1") return 1;
+                if (s === "high" || s === "3") return 3;
+                return 2;
+            })(task.priority),
+            tags: task.tags || "",
+            recurrence: task.recurrence || "",
+            attachments: task.attachments || "",
+            attachmentsFiles: task.attachments
+                ? task.attachments.split(",").filter(Boolean).map((n) => ({ name: n }))
+                : [],
+            assignee: task.assignee || "",
+            key_area_id: task.key_area_id || task.keyAreaId || selectedKA?.id || null,
+            list: "",
+            finish_date: "",
+            duration: task.duration || "",
+            _endAuto: false,
+        });
+        setEditingTaskId(task.id || task.taskId || task.task_id || task._id || null);
+        setEditingActivityViaTaskModal(null);
+        setShowEditActivityModal(false);
+        setShowActivityComposer(false);
+        setShowTaskComposer(true);
+    }, [selectedKA]);
+
+    const editUnifiedActivity = useCallback(async (activity) => {
+        if (!activity) return;
+        const normalizedActivity = normalizeActivity(activity || {});
+        const task = await resolveTaskForUnifiedActivity(normalizedActivity);
+        const taskId =
+            task?.id ||
+            normalizedActivity?.taskId ||
+            normalizedActivity?.task_id ||
+            activity?.taskId ||
+            activity?.task_id ||
+            null;
+
+        setActivityAttachTaskId(taskId ? String(taskId) : null);
+
+        setTaskForm({
+            id: normalizedActivity.id || null,
+            title: normalizedActivity.text || "",
+            description: normalizedActivity.description || normalizedActivity.notes || "",
+            list_index: normalizedActivity.list || normalizedActivity.list_index || 1,
+            category: "Key Areas",
+            goal_id: normalizedActivity.goal || normalizedActivity.goalId || normalizedActivity.goal_id || "",
+            start_date: toDateOnly(normalizedActivity.start_date) || "",
+            deadline: toDateOnly(normalizedActivity.deadline) || "",
+            end_date: toDateOnly(normalizedActivity.end_date) || "",
+            status: normalizedActivity.completed ? "done" : "open",
+            priority: (function (p) {
+                const s = String(p || "normal").toLowerCase();
+                if (s === "low" || s === "1") return 1;
+                if (s === "high" || s === "3") return 3;
+                return 2;
+            })(normalizedActivity.priority),
+            tags: "",
+            recurrence: "",
+            attachments: "",
+            attachmentsFiles: [],
+            assignee: normalizedActivity.assignee || normalizedActivity.responsible || "",
+            key_area_id: normalizedActivity.key_area_id || selectedKA?.id || null,
+            list: normalizedActivity.list || "",
+            finish_date: toDateOnly(normalizedActivity.completionDate) || "",
+            duration: normalizedActivity.duration || "",
+            _endAuto: false,
+        });
+
+        setActivityForm({
+            title: normalizedActivity.text || "",
+            description: normalizedActivity.description || normalizedActivity.notes || "",
+            list: normalizedActivity.list || "",
+            key_area_id: normalizedActivity.key_area_id || selectedKA?.id || null,
+            assignee: normalizedActivity.assignee || normalizedActivity.responsible || "",
+            priority: (function (p) {
+                const s = String(p || "normal").toLowerCase();
+                if (s === "low" || s === "1") return 1;
+                if (s === "high" || s === "3") return 3;
+                return 2;
+            })(normalizedActivity.priority),
+            goal: normalizedActivity.goal || "",
+            start_date: toDateOnly(normalizedActivity.start_date) || "",
+            end_date: toDateOnly(normalizedActivity.end_date) || "",
+            deadline: toDateOnly(normalizedActivity.deadline) || "",
+            finish_date: toDateOnly(normalizedActivity.completionDate) || "",
+            duration: normalizedActivity.duration || "",
+            _endAuto: false,
+        });
+
+        setEditingTaskId(null);
+        setShowTaskComposer(false);
+        setShowActivityComposer(false);
+        setEditingActivityViaTaskModal({
+            id: normalizedActivity.id || activity.id,
+            taskId: taskId ? String(taskId) : null,
+        });
+        setShowEditActivityModal(true);
+    }, [resolveTaskForUnifiedActivity, selectedKA]);
+
+    const getDelegationStatus = useCallback(
+        (item) => String(item?.delegationStatus || item?.delegation_status || '').toLowerCase(),
+        [],
+    );
+
+    const refreshDelegatedData = useCallback(async ({ showLoading = false } = {}) => {
+        if (showLoading) setPendingDelegationsLoading(true);
+        try {
+            const [delegatedToMe, delegatedToMeActivities] = await Promise.all([
+                taskDelegationService.getDelegatedToMe(),
+                activityDelegationService.getDelegatedToMe(),
+            ]);
+
+            const nextTasks = Array.isArray(delegatedToMe) ? delegatedToMe : [];
+            const nextActivities = Array.isArray(delegatedToMeActivities) ? delegatedToMeActivities : [];
+
+            setDelegatedTasks(nextTasks);
+            setDelegatedActivities(nextActivities);
+            setAllTasks(nextTasks);
+            setActivitiesByTask({});
+        } catch (e) {
+            console.error('Failed to load delegated tasks', e);
+            setDelegatedTasks([]);
+            setDelegatedActivities([]);
+            setAllTasks([]);
+            setActivitiesByTask({});
+        } finally {
+            if (showLoading) setPendingDelegationsLoading(false);
+        }
+    }, []);
+
+    const pendingDelegations = useMemo(
+        () => [
+            ...delegatedTasks
+                .filter((item) => {
+                    const status = getDelegationStatus(item);
+                    return !status || status === 'pending';
+                })
+                .map((item) => ({ ...item, type: 'task' })),
+            ...delegatedActivities
+                .filter((item) => {
+                    const status = getDelegationStatus(item);
+                    return !status || status === 'pending';
+                })
+                .map((item) => ({ ...item, type: 'activity' })),
+        ],
+        [delegatedActivities, delegatedTasks, getDelegationStatus],
+    );
+
+    const acceptedDelegatedTasks = useMemo(
+        () => delegatedTasks.filter((item) => getDelegationStatus(item) === 'accepted'),
+        [delegatedTasks, getDelegationStatus],
+    );
+
+    const acceptedDelegatedActivities = useMemo(
+        () => delegatedActivities.filter((item) => getDelegationStatus(item) === 'accepted'),
+        [delegatedActivities, getDelegationStatus],
+    );
     const [panelViewMode, setPanelViewMode] = useState(() => {
         try {
             return window.localStorage.getItem("keyareas.panelViewMode") || "triple";
@@ -843,7 +1100,18 @@ export default function KeyAreas() {
             if (key === 'status') return { ...a, status: value };
             if (key === 'priority') return { ...a, priority: value };
             if (key === 'start_date' || key === 'end_date' || key === 'deadline') return { ...a, [key]: value };
-            if (key === 'assignee') return { ...a, assignee: value };
+            if (key === 'assignee') {
+                const selectedUser = (users || []).find((u) => String(u.id || u.member_id) === String(value));
+                if (selectedUser) {
+                    const selectedUserId = selectedUser.id || selectedUser.member_id;
+                    const displayName =
+                        currentUserId && String(selectedUserId) === String(currentUserId)
+                            ? 'Me'
+                            : (selectedUser.name || `${selectedUser.firstname || ''} ${selectedUser.lastname || ''}`.trim() || a.assignee || '');
+                    return { ...a, assignee: displayName };
+                }
+                return { ...a, assignee: value || '' };
+            }
             return { ...a, [key]: value };
         };
 
@@ -1091,6 +1359,8 @@ export default function KeyAreas() {
     // Mass edit UI toggle and anchor
     const [showMassEdit, setShowMassEdit] = useState(false);
     const [showMassEditModal, setShowMassEditModal] = useState(false);
+    const [showMassFieldPicker, setShowMassFieldPicker] = useState(false);
+    const [massEditField, setMassEditField] = useState(null);
     const tasksDisplayRef = useRef(null);
     const [users, setUsers] = useState([]);
     const [currentUserId, setCurrentUserId] = useState(null);
@@ -1191,80 +1461,7 @@ export default function KeyAreas() {
         
         // Handle DELEGATED tab - show TWO sections: pending at top, all delegated below
         if (viewTab === 'delegated') {
-            (async () => {
-                setPendingDelegationsLoading(true);
-                try {
-                    let delegatedToMe = [];
-                    let delegatedActivities = [];
-                    try {
-                        // Get ALL delegated tasks (both pending and accepted)
-                        delegatedToMe = await taskDelegationService.getDelegatedToMe();
-                        
-                        // Get ALL delegated activities (both pending and accepted)
-                        delegatedActivities = await activityDelegationService.getDelegatedToMe();
-                        
-                        console.log('✅ getDelegatedToMe() returned:', { 
-                            tasks: Array.isArray(delegatedToMe) ? delegatedToMe.length : 0,
-                            tasksPending: delegatedToMe?.filter(t => (t.delegationStatus || t.delegation_status) === 'pending').length,
-                            tasksAccepted: delegatedToMe?.filter(t => (t.delegationStatus || t.delegation_status) === 'accepted').length,
-                            activities: Array.isArray(delegatedActivities) ? delegatedActivities.length : 0,
-                            activitiesPending: delegatedActivities?.filter(a => (a.delegationStatus || a.delegation_status) === 'pending').length,
-                            activitiesAccepted: delegatedActivities?.filter(a => (a.delegationStatus || a.delegation_status) === 'accepted').length,
-                        });
-                        
-                        // Normalize both tasks and activities with type indicator
-                        const normalizedTasks = (delegatedToMe || []).map(t => ({ ...t, type: 'task' }));
-                        const normalizedActivities = (delegatedActivities || []).map(a => ({ ...a, type: 'activity' }));
-                        
-                        // Combine all delegated items
-                        const allDelegated = [...normalizedTasks, ...normalizedActivities];
-                        
-                        // Separate pending delegations for top section
-                        const pending = allDelegated.filter(item => 
-                            (item.delegationStatus || item.delegation_status) === 'pending' || 
-                            !(item.delegationStatus || item.delegation_status)
-                        );
-                        setPendingDelegations(pending);
-                        
-                        // Set all items for the bottom section (with filters)
-                        setAllTasks(allDelegated);
-                        // Stop showing pending-loading UI as soon as delegated lists are ready.
-                        // Activity hydration can continue silently in the background.
-                        setPendingDelegationsLoading(false);
-                    } catch (err) {
-                        console.error('❌ ERROR: getDelegatedToMe() failed:', err);
-                        delegatedToMe = [];
-                        delegatedActivities = [];
-                        setPendingDelegations([]);
-                        setPendingDelegationsLoading(false);
-                    }
-
-                    // Load activities for delegated tasks
-                    const actSvc = await getActivityService();
-                    const entries = await Promise.all(
-                        (delegatedToMe || []).map(async (row) => {
-                            try {
-                                const list = await actSvc.list({ taskId: row.id });
-                                const filtered = Array.isArray(list)
-                                    ? list.filter((activity) => {
-                                          if (!currentUserId) return true;
-                                          const delegatedTo = activity.delegatedToUserId || activity.delegated_to_user_id;
-                                          if (!delegatedTo) return true;
-                                          return String(delegatedTo) === String(currentUserId);
-                                      })
-                                    : [];
-                                return [String(row.id), filtered.map(normalizeActivity)];
-                            } catch {
-                                return [String(row.id), []];
-                            }
-                        }),
-                    );
-                    setActivitiesByTask(Object.fromEntries(entries));
-                } catch (e) {
-                    console.error('Failed to load delegated tasks', e);
-                    setPendingDelegations([]);
-                }
-            })();
+            refreshDelegatedData({ showLoading: true });
             return;
         }
         
@@ -1275,12 +1472,15 @@ export default function KeyAreas() {
                     const svc = await getTaskService();
                     // Load ALL user tasks (empty opts = all tasks owned by user)
                     const allUserTasks = await svc.list({});
-                    setAllTasks(allUserTasks || []);
+                    const normalizedTasks = Array.isArray(allUserTasks)
+                        ? allUserTasks.map((task) => normalizeTaskForUi(task))
+                        : [];
+                    setAllTasks(normalizedTasks);
                     
                     // Load activities for all tasks
                     const actSvc = await getActivityService();
                     const entries = await Promise.all(
-                        (allUserTasks || []).map(async (row) => {
+                        normalizedTasks.map(async (row) => {
                             try {
                                 const list = await actSvc.list({ taskId: row.id });
                                 return [
@@ -1309,12 +1509,15 @@ export default function KeyAreas() {
                     const svc = await getTaskService();
                     // Load all tasks without goals (empty keyAreaId = all key areas)
                     const trapTasks = await svc.list({ withoutGoal: true });
-                    setAllTasks(trapTasks || []);
+                    const normalizedTrapTasks = Array.isArray(trapTasks)
+                        ? trapTasks.map((task) => normalizeTaskForUi(task))
+                        : [];
+                    setAllTasks(normalizedTrapTasks);
                     
                     // Load activities for all trap tasks
                     const actSvc = await getActivityService();
                     const entries = await Promise.all(
-                        (trapTasks || []).map(async (row) => {
+                        normalizedTrapTasks.map(async (row) => {
                             try {
                                 const list = await actSvc.list({ taskId: row.id });
                                 return [
@@ -1360,7 +1563,7 @@ export default function KeyAreas() {
                 // ignore activity load failures
             }
         })();
-    }, [viewTab, activeFilter, selectedKA?.id, currentUserId, navigate, refreshTick]);
+    }, [viewTab, activeFilter, selectedKA?.id, currentUserId, navigate, refreshTick, refreshDelegatedData]);
     
     // Listen for 'task-created' events from ModalManager (navbar quick actions)
     // When a task is created via the quick actions with a key area, add it to allTasks
@@ -1706,22 +1909,25 @@ export default function KeyAreas() {
                 try { return { ...t, priority: getPriorityLevel(value) }; } catch (e) { return { ...t, priority: value }; }
             }
             if (key === 'assignee') {
-                const selectedUser = (users || []).find((u) => String(u.id) === String(value));
+                const existingDelegatedToUserId = t.delegatedToUserId || t.delegated_to_user_id || null;
+                const selectedUser = (users || []).find((u) => String(u.id || u.member_id) === String(value));
                 if (selectedUser) {
+                    const selectedUserId = selectedUser.id || selectedUser.member_id;
+                    const assigningToSelf = currentUserId && String(selectedUserId) === String(currentUserId);
                     const displayName =
-                        currentUserId && String(selectedUser.id) === String(currentUserId)
+                        assigningToSelf
                             ? 'Me'
                             : (selectedUser.name || `${selectedUser.firstname || ''} ${selectedUser.lastname || ''}`.trim() || t.assignee || '');
                     return {
                         ...t,
                         assignee: displayName,
                         delegatedToUserId:
-                            currentUserId && String(selectedUser.id) === String(currentUserId)
-                                ? null
-                                : selectedUser.id,
+                            assigningToSelf
+                                ? (existingDelegatedToUserId || null)
+                                : selectedUserId,
                     };
                 }
-                return { ...t, assignee: value || '', delegatedToUserId: null };
+                return { ...t, assignee: value || '', delegatedToUserId: existingDelegatedToUserId || null };
             }
             return { ...t, [key]: value };
         };
@@ -1737,20 +1943,22 @@ export default function KeyAreas() {
         if (key === 'name') patch.title = value;
         else if (key === 'notes') patch.description = value;
         else if (key === 'assignee') {
-            const selectedUser = (users || []).find((u) => String(u.id) === String(value));
+            const existingDelegatedToUserId = prevTask.delegatedToUserId || prevTask.delegated_to_user_id || null;
+            const selectedUser = (users || []).find((u) => String(u.id || u.member_id) === String(value));
             if (selectedUser) {
-                const selectedUserId = selectedUser.id;
+                const selectedUserId = selectedUser.id || selectedUser.member_id;
+                const assigningToSelf = currentUserId && String(selectedUserId) === String(currentUserId);
                 patch.assignee =
-                    currentUserId && String(selectedUserId) === String(currentUserId)
+                    assigningToSelf
                         ? 'Me'
                         : (selectedUser.name || `${selectedUser.firstname || ''} ${selectedUser.lastname || ''}`.trim() || null);
                 patch.delegatedToUserId =
-                    currentUserId && String(selectedUserId) === String(currentUserId)
-                        ? null
+                    assigningToSelf
+                        ? (existingDelegatedToUserId || null)
                         : selectedUserId;
             } else {
                 patch.assignee = value || null;
-                patch.delegatedToUserId = null;
+                patch.delegatedToUserId = existingDelegatedToUserId || null;
             }
         }
         else if (key === 'start_date') patch.startDate = value ? new Date(value).toISOString() : null;
@@ -2070,8 +2278,19 @@ export default function KeyAreas() {
         if (selectedIds.size === 0) {
             if (showMassEdit) setShowMassEdit(false);
             if (showMassEditModal) setShowMassEditModal(false);
+            if (showMassFieldPicker) setShowMassFieldPicker(false);
+            if (massEditField) setMassEditField(null);
         }
-    }, [selectedIds, showMassEdit, showMassEditModal]);
+    }, [selectedIds, showMassEdit, showMassEditModal, showMassFieldPicker, massEditField]);
+
+    useEffect(() => {
+        setSelectedActivityIdsInPanel(new Set());
+        setSelectedActivityCountInPanel(0);
+    }, [selectedTaskInPanel?.id]);
+
+    useEffect(() => {
+        setSelectedActivityCountInPanel(selectedActivityIdsInPanel.size);
+    }, [selectedActivityIdsInPanel]);
 
     useEffect(() => {
         (async () => {
@@ -2624,8 +2843,15 @@ export default function KeyAreas() {
         }
         if (kaParam && keyAreas.length) {
             const found = keyAreas.find((k) => String(k.id) === String(kaParam));
-            // Only (re)open if it's a different KA than the current selection
-            if (found && (!selectedKA || String(selectedKA.id) !== String(found.id))) {
+            // Re-open when switching from global tabs even if the KA id matches.
+            if (
+                found &&
+                (
+                    !selectedKA ||
+                    String(selectedKA.id) !== String(found.id) ||
+                    viewTab !== "active-tasks"
+                )
+            ) {
                 openKA(found);
             }
         }
@@ -2635,19 +2861,28 @@ export default function KeyAreas() {
             const hit = (allTasks || []).find((t) => String(t.id) === tId);
             if (hit) setSelectedTaskFull(hit);
         }
-    }, [location.search, keyAreas, selectedKA, allTasks]);
+    }, [location.search, keyAreas, selectedKA, allTasks, viewTab]);
 
     const openKA = async (ka) => {
         if (!ka?.id) return;
         const nextId = String(ka.id);
         // Ignore duplicate open requests for the same KA while it is opening.
         if (openingKaIdRef.current === nextId) return;
-        // Avoid reopening the already-open KA (prevents UI bounce from duplicate triggers).
-        if (selectedKA && String(selectedKA.id) === nextId) return;
+        const isSameKa = selectedKA && String(selectedKA.id) === nextId;
+        const needsContextReset =
+            viewTab !== 'active-tasks' ||
+            !!selectedTaskFull ||
+            !!selectedTaskInPanel ||
+            panelViewMode === 'simple';
+        // Avoid reopening only when we are already on the same KA in the normal active-tasks state.
+        if (isSameKa && !needsContextReset) return;
         openingKaIdRef.current = nextId;
         // Close any open task full view when switching Key Areas
         try {
             setSelectedTaskFull(null);
+            setSelectedTaskInPanel(null);
+            setSelectedActivityIdsInPanel(new Set());
+            setSelectedActivityCountInPanel(0);
             setSelectedKA(ka);
             // Load tasks based on the view mode (all vs activity-trap)
             const opts = {};
@@ -3077,7 +3312,11 @@ export default function KeyAreas() {
             return next;
         });
     };
-    const clearSelection = () => setSelectedIds(new Set());
+    const clearSelection = () => {
+        setSelectedIds(new Set());
+        setShowMassFieldPicker(false);
+        setMassEditField(null);
+    };
     const selectAllVisible = () => {
         const all = new Set(selectedIds);
         const allSelected = sortedTasks.every((t) => all.has(t.id));
@@ -3306,6 +3545,206 @@ export default function KeyAreas() {
             console.error("Failed to create activity", err);
             alert(t("keyAreas.alertCreateActivityFailed"));
         }
+    };
+
+    const handleBulkDeleteSelected = async () => {
+        if (selectedIds.size === 0) return;
+        const confirmed = window.confirm("Delete selected tasks?");
+        if (!confirmed) return;
+
+        for (const id of Array.from(selectedIds)) {
+            const task = allTasks.find((t) => String(t.id) === String(id));
+            if (!task) continue;
+            try {
+                await handleDeleteTask(task);
+            } catch (error) {
+                console.error("Failed to delete selected task", task, error);
+            }
+        }
+        setSelectedIds(new Set());
+    };
+
+    const handleTaskMassActionChange = async (e) => {
+        const action = e.target.value;
+        e.target.value = "";
+        if (!action || selectedIds.size === 0) return;
+        if (action === "edit") {
+            setShowMassFieldPicker(true);
+            return;
+        }
+        if (action === "delete") {
+            await handleBulkDeleteSelected();
+        }
+    };
+
+    const handleBulkFieldSave = async (
+        field,
+        value,
+        targetIds = Array.from(selectedIds),
+        activityTargetIds = [],
+    ) => {
+        const taskIds = Array.isArray(targetIds) ? targetIds.map((id) => String(id)) : [];
+        const activityIds = Array.isArray(activityTargetIds)
+            ? activityTargetIds.map((id) => String(id))
+            : [];
+
+        const updates = [];
+        for (const id of taskIds) {
+            const original = allTasks.find((t) => String(t.id) === String(id));
+            if (!original) continue;
+            const next = { ...original };
+
+            if (field === 'assignee') {
+                const selectedUser = users.find((user) => String(user.id || user.member_id) === String(value));
+                if (selectedUser) {
+                    const userId = selectedUser.id || selectedUser.member_id;
+                    next.assignee = String(userId) === String(currentUserId)
+                        ? 'Me'
+                        : `${selectedUser.name || selectedUser.firstname || ''} ${selectedUser.lastname || ''}`.trim();
+                    next.delegatedToUserId = String(userId) === String(currentUserId) ? null : userId;
+                } else {
+                    next.assignee = '';
+                    next.delegatedToUserId = null;
+                }
+            } else if (field === 'status') {
+                next.status = value || next.status;
+            } else if (field === 'priority') {
+                next.priority = value || next.priority;
+            } else if (field === 'duration') {
+                next.duration = value || null;
+            } else if (field === 'goalId') {
+                next.goal_id = value || null;
+                next.goalId = value || null;
+            } else if (field === 'key_area_bundle') {
+                next.key_area_id = value?.key_area_id || null;
+                if (value?.list_index) next.list_index = value.list_index;
+            } else if (field === 'date') {
+                next.start_date = value?.start_date || null;
+                next.end_date = value?.end_date || null;
+                next.deadline = value?.deadline || null;
+            }
+
+            next.eisenhower_quadrant = computeEisenhowerQuadrant({
+                deadline: next.deadline,
+                end_date: next.end_date,
+                start_date: next.start_date,
+                priority: next.priority,
+                status: next.status,
+                key_area_id: next.key_area_id,
+            });
+
+            // eslint-disable-next-line no-await-in-loop
+            const saved = await api.updateTask(next.id, next);
+            updates.push(saved);
+        }
+
+        setAllTasks((prev) => {
+            const map = new Map(prev.map((task) => [String(task.id), task]));
+            updates.forEach((task) => map.set(String(task.id), { ...map.get(String(task.id)), ...task }));
+            return Array.from(map.values());
+        });
+
+        if (activityIds.length > 0) {
+            const svc = await getActivityService();
+            const updatedActivities = [];
+
+            for (const activityId of activityIds) {
+                let originalActivity = null;
+                let originalTask = null;
+
+                for (const [taskId, list] of Object.entries(activitiesByTask || {})) {
+                    const found = Array.isArray(list)
+                        ? list.find((activity) => String(activity.id) === String(activityId))
+                        : null;
+                    if (found) {
+                        originalActivity = found;
+                        originalTask = allTasks.find((task) => String(task.id) === String(taskId)) || null;
+                        break;
+                    }
+                }
+
+                if (!originalActivity) continue;
+
+                const body = {};
+
+                if (field === 'assignee') {
+                    body.delegatedToUserId =
+                        value && String(value) !== String(currentUserId) ? value : null;
+                } else if (field === 'status') {
+                    body.status = value || originalActivity.status;
+                    body.completed = String(value || '').toLowerCase() === 'done';
+                } else if (field === 'priority') {
+                    body.priority = value || originalActivity.priority || null;
+                } else if (field === 'duration') {
+                    body.duration = value || null;
+                } else if (field === 'goalId') {
+                    body.goalId = value || null;
+                } else if (field === 'date') {
+                    body.startDate = value?.start_date || null;
+                    body.endDate = value?.end_date || null;
+                    body.deadline = value?.deadline || null;
+                } else {
+                    body[field] = value;
+                }
+
+                // eslint-disable-next-line no-await-in-loop
+                const savedActivity = await svc.update(activityId, body);
+                updatedActivities.push({
+                    activityId: String(activityId),
+                    normalized: normalizeActivityWithTask(savedActivity || {}, originalTask || originalActivity),
+                });
+            }
+
+            if (updatedActivities.length > 0) {
+                setActivitiesByTask((prev) => {
+                    const updated = { ...prev };
+                    for (const key of Object.keys(updated)) {
+                        updated[key] = (updated[key] || []).map((activity) => {
+                            const match = updatedActivities.find(
+                                (entry) => String(entry.activityId) === String(activity.id),
+                            );
+                            return match ? { ...activity, ...match.normalized } : activity;
+                        });
+                    }
+                    return updated;
+                });
+            }
+        }
+
+        setShowMassFieldPicker(false);
+        setMassEditField(null);
+        clearSelection();
+    };
+
+    const handleActivityPanelMassFieldSave = async (field, value) => {
+        if (!selectedTaskInPanel?.id || selectedActivityIdsInPanel.size === 0) return;
+        const taskId = selectedTaskInPanel.id;
+        const taskKey = String(taskId);
+        const list = Array.isArray(activitiesByTask[taskKey]) ? activitiesByTask[taskKey] : [];
+        const selectedActivities = list.filter((activity) => selectedActivityIdsInPanel.has(activity.id));
+
+        for (const activity of selectedActivities) {
+            if (field === 'date') {
+                // eslint-disable-next-line no-await-in-loop
+                await updateActivityField(activity, taskId, 'start_date', value?.start_date || '');
+                // eslint-disable-next-line no-await-in-loop
+                await updateActivityField(activity, taskId, 'end_date', value?.end_date || '');
+                // eslint-disable-next-line no-await-in-loop
+                await updateActivityField(activity, taskId, 'deadline', value?.deadline || '');
+            } else if (field === 'goalId') {
+                // eslint-disable-next-line no-await-in-loop
+                await updateActivityField(activity, taskId, 'goalId', value || null);
+            } else if (field === 'duration') {
+                // eslint-disable-next-line no-await-in-loop
+                await updateActivityField(activity, taskId, 'duration', value || null);
+            } else {
+                // eslint-disable-next-line no-await-in-loop
+                await updateActivityField(activity, taskId, field, value);
+            }
+        }
+
+        setShowActivityMassFieldPicker(false);
+        setSelectedActivityIdsInPanel(new Set());
     };
 
     // Close activity composer with Escape
@@ -3983,20 +4422,17 @@ export default function KeyAreas() {
                                                 <span className="text-slate-500" aria-live="polite">
                                                     {selectedIds.size} selected
                                                 </span>
-                                                <button
-                                                    type="button"
+                                                <select
                                                     disabled={selectedIds.size === 0}
-                                                    onClick={() => {
-                                                        // Only allow entering mass edit when at least one task is selected
-                                                        if (selectedIds.size === 0) return;
-                                                        setShowMassEditModal(true);
-                                                    }}
-                                                    className="px-4 py-1 rounded-md text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
-                                                    aria-label="mass edit"
-                                                    title={selectedIds.size === 0 ? "Select tasks to enable mass edit" : "Mass edit selected tasks"}
+                                                    onChange={handleTaskMassActionChange}
+                                                    defaultValue=""
+                                                    className="h-[32px] rounded-md border border-emerald-700 bg-emerald-600 px-3 text-sm font-semibold text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-300 disabled:opacity-50"
+                                                    aria-label="mass action"
                                                 >
-                                                    Mass Edit
-                                                </button>
+                                                    <option value="" hidden>Mass Edit</option>
+                                                    <option value="edit" className="bg-white text-slate-900">Select field</option>
+                                                    <option value="delete" className="bg-white text-slate-900">Delete</option>
+                                                </select>
                                                 <button
                                                     type="button"
                                                     onClick={() => {
@@ -4192,8 +4628,21 @@ export default function KeyAreas() {
                                                 ) : (
                                                     <div className="flex-1 min-h-0 overflow-x-auto overflow-y-auto hover-scrollbar-y">
                                                         <table className="min-w-[1400px] w-full text-sm table-fixed">
-                                                            <thead className="bg-slate-50 border border-slate-200 text-slate-700 block">
-                                                                <tr className="table w-full table-fixed">
+                                                            <colgroup>
+                                                                <col style={{ width: '3rem' }} />
+                                                                <col style={{ width: '15rem' }} />
+                                                                {visibleColumns.responsible && <col style={{ width: '6rem' }} />}
+                                                                <col style={{ width: '6rem' }} />
+                                                                {visibleColumns.priority && <col style={{ width: '6rem' }} />}
+                                                                {visibleColumns.quadrant && <col style={{ width: '6rem' }} />}
+                                                                {visibleColumns.start_date && <col style={{ width: '6rem' }} />}
+                                                                {visibleColumns.end_date && <col style={{ width: '6rem' }} />}
+                                                                {visibleColumns.deadline && <col style={{ width: '6rem' }} />}
+                                                                {visibleColumns.duration && <col style={{ width: '6rem' }} />}
+                                                                {visibleColumns.completed && <col style={{ width: '6rem' }} />}
+                                                            </colgroup>
+                                                            <thead className="bg-slate-50 border border-slate-200 text-slate-700">
+                                                                <tr>
                                                                     <th className="px-3 py-2 text-left w-12">
                                                                         <input
                                                                             type="checkbox"
@@ -4215,21 +4664,21 @@ export default function KeyAreas() {
                                                                     </th>
                                                                     {visibleColumns.responsible && (
                                                                         <th 
-                                                                            className="px-3 py-2 text-left font-semibold w-[140px] cursor-pointer hover:bg-slate-100"
+                                                                            className="px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                             onClick={() => handleTaskSort('responsible')}
                                                                         >
                                                                             Responsible {taskSortField === 'responsible' && (taskSortDirection === 'asc' ? '↑' : '↓')}
                                                                         </th>
                                                                     )}
                                                                     <th 
-                                                                        className="px-3 py-2 text-left font-semibold w-[120px] cursor-pointer hover:bg-slate-100"
+                                                                        className="px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                         onClick={() => handleTaskSort('status')}
                                                                     >
                                                                         Status {taskSortField === 'status' && (taskSortDirection === 'asc' ? '↑' : '↓')}
                                                                     </th>
                                                                     {visibleColumns.priority && (
                                                                         <th 
-                                                                            className="px-3 py-2 text-left font-semibold w-[100px] cursor-pointer hover:bg-slate-100"
+                                                                            className="px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                             onClick={() => handleTaskSort('priority')}
                                                                         >
                                                                             Priority {taskSortField === 'priority' && (taskSortDirection === 'asc' ? '↑' : '↓')}
@@ -4237,7 +4686,7 @@ export default function KeyAreas() {
                                                                     )}
                                                                     {visibleColumns.quadrant && (
                                                                         <th 
-                                                                            className="px-3 py-2 text-left font-semibold w-[90px] cursor-pointer hover:bg-slate-100"
+                                                                            className="px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                             onClick={() => handleTaskSort('quadrant')}
                                                                         >
                                                                             Quadrant {taskSortField === 'quadrant' && (taskSortDirection === 'asc' ? '↑' : '↓')}
@@ -4246,7 +4695,7 @@ export default function KeyAreas() {
                                                                     {/* Goal and Tags columns removed per UX request */}
                                                                     {visibleColumns.start_date && (
                                                                         <th 
-                                                                            className="px-3 py-2 text-left font-semibold w-[120px] cursor-pointer hover:bg-slate-100"
+                                                                            className="px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                             onClick={() => handleTaskSort('start_date')}
                                                                         >
                                                                             Start Date {taskSortField === 'start_date' && (taskSortDirection === 'asc' ? '↑' : '↓')}
@@ -4254,7 +4703,7 @@ export default function KeyAreas() {
                                                                     )}
                                                                     {visibleColumns.end_date && (
                                                                         <th 
-                                                                            className="px-3 py-2 text-left font-semibold w-[120px] cursor-pointer hover:bg-slate-100"
+                                                                            className="px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                             onClick={() => handleTaskSort('end_date')}
                                                                         >
                                                                             End date {taskSortField === 'end_date' && (taskSortDirection === 'asc' ? '↑' : '↓')}
@@ -4262,7 +4711,7 @@ export default function KeyAreas() {
                                                                     )}
                                                                     {visibleColumns.deadline && (
                                                                         <th 
-                                                                            className="px-3 py-2 text-left font-semibold w-[120px] cursor-pointer hover:bg-slate-100"
+                                                                            className="px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                             onClick={() => handleTaskSort('deadline')}
                                                                         >
                                                                             Deadline {taskSortField === 'deadline' && (taskSortDirection === 'asc' ? '↑' : '↓')}
@@ -4270,7 +4719,7 @@ export default function KeyAreas() {
                                                                     )}
                                                                     {visibleColumns.duration && (
                                                                         <th 
-                                                                            className="px-3 py-2 text-left font-semibold w-[90px] cursor-pointer hover:bg-slate-100"
+                                                                            className="px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                             onClick={() => handleTaskSort('duration')}
                                                                         >
                                                                             Duration {taskSortField === 'duration' && (taskSortDirection === 'asc' ? '↑' : '↓')}
@@ -4278,7 +4727,7 @@ export default function KeyAreas() {
                                                                     )}
                                                                     {visibleColumns.completed && (
                                                                         <th 
-                                                                            className="px-3 py-2 text-left font-semibold w-[120px] cursor-pointer hover:bg-slate-100"
+                                                                            className="px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                             onClick={() => handleTaskSort('completed')}
                                                                         >
                                                                             Completed {taskSortField === 'completed' && (taskSortDirection === 'asc' ? '↑' : '↓')}
@@ -4287,7 +4736,7 @@ export default function KeyAreas() {
                                                                     {/* Actions column removed — actions available via row menu */}
                                                                 </tr>
                                                             </thead>
-                                                            <tbody className="bg-white block">
+                                                            <tbody className="bg-white">
                                                                 {sortedTasks.map((t) => {
                                                                     const q = computeEisenhowerQuadrant({
                                                                         deadline: t.deadline,
@@ -4388,10 +4837,10 @@ export default function KeyAreas() {
                                                                                     }
                                                                                     setSelectedTaskInPanel(task);
                                                                                 }}
-                                                                                rowClassName="table w-full table-fixed"
+                                                                                rowClassName=""
                                                                             />
                                                                             {expandedActivityRows.has(t.id) && (
-                                                                                <tr className="bg-slate-50 table w-full table-fixed">
+                                                                                <tr className="bg-slate-50">
                                                                                     <td className="px-3 py-2" />
                                                                                     <td colSpan={14} className="px-0 py-2">
                                                                                         <div className="ml-6 pl-6 border-l-2 border-slate-200">
@@ -4407,6 +4856,7 @@ export default function KeyAreas() {
                                                                                                              enableInlineEditing={!showMassEdit}
                                                                                                              users={users}
                                                                                                              currentUserId={currentUserId}
+                                                                                                             goals={goals}
                                                                                             />
                                                                                         </div>
                                                                                     </td>
@@ -4502,9 +4952,69 @@ export default function KeyAreas() {
                                                             </span>
                                                         </div>
                                                     </div>
+                                                    <div className="ml-auto flex items-center gap-3 text-sm">
+                                                        <span className="text-slate-500" aria-live="polite">
+                                                            {selectedActivityCountInPanel} selected
+                                                        </span>
+                                                        <select
+                                                            disabled={selectedActivityCountInPanel === 0}
+                                                            defaultValue=""
+                                                            onChange={(e) => {
+                                                                const action = e.target.value;
+                                                                e.target.value = '';
+                                                                if (!action) return;
+                                                                if (action === 'edit') {
+                                                                    setShowActivityMassFieldPicker(true);
+                                                                    return;
+                                                                }
+                                                                if (action === 'delete') {
+                                                                    const confirmed = window.confirm(
+                                                                        t('unifiedTable.confirmDeleteSelected') || 'Delete selected items?',
+                                                                    );
+                                                                    if (!confirmed) return;
+                                                                    const taskKey = String(selectedTaskInPanel?.id || '');
+                                                                    const list = Array.isArray(activitiesByTask[taskKey])
+                                                                        ? activitiesByTask[taskKey]
+                                                                        : [];
+                                                                    const toDelete = list.filter((activity) =>
+                                                                        selectedActivityIdsInPanel.has(activity.id),
+                                                                    );
+                                                                    Promise.all(
+                                                                        toDelete.map(async (activity) => {
+                                                                            try {
+                                                                                const activityService = await getActivityService();
+                                                                                await activityService.remove(activity.id);
+                                                                                return activity.id;
+                                                                            } catch (error) {
+                                                                                console.error('Failed to delete activity:', error);
+                                                                                return null;
+                                                                            }
+                                                                        }),
+                                                                    ).then((removedIds) => {
+                                                                        const deleted = new Set(
+                                                                            removedIds.filter(Boolean).map((id) => String(id)),
+                                                                        );
+                                                                        setActivitiesByTask((prev) => ({
+                                                                            ...prev,
+                                                                            [taskKey]: (prev[taskKey] || []).filter(
+                                                                                (item) => !deleted.has(String(item.id)),
+                                                                            ),
+                                                                        }));
+                                                                    });
+                                                                    setSelectedActivityIdsInPanel(new Set());
+                                                                }
+                                                            }}
+                                                            className="h-[32px] rounded-md border border-emerald-700 bg-emerald-600 px-3 text-sm font-semibold text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-300 disabled:opacity-50"
+                                                            aria-label="activity mass action"
+                                                        >
+                                                            <option value="" hidden>Mass Edit</option>
+                                                            <option value="edit" className="bg-white text-slate-900">Select field</option>
+                                                            <option value="delete" className="bg-white text-slate-900">Delete</option>
+                                                        </select>
+                                                    </div>
                                                     <button
                                                         type="button"
-                                                        className="px-3 py-1 rounded-md text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 ml-auto"
+                                                        className="px-3 py-1 rounded-md text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700"
                                                         onClick={() => window.dispatchEvent(new CustomEvent("ka-open-activity-composer", { detail: { taskId: selectedTaskInPanel?.id } }))}
                                                     >
                                                         Add Activity
@@ -4512,7 +5022,7 @@ export default function KeyAreas() {
                                                 </div>
 
                                                 {/* Activities Table */}
-                                                <div className="flex-1 min-h-0 p-4 flex flex-col">
+                                                <div className="flex-1 min-h-0 px-2 pt-2 pb-4 flex flex-col">
                                                     <div className="mb-3 flex-1 min-h-0 flex flex-col">
                                                         {(() => {
                                                             const taskKey = String(selectedTaskInPanel.id);
@@ -4584,8 +5094,46 @@ export default function KeyAreas() {
                                                             return Array.isArray(list) && list.length > 0 ? (
                                                                 <div className="flex-1 min-h-0 overflow-x-auto overflow-y-auto hover-scrollbar-y">
                                                                     <table className="min-w-[1400px] w-full text-sm table-fixed border-collapse">
+                                                                        <colgroup>
+                                                                            <col style={{ width: '3rem' }} />
+                                                                            <col style={{ width: '15rem' }} />
+                                                                            {visibleColumns.responsible && <col style={{ width: '6rem' }} />}
+                                                                            {visibleColumns.status !== false && <col style={{ width: '6rem' }} />}
+                                                                            {visibleColumns.priority && <col style={{ width: '6rem' }} />}
+                                                                            {visibleColumns.start_date && <col style={{ width: '6rem' }} />}
+                                                                            {visibleColumns.end_date && <col style={{ width: '6rem' }} />}
+                                                                            {visibleColumns.deadline && <col style={{ width: '6rem' }} />}
+                                                                            {visibleColumns.duration && <col style={{ width: '6rem' }} />}
+                                                                            {visibleColumns.completed && <col style={{ width: '6rem' }} />}
+                                                                        </colgroup>
                                                                         <thead className="bg-slate-50 border border-slate-200 text-slate-700">
                                                                             <tr>
+                                                                                <th className="px-3 py-2 text-left w-12">
+                                                                                    <input
+                                                                                        type="checkbox"
+                                                                                        aria-label="Select all visible activities"
+                                                                                        checked={
+                                                                                            list.length > 0 &&
+                                                                                            list.every((activity) =>
+                                                                                                selectedActivityIdsInPanel.has(activity.id),
+                                                                                            )
+                                                                                        }
+                                                                                        onChange={() => {
+                                                                                            if (
+                                                                                                list.length > 0 &&
+                                                                                                list.every((activity) =>
+                                                                                                    selectedActivityIdsInPanel.has(activity.id),
+                                                                                                )
+                                                                                            ) {
+                                                                                                setSelectedActivityIdsInPanel(new Set());
+                                                                                                return;
+                                                                                            }
+                                                                                            setSelectedActivityIdsInPanel(
+                                                                                                new Set(list.map((activity) => activity.id)),
+                                                                                            );
+                                                                                        }}
+                                                                                    />
+                                                                                </th>
                                                                                 <th 
                                                                                     className="px-3 py-2 text-left font-semibold w-[240px] cursor-pointer hover:bg-slate-100"
                                                                                     onClick={() => handleActivitySort('name')}
@@ -4594,7 +5142,7 @@ export default function KeyAreas() {
                                                                                 </th>
                                                                                 {visibleColumns.responsible && (
                                                                                     <th 
-                                                                                        className="px-3 py-2 text-left font-semibold w-[140px] cursor-pointer hover:bg-slate-100"
+                                                                                        className="px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                                         onClick={() => handleActivitySort('responsible')}
                                                                                     >
                                                                                         Responsible {activitySortField === 'responsible' && (activitySortDirection === 'asc' ? '↑' : '↓')}
@@ -4602,7 +5150,7 @@ export default function KeyAreas() {
                                                                                 )}
                                                                                 {visibleColumns.status !== false && (
                                                                                     <th 
-                                                                                        className="px-3 py-2 text-left font-semibold w-[120px] cursor-pointer hover:bg-slate-100"
+                                                                                        className="px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                                         onClick={() => handleActivitySort('status')}
                                                                                     >
                                                                                         Status {activitySortField === 'status' && (activitySortDirection === 'asc' ? '↑' : '↓')}
@@ -4610,7 +5158,7 @@ export default function KeyAreas() {
                                                                                 )}
                                                                                 {visibleColumns.priority && (
                                                                                     <th 
-                                                                                        className="px-3 py-2 text-left font-semibold w-[100px] cursor-pointer hover:bg-slate-100"
+                                                                                        className="px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                                         onClick={() => handleActivitySort('priority')}
                                                                                     >
                                                                                         Priority {activitySortField === 'priority' && (activitySortDirection === 'asc' ? '↑' : '↓')}
@@ -4618,7 +5166,7 @@ export default function KeyAreas() {
                                                                                 )}
                                                                                 {visibleColumns.start_date && (
                                                                                     <th 
-                                                                                        className="px-3 py-2 text-left font-semibold w-[120px] cursor-pointer hover:bg-slate-100"
+                                                                                        className="px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                                         onClick={() => handleActivitySort('start_date')}
                                                                                     >
                                                                                         Start date {activitySortField === 'start_date' && (activitySortDirection === 'asc' ? '↑' : '↓')}
@@ -4626,7 +5174,7 @@ export default function KeyAreas() {
                                                                                 )}
                                                                                 {visibleColumns.end_date && (
                                                                                     <th 
-                                                                                        className="px-3 py-2 text-left font-semibold w-[120px] cursor-pointer hover:bg-slate-100"
+                                                                                        className="px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                                         onClick={() => handleActivitySort('end_date')}
                                                                                     >
                                                                                         End date {activitySortField === 'end_date' && (activitySortDirection === 'asc' ? '↑' : '↓')}
@@ -4634,7 +5182,7 @@ export default function KeyAreas() {
                                                                                 )}
                                                                                 {visibleColumns.deadline && (
                                                                                     <th 
-                                                                                        className="px-3 py-2 text-left font-semibold w-[120px] cursor-pointer hover:bg-slate-100"
+                                                                                        className="px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                                         onClick={() => handleActivitySort('deadline')}
                                                                                     >
                                                                                         Deadline {activitySortField === 'deadline' && (activitySortDirection === 'asc' ? '↑' : '↓')}
@@ -4642,7 +5190,7 @@ export default function KeyAreas() {
                                                                                 )}
                                                                                 {visibleColumns.duration && (
                                                                                     <th 
-                                                                                        className="px-3 py-2 text-left font-semibold w-[90px] cursor-pointer hover:bg-slate-100"
+                                                                                        className="px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                                         onClick={() => handleActivitySort('duration')}
                                                                                     >
                                                                                         Duration {activitySortField === 'duration' && (activitySortDirection === 'asc' ? '↑' : '↓')}
@@ -4650,7 +5198,7 @@ export default function KeyAreas() {
                                                                                 )}
                                                                                 {visibleColumns.completed && (
                                                                                     <th 
-                                                                                        className="px-3 py-2 text-left font-semibold w-[120px] cursor-pointer hover:bg-slate-100"
+                                                                                        className="px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                                         onClick={() => handleActivitySort('completed')}
                                                                                     >
                                                                                         Completed {activitySortField === 'completed' && (activitySortDirection === 'asc' ? '↑' : '↓')}
@@ -4661,9 +5209,26 @@ export default function KeyAreas() {
                                                                         <tbody>
                                                                             {list.map((a) => (
                                                                                 <tr key={a.id} className="bg-white border-b border-slate-100">
+                                                                                    <td className="px-3 py-2 align-top w-12">
+                                                                                        <div className="relative inline-flex items-center gap-2">
+                                                                                            <input
+                                                                                                type="checkbox"
+                                                                                                aria-label={`Select ${a.text || a.activity_name || 'activity'}`}
+                                                                                                checked={selectedActivityIdsInPanel.has(a.id)}
+                                                                                                onChange={() => {
+                                                                                                    setSelectedActivityIdsInPanel((prev) => {
+                                                                                                        const next = new Set(prev);
+                                                                                                        if (next.has(a.id)) next.delete(a.id);
+                                                                                                        else next.add(a.id);
+                                                                                                        return next;
+                                                                                                    });
+                                                                                                }}
+                                                                                            />
+                                                                                            <ActivityRowMenu activity={a} taskId={selectedTaskInPanel?.id} />
+                                                                                        </div>
+                                                                                    </td>
                                                                                     <td className="px-3 py-2 align-top w-[240px] overflow-hidden">
                                                                                         <div className="flex items-center gap-2">
-                                                                                            <ActivityRowMenu activity={a} taskId={selectedTaskInPanel?.id} />
                                                                                             <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" className="w-4 h-4 shrink-0" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg" style={{ color: selectedKA?.color || 'rgb(16, 185, 129)' }}>
                                                                                                 <path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z"></path>
                                                                                             </svg>
@@ -4702,10 +5267,10 @@ export default function KeyAreas() {
                                                                                         </div>
                                                                                     </td>
                                                                                     {visibleColumns.responsible && (
-                                                                                        <td className="px-3 py-2 align-top text-slate-800 w-[140px]">
+                                                                                        <td className="px-3 py-2 align-top text-slate-800 w-[96px]">
                                                                                             {Array.isArray(users) && users.length ? (
                                                                                                 <select
-                                                                                                    className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-sm w-20"
+                                                                                                    className="w-full min-w-0 rounded-md border border-slate-300 bg-white px-2 py-0.5 text-sm"
                                                                                                     value={resolveAssignee({ activity: a, taskAssignee: selectedTaskInPanel?.assignee, users, currentUserId }).selectValue}
                                                                                                     onChange={(e) => updateActivityField(a, selectedTaskInPanel?.id, 'assignee', e.target.value)}
                                                                                                     disabled={savingActivityIds.has(a.id)}
@@ -4719,15 +5284,15 @@ export default function KeyAreas() {
                                                                                         </td>
                                                                                     )}
                                                                                     {visibleColumns.status !== false && (
-                                                                                        <td className="px-3 py-2 align-top w-[120px]">
-                                                                                            <div className="flex items-center gap-2">
+                                                                                        <td className="px-3 py-2 align-top w-[96px]">
+                                                                                            <div className="flex w-full items-center gap-2">
                                                                                                 <span className={`inline-block w-2.5 h-2.5 rounded-full ${String(a.status || '').toLowerCase() === 'done' ? 'bg-emerald-500' : String(a.status || '').toLowerCase() === 'in_progress' ? 'bg-blue-500' : 'bg-slate-400'}`} aria-hidden="true" />
-                                                                                                <div>
+                                                                                                <div className="min-w-0 flex-1">
                                                                                                     <select
                                                                                                         value={a.status || 'open'}
                                                                                                         onChange={(e) => updateActivityField(a, selectedTaskInPanel?.id, 'status', e.target.value)}
                                                                                                         disabled={savingActivityIds.has(a.id)}
-                                                                                                        className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-sm w-18"
+                                                                                                        className="w-full min-w-0 rounded-md border border-slate-300 bg-white px-2 py-0.5 text-sm"
                                                                                                         aria-label={`Change status for ${a.text || 'activity'}`}
                                                                                                     >
                                                                                                         <option value="open">Open</option>
@@ -4739,7 +5304,7 @@ export default function KeyAreas() {
                                                                                         </td>
                                                                                     )}
                                                                                     {visibleColumns.priority && (
-                                                                                        <td className="px-3 py-2 align-top w-[100px]">
+                                                                                        <td className="px-3 py-2 align-top w-[96px]">
                                                                                             {(() => {
                                                                                                 const priorityValue = (function() {
                                                                                                     const raw = a.priority ?? selectedTaskInPanel.priority;
@@ -4749,7 +5314,7 @@ export default function KeyAreas() {
                                                                                                 })();
                                                                                                 return (
                                                                                                     <select
-                                                                                                        className="w-[96px] rounded-md border border-slate-300 bg-white py-0.5 text-sm px-2"
+                                                                                                        className="w-full min-w-0 rounded-md border border-slate-300 bg-white py-0.5 text-sm px-2"
                                                                                                         value={priorityValue}
                                                                                                         onChange={(e) => updateActivityField(a, selectedTaskInPanel?.id, 'priority', e.target.value)}
                                                                                                         disabled={savingActivityIds.has(a.id)}
@@ -4763,11 +5328,11 @@ export default function KeyAreas() {
                                                                                         </td>
                                                                                     )}
                                                                                     {visibleColumns.start_date && (
-                                                                                        <td className="px-3 py-2 align-top text-slate-800 w-[120px]">
-                                                                                            <div className="relative inline-block">
+                                                                                        <td className="px-3 py-2 align-top text-slate-800 w-[96px]">
+                                                                                            <div className="relative block w-full">
                                                                                                 <button
                                                                                                     type="button"
-                                                                                                    className="hover:bg-slate-100 rounded px-1 flex items-center gap-1"
+                                                                                                    className="flex w-full items-center justify-start gap-1 rounded px-1 text-left hover:bg-slate-100"
                                                                                                     onClick={() => {
                                                                                                         const key = `start_${a.id}`;
                                                                                                         setActivityDateEditId(key);
@@ -4797,11 +5362,11 @@ export default function KeyAreas() {
                                                                                         </td>
                                                                                     )}
                                                                                     {visibleColumns.end_date && (
-                                                                                        <td className="px-3 py-2 align-top text-slate-800 w-[120px]">
-                                                                                            <div className="relative inline-block">
+                                                                                        <td className="px-3 py-2 align-top text-slate-800 w-[96px]">
+                                                                                            <div className="relative block w-full">
                                                                                                 <button
                                                                                                     type="button"
-                                                                                                    className="hover:bg-slate-100 rounded px-1 flex items-center gap-1"
+                                                                                                    className="flex w-full items-center justify-start gap-1 rounded px-1 text-left hover:bg-slate-100"
                                                                                                     onClick={() => {
                                                                                                         const key = `end_${a.id}`;
                                                                                                         setActivityDateEditId(key);
@@ -4831,11 +5396,11 @@ export default function KeyAreas() {
                                                                                         </td>
                                                                                     )}
                                                                                     {visibleColumns.deadline && (
-                                                                                        <td className="px-3 py-2 align-top text-slate-800 w-[120px]">
-                                                                                            <div className="relative inline-block">
+                                                                                        <td className="px-3 py-2 align-top text-slate-800 w-[96px]">
+                                                                                            <div className="relative block w-full">
                                                                                                 <button
                                                                                                     type="button"
-                                                                                                    className="hover:bg-slate-100 rounded px-1 flex items-center gap-1"
+                                                                                                    className="flex w-full items-center justify-start gap-1 rounded px-1 text-left hover:bg-slate-100"
                                                                                                     onClick={() => {
                                                                                                         const key = `deadline_${a.id}`;
                                                                                                         setActivityDateEditId(key);
@@ -4865,18 +5430,22 @@ export default function KeyAreas() {
                                                                                         </td>
                                                                                     )}
                                                                                     {visibleColumns.duration && (
-                                                                                        <td className="px-3 py-2 align-top text-slate-800 w-[90px]">{a.duration || '0d'}</td>
+                                                                                        <td className="px-3 py-2 align-top text-slate-800 w-[96px]">
+                                                                                            <div className="w-full text-left">{a.duration || '0d'}</div>
+                                                                                        </td>
                                                                                     )}
                                                                                     {visibleColumns.completed && (
-                                                                                        <td className="px-3 py-2 align-top text-slate-800 w-[120px]">
-                                                                                            {(() => {
-                                                                                                const date = a.completionDate || a.completion_date;
-                                                                                                if (!date) return '';
-                                                                                                try {
-                                                                                                    const d = new Date(date);
-                                                                                                    return d.toISOString().split('T')[0];
-                                                                                                } catch { return ''; }
-                                                                                            })()}
+                                                                                        <td className="px-3 py-2 align-top text-slate-800 w-[96px]">
+                                                                                            <div className="w-full text-left">
+                                                                                                {(() => {
+                                                                                                    const date = a.completionDate || a.completion_date;
+                                                                                                    if (!date) return '';
+                                                                                                    try {
+                                                                                                        const d = new Date(date);
+                                                                                                        return d.toISOString().split('T')[0];
+                                                                                                    } catch { return ''; }
+                                                                                                })()}
+                                                                                            </div>
                                                                                         </td>
                                                                                     )}
                                                                                 </tr>
@@ -4939,84 +5508,95 @@ export default function KeyAreas() {
                         {/* DELEGATED TAB: Two-section layout - pending at top, all delegated below */}
                         {viewTab === 'delegated' && (
                             <div className="flex-1 h-[calc(100vh-200px)] min-h-0 overflow-hidden flex flex-col gap-4" style={{ display: selectedTaskFull ? "none" : undefined }}>
-                                {/* Section 1: Pending Delegations */}
-                                <PendingDelegationsSection
-                                    pendingTasks={pendingDelegations}
-                                    pendingLoading={pendingDelegationsLoading}
-                                    keyAreas={keyAreas}
-                                    onTaskAccept={async (taskId) => {
-                                        // Ensure ?view=delegated is always in the URL
-                                        const params = new URLSearchParams(window.location.search);
-                                        if (params.get('view') !== 'delegated') {
-                                            params.set('view', 'delegated');
-                                            window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
-                                        }
-                                        // Reload ALL delegated tasks from backend to show the newly created accepted task with keyAreaId
-                                        try {
-                                            const delegatedToMe = await taskDelegationService.getDelegatedToMe();
-                                            setAllTasks(delegatedToMe || []);
-                                            // Update pending list by filtering for pending status only
-                                            const pending = (delegatedToMe || []).filter(t => 
-                                                (t.delegationStatus || t.delegation_status) === 'pending' || 
-                                                !(t.delegationStatus || t.delegation_status)
-                                            );
-                                            setPendingDelegations(pending);
-                                        } catch (error) {
-                                            console.error('Failed to reload delegated tasks after accept:', error);
-                                        }
-                                    }}
-                                    onTaskReject={async (taskId) => {
-                                        // Ensure ?view=delegated is always in the URL
-                                        const params = new URLSearchParams(window.location.search);
-                                        if (params.get('view') !== 'delegated') {
-                                            params.set('view', 'delegated');
-                                            window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
-                                        }
-                                        // Reload delegated tasks to refresh the list
-                                        try {
-                                            const delegatedToMe = await taskDelegationService.getDelegatedToMe();
-                                            setAllTasks(delegatedToMe || []);
-                                            // Update pending list by filtering for pending status only
-                                            const pending = (delegatedToMe || []).filter(t => 
-                                                (t.delegationStatus || t.delegation_status) === 'pending' || 
-                                                !(t.delegationStatus || t.delegation_status)
-                                            );
-                                            setPendingDelegations(pending);
-                                        } catch (error) {
-                                            console.error('Failed to reload delegated tasks after reject:', error);
-                                        }
-                                    }}
-                                    getDelegatorName={(task) => {
-                                        // First try to get from delegatedByUser object (enriched by backend)
-                                        if (task.delegatedByUser) {
-                                            return `${task.delegatedByUser.firstName || ''} ${task.delegatedByUser.lastName || ''}`.trim();
-                                        }
-                                        
-                                        // Fallback to delegatedByUserId with users list
-                                        const delegatorId = task.delegatedByUserId || task.delegated_by_user_id;
-                                        const delegator = users.find(u => u.id === delegatorId);
-                                        return delegator ? `${delegator.firstName} ${delegator.lastName}` : 'Unknown';
-                                    }}
-                                    currentUserId={currentUserId}
-                                />
+                                <div
+                                    className={`min-h-[180px] overflow-hidden flex flex-col ${pendingDelegations.length > 0 ? 'flex-1' : 'flex-none'}`}
+                                    style={pendingDelegations.length > 0 ? undefined : { flexBasis: '180px' }}
+                                >
+                                    <UnifiedTaskActivityTable
+                                        viewTab={viewTab}
+                                        title="Pending Delegations"
+                                        tasks={delegatedTasks.filter((item) => {
+                                            const status = getDelegationStatus(item);
+                                            return !status || status === 'pending';
+                                        })}
+                                        activities={delegatedActivities.filter((item) => {
+                                            const status = getDelegationStatus(item);
+                                            return !status || status === 'pending';
+                                        })}
+                                        keyAreas={keyAreas}
+                                        users={users}
+                                        goals={goals}
+                                        currentUserId={currentUserId}
+                                        hideSearch={true}
+                                        delegationActionsEnabled={true}
+                                        onDelegationRefresh={refreshDelegatedData}
+                                        onTaskClick={(task) => {
+                                            setSelectedTaskFull(task);
+                                            setTaskFullInitialTab("details");
+                                        }}
+                                        onActivityClick={(activity) => {
+                                            const task = delegatedTasks.find(t => String(t.id) === String(activity.taskId || activity.task_id));
+                                            if (task) {
+                                                setSelectedTaskFull(task);
+                                                setTaskFullInitialTab("details");
+                                            }
+                                        }}
+                                        onTaskUpdate={async (id, updatedTask) => {
+                                            try {
+                                                await api.updateTask(id, updatedTask);
+                                                await refreshDelegatedData();
+                                            } catch (error) {
+                                                console.error('Failed to update task:', error);
+                                            }
+                                        }}
+                                        onTaskDelete={async (id) => {
+                                            try {
+                                                await api.deleteTask(id);
+                                                await refreshDelegatedData();
+                                            } catch (error) {
+                                                console.error('Failed to delete task:', error);
+                                            }
+                                        }}
+                                        onActivityUpdate={async (id, updatedActivity) => {
+                                            try {
+                                                const activityService = await getActivityService();
+                                                await activityService.update(id, updatedActivity);
+                                                await refreshDelegatedData();
+                                            } catch (error) {
+                                                console.error('Failed to update activity:', error);
+                                            }
+                                        }}
+                                        onActivityDelete={async (id) => {
+                                            try {
+                                                const activityService = await getActivityService();
+                                                await activityService.remove(id);
+                                                await refreshDelegatedData();
+                                            } catch (error) {
+                                                console.error('Failed to delete activity:', error);
+                                            }
+                                        }}
+                                    />
+                                </div>
 
-                                {/* Section 2: All Delegated Tasks with filters */}
                                 <div className="flex-1 min-h-0 flex flex-col">
-                                    <div className="flex-1 min-h-0">
+                                    <div className="flex-1 min-h-0 overflow-hidden">
                                         <UnifiedTaskActivityTable
                                             viewTab={viewTab}
-                                            tasks={allTasks}
-                                            activities={Object.values(activitiesByTask).flat()}
+                                            title="Accepted Delegations"
+                                            tasks={acceptedDelegatedTasks}
+                                            activities={acceptedDelegatedActivities}
                                             keyAreas={keyAreas}
                                             users={users}
                                             goals={goals}
                                             currentUserId={currentUserId}
+                                            hideSearch={true}
+                                            onDelegationRefresh={refreshDelegatedData}
                                             onTaskClick={(task) => {
                                                 setSelectedTaskFull(task);
                                                 setTaskFullInitialTab("details");
                                             }}
                                             onActivityClick={(activity) => {
-                                                const task = allTasks.find(t => String(t.id) === String(activity.taskId || activity.task_id));
+                                                const task = delegatedTasks.find(t => String(t.id) === String(activity.taskId || activity.task_id));
                                                 if (task) {
                                                     setSelectedTaskFull(task);
                                                     setTaskFullInitialTab("details");
@@ -5024,15 +5604,8 @@ export default function KeyAreas() {
                                             }}
                                             onTaskUpdate={async (id, updatedTask) => {
                                                 try {
-                                                    if (updatedTask.delegatedToUserId) {
-                                                        await api.updateTask(id, updatedTask);
-                                                        const svc = await getTaskService();
-                                                        const delegatedToMe = await svc.list({ delegatedTo: true });
-                                                        setAllTasks(delegatedToMe || []);
-                                                    } else {
-                                                        const result = await api.updateTask(id, updatedTask);
-                                                        setAllTasks(prev => prev.map(t => t.id === id ? result : t));
-                                                    }
+                                                    await api.updateTask(id, updatedTask);
+                                                    await refreshDelegatedData();
                                                 } catch (error) {
                                                     console.error('Failed to update task:', error);
                                                 }
@@ -5040,7 +5613,7 @@ export default function KeyAreas() {
                                             onTaskDelete={async (id) => {
                                                 try {
                                                     await api.deleteTask(id);
-                                                    setAllTasks(prev => prev.filter(t => t.id !== id));
+                                                    await refreshDelegatedData();
                                                 } catch (error) {
                                                     console.error('Failed to delete task:', error);
                                                 }
@@ -5048,14 +5621,8 @@ export default function KeyAreas() {
                                             onActivityUpdate={async (id, updatedActivity) => {
                                                 try {
                                                     const activityService = await getActivityService();
-                                                    const result = await activityService.update(id, updatedActivity);
-                                                    setActivitiesByTask(prev => {
-                                                        const updated = { ...prev };
-                                                        for (let key in updated) {
-                                                            updated[key] = updated[key].map(a => a.id === id ? result : a);
-                                                        }
-                                                        return updated;
-                                                    });
+                                                    await activityService.update(id, updatedActivity);
+                                                    await refreshDelegatedData();
                                                 } catch (error) {
                                                     console.error('Failed to update activity:', error);
                                                 }
@@ -5064,13 +5631,7 @@ export default function KeyAreas() {
                                                 try {
                                                     const activityService = await getActivityService();
                                                     await activityService.remove(id);
-                                                    setActivitiesByTask(prev => {
-                                                        const updated = { ...prev };
-                                                        for (let key in updated) {
-                                                            updated[key] = updated[key].filter(a => a.id !== id);
-                                                        }
-                                                        return updated;
-                                                    });
+                                                    await refreshDelegatedData();
                                                 } catch (error) {
                                                     console.error('Failed to delete activity:', error);
                                                 }
@@ -5093,17 +5654,10 @@ export default function KeyAreas() {
                                         users={users}
                                         goals={goals}
                                         currentUserId={currentUserId}
-                                        onTaskClick={(task) => {
-                                            setSelectedTaskFull(task);
-                                            setTaskFullInitialTab("activities");
-                                        }}
-                                        onActivityClick={(activity) => {
-                                            const task = allTasks.find(t => String(t.id) === String(activity.taskId || activity.task_id));
-                                            if (task) {
-                                                setSelectedTaskFull(task);
-                                                setTaskFullInitialTab("activities");
-                                            }
-                                        }}
+                                        onTaskClick={openUnifiedTaskDetails}
+                                        onActivityClick={openUnifiedActivityDetails}
+                                        onTaskEdit={editUnifiedTask}
+                                        onActivityEdit={editUnifiedActivity}
                                         onTaskUpdate={async (id, updatedTask) => {
                                             try {
                                                 // If delegation happened, refresh the task list for the current view
@@ -5113,11 +5667,19 @@ export default function KeyAreas() {
                                                     if (viewTab === 'todo') {
                                                         const svc = await getTaskService();
                                                         const allUserTasks = await svc.list({});
-                                                        setAllTasks(allUserTasks || []);
+                                                        setAllTasks(
+                                                            Array.isArray(allUserTasks)
+                                                                ? allUserTasks.map((task) => normalizeTaskForUi(task))
+                                                                : [],
+                                                        );
                                                     } else if (viewTab === 'activity-trap') {
                                                         const svc = await getTaskService();
                                                         const trapTasks = await svc.list({ withoutGoal: true });
-                                                        setAllTasks(trapTasks || []);
+                                                        setAllTasks(
+                                                            Array.isArray(trapTasks)
+                                                                ? trapTasks.map((task) => normalizeTaskForUi(task))
+                                                                : [],
+                                                        );
                                                     } else if (selectedKA) {
                                                         // Active tasks view - reload selected key area tasks
                                                         const rows = await api.listTasks(selectedKA.id);
@@ -5126,7 +5688,15 @@ export default function KeyAreas() {
                                                 } else {
                                                     // Normal update
                                                     const result = await api.updateTask(id, updatedTask);
-                                                    setAllTasks(prev => prev.map(t => t.id === id ? result : t));
+                                                    const normalizedResult = normalizeTaskForUi(
+                                                        result,
+                                                        updatedTask?.key_area_id || updatedTask?.keyAreaId || null,
+                                                    );
+                                                    setAllTasks((prev) =>
+                                                        prev.map((task) =>
+                                                            String(task.id) === String(id) ? normalizedResult : task,
+                                                        ),
+                                                    );
                                                 }
                                             } catch (error) {
                                                 console.error('Failed to update task:', error);
@@ -5135,7 +5705,14 @@ export default function KeyAreas() {
                                         onTaskDelete={async (id) => {
                                             try {
                                                 await api.deleteTask(id);
-                                                setAllTasks(prev => prev.filter(t => t.id !== id));
+                                                setAllTasks((prev) =>
+                                                    prev.filter((task) => String(task.id) !== String(id)),
+                                                );
+                                                setActivitiesByTask((prev) => {
+                                                    const updated = { ...prev };
+                                                    delete updated[String(id)];
+                                                    return updated;
+                                                });
                                             } catch (error) {
                                                 console.error('Failed to delete task:', error);
                                             }
@@ -5144,11 +5721,28 @@ export default function KeyAreas() {
                                             try {
                                                 const activityService = await getActivityService();
                                                 const result = await activityService.update(id, updatedActivity);
+                                                const normalizedResult = normalizeActivity(result || {});
                                                 // Update the activities in state
-                                                setActivitiesByTask(prev => {
+                                                setActivitiesByTask((prev) => {
                                                     const updated = { ...prev };
-                                                    for (let key in updated) {
-                                                        updated[key] = updated[key].map(a => a.id === id ? result : a);
+                                                    for (const key of Object.keys(updated)) {
+                                                        updated[key] = updated[key].map((activity) =>
+                                                            String(activity.id) === String(id)
+                                                                ? normalizeActivityWithTask(
+                                                                    normalizedResult,
+                                                                    allTasks.find(
+                                                                        (task) =>
+                                                                            String(task.id) ===
+                                                                            String(
+                                                                                normalizedResult.taskId ||
+                                                                                    normalizedResult.task_id ||
+                                                                                    activity.taskId ||
+                                                                                    activity.task_id,
+                                                                            ),
+                                                                    ) || activity,
+                                                                )
+                                                                : activity,
+                                                        );
                                                     }
                                                     return updated;
                                                 });
@@ -5161,10 +5755,12 @@ export default function KeyAreas() {
                                                 const activityService = await getActivityService();
                                                 await activityService.remove(id);
                                                 // Remove the activity from state
-                                                setActivitiesByTask(prev => {
+                                                setActivitiesByTask((prev) => {
                                                     const updated = { ...prev };
-                                                    for (let key in updated) {
-                                                        updated[key] = updated[key].filter(a => a.id !== id);
+                                                    for (const key of Object.keys(updated)) {
+                                                        updated[key] = updated[key].filter(
+                                                            (activity) => String(activity.id) !== String(id),
+                                                        );
                                                     }
                                                     return updated;
                                                 });
@@ -5172,13 +5768,20 @@ export default function KeyAreas() {
                                                 console.error('Failed to delete activity:', error);
                                             }
                                         }}
-                                        onMassEdit={(selected) => {
+                                        onMassEdit={async (selected) => {
                                             const taskIds = Array.isArray(selected?.taskIds)
                                                 ? selected.taskIds.map((id) => String(id))
                                                 : [];
-                                            if (taskIds.length === 0) return;
-                                            setSelectedIds(new Set(taskIds));
-                                            setShowMassEditModal(true);
+                                            const activityIds = Array.isArray(selected?.activityIds)
+                                                ? selected.activityIds.map((id) => String(id))
+                                                : [];
+                                            if ((taskIds.length === 0 && activityIds.length === 0) || !selected?.field) return;
+                                            await handleBulkFieldSave(
+                                                selected.field,
+                                                selected.value,
+                                                taskIds,
+                                                activityIds,
+                                            );
                                         }}
                                     />
                                 </div>
@@ -5445,67 +6048,44 @@ export default function KeyAreas() {
                             </div>
                         )}
 
-                        {/* Mass Edit Modal */}
-                        {showMassEditModal && selectedIds.size > 0 && (
-                            <EditTaskModal
-                                isOpen={true}
-                                initialData={{
-                                    type: 'bulk',
-                                    count: selectedIds.size,
-                                    key_area_id: (() => {
-                                        const firstId = Array.from(selectedIds)[0];
-                                        const firstTask = allTasks.find((t) => String(t.id) === String(firstId));
-                                        return firstTask?.key_area_id || firstTask?.keyAreaId || selectedKA?.id || null;
-                                    })(),
-                                }}
-                                onSave={async (payload) => {
-                                    // Apply bulk edit to all selected tasks
-                                    const updates = [];
-                                    for (const id of Array.from(selectedIds)) {
-                                        const original = allTasks.find((t) => String(t.id) === String(id));
-                                        if (!original) continue;
-                                        const next = { ...original };
-                                        
-                                        // Apply only the fields that are being edited
-                                        if (payload.assignee) next.assignee = payload.assignee;
-                                        if (payload.status) next.status = payload.status;
-                                        if (payload.priority) next.priority = payload.priority;
-                                        if (payload.start_date) next.start_date = payload.start_date;
-                                        if (payload.deadline) next.deadline = payload.deadline;
-                                        if (payload.end_date) next.end_date = payload.end_date;
-                                        
-                                        next.eisenhower_quadrant = computeEisenhowerQuadrant({
-                                            deadline: next.deadline,
-                                            end_date: next.end_date,
-                                            start_date: next.start_date,
-                                            priority: next.priority,
-                                            status: next.status,
-                                            key_area_id: next.key_area_id,
-                                        });
-                                        
-                                        // eslint-disable-next-line no-await-in-loop
-                                        const saved = await api.updateTask(next.id, next);
-                                        updates.push(saved);
-                                    }
-                                    
-                                    // Update state
-                                    setAllTasks((prev) => {
-                                        const map = new Map(prev.map((t) => [String(t.id), t]));
-                                        updates.forEach((u) => map.set(String(u.id), { ...map.get(String(u.id)), ...u }));
-                                        return Array.from(map.values());
-                                    });
-                                    
-                                    setShowMassEditModal(false);
-                                    clearSelection();
-                                }}
-                                onCancel={() => setShowMassEditModal(false)}
-                                isSaving={false}
-                                keyAreas={keyAreas}
-                                users={users}
-                                goals={goals}
-                                availableLists={availableListNumbers}
-                            />
-                        )}
+                        <BulkFieldPickerModal
+                            isOpen={showMassFieldPicker}
+                            title="Select field"
+                            fields={[
+                                { value: 'assignee', label: 'Responsible' },
+                                { value: 'status', label: 'Status' },
+                                { value: 'priority', label: 'Priority' },
+                                { value: 'duration', label: 'Duration' },
+                                { value: 'key_area_bundle', label: 'Key Area' },
+                                { value: 'date', label: 'Date' },
+                            ]}
+                            users={users}
+                            keyAreas={keyAreas}
+                            availableLists={availableListNumbers}
+                            listNamesByKeyArea={listNames}
+                            onCancel={() => {
+                                setShowMassFieldPicker(false);
+                                setMassEditField(null);
+                            }}
+                            onSave={handleBulkFieldSave}
+                        />
+
+                        <BulkFieldPickerModal
+                            isOpen={showActivityMassFieldPicker}
+                            title="Select field"
+                            fields={[
+                                { value: 'assignee', label: 'Responsible' },
+                                { value: 'status', label: 'Status' },
+                                { value: 'priority', label: 'Priority' },
+                                { value: 'goalId', label: 'Goal' },
+                                { value: 'duration', label: 'Duration' },
+                                { value: 'date', label: 'Date' },
+                            ]}
+                            users={users}
+                            goals={goals}
+                            onCancel={() => setShowActivityMassFieldPicker(false)}
+                            onSave={handleActivityPanelMassFieldSave}
+                        />
                         
                         {/* Modals Container */}
                         <>

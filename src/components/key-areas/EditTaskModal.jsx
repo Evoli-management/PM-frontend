@@ -58,6 +58,7 @@ export default function EditTaskModal({
   parentListNames = null,
   // optional custom modal title (used for mass-editing banner)
   modalTitle = undefined,
+  visibleFields = null,
   // When true, editing a Don't Forget task (no Key Area required)
   isDontForgetMode = false,
 }) {
@@ -338,33 +339,23 @@ export default function EditTaskModal({
           return newTasks;
         });
         const fetchedGoals = Array.isArray(goalsData) ? goalsData : [];
-  setLocalGoals((prev) => {
-    try {
-      if (_idsOf(prev) === _idsOf(fetchedGoals)) return prev;
-    } catch (_) {}
-    return fetchedGoals;
-  });
-        // If the task has a goal id that wasn't included in fetched goals, try to fetch it individually
-        try {
-          const taskGoalId = initialData && (initialData.goal || initialData.goal_id || initialData.goalId);
-          const hasGoal = fetchedGoals.some((g) => String(g.id) === String(taskGoalId));
-          if (taskGoalId && !hasGoal) {
-            const getGoal = (await import('../../services/goalService')).getGoalById;
-            if (typeof getGoal === 'function') {
-              const single = await getGoal(taskGoalId).catch(() => null);
-              if (single) {
-                setLocalGoals((prev) => {
-                  const exists = (prev || []).some((g) => String(g.id) === String(single.id));
-                  if (exists) return prev;
-                  return [single, ...(prev || [])];
-                });
-              }
-            }
-          }
-        } catch (err) {
-          // non-fatal
-          console.warn('Could not fetch single goal for EditTaskModal', err);
+        const taskGoalId = initialData && (initialData.goal || initialData.goal_id || initialData.goalId);
+        const mergedGoals = Array.isArray(fetchedGoals) ? [...fetchedGoals] : [];
+        const hasGoal = mergedGoals.some((g) => String(g.id) === String(taskGoalId));
+        if (taskGoalId && !hasGoal) {
+          mergedGoals.unshift({
+            id: taskGoalId,
+            title: initialData.goalTitle || initialData.goal_name || initialData.goalName || 'Current goal',
+            milestones: [],
+            _missing: true,
+          });
         }
+        setLocalGoals((prev) => {
+          try {
+            if (_idsOf(prev) === _idsOf(mergedGoals)) return prev;
+          } catch (_) {}
+          return mergedGoals;
+        });
       } catch (e) {
         console.error('Failed to load key areas or tasks for EditTaskModal', e);
         if (!ignore) {
@@ -524,6 +515,7 @@ export default function EditTaskModal({
     'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50';
   const dateCls = `${inputCls} appearance-none pr-11 no-calendar`;
   const selectCls = `${inputCls} appearance-none pr-10`;
+  const showField = (field) => !Array.isArray(visibleFields) || visibleFields.length === 0 || visibleFields.includes(field);
 
   return (
     <Modal open={isOpen} onClose={onCancel}>
@@ -578,17 +570,19 @@ export default function EditTaskModal({
           </div>
         </div>
         <form id="edit-task-form" className="pm-notched-form px-4 pb-4 pt-2 space-y-2 overflow-y-auto flex-1" onSubmit={onSubmit}>
+          {showField('title') && (
           <div className="mb-4">
             <label className="text-sm font-medium text-slate-700" htmlFor="edit-task-title">{t("createTaskModal.taskNameLabel")}</label>
             <input autoFocus id="edit-task-title" required className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 mt-0.5" placeholder="Task name" value={title} onChange={(e) => setTitle(e.target.value)} />
           </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-y-4 md:gap-x-6">
             <div className="grid grid-rows-5 gap-0 md:col-span-1">
-              <div style={{ minHeight: '64px' }}>
+              {showField('description') && <div style={{ minHeight: '64px' }}>
                 <label className="text-sm font-medium text-slate-700">{t("createTaskModal.descLabel")}</label>
                 <input className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 mt-0" placeholder="Brief description" value={description} onChange={(e) => setDescription(e.target.value)} />
-              </div>
-              <div style={{ minHeight: '64px' }}>
+              </div>}
+              {showField('start_date') && <div style={{ minHeight: '64px' }}>
                 <label className="text-sm font-medium text-slate-700">{t("createTaskModal.startDateLabel")}</label>
                 <div className="relative mt-0">
                   <input ref={startRef} className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
@@ -606,8 +600,8 @@ export default function EditTaskModal({
                     📅
                   </button>
                 </div>
-              </div>
-              <div style={{ minHeight: '64px' }}>
+              </div>}
+              {showField('end_date') && <div style={{ minHeight: '64px' }}>
                 <label className="text-sm font-medium text-slate-700">{t("createTaskModal.endDateLabel")}</label>
                 <div className="relative mt-0">
                   <input ref={endRef} className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar" type="date" value={endDate} onChange={(e) => { const v = e.target.value; setEndDate(v); setEndAuto(false); if (v && startDate && v < startDate) setStartDate(v); }} />
@@ -625,8 +619,8 @@ export default function EditTaskModal({
                     📅
                   </button>
                 </div>
-              </div>
-              <div style={{ minHeight: '64px' }}>
+              </div>}
+              {showField('deadline') && <div style={{ minHeight: '64px' }}>
                 <label className="text-sm font-medium text-slate-700">{t("createTaskModal.deadlineLabel")}</label>
                 <div className="relative mt-0.5">
                   <input ref={deadlineRef} className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar" type="date" value={deadline} onChange={(e) => { setDeadline(e.target.value); setDeadlineAuto(false); }} />
@@ -645,11 +639,11 @@ export default function EditTaskModal({
                   </button>
                 </div>
                 <p className="mt-0 text-xs text-slate-500" aria-hidden="true">&nbsp;</p>
-              </div>
-              <div style={{ minHeight: '64px' }}>
+              </div>}
+              {showField('duration') && <div style={{ minHeight: '64px' }}>
                 <label className="text-sm font-medium text-slate-700">{t("createTaskModal.durationLabel")}</label>
                 <input className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 mt-0" type="time" step="60" value={duration || ""} onChange={(e) => setDuration(e.target.value)} />
-              </div>
+              </div>}
             </div>
 
             <div className="hidden md:flex md:items-stretch md:justify-center md:col-span-1">
@@ -657,7 +651,7 @@ export default function EditTaskModal({
             </div>
 
             <div className="grid grid-rows-5 gap-0 md:col-span-1">
-              <div style={{ minHeight: '64px' }}>
+              {showField('key_area_id') && <div style={{ minHeight: '64px' }}>
                 <label className="text-sm font-medium text-slate-700">{t("createTaskModal.keyAreaLabel")}</label>
                 <div className="relative mt-0">
                   <select name="key_area_id" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" required="" value={keyAreaId} onChange={(e) => setKeyAreaId(e.target.value)}>
@@ -668,8 +662,8 @@ export default function EditTaskModal({
                   </select>
                   <svg viewBox="0 0 24 24" aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"><path fill="currentColor" d="M6.7 8.7a1 1 0 0 1 1.4 0L12 12.6l3.9-3.9a1 1 0 1 1 1.4 1.4l-4.6 4.6a1 1 0 0 1-1.4 0L6.7 10.1a1 1 0 0 1 0-1.4Z"></path></svg>
                 </div>
-              </div>
-              <div style={{ minHeight: '64px' }}>
+              </div>}
+              {showField('list_index') && <div style={{ minHeight: '64px' }}>
                 <label className="text-sm font-medium text-slate-700">{t("createTaskModal.listLabel")}</label>
                 <div className="relative mt-0">
                   <select name="list_index" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" required="" value={listIndex} onChange={(e) => setListIndex(Number(e.target.value))} disabled={!keyAreaId}>
@@ -690,8 +684,8 @@ export default function EditTaskModal({
                   </select>
                   <svg viewBox="0 0 24 24" aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"><path fill="currentColor" d="M6.7 8.7a1 1 0 0 1 1.4 0L12 12.6l3.9-3.9a1 1 0 1 1 1.4 1.4l-4.6 4.6a1 1 0 0 1-1.4 0L6.7 10.1a1 1 0 0 1 0-1.4Z"></path></svg>
                 </div>
-              </div>
-              <div style={{ minHeight: '64px' }}>
+              </div>}
+              {showField('assignee') && <div style={{ minHeight: '64px' }}>
                 <label className="text-sm font-medium text-slate-700">{t("createTaskModal.responsibleLabel")}</label>
                 <div className="relative mt-0">
                   <select name="assignee" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10 mt-0 h-9" value={assignee} onChange={(e) => setAssignee(e.target.value)}>
@@ -702,8 +696,8 @@ export default function EditTaskModal({
                   </select>
                   <svg viewBox="0 0 24 24" aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"><path fill="currentColor" d="M6.7 8.7a1 1 0 0 1 1.4 0L12 12.6l3.9-3.9a1 1 0 1 1 1.4 1.4l-4.6 4.6a1 1 0 0 1-1.4 0L6.7 10.1a1 1 0 0 1 0-1.4Z"></path></svg>
                 </div>
-              </div>
-              <div style={{ minHeight: '64px' }}>
+              </div>}
+              {showField('priority') && <div style={{ minHeight: '64px' }}>
                 <label className="text-sm font-medium text-slate-700">{t("createTaskModal.priorityLabel")}</label>
                 <div className="relative mt-0">
                   <select
@@ -718,8 +712,8 @@ export default function EditTaskModal({
                   </select>
                   <svg viewBox="0 0 24 24" aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"><path fill="currentColor" d="M6.7 8.7a1 1 0 0 1 1.4 0L12 12.6l3.9-3.9a1 1 0 1 1 1.4 1.4l-4.6 4.6a1 1 0 0 1-1.4 0L6.7 10.1a1 1 0 0 1 0-1.4Z"></path></svg>
                 </div>
-              </div>
-              <div style={{ minHeight: '64px' }}>
+              </div>}
+              {showField('goal_id') && <div style={{ minHeight: '64px' }}>
                 <label className="text-sm font-medium text-slate-700">{t("createTaskModal.goalLabel")}</label>
                 <div className="relative mt-0">
                   <select name="goal" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" value={goal || ""} onChange={(e) => setGoal(e.target.value)}>
@@ -732,7 +726,7 @@ export default function EditTaskModal({
                   </select>
                   <svg viewBox="0 0 24 24" aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"><path fill="currentColor" d="M6.7 8.7a1 1 0 0 1 1.4 0L12 12.6l3.9-3.9a1 1 0 1 1 1.4 1.4l-4.6 4.6a1 1 0 0 1-1.4 0L6.7 10.1a1 1 0 0 1 0-1.4Z"></path></svg>
                 </div>
-              </div>
+              </div>}
             </div>
           </div>
         </form>

@@ -8,6 +8,8 @@ const ActivityRow = ({
   a,
   index,
   listLength,
+  selected = false,
+  onToggleSelect = null,
   toggleComplete,
   savingActivityIds,
   remove,
@@ -81,6 +83,19 @@ const ActivityRow = ({
     <div key={a.id} className="bg-white rounded border border-slate-200 p-2 mb-2">
       <div className="flex flex-col">
         <div className="flex items-center">
+          {typeof onToggleSelect === 'function' && (
+            <input
+              type="checkbox"
+              className="mr-2"
+              checked={selected}
+              onChange={(e) => {
+                e.stopPropagation();
+                onToggleSelect(a.id);
+              }}
+              onClick={(e) => e.stopPropagation()}
+              aria-label={`Select ${(a.text || a.activity_name || 'activity').trim() || 'activity'}`}
+            />
+          )}
           <button
             type="button"
             disabled={isSaving}

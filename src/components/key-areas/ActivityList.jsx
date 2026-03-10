@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import EmptyState from '../../components/goals/EmptyState.jsx';
 import ActivityRow from './ActivityRow';
 import { normalizeActivity, mapUiStatusToServer } from '../../utils/keyareasHelpers';
+import BulkFieldPickerModal from '../shared/BulkFieldPickerModal';
 
 // Lazy service getter to avoid circular imports
 let _activityService = null;
@@ -26,16 +27,71 @@ export default function ActivityList({
     // optional users for responsible dropdown
     users = [],
     currentUserId = null,
+    goals = [],
 }) {
     const { t } = useTranslation();
     if (!task || !task.id) return null;
     const taskKey = String(task.id);
     const list = (activitiesByTask[taskKey] || []).slice();
+    const [selectedActivityIds, setSelectedActivityIds] = React.useState(new Set());
+    const [showMassFieldPicker, setShowMassFieldPicker] = React.useState(false);
 
     const setList = (updater) => {
         const nextList = typeof updater === 'function' ? updater(list) : updater;
         setActivitiesByTask((prev) => ({ ...prev, [taskKey]: nextList }));
     };
+
+    React.useEffect(() => {
+        setSelectedActivityIds((prev) => {
+            const next = new Set(
+                Array.from(prev).filter((id) => list.some((a) => String(a.id) === String(id))),
+            );
+            return next.size === prev.size ? prev : next;
+        });
+    }, [list]);
+
+    const toggleSelectActivity = (id) => {
+        setSelectedActivityIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    React.useEffect(() => {
+        window.dispatchEvent(
+            new CustomEvent('ka-activity-selection-change', {
+                detail: { taskId: taskKey, count: selectedActivityIds.size },
+            }),
+        );
+    }, [selectedActivityIds.size, taskKey]);
+
+    React.useEffect(() => {
+        const onMassAction = async (event) => {
+            const requestedTaskId = String(event?.detail?.taskId || '');
+            if (requestedTaskId !== taskKey) return;
+            if (selectedActivityIds.size === 0) return;
+            const action = event?.detail?.action;
+            if (action === 'edit') {
+                setShowMassFieldPicker(true);
+                return;
+            }
+            if (action === 'delete') {
+                const selected = list.filter((a) => selectedActivityIds.has(a.id));
+                const confirmed = window.confirm(t('unifiedTable.confirmDeleteSelected') || 'Delete selected items?');
+                if (!confirmed) return;
+                for (const activity of selected) {
+                    // eslint-disable-next-line no-await-in-loop
+                    await remove(activity.id);
+                }
+                setSelectedActivityIds(new Set());
+            }
+        };
+
+        window.addEventListener('ka-activity-mass-action', onMassAction);
+        return () => window.removeEventListener('ka-activity-mass-action', onMassAction);
+    }, [list, remove, selectedActivityIds, taskKey, t]);
 
     // Generic single-field update for activities with optimistic UI
     const updateActivityField = async (id, key, value) => {
@@ -169,8 +225,56 @@ export default function ActivityList({
         }
     };
 
+    const handleMassEdit = async (field, value) => {
+        const selected = list.filter((a) => selectedActivityIds.has(a.id));
+        if (selected.length === 0) return;
+
+        for (const activity of selected) {
+            if (field === 'date') {
+                // eslint-disable-next-line no-await-in-loop
+                await updateActivityField(activity.id, 'startDate', value?.start_date || null);
+                // eslint-disable-next-line no-await-in-loop
+                await updateActivityField(activity.id, 'endDate', value?.end_date || null);
+                // eslint-disable-next-line no-await-in-loop
+                await updateActivityField(activity.id, 'deadline', value?.deadline || null);
+            } else if (field === 'assignee') {
+                // eslint-disable-next-line no-await-in-loop
+                await updateActivityField(activity.id, 'assignee', value || null);
+            } else if (field === 'goalId') {
+                // eslint-disable-next-line no-await-in-loop
+                await updateActivityField(activity.id, 'goalId', value || null);
+            } else if (field === 'duration') {
+                // eslint-disable-next-line no-await-in-loop
+                await updateActivityField(activity.id, 'duration', value || null);
+            } else {
+                // eslint-disable-next-line no-await-in-loop
+                await updateActivityField(activity.id, field, value);
+            }
+        }
+
+        setSelectedActivityIds(new Set());
+        setShowMassFieldPicker(false);
+    };
+
     return (
         <div className="space-y-2">
+            <BulkFieldPickerModal
+                isOpen={showMassFieldPicker}
+                title="Select field"
+                fields={[
+                    { value: 'assignee', label: 'Responsible' },
+                    { value: 'status', label: 'Status' },
+                    { value: 'priority', label: 'Priority' },
+                    { value: 'goalId', label: 'Goal' },
+                    { value: 'duration', label: 'Duration' },
+                    { value: 'date', label: 'Date' },
+                ]}
+                users={users}
+                goals={goals}
+                onCancel={() => setShowMassFieldPicker(false)}
+                onSave={handleMassEdit}
+            />
+
             {list.length === 0 ? (
                 <EmptyState title={t('activityList.emptyTitle')} hint={t('activityList.emptyHint')} />
             ) : (
@@ -181,6 +285,8 @@ export default function ActivityList({
                             a={a}
                             index={index}
                             listLength={list.length}
+                            selected={selectedActivityIds.has(a.id)}
+                            onToggleSelect={toggleSelectActivity}
                             toggleComplete={toggleComplete}
                             savingActivityIds={savingActivityIds}
                             remove={remove}
