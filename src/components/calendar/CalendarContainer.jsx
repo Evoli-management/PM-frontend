@@ -272,7 +272,7 @@ const CalendarContainer = () => {
         if (!syncActive) return;
         const id = setInterval(() => {
             setRefreshTick((t) => t + 1);
-        }, 10000); // refresh every 10s
+        }, 5000); // refresh every 5s
         return () => clearInterval(id);
     }, [syncActive]);
 
