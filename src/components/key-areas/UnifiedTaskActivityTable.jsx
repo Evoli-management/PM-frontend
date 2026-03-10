@@ -1513,65 +1513,66 @@ export default function UnifiedTaskActivityTable({
                 )}
             </div>
 
-            {/* Accept Delegation Modal - Styled to match app theme */}
+            {/* Accept Delegation Modal */}
             {showAcceptModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
-                    <div className="bg-[#2c3e50] rounded-lg shadow-2xl w-full max-w-md border border-gray-600">
+                    <div className="relative bg-white border border-slate-300 rounded-xl shadow-2xl overflow-hidden w-full max-w-md">
                         {/* Header */}
-                        <div className="flex items-center justify-between p-4 border-b border-gray-600">
-                            <div className="flex items-center gap-2">
-                                <FaCheck className="text-green-400" />
-                                <h2 className="text-lg font-semibold text-white">
-                                    Accept Delegation
-                                </h2>
+                        <div className="bg-white text-slate-900 border-b border-slate-200 py-3 px-4 font-semibold">
+                            <div className="relative flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <FaCheck className="text-green-600" />
+                                    <h2 className="text-lg font-semibold text-slate-900">
+                                        Accept Delegation
+                                    </h2>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        setShowAcceptModal(false);
+                                        setAcceptingTask(null);
+                                        setAcceptingActivity(null);
+                                        setSelectedKeyArea('');
+                                        setSelectedTaskForActivity('');
+                                        setUserTasks([]);
+                                    }}
+                                    className="p-2 rounded-md text-slate-600 hover:text-slate-800 hover:bg-slate-100"
+                                >
+                                    <FaTimes />
+                                </button>
                             </div>
-                            <button
-                                onClick={() => {
-                                    setShowAcceptModal(false);
-                                    setAcceptingTask(null);
-                                    setAcceptingActivity(null);
-                                    setSelectedKeyArea('');
-                                    setSelectedTaskForActivity('');
-                                    setUserTasks([]);
-                                }}
-                                className="text-gray-400 hover:text-white"
-                            >
-                                <FaTimes />
-                            </button>
                         </div>
 
                         {/* Body */}
                         <div className="p-4">
                             {acceptingTask && (
-                                <div className="bg-[#34495e] p-3 rounded-lg mb-4 border border-gray-600">
-                                    <p className="text-sm text-gray-400 mb-1">Task:</p>
-                                    <p className="font-medium text-white">
+                                <div className="bg-slate-50 p-3 rounded-lg mb-4 border border-slate-200">
+                                    <p className="text-sm text-slate-500 mb-1">Task:</p>
+                                    <p className="font-medium text-slate-900">
                                         {acceptingTask.title}
                                     </p>
                                 </div>
                             )}
                             
                             {acceptingActivity && (
-                                <div className="bg-[#34495e] p-3 rounded-lg mb-4 border border-gray-600">
-                                    <p className="text-sm text-gray-400 mb-1">Activity:</p>
-                                    <p className="font-medium text-white">
+                                <div className="bg-slate-50 p-3 rounded-lg mb-4 border border-slate-200">
+                                    <p className="text-sm text-slate-500 mb-1">Activity:</p>
+                                    <p className="font-medium text-slate-900">
                                         {acceptingActivity.text}
                                     </p>
                                 </div>
                             )}
 
                             <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-300 mb-2">
-                                    Select Key Area <span className="text-red-400">*</span>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                    Select Key Area <span className="text-red-500">*</span>
                                 </label>
-                                <p className="text-xs text-gray-400 mb-2">
+                                <p className="text-xs text-slate-500 mb-2">
                                     Choose which Key Area to add this {acceptingTask ? 'task' : 'activity'} to
                                 </p>
                                 <select
                                     value={selectedKeyArea}
                                     onChange={(e) => acceptingActivity ? handleKeyAreaChangeForActivity(e.target.value) : setSelectedKeyArea(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-600 rounded-lg 
-                                             bg-[#34495e] text-white focus:ring-2 focus:ring-blue-500 
+                                    className="w-full h-10 rounded-lg border border-slate-300 px-3 text-sm bg-white shadow-sm placeholder-slate-400 text-slate-900 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 
                                              focus:border-transparent"
                                 >
                                     <option value="">-- Select a Key Area --</option>
@@ -1585,8 +1586,8 @@ export default function UnifiedTaskActivityTable({
                             
                             {/* Task selector for activities (accept-into-task feature) */}
                             {acceptingActivity && selectedKeyArea && (
-                                <div className="mb-4">
-                                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                                <div className="mb-4 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">
                                         How would you like to proceed?
                                     </label>
                                     <div className="flex flex-col gap-2">
@@ -1598,7 +1599,7 @@ export default function UnifiedTaskActivityTable({
                                                 checked={!selectedTaskForActivity}
                                                 onChange={() => setSelectedTaskForActivity('')}
                                             />
-                                            <span className="text-gray-200">Add as <b>new Task</b> in Key Area</span>
+                                            <span className="text-sm text-slate-700">Add as a <b>new Task</b> in Key Areas</span>
                                         </label>
                                         <label className="flex items-center gap-2">
                                             <input
@@ -1610,20 +1611,19 @@ export default function UnifiedTaskActivityTable({
                                                     if (userTasks.length > 0) setSelectedTaskForActivity(userTasks[0].id);
                                                 }}
                                             />
-                                            <span className="text-gray-200">Attach as <b>Activity</b> under an existing Task</span>
+                                            <span className="text-sm text-slate-700">Add as Activity to <b>existing Task</b></span>
                                         </label>
                                     </div>
                                     {/* Only show task select if "Attach as Activity" is chosen */}
                                     {!!selectedTaskForActivity && (
-                                        <div className="mt-2 p-2 border-l-4 border-orange-400 bg-orange-100 bg-opacity-10 rounded">
-                                            <label className="block text-xs font-medium text-orange-300 mb-1">
+                                        <div className="mt-3 p-2 border-l-4 border-slate-300 bg-white rounded">
+                                            <label className="block text-xs font-medium text-slate-700 mb-1">
                                                 Select Task to attach Activity
                                             </label>
                                             <select
                                                 value={selectedTaskForActivity}
                                                 onChange={(e) => setSelectedTaskForActivity(e.target.value)}
-                                                className="w-full px-3 py-2 border border-gray-600 rounded-lg 
-                                                         bg-[#34495e] text-white focus:ring-2 focus:ring-blue-500 
+                                                className="w-full h-10 rounded-lg border border-slate-300 px-3 text-sm bg-white shadow-sm placeholder-slate-400 text-slate-900 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 
                                                          focus:border-transparent"
                                             >
                                                 {userTasks.map((task) => (
@@ -1632,7 +1632,7 @@ export default function UnifiedTaskActivityTable({
                                                     </option>
                                                 ))}
                                             </select>
-                                            <p className="text-xs text-orange-300 mt-1">
+                                            <p className="text-xs text-slate-500 mt-1">
                                                 The activity will be added under the selected task.
                                             </p>
                                         </div>
@@ -1642,7 +1642,7 @@ export default function UnifiedTaskActivityTable({
                         </div>
 
                         {/* Footer */}
-                        <div className="flex items-center justify-end gap-2 p-4 border-t border-gray-600">
+                        <div className="flex items-center justify-end gap-2 p-4 border-t border-slate-200">
                             <button
                                 onClick={() => {
                                     setShowAcceptModal(false);
@@ -1652,7 +1652,7 @@ export default function UnifiedTaskActivityTable({
                                     setSelectedTaskForActivity('');
                                     setUserTasks([]);
                                 }}
-                                className="px-4 py-2 text-sm font-medium text-gray-300 hover:bg-[#34495e] 
+                                className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 
                                          rounded-lg transition"
                             >
                                 Cancel
