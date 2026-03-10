@@ -34,33 +34,18 @@ export const getGoals = async (filters = {}) => {
         if (filters.keyAreaId) params.append('keyAreaId', filters.keyAreaId);
         if (filters.parentId !== undefined) params.append('parentId', filters.parentId);
         if (filters.q) params.append('q', filters.q);
+        params.append('includeMilestones', 'true');
         
         const queryString = params.toString();
         const url = queryString ? `/goals?${queryString}` : "/goals";
         const response = await apiClient.get(url);
+        if (!Array.isArray(response.data)) return response.data;
 
-        // The backend findAll doesn't include milestones, so we need to fetch them separately
-        if (Array.isArray(response.data)) {
-            // For each goal, fetch the detailed version with milestones
-            const goalsWithMilestones = await Promise.all(
-                response.data.map(async (goal) => {
-                    try {
-                        const detailedGoal = await getGoalById(goal.id);
-                        return detailedGoal;
-                    } catch (error) {
-                        console.warn(`Failed to fetch milestones for goal ${goal.id}:`, error);
-                        // Return goal with empty milestones array if individual fetch fails
-                        return {
-                            ...goal,
-                            milestones: [],
-                        };
-                    }
-                }),
-            );
-            return goalsWithMilestones;
-        }
-
-        return response.data;
+        return response.data.map((goal) => ({
+            ...goal,
+            milestones: Array.isArray(goal?.milestones) ? goal.milestones : [],
+            raci: Array.isArray(goal?.raci) ? goal.raci : [],
+        }));
     } catch (error) {
         handleError("fetching goals", error);
     }
