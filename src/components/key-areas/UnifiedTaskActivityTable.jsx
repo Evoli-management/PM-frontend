@@ -73,6 +73,7 @@ export default function UnifiedTaskActivityTable({
     const bodyScrollRef = useRef(null);
     const [bodyScrollbarWidth, setBodyScrollbarWidth] = useState(0);
     const [showMassFieldPicker, setShowMassFieldPicker] = useState(false);
+    const rowMenuInstanceIdRef = useRef(`utm-row-menu-${Math.random().toString(36).slice(2)}`);
 
     useEffect(() => {
         if (!openRowMenuId) return;
@@ -103,6 +104,18 @@ export default function UnifiedTaskActivityTable({
             window.removeEventListener('scroll', updateRowMenuPos, true);
         };
     }, [openRowMenuId, rowMenuButtonEl]);
+
+    useEffect(() => {
+        const onExternalRowMenuOpen = (event) => {
+            const sourceId = event?.detail?.sourceId;
+            if (!sourceId || sourceId === rowMenuInstanceIdRef.current) return;
+            setOpenRowMenuId(null);
+            setRowMenuButtonEl(null);
+        };
+
+        window.addEventListener('unified-task-row-menu-open', onExternalRowMenuOpen);
+        return () => window.removeEventListener('unified-task-row-menu-open', onExternalRowMenuOpen);
+    }, []);
 
     const getRowMenuPosition = (buttonEl) => {
         if (!buttonEl || typeof buttonEl.getBoundingClientRect !== 'function') {
@@ -901,7 +914,7 @@ export default function UnifiedTaskActivityTable({
                 </th>
             )}
             {delegationActionsEnabled && (
-                <th className="w-28 px-2 sm:px-3 py-2 text-left font-semibold bg-slate-50">
+                <th className="sticky top-0 z-20 w-28 px-2 sm:px-3 py-2 text-left font-semibold bg-slate-50">
                     {t("pendingDelegationsSection.colActions")}
                 </th>
             )}
@@ -1249,6 +1262,9 @@ export default function UnifiedTaskActivityTable({
                                                                 setRowMenuButtonEl(null);
                                                                 return item.itemId;
                                                             }
+                                                            window.dispatchEvent(new CustomEvent('unified-task-row-menu-open', {
+                                                                detail: { sourceId: rowMenuInstanceIdRef.current },
+                                                            }));
                                                             setRowMenuPos(getRowMenuPosition(btnEl));
                                                             setRowMenuButtonEl(btnEl);
                                                             return item.itemId;
