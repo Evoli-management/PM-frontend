@@ -1500,7 +1500,7 @@ export default function UnifiedTaskActivityTable({
                         </tbody>
                     </table>
                 ) : (
-                    <div className="flex min-h-[220px] items-center justify-center px-4 py-10 overflow-visible">
+                    <div className="flex min-h-[220px] items-start justify-center px-4 pt-8 pb-10 overflow-visible">
                         <div className="text-center overflow-visible">
                             <h3 className="mb-2 text-xl font-bold text-slate-900">
                                 No items found
