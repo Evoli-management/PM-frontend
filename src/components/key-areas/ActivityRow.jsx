@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import { FaSpinner, FaCheckCircle, FaRegCircle, FaAlignJustify, FaTag, FaTrash, FaEdit, FaAngleDoubleRight, FaChevronUp, FaChevronDown, FaEllipsisV } from 'react-icons/fa';
 import { toDateOnly, getPriorityLabel, mapUiStatusToServer, getStatusColorClass, getPriorityColorClass, resolveAssignee } from '../../utils/keyareasHelpers';
+import { durationToTimeInputValue } from '../../utils/duration';
 
 const ActivityRow = ({
   a,
@@ -36,6 +37,10 @@ const ActivityRow = ({
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
   const menuRef = useRef(null);
   const menuBtnRef = useRef(null);
+  const startDateValue = toDateOnly(a.start_date || a.startDate) || '';
+  const endDateValue = toDateOnly(a.end_date || a.endDate) || '';
+  const durationRaw = String(a.duration ?? '').trim();
+  const durationInputValue = durationToTimeInputValue(a.duration);
   useEffect(() => {
     if (!menuOpen) return;
     const onDown = (e) => {
@@ -313,23 +318,67 @@ const ActivityRow = ({
           <div className="text-xs text-slate-500">{t("activityRow.start")}</div>
           {typeof updateField === 'function' ? (
             editingKey === 'start_date' ? (
-              <input autoFocus type="date" className="border rounded px-1 py-0.5 text-sm" value={toDateOnly(a.start_date) || ''} onChange={async (e) => { try { await updateField && updateField(a.id, 'start_date', e.target.value); } catch (err) {} setEditingKey(null); }} onBlur={() => setEditingKey(null)} />
+              <input autoFocus type="date" className="border rounded px-1 py-0.5 text-sm" value={startDateValue} onChange={async (e) => { try { await updateField && updateField(a.id, 'start_date', e.target.value); } catch (err) {} setEditingKey(null); }} onBlur={() => setEditingKey(null)} />
             ) : (
-              <button className="hover:bg-slate-50 rounded px-1" onClick={(e) => { e.stopPropagation(); setEditingKey('start_date'); }} title="Edit start date">{toDateOnly(a.start_date) || '—'}</button>
+              <button className="hover:bg-slate-50 rounded px-1" onClick={(e) => { e.stopPropagation(); setEditingKey('start_date'); }} title="Edit start date">{startDateValue || '—'}</button>
             )
           ) : (
-            <div>{toDateOnly(a.start_date) || '—'}</div>
+            <div>{startDateValue || '—'}</div>
           )}
 
           <div className="text-xs text-slate-500">{t("activityRow.end")}</div>
           {typeof updateField === 'function' ? (
             editingKey === 'end_date' ? (
-              <input autoFocus type="date" className="border rounded px-1 py-0.5 text-sm" value={toDateOnly(a.end_date) || ''} onChange={async (e) => { try { await updateField && updateField(a.id, 'end_date', e.target.value); } catch (err) {} setEditingKey(null); }} onBlur={() => setEditingKey(null)} />
+              <input autoFocus type="date" className="border rounded px-1 py-0.5 text-sm" value={endDateValue} onChange={async (e) => { try { await updateField && updateField(a.id, 'end_date', e.target.value); } catch (err) {} setEditingKey(null); }} onBlur={() => setEditingKey(null)} />
             ) : (
-              <button className="hover:bg-slate-50 rounded px-1" onClick={(e) => { e.stopPropagation(); setEditingKey('end_date'); }} title="Edit end date">{toDateOnly(a.end_date) || '—'}</button>
+              <button className="hover:bg-slate-50 rounded px-1" onClick={(e) => { e.stopPropagation(); setEditingKey('end_date'); }} title="Edit end date">{endDateValue || '—'}</button>
             )
           ) : (
-            <div>{toDateOnly(a.end_date) || '—'}</div>
+            <div>{endDateValue || '—'}</div>
+          )}
+
+          <div className="text-xs text-slate-500">{t("createTaskModal.durationLabel")}</div>
+          {typeof updateField === 'function' ? (
+            editingKey === 'duration' ? (
+              <input
+                autoFocus
+                type="time"
+                step="60"
+                className="border rounded px-1 py-0.5 text-sm"
+                value={localValue}
+                onChange={(e) => setLocalValue(e.target.value)}
+                onBlur={async (e) => {
+                  const nextValue = e.target.value;
+                  setEditingKey(null);
+                  if (nextValue !== durationInputValue) {
+                    try { await updateField && updateField(a.id, 'duration', nextValue || null); } catch (err) {}
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    e.currentTarget.blur();
+                  } else if (e.key === 'Escape') {
+                    setLocalValue(durationInputValue);
+                    setEditingKey(null);
+                  }
+                }}
+              />
+            ) : (
+              <button
+                className="hover:bg-slate-50 rounded px-1"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setLocalValue(durationInputValue);
+                  setEditingKey('duration');
+                }}
+                title="Edit duration"
+              >
+                {durationRaw || '—'}
+              </button>
+            )
+          ) : (
+            <div>{durationRaw || '—'}</div>
           )}
 
           <div className="text-xs text-slate-500">{t("activityRow.deadline")}</div>

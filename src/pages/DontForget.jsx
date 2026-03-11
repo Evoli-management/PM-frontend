@@ -11,6 +11,7 @@ import { FaCheck, FaExclamation, FaLongArrowAltDown, FaTimes, FaTrash, FaBars, F
 import CreateTaskModal from "../components/key-areas/CreateTaskModal.jsx";
 import EditTaskModal from "../components/key-areas/EditTaskModal.jsx";
 import BulkFieldPickerModal from "../components/shared/BulkFieldPickerModal.jsx";
+import MassActionMenu from "../components/shared/MassActionMenu.jsx";
 import TaskRow from "../components/key-areas/TaskRow.jsx";
 import SyncSourceBadge from "../components/tasks/SyncSourceBadge.jsx";
 import TaskFullView from "../components/key-areas/TaskFullView";
@@ -1007,9 +1008,7 @@ export default function DontForget() {
     const massComplete = (val) =>
         setTasks((prev) => prev.map((t) => (selectedIds.has(t.id) ? { ...t, completed: !!val } : t)));
 
-    const handleMassActionChange = async (e) => {
-        const action = e.target.value;
-        e.target.value = "";
+    const handleMassActionChange = async (action) => {
         if (!action || selectedIds.size === 0) return;
         if (action === "edit") {
             setShowMassFieldPicker(true);
@@ -1978,17 +1977,13 @@ export default function DontForget() {
                                                 <span className="text-sm text-gray-600" aria-live="polite">
                                                     {t("dontForget.selected", { n: selectedIds.size })}
                                                 </span>
-                                                <select
+                                                <MassActionMenu
+                                                    label={t("dontForget.massEdit")}
+                                                    ariaLabel="Mass action"
                                                     disabled={selectedIds.size === 0}
-                                                    defaultValue=""
-                                                    className="h-[32px] rounded-md border border-emerald-700 bg-emerald-600 px-3 text-sm font-semibold text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-300 disabled:opacity-50"
-                                                    aria-label="Mass action"
-                                                    onChange={handleMassActionChange}
-                                                >
-                                                    <option value="" hidden>{t("dontForget.massEdit")}</option>
-                                                    <option value="edit" className="bg-white text-slate-900">Select field</option>
-                                                    <option value="delete" className="bg-white text-slate-900">Delete</option>
-                                                </select>
+                                                    title={selectedIds.size === 0 ? "Select tasks to enable mass edit" : undefined}
+                                                    onSelect={handleMassActionChange}
+                                                />
                                                 <button
                                                     type="button"
                                                     onClick={() => {

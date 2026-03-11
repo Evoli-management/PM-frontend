@@ -10,6 +10,7 @@ import activityDelegationService from '../../services/activityDelegationService'
 import keyAreaService from '../../services/keyAreaService';
 import { formatKeyAreaLabel } from '../../utils/keyAreaDisplay';
 import BulkFieldPickerModal from '../shared/BulkFieldPickerModal';
+import MassActionMenu from '../shared/MassActionMenu';
 
 /**
  * UnifiedTaskActivityTable - Displays tasks AND activities in a single table
@@ -563,8 +564,7 @@ export default function UnifiedTaskActivityTable({
         }
     };
 
-    const handleMassDelete = async (e) => {
-        e.stopPropagation();
+    const handleMassDelete = async () => {
         if (selectedItems.size === 0) return;
         const confirmed = window.confirm(t("unifiedTable.confirmDeleteSelected") || "Delete selected items?");
         if (!confirmed) return;
@@ -586,16 +586,14 @@ export default function UnifiedTaskActivityTable({
         setSelectedItems(new Set());
     };
 
-    const handleMassActionChange = async (e) => {
-        const action = e.target.value;
-        e.target.value = '';
+    const handleMassActionChange = async (action) => {
         if (!action || selectedItems.size === 0) return;
         if (action === 'edit') {
             setShowMassFieldPicker(true);
             return;
         }
         if (action === 'delete') {
-            await handleMassDelete(e);
+            await handleMassDelete();
         }
     };
 
@@ -1156,16 +1154,13 @@ export default function UnifiedTaskActivityTable({
                     {viewTab !== 'delegated' && (
                         <div className="flex items-center gap-2">
                             <span className="text-sm text-slate-600">{t("unifiedTable.selectedCount", { n: selectedItems.size })}</span>
-                            <select
-                                defaultValue=""
-                                onChange={handleMassActionChange}
-                                className="h-[32px] rounded-md border border-emerald-700 bg-emerald-600 px-3 text-sm font-semibold text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-300 disabled:opacity-50"
+                            <MassActionMenu
+                                label={t("unifiedTable.massEdit")}
+                                ariaLabel="mass action"
                                 disabled={selectedItems.size === 0}
-                            >
-                                <option value="" hidden>{t("unifiedTable.massEdit")}</option>
-                                <option value="edit" className="bg-white text-slate-900">Select field</option>
-                                <option value="delete" className="bg-white text-slate-900">Delete</option>
-                            </select>
+                                title={selectedItems.size === 0 ? 'Select items to enable mass edit' : undefined}
+                                onSelect={handleMassActionChange}
+                            />
                         </div>
                     )}
                 </div>

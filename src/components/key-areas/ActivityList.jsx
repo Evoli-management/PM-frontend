@@ -98,6 +98,13 @@ export default function ActivityList({
         const prevList = Array.isArray(list) ? list.slice() : [];
         const prevItem = prevList.find((a) => a.id === id);
         if (!prevItem) return;
+        const apiDateKeyMap = {
+            start_date: 'startDate',
+            end_date: 'endDate',
+            startDate: 'startDate',
+            endDate: 'endDate',
+            deadline: 'deadline',
+        };
 
         const optimistic = (a) => (a.id === id ? { ...a, [key]: value } : a);
         setList((prev) => prev.map(optimistic));
@@ -125,18 +132,19 @@ export default function ActivityList({
             if (key === 'text' || key === 'title') body.text = value;
             else if (key === 'completed') body.completed = !!value;
             else if (key === 'priority') body.priority = value;
-            else if (key === 'startDate' || key === 'endDate' || key === 'deadline') {
+            else if (apiDateKeyMap[key]) {
+                const apiKey = apiDateKeyMap[key];
                 // convert YYYY-MM-DD to ISO datetime at UTC midnight to satisfy server
-                if (!value) body[key] = null;
+                if (!value) body[apiKey] = null;
                 else if (/^\d{4}-\d{2}-\d{2}$/.test(String(value))) {
                     try {
                         const [y, m, d] = String(value).split('-').map((s) => parseInt(s, 10));
-                        body[key] = new Date(Date.UTC(y, m - 1, d)).toISOString();
+                        body[apiKey] = new Date(Date.UTC(y, m - 1, d)).toISOString();
                     } catch (err) {
-                        body[key] = String(value);
+                        body[apiKey] = String(value);
                     }
                 } else {
-                    body[key] = String(value);
+                    body[apiKey] = String(value);
                 }
             } else body[key] = value;
 

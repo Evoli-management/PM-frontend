@@ -6,6 +6,7 @@ import PriorityBadge from '../ui/PriorityBadge';
 import { getQuadrantColorClass } from '../../utils/keyareasHelpers';
 import { FaEdit, FaTrash, FaEllipsisV } from 'react-icons/fa';
 import { useFormattedDate } from '../../hooks/useFormattedDate';
+import { durationToTimeInputValue } from '../../utils/duration';
 
 const TaskRow = ({
   t: task,
@@ -273,6 +274,8 @@ const TaskRow = ({
           <select
             className="w-full min-w-0 rounded-md border border-slate-300 bg-white px-2 py-0.5 text-sm"
             value={(() => {
+              const delegatedToUserId = task.delegatedToUserId || task.delegated_to_user_id || null;
+              if (delegatedToUserId) return String(delegatedToUserId);
               if (task.assignee === 'Me' && currentUserId) return String(currentUserId);
               const found = (users || []).find((u) => (u.name || '') === task.assignee);
               return found ? String(found.id) : '';
@@ -282,9 +285,7 @@ const TaskRow = ({
             onChange={async (e) => {
               e.stopPropagation();
               const sel = e.target.value;
-              const user = (users || []).find((u) => String(u.id) === String(sel));
-              const valueToSave = user ? ((currentUserId && String(user.id) === String(currentUserId)) ? 'Me' : (user.name || '')) : '';
-              try { await updateField && updateField(task.id, 'assignee', valueToSave); } catch (err) {}
+              try { await updateField && updateField(task.id, 'assignee', sel || null); } catch (err) {}
             }}
           >
             <option value="">—</option>
@@ -402,7 +403,6 @@ const TaskRow = ({
               title="Edit start date"
             >
               <span>{(task.start_date) ? formatDate(task.start_date) : '—'}</span>
-              {editingKey === 'start_date' && <span className="text-sm">📅</span>}
             </button>
             <input
               ref={(el) => { dateInputRefs.current['start_date'] = el; }}
@@ -411,7 +411,7 @@ const TaskRow = ({
               style={{ width: 0, height: 0 }}
               value={toDateOnly(task.start_date) || ''}
               onChange={async (e) => {
-                const v = e.targetask.value || '';
+                const v = e.target.value || '';
                 try { await updateField && updateField(task.id, 'start_date', v); } catch (e) {}
               }}
               onBlur={() => setEditingKey(null)}
@@ -436,7 +436,7 @@ const TaskRow = ({
                 setTimeout(() => {
                   const input = dateInputRefs.current['end_date'];
                   if (input?.showPicker) {
-                    inputask.showPicker();
+                    input.showPicker();
                   } else {
                     input?.focus();
                   }
@@ -445,7 +445,6 @@ const TaskRow = ({
               title="Edit end date"
             >
               <span>{(task.end_date) ? formatDate(task.end_date) : '—'}</span>
-              {editingKey === 'end_date' && <span className="text-sm">📅</span>}
             </button>
             <input
               ref={(el) => { dateInputRefs.current['end_date'] = el; }}
@@ -454,7 +453,7 @@ const TaskRow = ({
               style={{ width: 0, height: 0 }}
               value={toDateOnly(task.end_date) || ''}
               onChange={async (e) => {
-                const v = e.targetask.value || '';
+                const v = e.target.value || '';
                 try { await updateField && updateField(task.id, 'end_date', v); } catch (e) {}
               }}
               onBlur={() => setEditingKey(null)}
@@ -479,7 +478,7 @@ const TaskRow = ({
                 setTimeout(() => {
                   const input = dateInputRefs.current['deadline'];
                   if (input?.showPicker) {
-                    inputask.showPicker();
+                    input.showPicker();
                   } else {
                     input?.focus();
                   }
@@ -488,7 +487,6 @@ const TaskRow = ({
               title="Edit deadline"
             >
               <span>{(task.deadline || task.dueDate) ? formatDate(task.deadline || task.dueDate) : '—'}</span>
-              {editingKey === 'deadline' && <span className="text-sm">📅</span>}
             </button>
             <input
               ref={(el) => { dateInputRefs.current['deadline'] = el; }}
@@ -497,7 +495,7 @@ const TaskRow = ({
               style={{ width: 0, height: 0 }}
               value={toDateOnly(task.deadline || task.dueDate) || ''}
               onChange={async (e) => {
-                const v = e.targetask.value || '';
+                const v = e.target.value || '';
                 try { await updateField && updateField(task.id, 'dueDate', v); } catch (e) {}
               }}
               onBlur={() => setEditingKey(null)}
@@ -514,8 +512,52 @@ const TaskRow = ({
           <div className="w-full text-left">
             {(() => {
               const raw = task.duration ?? task.duration_minutes ?? '';
-              const val = String(raw).trim();
-              return val || '—';
+              const val = String(raw ?? '').trim();
+              const normalized = durationToTimeInputValue(raw);
+              if (!enableInlineEditing) return val || '—';
+              if (editingKey === 'duration') {
+                return (
+                  <input
+                    autoFocus
+                    type="time"
+                    step="60"
+                    className="w-full rounded border border-slate-300 px-1 py-0.5 text-sm"
+                    value={localValue}
+                    onChange={(e) => setLocalValue(e.target.value)}
+                    onBlur={async (e) => {
+                      const nextValue = e.target.value;
+                      setEditingKey(null);
+                      if (nextValue !== normalized && typeof updateField === 'function') {
+                        try { await updateField(task.id, 'duration', nextValue || null); } catch (e) {}
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        e.currentTarget.blur();
+                      } else if (e.key === 'Escape') {
+                        setLocalValue(normalized);
+                        setEditingKey(null);
+                      }
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                );
+              }
+              return (
+                <button
+                  type="button"
+                  className="w-full rounded px-1 text-left hover:bg-slate-50"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setLocalValue(normalized);
+                    setEditingKey('duration');
+                  }}
+                  title="Edit duration"
+                >
+                  {val || '—'}
+                </button>
+              );
             })()}
           </div>
         </td>
