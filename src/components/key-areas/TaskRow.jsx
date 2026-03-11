@@ -106,12 +106,30 @@ const TaskRow = ({
     };
   }, [menuOpen]);
 
+  useEffect(() => {
+    return () => {
+      if (clickTimer.current) {
+        clearTimeout(clickTimer.current);
+        clickTimer.current = null;
+      }
+    };
+  }, []);
+
+  const queueTitleOpen = (e) => {
+    try { e.stopPropagation(); } catch (__) {}
+    if (!onRowClick) return;
+    if (clickTimer.current) clearTimeout(clickTimer.current);
+    clickTimer.current = setTimeout(() => {
+      clickTimer.current = null;
+      onRowClick(task);
+    }, 180);
+  };
+
   
   return (
     <tr
-      className={`border-t border-slate-200 hover:bg-slate-50 cursor-pointer transition-colors ${rowClassName}`.trim()}
+      className={`border-t border-slate-200 hover:bg-slate-50 transition-colors ${rowClassName}`.trim()}
       onMouseEnter={onMouseEnter}
-      onClick={() => onRowClick && onRowClick(task)}
     >
       <td className="px-3 py-2 align-top w-12">
         <div className="relative inline-flex items-center gap-2">
@@ -187,11 +205,11 @@ const TaskRow = ({
             if (lvl === 2) return null;
             if (lvl === 3) {
               return (
-                <img src="/high-priority.svg" alt="High priority" className="mt-0.5 inline-block shrink-0 w-2 h-4" title="Priority: High" />
+                <img src={`${import.meta.env.BASE_URL}high-priority.svg`} alt="High priority" className="mt-0.5 inline-block shrink-0 w-2 h-4" title="Priority: High" />
               );
             }
             return (
-              <img src="/low-priority-down.svg" alt="Low priority" className="mt-0.5 inline-block shrink-0 w-2 h-4" title="Priority: Low" />
+              <img src={`${import.meta.env.BASE_URL}low-priority-down.svg`} alt="Low priority" className="mt-0.5 inline-block shrink-0 w-2 h-4" title="Priority: Low" />
             );
           })()}
           <div className="flex flex-col">
@@ -220,7 +238,8 @@ const TaskRow = ({
                 />
               ) : (
                 <div
-                  className={`text-sm truncate max-w-[540px] cursor-pointer ${String(task.status || "").toLowerCase() === 'done' ? 'text-slate-400 line-through' : 'text-slate-800'}`}
+                  className={`max-w-[540px] cursor-pointer truncate text-sm ${String(task.status || "").toLowerCase() === 'done' ? 'text-slate-400 line-through' : 'text-slate-800'}`}
+                  onClick={queueTitleOpen}
                   onDoubleClick={(e) => {
                     try { if (clickTimer.current) { clearTimeout(clickTimer.current); clickTimer.current = null; } } catch (__) {}
                     e.stopPropagation();
@@ -233,7 +252,10 @@ const TaskRow = ({
                 </div>
               )
             ) : (
-              <div className={`text-sm truncate max-w-[540px] ${String(task.status || "").toLowerCase() === 'done' ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
+              <div
+                className={`max-w-[540px] cursor-pointer truncate text-sm ${String(task.status || "").toLowerCase() === 'done' ? 'text-slate-400 line-through' : 'text-slate-800'}`}
+                onClick={queueTitleOpen}
+              >
                 {task.title}
               </div>
             )}

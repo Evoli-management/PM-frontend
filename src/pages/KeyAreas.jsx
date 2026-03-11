@@ -407,11 +407,11 @@ const KanbanView = ({ tasks = [], onSelect, selectedIds = new Set(), toggleSelec
         if (lvl === 2) return null;
         if (lvl === 3) {
             return (
-                <img src="/high-priority.svg" alt="High priority" className="inline-block w-2 h-4" title="Priority: High" />
+                <img src={`${import.meta.env.BASE_URL}high-priority.svg`} alt="High priority" className="inline-block w-2 h-4" title="Priority: High" />
             );
         }
         return (
-            <img src="/low-priority-down.svg" alt="Low priority" className="inline-block w-2 h-4" title="Priority: Low" />
+            <img src={`${import.meta.env.BASE_URL}low-priority-down.svg`} alt="Low priority" className="inline-block w-2 h-4" title="Priority: Low" />
         );
     };
 
@@ -4443,11 +4443,11 @@ export default function KeyAreas() {
                                         if (lvl === 2) return null;
                                         if (lvl === 3) {
                                             return (
-                                                <img src="/high-priority.svg" alt="High priority" className="inline-block w-2 h-4" title="Priority: High" />
+                                                <img src={`${import.meta.env.BASE_URL}high-priority.svg`} alt="High priority" className="inline-block w-2 h-4" title="Priority: High" />
                                             );
                                         }
                                         return (
-                                            <img src="/low-priority-down.svg" alt="Low priority" className="inline-block w-2 h-4" title="Priority: Low" />
+                                            <img src={`${import.meta.env.BASE_URL}low-priority-down.svg`} alt="Low priority" className="inline-block w-2 h-4" title="Priority: Low" />
                                         );
                                     })()}
                                     <span className="text-sm font-semibold text-slate-900 truncate">
@@ -5076,11 +5076,11 @@ export default function KeyAreas() {
                                                             if (lvl === 2) return null;
                                                             if (lvl === 3) {
                                                                 return (
-                                                                    <img src="/high-priority.svg" alt="High priority" className="inline-block w-2 h-4" title="Priority: High" />
+                                                                    <img src={`${import.meta.env.BASE_URL}high-priority.svg`} alt="High priority" className="inline-block w-2 h-4" title="Priority: High" />
                                                                 );
                                                             }
                                                             return (
-                                                                <img src="/low-priority-down.svg" alt="Low priority" className="inline-block w-2 h-4" title="Priority: Low" />
+                                                                <img src={`${import.meta.env.BASE_URL}low-priority-down.svg`} alt="Low priority" className="inline-block w-2 h-4" title="Priority: Low" />
                                                             );
                                                         })()}
                                                         <h3 className="text-sm font-semibold text-slate-900 truncate">{selectedTaskInPanel.title || 'Untitled Task'}</h3>
