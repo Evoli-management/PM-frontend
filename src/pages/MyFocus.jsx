@@ -118,6 +118,10 @@ export default function MyFocus() {
         acc[q].push(t);
         return acc;
     }, {});
+    const commandToggleBaseClass = 'inline-flex h-8 w-8 items-center justify-center rounded-md border transition focus:outline-none focus:ring-2 focus:ring-blue-200';
+    const commandToggleActiveClass = 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100';
+    const commandToggleInactiveClass = 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50';
+    const commandSelectClass = 'h-[32px] rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-200';
 
     return (
         <div className="min-h-screen bg-[#EDEDED]">
@@ -142,37 +146,37 @@ export default function MyFocus() {
                                 <div className="relative h-full min-h-0 flex flex-col">
                                     <div className="shrink-0 pb-2">
                                         <div className="flex flex-wrap items-center gap-2 text-sm">
-                                            <span className="text-slate-700 mr-1">{t("myFocus.filter")}</span>
+                                            <span className="mr-1 text-sm font-medium text-slate-600">{t("myFocus.filter")}</span>
                                             <button
                                                 type="button"
                                                 title={t("myFocus.filterActivities")}
-                                                className={`p-2 rounded border transition ${showActivities ? 'text-blue-700 border-blue-300 bg-blue-50' : 'text-slate-500 border-slate-300 bg-white'}`}
+                                                className={`${commandToggleBaseClass} ${showActivities ? commandToggleActiveClass : commandToggleInactiveClass}`}
                                                 onClick={() => setShowActivities((v) => !v)}
                                             >
-                                                <FaAlignJustify />
+                                                <FaAlignJustify className="h-4 w-4" />
                                             </button>
                                             <button
                                                 type="button"
                                                 title={t("myFocus.filterDontForget")}
-                                                className={`p-2 rounded border transition ${showDontForget ? 'text-blue-700 border-blue-300 bg-blue-50' : 'text-slate-500 border-slate-300 bg-white'}`}
+                                                className={`${commandToggleBaseClass} ${showDontForget ? commandToggleActiveClass : commandToggleInactiveClass}`}
                                                 onClick={() => setShowDontForget((v) => !v)}
                                             >
                                                 <img
                                                     src={`${import.meta.env.BASE_URL}dont-forget.png`}
                                                     alt="Don't forget"
-                                                    className="w-5 h-5 object-contain"
+                                                    className="h-6 w-6 object-contain"
                                                 />
                                             </button>
                                             <button
                                                 type="button"
                                                 title={t("myFocus.filterNoDate")}
-                                                className={`p-2 rounded border transition ${showNoDateItems ? 'text-blue-700 border-blue-300 bg-blue-50' : 'text-slate-500 border-slate-300 bg-white'}`}
+                                                className={`${commandToggleBaseClass} ${showNoDateItems ? commandToggleActiveClass : commandToggleInactiveClass}`}
                                                 onClick={() => setShowNoDateItems((v) => !v)}
                                             >
                                                 <span className="relative inline-flex">
                                                     <svg
                                                         viewBox="0 0 448 512"
-                                                        className="w-4 h-4"
+                                                        className="h-4 w-4"
                                                         fill="currentColor"
                                                         aria-hidden="true"
                                                     >
@@ -186,7 +190,7 @@ export default function MyFocus() {
                                                 </span>
                                             </button>
                                             <select
-                                                className="h-8 px-2 rounded border border-slate-300 bg-white text-sm min-w-[140px]"
+                                                className={`${commandSelectClass} min-w-[140px]`}
                                                 value={selectedKeyArea}
                                                 onChange={(e) => setSelectedKeyArea(e.target.value)}
                                                 title="Key Area"
@@ -197,7 +201,7 @@ export default function MyFocus() {
                                                 ))}
                                             </select>
                                             <select
-                                                className="h-8 px-2 rounded border border-slate-300 bg-white text-sm min-w-[90px]"
+                                                className={`${commandSelectClass} min-w-[90px]`}
                                                 value={selectedList}
                                                 onChange={(e) => setSelectedList(e.target.value)}
                                                 title="List"
@@ -251,7 +255,7 @@ export default function MyFocus() {
                                                                         <img
                                                                             src={`${import.meta.env.BASE_URL}dont-forget.png`}
                                                                             alt="Don't forget"
-                                                                            className="w-4 h-4 object-contain opacity-80"
+                                                                            className="h-6 w-6 object-contain opacity-80"
                                                                         />
                                                                     )}
                                                                     <span className="truncate">{t.title || t.name}</span>
@@ -291,7 +295,7 @@ export default function MyFocus() {
                                                                         <img
                                                                             src={`${import.meta.env.BASE_URL}dont-forget.png`}
                                                                             alt="Don't forget"
-                                                                            className="w-4 h-4 object-contain opacity-80"
+                                                                            className="h-6 w-6 object-contain opacity-80"
                                                                         />
                                                                     )}
                                                                     <span className="truncate">{t.title || t.name}</span>
@@ -336,7 +340,7 @@ export default function MyFocus() {
                                                                         <img
                                                                             src={`${import.meta.env.BASE_URL}dont-forget.png`}
                                                                             alt="Don't forget"
-                                                                            className="w-4 h-4 object-contain opacity-80"
+                                                                            className="h-6 w-6 object-contain opacity-80"
                                                                         />
                                                                     )}
                                                                     <span className="truncate">{t.title || t.name}</span>
@@ -376,7 +380,7 @@ export default function MyFocus() {
                                                                         <img
                                                                             src={`${import.meta.env.BASE_URL}dont-forget.png`}
                                                                             alt="Don't forget"
-                                                                            className="w-4 h-4 object-contain opacity-80"
+                                                                            className="h-6 w-6 object-contain opacity-80"
                                                                         />
                                                                     )}
                                                                     <span className="truncate">{t.title || t.name}</span>
