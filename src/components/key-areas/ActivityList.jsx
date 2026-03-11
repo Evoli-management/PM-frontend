@@ -105,10 +105,11 @@ export default function ActivityList({
         const prevItem = prevList.find((a) => a.id === id);
         if (!prevItem) return;
         const resolvedDates =
-            key === 'start_date' || key === 'end_date'
+            key === 'start_date' || key === 'end_date' || key === 'deadline'
                 ? applyStartEndDateRule({
                     startDate: prevItem.start_date ?? prevItem.startDate,
                     endDate: prevItem.end_date ?? prevItem.endDate,
+                    deadline: prevItem.deadline,
                     changedKey: key,
                     changedValue: value,
                 })
@@ -130,6 +131,7 @@ export default function ActivityList({
                     startDate: resolvedDates.startDate || null,
                     end_date: resolvedDates.endDate || null,
                     endDate: resolvedDates.endDate || null,
+                    deadline: resolvedDates.deadline || null,
                 };
             }
             return { ...a, [key]: value };
@@ -174,6 +176,7 @@ export default function ActivityList({
                 };
                 body.startDate = toIsoOrNull(resolvedDates.startDate);
                 body.endDate = toIsoOrNull(resolvedDates.endDate);
+                body.deadline = toIsoOrNull(resolvedDates.deadline);
             } else if (apiDateKeyMap[key]) {
                 const apiKey = apiDateKeyMap[key];
                 // convert YYYY-MM-DD to ISO datetime at UTC midnight to satisfy server

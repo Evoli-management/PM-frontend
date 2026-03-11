@@ -140,9 +140,10 @@ export const toDateOnly = (val) => {
     }
 };
 
-export const applyStartEndDateRule = ({ startDate, endDate, changedKey, changedValue }) => {
+export const applyStartEndDateRule = ({ startDate, endDate, deadline, changedKey, changedValue }) => {
     let nextStart = toDateOnly(startDate) || "";
     let nextEnd = toDateOnly(endDate) || "";
+    let nextDeadline = toDateOnly(deadline) || "";
     const nextValue = toDateOnly(changedValue) || "";
     const key = String(changedKey || "");
 
@@ -151,16 +152,28 @@ export const applyStartEndDateRule = ({ startDate, endDate, changedKey, changedV
         if (nextValue && (!nextEnd || nextValue > nextEnd)) {
             nextEnd = nextValue;
         }
+        if (nextValue && nextDeadline && nextDeadline < nextValue) {
+            nextDeadline = nextValue;
+        }
     } else if (key === "end_date" || key === "endDate") {
         nextEnd = nextValue;
         if (nextValue && nextStart && nextValue < nextStart) {
             nextStart = nextValue;
+        }
+        if (nextStart && nextDeadline && nextDeadline < nextStart) {
+            nextDeadline = nextStart;
+        }
+    } else if (key === "deadline" || key === "dueDate") {
+        nextDeadline = nextValue;
+        if (nextDeadline && nextStart && nextDeadline < nextStart) {
+            nextDeadline = nextStart;
         }
     }
 
     return {
         startDate: nextStart,
         endDate: nextEnd,
+        deadline: nextDeadline,
     };
 };
 

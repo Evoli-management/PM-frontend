@@ -1119,10 +1119,11 @@ export default function KeyAreas() {
         if (!tid) return;
         const prevList = Array.isArray(activitiesByTask[tid]) ? activitiesByTask[tid].slice() : [];
         const resolvedDates =
-            key === 'start_date' || key === 'end_date'
+            key === 'start_date' || key === 'end_date' || key === 'deadline'
                 ? applyStartEndDateRule({
                     startDate: activity?.start_date ?? activity?.startDate,
                     endDate: activity?.end_date ?? activity?.endDate,
+                    deadline: activity?.deadline,
                     changedKey: key,
                     changedValue: value,
                 })
@@ -1144,6 +1145,7 @@ export default function KeyAreas() {
                     startDate: resolvedDates.startDate || null,
                     end_date: resolvedDates.endDate || null,
                     endDate: resolvedDates.endDate || null,
+                    deadline: resolvedDates.deadline || null,
                 };
             }
             if (key === 'status') return { ...a, status: value };
@@ -1200,6 +1202,7 @@ export default function KeyAreas() {
                     };
                     body.startDate = toIsoOrNull(resolvedDates.startDate);
                     body.endDate = toIsoOrNull(resolvedDates.endDate);
+                    body.deadline = toIsoOrNull(resolvedDates.deadline);
                 } else if (apiDateKeyMap[key]) {
                     const apiKey = apiDateKeyMap[key];
                     if (!value) body[apiKey] = null;
@@ -1954,10 +1957,11 @@ export default function KeyAreas() {
         const prevTask = prev.find((t) => t.id === id);
         if (!prevTask) return;
         const resolvedDates =
-            key === 'start_date' || key === 'end_date'
+            key === 'start_date' || key === 'end_date' || key === 'deadline' || key === 'dueDate'
                 ? applyStartEndDateRule({
                     startDate: prevTask.start_date ?? prevTask.startDate,
                     endDate: prevTask.end_date ?? prevTask.endDate,
+                    deadline: prevTask.deadline ?? prevTask.dueDate ?? prevTask.due_date,
                     changedKey: key,
                     changedValue: value,
                 })
@@ -1973,6 +1977,9 @@ export default function KeyAreas() {
                     startDate: resolvedDates.startDate || null,
                     end_date: resolvedDates.endDate || null,
                     endDate: resolvedDates.endDate || null,
+                    deadline: resolvedDates.deadline || null,
+                    dueDate: resolvedDates.deadline || null,
+                    due_date: resolvedDates.deadline || null,
                 };
             }
             if (key === 'priority') {
@@ -2032,6 +2039,7 @@ export default function KeyAreas() {
         else if (resolvedDates) {
             patch.startDate = resolvedDates.startDate ? new Date(resolvedDates.startDate).toISOString() : null;
             patch.endDate = resolvedDates.endDate ? new Date(resolvedDates.endDate).toISOString() : null;
+            patch.dueDate = resolvedDates.deadline ? new Date(resolvedDates.deadline).toISOString() : null;
         }
         else if (key === 'dueDate' || key === 'deadline') patch.dueDate = value ? new Date(value).toISOString() : null;
         else if (key === 'duration') patch.duration = value;
