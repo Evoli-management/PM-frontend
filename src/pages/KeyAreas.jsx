@@ -222,9 +222,18 @@ const api = {
             title: task.title,
             description: nullableString(task.description, true),
             assignee: nullableString(task.assignee, true),
-            startDate: (toDateOnly(task.start_date ?? task.startDate) || undefined),
-            dueDate: (toDateOnly(task.deadline ?? task.due_date ?? task.dueDate) || undefined),
-            endDate: (toDateOnly(task.end_date ?? task.endDate) || undefined),
+            startDate:
+                task.start_date !== undefined || task.startDate !== undefined
+                    ? (toDateOnly(task.start_date ?? task.startDate) || null)
+                    : undefined,
+            dueDate:
+                task.deadline !== undefined || task.due_date !== undefined || task.dueDate !== undefined
+                    ? (toDateOnly(task.deadline ?? task.due_date ?? task.dueDate) || null)
+                    : undefined,
+            endDate:
+                task.end_date !== undefined || task.endDate !== undefined
+                    ? (toDateOnly(task.end_date ?? task.endDate) || null)
+                    : undefined,
             duration:
                 durationRaw === undefined
                     ? undefined
@@ -674,16 +683,6 @@ export default function KeyAreas() {
                 fetchedTask,
                 normalizedActivity?.key_area_id || selectedKA?.id || null,
             );
-
-            if (normalizedTask?.id) {
-                setAllTasks((prev) => {
-                    if ((prev || []).some((task) => String(task.id) === String(normalizedTask.id))) {
-                        return prev;
-                    }
-                    return [normalizedTask, ...(Array.isArray(prev) ? prev : [])];
-                });
-            }
-
             return normalizedTask;
         } catch (error) {
             console.error('Failed to resolve parent task for activity', error);
@@ -1768,29 +1767,6 @@ export default function KeyAreas() {
                 return String(v || "normal").toLowerCase();
             };
 
-            // Ensure parent task is available in allTasks so the modal can look it up
-            (async () => {
-                try {
-                    const tidVal = tid ? String(tid) : (norm.taskId || norm.task_id || norm.task || null);
-                    if (tidVal) {
-                        const exists = (allTasks || []).some((t) => String(t.id) === String(tidVal));
-                        if (!exists) {
-                            try {
-                                const tsvc = await getTaskService();
-                                const fetched = await tsvc.get(String(tidVal));
-                                if (fetched && fetched.id) {
-                                    setAllTasks((prev) => {
-                                        const copy = Array.isArray(prev) ? prev.slice() : [];
-                                        copy.unshift(fetched);
-                                        return copy;
-                                    });
-                                }
-                            } catch (e) {}
-                        }
-                    }
-                } catch (e) {}
-            })();
-
             // Populate taskForm with normalized activity values so the Task composer UI is reused
             setTaskForm({
                 id: norm.id || null,
@@ -2130,11 +2106,54 @@ export default function KeyAreas() {
     // Listen for refresh events from slide-over
     useEffect(() => {
         const handler = (e) => {
-            if (e?.detail?.refresh) refreshAllActivities();
+            const detail = e?.detail || {};
+            if (detail.sourceTaskId || detail.targetTaskId) {
+                setActivitiesByTask((prev) => {
+                    const next = { ...prev };
+                    const sourceKey = detail.sourceTaskId ? String(detail.sourceTaskId) : null;
+                    const targetKey = detail.targetTaskId ? String(detail.targetTaskId) : null;
+
+                    if (sourceKey) {
+                        if (Array.isArray(detail.sourceList)) {
+                            next[sourceKey] = detail.sourceList.map(normalizeActivity);
+                        } else {
+                            const sourceList = Array.isArray(next[sourceKey]) ? next[sourceKey] : [];
+                            next[sourceKey] = sourceList.filter((activity) => String(activity.id) !== String(detail.movedActivity?.id));
+                        }
+                    }
+
+                    if (targetKey && detail.movedActivity) {
+                        const parentTask = (allTasks || []).find((task) => String(task.id) === String(targetKey)) || null;
+                        const targetList = Array.isArray(next[targetKey]) ? next[targetKey] : [];
+                        const moved = normalizeActivityWithTask(detail.movedActivity, parentTask);
+                        const existingIndex = targetList.findIndex((activity) => String(activity.id) === String(moved.id));
+                        if (existingIndex >= 0) {
+                            const copy = targetList.slice();
+                            copy[existingIndex] = moved;
+                            next[targetKey] = copy;
+                        } else {
+                            next[targetKey] = [...targetList, moved];
+                        }
+                    }
+
+                    return next;
+                });
+                return;
+            }
+
+            if (detail.taskId && Array.isArray(detail.list)) {
+                setActivitiesByTask((prev) => ({
+                    ...prev,
+                    [String(detail.taskId)]: detail.list.map(normalizeActivity),
+                }));
+                return;
+            }
+
+            if (detail?.refresh) refreshAllActivities();
         };
         window.addEventListener("ka-activities-updated", handler);
         return () => window.removeEventListener("ka-activities-updated", handler);
-    }, []);
+    }, [allTasks]);
 
     // Ensure activities for the currently selected full-task view are loaded.
     // When a user clicks a task to open the full view, we may not have primed
@@ -3910,9 +3929,27 @@ export default function KeyAreas() {
             };
             // Include optional date/metadata fields when provided by the modal so
             // activities created/updated from the composer retain start/end/deadline.
-            if (payload.startDate || payload.start_date || payload.date_start) body.startDate = toDateOnly(payload.startDate || payload.start_date || payload.date_start);
-            if (payload.endDate || payload.end_date || payload.date_end) body.endDate = toDateOnly(payload.endDate || payload.end_date || payload.date_end);
-            if (payload.deadline || payload.dueDate || payload.due_date) body.deadline = toDateOnly(payload.deadline || payload.dueDate || payload.due_date);
+            if (
+                payload.startDate !== undefined ||
+                payload.start_date !== undefined ||
+                payload.date_start !== undefined
+            ) {
+                body.startDate = toDateOnly(payload.startDate ?? payload.start_date ?? payload.date_start) || null;
+            }
+            if (
+                payload.endDate !== undefined ||
+                payload.end_date !== undefined ||
+                payload.date_end !== undefined
+            ) {
+                body.endDate = toDateOnly(payload.endDate ?? payload.end_date ?? payload.date_end) || null;
+            }
+            if (
+                payload.deadline !== undefined ||
+                payload.dueDate !== undefined ||
+                payload.due_date !== undefined
+            ) {
+                body.deadline = toDateOnly(payload.deadline ?? payload.dueDate ?? payload.due_date) || null;
+            }
             if (typeof payload.duration !== 'undefined') {
                 const durationRaw = payload.duration;
                 body.duration =
@@ -3931,16 +3968,69 @@ export default function KeyAreas() {
             if (payload.id) {
                 // update
                 const updated = await svc.update(payload.id, body);
-                // refresh the task bucket if attached
-                const tid = body.taskId || payload.taskId || payload.task_id || activityAttachTaskId || null;
-                if (tid) {
-                    try {
-                        const list = await svc.list({ taskId: tid });
-                        setActivitiesByTask((prev) => ({ ...prev, [String(tid)]: Array.isArray(list) ? list.map(normalizeActivity) : [] }));
-                    } catch (e) {
-                        // ignore
+                const sourceTaskId =
+                    editingActivityViaTaskModal?.taskId ||
+                    payload.originalTaskId ||
+                    payload.original_task_id ||
+                    activityAttachTaskId ||
+                    null;
+                const targetTaskId =
+                    updated?.taskId ||
+                    updated?.task_id ||
+                    body.taskId ||
+                    payload.taskId ||
+                    payload.task_id ||
+                    sourceTaskId ||
+                    null;
+                const normalizedUpdated = normalizeActivity(updated || {});
+
+                setActivitiesByTask((prev) => {
+                    const next = { ...prev };
+                    const sourceKey = sourceTaskId ? String(sourceTaskId) : null;
+                    const targetKey = targetTaskId ? String(targetTaskId) : null;
+
+                    if (sourceKey) {
+                        const sourceList = Array.isArray(next[sourceKey]) ? next[sourceKey] : [];
+                        next[sourceKey] = sourceList.filter((activity) => String(activity.id) !== String(payload.id));
                     }
-                }
+
+                    if (targetKey) {
+                        const parentTask = (allTasks || []).find((task) => String(task.id) === String(targetKey)) || null;
+                        const targetList = Array.isArray(next[targetKey]) ? next[targetKey] : [];
+                        const targetActivity = normalizeActivityWithTask(normalizedUpdated, parentTask);
+                        const existingIndex = targetList.findIndex((activity) => String(activity.id) === String(payload.id));
+                        if (existingIndex >= 0) {
+                            const copy = targetList.slice();
+                            copy[existingIndex] = targetActivity;
+                            next[targetKey] = copy;
+                        } else {
+                            next[targetKey] = [...targetList, targetActivity];
+                        }
+                    }
+
+                    return next;
+                });
+
+                // Refresh the affected task buckets in the background to pick up any
+                // server-side normalization, but keep the optimistic move in place.
+                const refreshTaskIds = [...new Set(
+                    [sourceTaskId, targetTaskId]
+                        .filter((id) => id !== null && id !== undefined && `${id}`.trim() !== '')
+                        .map((id) => String(id)),
+                )];
+                refreshTaskIds.forEach((taskId) => {
+                    (async () => {
+                        try {
+                            const list = await svc.list({ taskId });
+                            setActivitiesByTask((prev) => ({
+                                ...prev,
+                                [String(taskId)]: Array.isArray(list) ? list.map(normalizeActivity) : [],
+                            }));
+                        } catch (e) {
+                            // ignore background refresh failures
+                        }
+                    })();
+                });
             } else {
                 // create
                 if (payload.taskId) body.taskId = payload.taskId;
@@ -4092,6 +4182,7 @@ export default function KeyAreas() {
                         goals={goals}
                         tasks={allTasks}
                         availableLists={availableListNumbers}
+                        parentListNames={selectedKA ? listNames[selectedKA.id] : null}
                         onSave={async (payload) => {
                             await handleActivityModalSave(payload);
                             setEditingActivityViaTaskModal(null);
@@ -6062,6 +6153,7 @@ export default function KeyAreas() {
                                                 goals={goals}
                                                 tasks={allTasks}
                                                 availableLists={availableListNumbers}
+                                                parentListNames={selectedKA ? listNames[selectedKA.id] : null}
                                                 onSave={async (payload) => {
                                                     await handleActivityModalSave(payload);
                                                     setEditingActivityViaTaskModal(null);

@@ -45,9 +45,6 @@ const validateDuration = (value) => {
   return { valid: false, error: 'Duration format invalid. Examples: 01:30, 1h30m, 1h 30m, 1hr 30min, 45m.' };
 };
 
-const now = new Date();
-const defaultDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-
 const _idsOf = (arr = []) => (Array.isArray(arr) ? arr.map((x) => String(x && x.id)).join(',') : '');
 
 const IconChevron = (props) => (
@@ -108,7 +105,7 @@ export default function CreateTaskModal({
   const [title, setTitle] = useState(initialData.title || '');
   const [description, setDescription] = useState(initialData.description || '');
   const [assignee, setAssignee] = useState(initialData.assignee || '');
-  const [startDate, setStartDate] = useState(safeDate(initialData.start_date || initialData.startDate || initialData.date) || defaultDate);
+  const [startDate, setStartDate] = useState(safeDate(initialData.start_date || initialData.startDate || initialData.date) || '');
   const [startTime, setStartTime] = useState(() => {
     try {
       // Prefer explicit start_time/startTime, then a generic `time` passed by calendar slot.
@@ -116,7 +113,7 @@ export default function CreateTaskModal({
       return initialData.start_time || initialData.startTime || initialData.time || '';
     } catch { return ''; }
   });
-  const [endDate, setEndDate] = useState(safeDate(initialData.end_date || initialData.endDate || initialData.date) || defaultDate);
+  const [endDate, setEndDate] = useState(safeDate(initialData.end_date || initialData.endDate || initialData.date) || '');
   const [endTime, setEndTime] = useState(() => {
     try {
       // Keep end time empty by default when not provided.
@@ -177,11 +174,11 @@ export default function CreateTaskModal({
     if (description !== nextDescription) setDescription(nextDescription);
     const nextAssignee = initialData.assignee || '';
     if (assignee !== nextAssignee) setAssignee(nextAssignee);
-  const nextStart = safeDate(initialData.start_date || initialData.startDate || initialData.date) || defaultDate;
+  const nextStart = safeDate(initialData.start_date || initialData.startDate || initialData.date) || '';
     if (startDate !== nextStart) setStartDate(nextStart);
     const nextStartTime = initialData.start_time || initialData.startTime || initialData.time || '';
     if (nextStartTime && startTime !== nextStartTime) setStartTime(nextStartTime);
-  const nextEnd = safeDate(initialData.end_date || initialData.endDate || initialData.date) || defaultDate;
+  const nextEnd = safeDate(initialData.end_date || initialData.endDate || initialData.date) || '';
   if (endDate !== nextEnd) setEndDate(nextEnd);
   const nextEndTime = initialData.end_time || initialData.endTime || initialData.endTime || '';
   if (nextEndTime && endTime !== nextEndTime) setEndTime(nextEndTime);
@@ -590,7 +587,6 @@ export default function CreateTaskModal({
                   <input
                     name="start_date"
                     type="date"
-                    required
                     className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar"
                     value={startDate}
                     onChange={(e) => {
@@ -612,7 +608,6 @@ export default function CreateTaskModal({
                   <input
                     name="end_date"
                     type="date"
-                    required
                     className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar"
                     value={endDate}
                     onChange={(e) => {
