@@ -8,6 +8,17 @@ export const parseDurationToMinutes = (value) => {
   const raw = String(value).trim().toLowerCase();
   if (!raw) return null;
 
+  const meridiemMatch = raw.match(/^([1-9]|1[0-2]):([0-5]\d)\s*(am|pm)$/);
+  if (meridiemMatch) {
+    const hour12 = parseInt(meridiemMatch[1], 10);
+    const minute = parseInt(meridiemMatch[2], 10);
+    const meridiem = meridiemMatch[3];
+    if (!Number.isFinite(hour12) || !Number.isFinite(minute)) return null;
+    let hour24 = hour12 % 12;
+    if (meridiem === 'pm') hour24 += 12;
+    return hour24 * 60 + minute;
+  }
+
   // Accept HH:mm (time-picker style) as duration.
   const hhmm = raw.match(/^(\d{1,2}):([0-5]\d)$/);
   if (hhmm) {

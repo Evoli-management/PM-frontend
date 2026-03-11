@@ -4,6 +4,8 @@ import notificationsService from '../../services/notificationsService';
 import recognitionsService from '../../services/recognitionsService';
 import { useTranslation } from 'react-i18next';
 
+const NOTIFICATION_POLL_MS = 5000;
+
 export default function NotificationBell() {
   const { t } = useTranslation();
   const [unreadCount, setUnreadCount] = useState(0);
@@ -17,10 +19,35 @@ export default function NotificationBell() {
   // Load unread count on mount and periodically
   useEffect(() => {
     loadUnreadCount();
-    // Refresh every 30 seconds
-    const interval = setInterval(loadUnreadCount, 30000);
-    return () => clearInterval(interval);
+
+    const handleVisibilityRefresh = () => {
+      if (document.visibilityState === 'visible') {
+        loadUnreadCount();
+      }
+    };
+
+    const interval = setInterval(loadUnreadCount, NOTIFICATION_POLL_MS);
+    window.addEventListener('focus', loadUnreadCount);
+    document.addEventListener('visibilitychange', handleVisibilityRefresh);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', loadUnreadCount);
+      document.removeEventListener('visibilitychange', handleVisibilityRefresh);
+    };
   }, []);
+
+  useEffect(() => {
+    if (!showDropdown) return undefined;
+
+    loadNotifications();
+    const interval = setInterval(() => {
+      loadUnreadCount();
+      loadNotifications();
+    }, NOTIFICATION_POLL_MS);
+
+    return () => clearInterval(interval);
+  }, [showDropdown]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -74,9 +101,6 @@ export default function NotificationBell() {
   };
 
   const handleBellClick = () => {
-    if (!showDropdown) {
-      loadNotifications();
-    }
     setShowDropdown(!showDropdown);
   };
 

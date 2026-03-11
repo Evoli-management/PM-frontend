@@ -12,6 +12,7 @@ import CreateActivityFormModal from '../components/modals/CreateActivityFormModa
 import KeyAreaModal from '../components/key-areas/KeyAreaModal';
 import EditTaskModal from '../components/key-areas/EditTaskModal';
 import BulkFieldPickerModal from '../components/shared/BulkFieldPickerModal';
+import MassActionMenu from '../components/shared/MassActionMenu.jsx';
 import EditActivityModal from '../components/key-areas/EditActivityModal';
 import EmptyState from '../components/goals/EmptyState.jsx';
 import TaskRow from '../components/key-areas/TaskRow';
@@ -41,7 +42,7 @@ import {
     normalizeActivity,
     resolveAssignee,
 } from '../utils/keyareasHelpers';
-import { parseDurationToMinutes } from '../utils/duration';
+import { durationToTimeInputValue, parseDurationToMinutes } from '../utils/duration';
 
 // Lazy getters for services to allow code-splitting and avoid circular imports
 let _taskService = null;
@@ -1094,6 +1095,13 @@ export default function KeyAreas() {
         const tid = String(taskId || activity?.taskId || activity?.task_id || '');
         if (!tid) return;
         const prevList = Array.isArray(activitiesByTask[tid]) ? activitiesByTask[tid].slice() : [];
+        const apiDateKeyMap = {
+            start_date: 'startDate',
+            end_date: 'endDate',
+            startDate: 'startDate',
+            endDate: 'endDate',
+            deadline: 'deadline',
+        };
 
         const optimistic = (a) => {
             if (a.id !== activity.id) return a;
@@ -1136,17 +1144,18 @@ export default function KeyAreas() {
 
                 if (key === 'status') body.status = mapUiStatusToServer(value);
                 else if (key === 'priority') body.priority = value;
-                else if (key === 'start_date' || key === 'end_date' || key === 'deadline') {
-                    if (!value) body[key] = null;
+                else if (apiDateKeyMap[key]) {
+                    const apiKey = apiDateKeyMap[key];
+                    if (!value) body[apiKey] = null;
                     else if (/^\d{4}-\d{2}-\d{2}$/.test(String(value))) {
                         try {
                             const [y, m, d] = String(value).split('-').map((s) => parseInt(s, 10));
-                            body[key] = new Date(Date.UTC(y, m - 1, d)).toISOString();
+                            body[apiKey] = new Date(Date.UTC(y, m - 1, d)).toISOString();
                         } catch (err) {
-                            body[key] = String(value);
+                            body[apiKey] = String(value);
                         }
                     } else {
-                        body[key] = String(value);
+                        body[apiKey] = String(value);
                     }
                 } else body[key] = value;
 
@@ -1342,6 +1351,7 @@ export default function KeyAreas() {
     const [activityNameEditId, setActivityNameEditId] = useState(null);
     const [activityNameEditValue, setActivityNameEditValue] = useState('');
     const [activityDateEditId, setActivityDateEditId] = useState(null);
+    const [activityDurationEdit, setActivityDurationEdit] = useState({ id: null, value: '' });
     const activityDateRefs = useRef({});
     const [showTaskHelp, setShowTaskHelp] = useState(false);
     const [listNames, setListNames] = useState({}); // { [keyAreaId]: { [index]: name } }
@@ -1886,7 +1896,6 @@ export default function KeyAreas() {
                 try { return { ...t, priority: getPriorityLevel(value) }; } catch (e) { return { ...t, priority: value }; }
             }
             if (key === 'assignee') {
-                const existingDelegatedToUserId = t.delegatedToUserId || t.delegated_to_user_id || null;
                 const selectedUser = (users || []).find((u) => String(u.id || u.member_id) === String(value));
                 if (selectedUser) {
                     const selectedUserId = selectedUser.id || selectedUser.member_id;
@@ -1900,11 +1909,11 @@ export default function KeyAreas() {
                         assignee: displayName,
                         delegatedToUserId:
                             assigningToSelf
-                                ? (existingDelegatedToUserId || null)
+                                ? null
                                 : selectedUserId,
                     };
                 }
-                return { ...t, assignee: value || '', delegatedToUserId: existingDelegatedToUserId || null };
+                return { ...t, assignee: '', delegatedToUserId: null };
             }
             return { ...t, [key]: value };
         };
@@ -1920,7 +1929,6 @@ export default function KeyAreas() {
         if (key === 'name') patch.title = value;
         else if (key === 'notes') patch.description = value;
         else if (key === 'assignee') {
-            const existingDelegatedToUserId = prevTask.delegatedToUserId || prevTask.delegated_to_user_id || null;
             const selectedUser = (users || []).find((u) => String(u.id || u.member_id) === String(value));
             if (selectedUser) {
                 const selectedUserId = selectedUser.id || selectedUser.member_id;
@@ -1931,11 +1939,11 @@ export default function KeyAreas() {
                         : (selectedUser.name || `${selectedUser.firstname || ''} ${selectedUser.lastname || ''}`.trim() || null);
                 patch.delegatedToUserId =
                     assigningToSelf
-                        ? (existingDelegatedToUserId || null)
+                        ? null
                         : selectedUserId;
             } else {
-                patch.assignee = value || null;
-                patch.delegatedToUserId = existingDelegatedToUserId || null;
+                patch.assignee = null;
+                patch.delegatedToUserId = null;
             }
         }
         else if (key === 'start_date') patch.startDate = value ? new Date(value).toISOString() : null;
@@ -3643,9 +3651,7 @@ export default function KeyAreas() {
         setSelectedIds(new Set());
     };
 
-    const handleTaskMassActionChange = async (e) => {
-        const action = e.target.value;
-        e.target.value = "";
+    const handleTaskMassActionChange = async (action) => {
         if (!action || selectedIds.size === 0) return;
         if (action === "edit") {
             setShowMassFieldPicker(true);
@@ -4580,17 +4586,13 @@ export default function KeyAreas() {
                                                 <span className="text-slate-500" aria-live="polite">
                                                     {selectedIds.size} selected
                                                 </span>
-                                                <select
+                                                <MassActionMenu
+                                                    label="Mass Edit"
+                                                    ariaLabel="mass action"
                                                     disabled={selectedIds.size === 0}
-                                                    onChange={handleTaskMassActionChange}
-                                                    defaultValue=""
-                                                    className="h-[32px] rounded-md border border-emerald-700 bg-emerald-600 px-3 text-sm font-semibold text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-300 disabled:opacity-50"
-                                                    aria-label="mass action"
-                                                >
-                                                    <option value="" hidden>Mass Edit</option>
-                                                    <option value="edit" className="bg-white text-slate-900">Select field</option>
-                                                    <option value="delete" className="bg-white text-slate-900">Delete</option>
-                                                </select>
+                                                    title={selectedIds.size === 0 ? 'Select tasks to enable mass edit' : undefined}
+                                                    onSelect={handleTaskMassActionChange}
+                                                />
                                                 <button
                                                     type="button"
                                                     onClick={() => {
@@ -5114,12 +5116,16 @@ export default function KeyAreas() {
                                                         <span className="text-slate-500" aria-live="polite">
                                                             {selectedActivityCountInPanel} selected
                                                         </span>
-                                                        <select
+                                                        <MassActionMenu
+                                                            label="Mass Edit"
+                                                            ariaLabel="activity mass action"
                                                             disabled={selectedActivityCountInPanel === 0}
-                                                            defaultValue=""
-                                                            onChange={(e) => {
-                                                                const action = e.target.value;
-                                                                e.target.value = '';
+                                                            title={
+                                                                selectedActivityCountInPanel === 0
+                                                                    ? 'Select activities to enable mass edit'
+                                                                    : undefined
+                                                            }
+                                                            onSelect={(action) => {
                                                                 if (!action) return;
                                                                 if (action === 'edit') {
                                                                     setShowActivityMassFieldPicker(true);
@@ -5162,13 +5168,7 @@ export default function KeyAreas() {
                                                                     setSelectedActivityIdsInPanel(new Set());
                                                                 }
                                                             }}
-                                                            className="h-[32px] rounded-md border border-emerald-700 bg-emerald-600 px-3 text-sm font-semibold text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-300 disabled:opacity-50"
-                                                            aria-label="activity mass action"
-                                                        >
-                                                            <option value="" hidden>Mass Edit</option>
-                                                            <option value="edit" className="bg-white text-slate-900">Select field</option>
-                                                            <option value="delete" className="bg-white text-slate-900">Delete</option>
-                                                        </select>
+                                                        />
                                                     </div>
                                                     <button
                                                         type="button"
@@ -5593,7 +5593,50 @@ export default function KeyAreas() {
                                                                                     )}
                                                                                     {visibleColumns.duration && (
                                                                                         <td className="px-3 py-2 align-top text-slate-800 w-[96px]">
-                                                                                            <div className="w-full text-left">{a.duration || '0d'}</div>
+                                                                                            <div className="w-full text-left">
+                                                                                                {activityDurationEdit.id === a.id ? (
+                                                                                                    <input
+                                                                                                        autoFocus
+                                                                                                        type="time"
+                                                                                                        step="60"
+                                                                                                        className="w-full rounded border border-slate-300 px-1 py-0.5 text-sm"
+                                                                                                        value={activityDurationEdit.value}
+                                                                                                        onChange={(e) => setActivityDurationEdit({ id: a.id, value: e.target.value })}
+                                                                                                        onBlur={(e) => {
+                                                                                                            const nextValue = e.target.value;
+                                                                                                            const currentValue = durationToTimeInputValue(a.duration);
+                                                                                                            setActivityDurationEdit({ id: null, value: '' });
+                                                                                                            if (nextValue !== currentValue) {
+                                                                                                                updateActivityField(a, selectedTaskInPanel?.id, 'duration', nextValue || null);
+                                                                                                            }
+                                                                                                        }}
+                                                                                                        onKeyDown={(e) => {
+                                                                                                            if (e.key === 'Enter') {
+                                                                                                                e.preventDefault();
+                                                                                                                e.currentTarget.blur();
+                                                                                                            } else if (e.key === 'Escape') {
+                                                                                                                setActivityDurationEdit({ id: null, value: '' });
+                                                                                                            }
+                                                                                                        }}
+                                                                                                        disabled={savingActivityIds.has(a.id)}
+                                                                                                    />
+                                                                                                ) : (
+                                                                                                    <button
+                                                                                                        type="button"
+                                                                                                        className="w-full rounded px-1 text-left hover:bg-slate-100"
+                                                                                                        onClick={() => {
+                                                                                                            setActivityDurationEdit({
+                                                                                                                id: a.id,
+                                                                                                                value: durationToTimeInputValue(a.duration),
+                                                                                                            });
+                                                                                                        }}
+                                                                                                        disabled={savingActivityIds.has(a.id)}
+                                                                                                        title="Edit duration"
+                                                                                                    >
+                                                                                                        {String(a.duration ?? '').trim() || '—'}
+                                                                                                    </button>
+                                                                                                )}
+                                                                                            </div>
                                                                                         </td>
                                                                                     )}
                                                                                     {visibleColumns.completed && (
@@ -6220,12 +6263,14 @@ export default function KeyAreas() {
                                 { value: 'assignee', label: 'Responsible' },
                                 { value: 'status', label: 'Status' },
                                 { value: 'priority', label: 'Priority' },
+                                { value: 'goalId', label: 'Goal' },
                                 { value: 'duration', label: 'Duration' },
                                 { value: 'key_area_bundle', label: 'Key Area' },
                                 { value: 'date', label: 'Date' },
                             ]}
                             users={users}
                             keyAreas={keyAreas}
+                            goals={goals}
                             availableLists={availableListNumbers}
                             listNamesByKeyArea={listNames}
                             onCancel={() => {
