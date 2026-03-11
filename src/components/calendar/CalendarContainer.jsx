@@ -259,7 +259,7 @@ const CalendarContainer = () => {
         (async () => {
             try {
                 const status = await calendarService.getSyncStatus();
-                if (!ignore) setSyncActive(!!(status?.syncToGoogle || status?.syncToOutlook));
+                if (!ignore) setSyncActive(!!(status?.google?.connected || status?.microsoft?.connected));
             } catch (_) {
                 if (!ignore) setSyncActive(false);
             }
