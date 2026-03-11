@@ -774,6 +774,7 @@
     "statusOther": "Altro",
     "columns": "Colonne",
     "showCompleted": "Mostra gli elementi completati",
+    "completed": "Completato",
     "activities": "Attività",
     "selectTask": "Seleziona un'attività",
     "viewTriple": "Triplicare",
@@ -1608,6 +1609,7 @@
   "viewTabsNavigation": {
     "activeTasks": "COMPITI ATTIVI",
     "allTasks": "TUTTI I COMPITI",
+    "completedTasks": "COMPLETATO",
     "delegated": "DELEGATO",
     "todo": "DA FARE (ROSSO)",
     "activityTrap": "TRAPPOLA DI ATTIVITÀ",

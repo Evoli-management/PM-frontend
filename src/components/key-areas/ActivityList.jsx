@@ -2,7 +2,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import EmptyState from '../../components/goals/EmptyState.jsx';
 import ActivityRow from './ActivityRow';
-import { normalizeActivity, mapUiStatusToServer } from '../../utils/keyareasHelpers';
+import { normalizeActivity, mapUiStatusToServer, applyStartEndDateRule, getItemStatusFilterValue } from '../../utils/keyareasHelpers';
 import BulkFieldPickerModal from '../shared/BulkFieldPickerModal';
 
 // Lazy service getter to avoid circular imports
@@ -28,11 +28,17 @@ export default function ActivityList({
     users = [],
     currentUserId = null,
     goals = [],
+    filterStatuses = [],
+    allStatusesSelected = true,
 }) {
     const { t } = useTranslation();
     if (!task || !task.id) return null;
     const taskKey = String(task.id);
     const list = (activitiesByTask[taskKey] || []).slice();
+    const visibleList = React.useMemo(() => {
+        if (allStatusesSelected) return list;
+        return list.filter((activity) => filterStatuses.includes(getItemStatusFilterValue(activity)));
+    }, [allStatusesSelected, filterStatuses, list]);
     const [selectedActivityIds, setSelectedActivityIds] = React.useState(new Set());
     const [showMassFieldPicker, setShowMassFieldPicker] = React.useState(false);
 
@@ -44,11 +50,11 @@ export default function ActivityList({
     React.useEffect(() => {
         setSelectedActivityIds((prev) => {
             const next = new Set(
-                Array.from(prev).filter((id) => list.some((a) => String(a.id) === String(id))),
+                Array.from(prev).filter((id) => visibleList.some((a) => String(a.id) === String(id))),
             );
             return next.size === prev.size ? prev : next;
         });
-    }, [list]);
+    }, [visibleList]);
 
     const toggleSelectActivity = (id) => {
         setSelectedActivityIds((prev) => {
@@ -78,7 +84,7 @@ export default function ActivityList({
                 return;
             }
             if (action === 'delete') {
-                const selected = list.filter((a) => selectedActivityIds.has(a.id));
+                const selected = visibleList.filter((a) => selectedActivityIds.has(a.id));
                 const confirmed = window.confirm(t('unifiedTable.confirmDeleteSelected') || 'Delete selected items?');
                 if (!confirmed) return;
                 for (const activity of selected) {
@@ -91,13 +97,22 @@ export default function ActivityList({
 
         window.addEventListener('ka-activity-mass-action', onMassAction);
         return () => window.removeEventListener('ka-activity-mass-action', onMassAction);
-    }, [list, remove, selectedActivityIds, taskKey, t]);
+    }, [visibleList, remove, selectedActivityIds, taskKey, t]);
 
     // Generic single-field update for activities with optimistic UI
     const updateActivityField = async (id, key, value) => {
         const prevList = Array.isArray(list) ? list.slice() : [];
         const prevItem = prevList.find((a) => a.id === id);
         if (!prevItem) return;
+        const resolvedDates =
+            key === 'start_date' || key === 'end_date'
+                ? applyStartEndDateRule({
+                    startDate: prevItem.start_date ?? prevItem.startDate,
+                    endDate: prevItem.end_date ?? prevItem.endDate,
+                    changedKey: key,
+                    changedValue: value,
+                })
+                : null;
         const apiDateKeyMap = {
             start_date: 'startDate',
             end_date: 'endDate',
@@ -106,7 +121,19 @@ export default function ActivityList({
             deadline: 'deadline',
         };
 
-        const optimistic = (a) => (a.id === id ? { ...a, [key]: value } : a);
+        const optimistic = (a) => {
+            if (a.id !== id) return a;
+            if (resolvedDates) {
+                return {
+                    ...a,
+                    start_date: resolvedDates.startDate || null,
+                    startDate: resolvedDates.startDate || null,
+                    end_date: resolvedDates.endDate || null,
+                    endDate: resolvedDates.endDate || null,
+                };
+            }
+            return { ...a, [key]: value };
+        };
         setList((prev) => prev.map(optimistic));
         setSavingActivityIds((s) => new Set([...s, id]));
 
@@ -132,7 +159,22 @@ export default function ActivityList({
             if (key === 'text' || key === 'title') body.text = value;
             else if (key === 'completed') body.completed = !!value;
             else if (key === 'priority') body.priority = value;
-            else if (apiDateKeyMap[key]) {
+            else if (resolvedDates) {
+                const toIsoOrNull = (dateValue) => {
+                    if (!dateValue) return null;
+                    if (/^\d{4}-\d{2}-\d{2}$/.test(String(dateValue))) {
+                        try {
+                            const [y, m, d] = String(dateValue).split('-').map((s) => parseInt(s, 10));
+                            return new Date(Date.UTC(y, m - 1, d)).toISOString();
+                        } catch (err) {
+                            return String(dateValue);
+                        }
+                    }
+                    return String(dateValue);
+                };
+                body.startDate = toIsoOrNull(resolvedDates.startDate);
+                body.endDate = toIsoOrNull(resolvedDates.endDate);
+            } else if (apiDateKeyMap[key]) {
                 const apiKey = apiDateKeyMap[key];
                 // convert YYYY-MM-DD to ISO datetime at UTC midnight to satisfy server
                 if (!value) body[apiKey] = null;
@@ -234,7 +276,7 @@ export default function ActivityList({
     };
 
     const handleMassEdit = async (field, value) => {
-        const selected = list.filter((a) => selectedActivityIds.has(a.id));
+        const selected = visibleList.filter((a) => selectedActivityIds.has(a.id));
         if (selected.length === 0) return;
 
         for (const activity of selected) {
@@ -283,16 +325,16 @@ export default function ActivityList({
                 onSave={handleMassEdit}
             />
 
-            {list.length === 0 ? (
+            {visibleList.length === 0 ? (
                 <EmptyState title={t('activityList.emptyTitle')} hint={t('activityList.emptyHint')} />
             ) : (
                 <div>
-                    {list.map((a, index) => (
+                    {visibleList.map((a, index) => (
                         <ActivityRow
                             key={a.id}
                             a={a}
                             index={index}
-                            listLength={list.length}
+                            listLength={visibleList.length}
                             selected={selectedActivityIds.has(a.id)}
                             onToggleSelect={toggleSelectActivity}
                             toggleComplete={toggleComplete}

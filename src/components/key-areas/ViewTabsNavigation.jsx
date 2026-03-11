@@ -15,7 +15,11 @@ export default function ViewTabsNavigation({
     const { t } = useTranslation();
     const [openActiveMenu, setOpenActiveMenu] = useState(false);
     const activeMenuRef = useRef(null);
-    const activeTasksLabel = activeFilter === 'all' ? t("viewTabsNavigation.allTasks") : t("viewTabsNavigation.activeTasks");
+    const activeTasksLabel = activeFilter === 'completed'
+        ? t("viewTabsNavigation.completedTasks")
+        : activeFilter === 'all'
+            ? t("viewTabsNavigation.allTasks")
+            : t("viewTabsNavigation.activeTasks");
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -78,6 +82,21 @@ export default function ViewTabsNavigation({
                                 }`}
                             >
                                 {t("viewTabsNavigation.allTasks")}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setViewTab('active-tasks');
+                                    setActiveFilter('completed');
+                                    setOpenActiveMenu(false);
+                                }}
+                                className={`w-full text-left px-3 py-2 text-xs font-semibold uppercase tracking-wide transition ${
+                                    viewTab === 'active-tasks' && activeFilter === 'completed'
+                                        ? 'text-blue-600'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                {t("viewTabsNavigation.completedTasks")}
                             </button>
                         </div>
                     )}
