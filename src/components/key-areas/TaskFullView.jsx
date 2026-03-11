@@ -303,12 +303,25 @@ export default function TaskFullView({
         const payload = {};
         if (values.text) payload.text = values.text;
         if (values.note) payload.note = values.note;
-        const sd = normalizeDate(values.startDate || values.start_date);
-        if (sd) payload.startDate = sd;
-        const ed = normalizeDate(values.endDate || values.end_date);
-        if (ed) payload.endDate = ed;
-        const dl = normalizeDate(values.deadline || values.dueDate || values.due_date);
-        if (dl) payload.deadline = dl;
+        if (
+            values.startDate !== undefined ||
+            values.start_date !== undefined
+        ) {
+            payload.startDate = normalizeDate(values.startDate ?? values.start_date) || null;
+        }
+        if (
+            values.endDate !== undefined ||
+            values.end_date !== undefined
+        ) {
+            payload.endDate = normalizeDate(values.endDate ?? values.end_date) || null;
+        }
+        if (
+            values.deadline !== undefined ||
+            values.dueDate !== undefined ||
+            values.due_date !== undefined
+        ) {
+            payload.deadline = normalizeDate(values.deadline ?? values.dueDate ?? values.due_date) || null;
+        }
         if (typeof values.completed === 'boolean') payload.completed = values.completed;
         if (values.status) payload.status = values.status;
         if (values.priority !== undefined && values.priority !== null) payload.priority = typeof values.priority === 'number' ? mapPriority(values.priority) : values.priority;
@@ -815,6 +828,7 @@ export default function TaskFullView({
                         goals={goals}
                         tasks={allTasks}
                         availableLists={listNumbers}
+                        parentListNames={kaId ? (listNames[String(kaId)] || null) : null}
                         onSave={async (saved) => {
                             // reuse same save logic as before for the Create modal
                             // eslint-disable-next-line no-console
@@ -847,9 +861,22 @@ export default function TaskFullView({
                                         const nStart = toDateOnly(rawStart) || null;
                                         const nEnd = toDateOnly(rawEnd) || null;
                                         const nDeadline = toDateOnly(rawDeadline) || null;
-                                        if (nStart) apiPayload.startDate = nStart;
-                                        if (nEnd) apiPayload.endDate = nEnd;
-                                        if (nDeadline) apiPayload.deadline = nDeadline;
+                                        if (
+                                            saved.startDate !== undefined ||
+                                            saved.start_date !== undefined ||
+                                            saved.date_start !== undefined ||
+                                            saved.date !== undefined
+                                        ) apiPayload.startDate = nStart;
+                                        if (
+                                            saved.endDate !== undefined ||
+                                            saved.end_date !== undefined ||
+                                            saved.date_end !== undefined
+                                        ) apiPayload.endDate = nEnd;
+                                        if (
+                                            saved.deadline !== undefined ||
+                                            saved.dueDate !== undefined ||
+                                            saved.due_date !== undefined
+                                        ) apiPayload.deadline = nDeadline;
 
                                         // status/completed
                                         if (typeof saved.status !== 'undefined') apiPayload.status = saved.status;
@@ -888,11 +915,35 @@ export default function TaskFullView({
                                 try { console.debug('[TaskFullView] activity.update payload JSON', JSON.stringify({ activityId, apiPayload })); } catch (__) {}
                                 const updated = saved && saved.id ? saved : await svc.update(activityId, apiPayload || {});
                                 const norm = normalizeActivity(updated || {});
-                                setList((prevList) => prevList.map((a) => (a.id === activityId ? norm : a)));
+                                const nextTaskId =
+                                    norm.taskId ||
+                                    norm.task_id ||
+                                    saved?.taskId ||
+                                    saved?.task_id ||
+                                    String(task.id);
+                                const movedToDifferentTask = String(nextTaskId) !== String(task.id);
+                                setList((prevList) => (
+                                    movedToDifferentTask
+                                        ? prevList.filter((a) => String(a.id) !== String(activityId))
+                                        : prevList.map((a) => (a.id === activityId ? norm : a))
+                                ));
                                 addToast && addToast({ title: 'Activity saved', variant: 'success' });
                                 try {
-                                    const nextList = (Array.isArray(list) ? list : []).map((a) => (a.id === activityId ? normalizeActivity((updated || saved) || {}) : a));
-                                    window.dispatchEvent(new CustomEvent('ka-activities-updated', { detail: { refresh: true, taskId: String(task.id), list: nextList } }));
+                                    if (movedToDifferentTask) {
+                                        const currentList = (Array.isArray(list) ? list : []).filter((a) => String(a.id) !== String(activityId));
+                                        window.dispatchEvent(new CustomEvent('ka-activities-updated', {
+                                            detail: {
+                                                refresh: true,
+                                                sourceTaskId: String(task.id),
+                                                targetTaskId: String(nextTaskId),
+                                                movedActivity: norm,
+                                                sourceList: currentList,
+                                            },
+                                        }));
+                                    } else {
+                                        const nextList = (Array.isArray(list) ? list : []).map((a) => (a.id === activityId ? normalizeActivity((updated || saved) || {}) : a));
+                                        window.dispatchEvent(new CustomEvent('ka-activities-updated', { detail: { refresh: true, taskId: String(task.id), list: nextList } }));
+                                    }
                                 } catch (e) {
                                     window.dispatchEvent(new CustomEvent('ka-activities-updated', { detail: { refresh: true, taskId: String(task.id) } }));
                                 }

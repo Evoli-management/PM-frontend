@@ -51,9 +51,6 @@ export default function CreateActivityFormModal({
     }
   }
 
-  const now = new Date()
-  const defaultDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-
   const IconChevron = (props) => (
     <svg viewBox="0 0 24 24" aria-hidden="true" {...props}>
       <path
@@ -65,8 +62,8 @@ export default function CreateActivityFormModal({
 
   const [title, setTitle] = useState(initialData.text || '')
   const [description, setDescription] = useState(initialData.description || '')
-  const [startDate, setStartDate] = useState(safeDate(initialData.startDate || initialData.date_start) || defaultDate)
-  const [endDate, setEndDate] = useState(safeDate(initialData.endDate || initialData.date_end) || defaultDate)
+  const [startDate, setStartDate] = useState(safeDate(initialData.startDate || initialData.date_start) || '')
+  const [endDate, setEndDate] = useState(safeDate(initialData.endDate || initialData.date_end) || '')
   const [endAuto, setEndAuto] = useState(!(initialData.endDate || initialData.date_end))
   const [deadlineAuto, setDeadlineAuto] = useState(true)
   const [deadline, setDeadline] = useState(safeDate(initialData.deadline || initialData.dueDate))
@@ -120,8 +117,8 @@ export default function CreateActivityFormModal({
     if (!isOpen) return
     setTitle(initialData?.text || '')
     setDescription(initialData?.description || '')
-    setStartDate(safeDate(initialData?.startDate || initialData?.date_start) || defaultDate)
-    const nextEnd = safeDate(initialData?.endDate || initialData?.date_end) || defaultDate
+    setStartDate(safeDate(initialData?.startDate || initialData?.date_start) || '')
+    const nextEnd = safeDate(initialData?.endDate || initialData?.date_end) || ''
     setEndDate(nextEnd)
     // If initial data provides an explicit end date, disable auto-sync; otherwise keep auto-sync enabled
     setEndAuto(!Boolean(initialData?.endDate || initialData?.date_end))

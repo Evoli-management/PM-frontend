@@ -27,8 +27,88 @@ const safeDate = (v) => {
   }
 };
 
-const now = new Date();
-const defaultDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const normalizeUserLookupValue = (value) => {
+  if (value === undefined || value === null) return '';
+  if (typeof value === 'object') {
+    return (
+      value.id ||
+      value.userId ||
+      value.user_id ||
+      value.name ||
+      value.username ||
+      value.email ||
+      ''
+    );
+  }
+  return String(value).trim();
+};
+
+const extractAssigneeCandidate = (item = {}) => {
+  const candidates = [
+    item.assigneeId,
+    item.assignee_id,
+    item.responsibleId,
+    item.responsible_id,
+    item.delegatedToUserId,
+    item.delegated_to_user_id,
+    item.assignee,
+    item.responsible,
+    item.assignee_name,
+    item.responsibleName,
+    item.responsible_name,
+    item.owner,
+    item.assigned_to,
+  ];
+  for (const candidate of candidates) {
+    const normalized = normalizeUserLookupValue(candidate);
+    if (normalized) return normalized;
+  }
+  return '';
+};
+
+const findUserIdFromValue = (value, users = [], currentUserId = null) => {
+  const normalized = normalizeUserLookupValue(value);
+  if (!normalized) return '';
+  if (String(normalized).toLowerCase() === 'me' && currentUserId) return String(currentUserId);
+  if (UUID_RE.test(normalized)) return normalized;
+
+  const target = String(normalized).toLowerCase();
+  const user = (users || []).find((u) => {
+    const candidates = [
+      u.id,
+      u.userId,
+      u.user_id,
+      u.name,
+      u.username,
+      u.email,
+      `${u.firstname || ''} ${u.lastname || ''}`.trim(),
+      `${u.name || u.firstname || ''} ${u.lastname || ''}`.trim(),
+    ]
+      .map((candidate) => String(candidate || '').trim())
+      .filter(Boolean);
+
+    return candidates.some((candidate) => {
+      const lower = candidate.toLowerCase();
+      return lower === target || target.includes(lower);
+    });
+  });
+
+  return user?.id ? String(user.id) : '';
+};
+
+const resolveActivityAssigneeSelectValue = (item = {}, users = [], currentUserId = null, taskOptions = []) => {
+  const direct = findUserIdFromValue(extractAssigneeCandidate(item), users, currentUserId);
+  if (direct) return direct;
+
+  const taskId = item.taskId || item.task_id || item.task || null;
+  if (!taskId) return '';
+  const parentTask = (taskOptions || []).find(
+    (task) => String(task.id || task.taskId || task.task_id || task._id) === String(taskId)
+  );
+  return findUserIdFromValue(extractAssigneeCandidate(parentTask), users, currentUserId);
+};
 
 const normalizePriority = (value) => {
   if (value === undefined || value === null || value === '') return 'normal';
@@ -37,6 +117,18 @@ const normalizePriority = (value) => {
   if (raw === '1' || raw === 'low') return 'low';
   if (raw === '2' || raw === 'normal' || raw === 'med' || raw === 'medium') return 'normal';
   return 'normal';
+};
+
+const sanitizeTaskOptions = (items = [], currentActivityId = null) => {
+  if (!Array.isArray(items)) return [];
+  return items.filter((item) => {
+    const id = item?.id ?? item?.taskId ?? item?.task_id ?? null;
+    if (!id) return false;
+    if (currentActivityId && String(id) === String(currentActivityId)) return false;
+    // Activity-shaped rows should never appear in the task selector.
+    if (item?.taskId || item?.task_id || item?.activityId || item?.activity_id) return false;
+    return true;
+  });
 };
 
 // inline SVG icons (untyped)
@@ -63,18 +155,36 @@ export default function EditActivityModal({
   tasks = [],
   availableLists = [1],
   currentUserId = null,
+  parentListNames = null,
 }) {
   const usersLoadedRef = useRef(false);
+  const currentActivityId =
+    initialData.id || initialData.activityId || initialData.activity_id || null;
   const [localKeyAreas, setLocalKeyAreas] = useState(keyAreas || []);
-  const [localTasks, setLocalTasks] = useState(tasks || []);
+  const [localTasks, setLocalTasks] = useState(sanitizeTaskOptions(tasks || [], currentActivityId));
   const { t } = useTranslation();
+  const hasSameListNames = (a, b) => {
+    const aObj = a && typeof a === 'object' ? a : {};
+    const bObj = b && typeof b === 'object' ? b : {};
+    const aKeys = Object.keys(aObj);
+    const bKeys = Object.keys(bObj);
+    if (aKeys.length !== bKeys.length) return false;
+    return aKeys.every((k) => String(aObj[k] ?? '') === String(bObj[k] ?? ''));
+  };
+  const normalizedParentListNames = {};
+  try {
+    Object.keys(parentListNames || {}).forEach((k) => {
+      const num = Number(k);
+      if (!Number.isNaN(num)) normalizedParentListNames[num] = parentListNames[k];
+      else normalizedParentListNames[k] = parentListNames[k];
+    });
+  } catch (e) {}
   const [localGoals, setLocalGoals] = useState(goals || []);
   const [usersList, setUsersList] = useState(users || []);
-  const [listNamesMap, setListNamesMap] = useState({});
   const [title, setTitle] = useState(initialData.text || initialData.activity_name || '');
   const [description, setDescription] = useState(initialData.notes || initialData.description || '');
-  const [startDate, setStartDate] = useState(safeDate(initialData.date_start || initialData.startDate) || defaultDate);
-  const [endDate, setEndDate] = useState(safeDate(initialData.date_end || initialData.endDate) || defaultDate);
+  const [startDate, setStartDate] = useState(safeDate(initialData.date_start || initialData.startDate) || '');
+  const [endDate, setEndDate] = useState(safeDate(initialData.date_end || initialData.endDate) || '');
   const [endAuto, setEndAuto] = useState(true);
   const [deadlineAuto, setDeadlineAuto] = useState(true);
   const [keyAreaError, setKeyAreaError] = useState('');
@@ -90,7 +200,9 @@ export default function EditActivityModal({
   const [localAvailableLists, setLocalAvailableLists] = useState(Array.isArray(availableLists) ? availableLists : [1]);
   const [localListNames, setLocalListNames] = useState({});
   const [taskId, setTaskId] = useState(initialData.taskId || initialData.task_id || initialData.task || '');
-  const [assignee, setAssignee] = useState(initialData.responsible || initialData.assignee || '');
+  const [assignee, setAssignee] = useState(() =>
+    resolveActivityAssigneeSelectValue(initialData, users, currentUserId, tasks)
+  );
   const [priority, setPriority] = useState(normalizePriority(initialData.priority ?? initialData.priority_level ?? 'normal'));
   const [goal, setGoal] = useState(initialData.goal || initialData.goalId || '');
   const startRef = useRef(null);
@@ -102,13 +214,16 @@ export default function EditActivityModal({
   // Filter tasks by selected key area and list
   const filteredTasks = useMemo(() => {
     if (!keyAreaId || !listIndex) return [];
-    const allTasks = localTasks.length > 0 ? localTasks : (tasks || []);
+    const allTasks = sanitizeTaskOptions(
+      localTasks.length > 0 ? localTasks : (tasks || []),
+      currentActivityId,
+    );
     return allTasks.filter((t) => {
       const tKeyArea = t.keyAreaId || t.key_area_id || t.keyArea || t.key_area;
       const tList = t.list || t.list_index || t.listIndex;
       return String(tKeyArea) === String(keyAreaId) && String(tList) === String(listIndex);
     });
-  }, [keyAreaId, listIndex, localTasks, tasks]);
+  }, [keyAreaId, listIndex, localTasks, tasks, currentActivityId]);
 
   useEffect(() => {
     if (isDragging) {
@@ -131,8 +246,8 @@ export default function EditActivityModal({
     setTitle(initialData.text || initialData.activity_name || '');
     setDescription(initialData.notes || initialData.description || '');
     // Try multiple possible date aliases to maximize chance of prefill
-    setStartDate(safeDate(initialData.date_start ?? initialData.dateStart ?? initialData.startDate ?? initialData.start_date ?? initialData.date) || defaultDate);
-    const nextEnd = safeDate(initialData.date_end ?? initialData.endDate ?? initialData.end_date ?? initialData.date_end) || defaultDate;
+    setStartDate(safeDate(initialData.date_start ?? initialData.dateStart ?? initialData.startDate ?? initialData.start_date ?? initialData.date) || '');
+    const nextEnd = safeDate(initialData.date_end ?? initialData.endDate ?? initialData.end_date ?? initialData.date_end) || '';
     setEndDate(nextEnd);
     // Keep auto-sync enabled on open so changing Start date auto-fills End date,
     // matching behavior in other composer/edit modals until user edits End date manually.
@@ -143,63 +258,19 @@ export default function EditActivityModal({
     setKeyAreaId(initialData.key_area_id || initialData.keyAreaId || initialData.keyArea || initialData.key_area || '');
     setListIndex(initialData.list || initialData.list_index || '');
     setTaskId(initialData.taskId || initialData.task_id || initialData.task || initialData.task_id || '');
-    // Activity assignee can come from responsible, assignee, or delegatedToUserId fields
-    const initialAssigneeValue = initialData.responsible || initialData.assignee || initialData.delegatedToUserId || initialData.delegated_to_user_id || '';
-    let nextAssignee = '';
-    if (initialAssigneeValue) {
-      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(initialAssigneeValue)) {
-        nextAssignee = initialAssigneeValue;
-      } else {
-        const user = usersList.find((u) => {
-          const fullName = `${u.name || ''} ${u.lastname || ''}`.trim();
-          const email = u.email || '';
-          const initialLower = String(initialAssigneeValue).toLowerCase();
-          return (
-            String(u.id) === String(initialAssigneeValue) ||
-            u.name === initialAssigneeValue ||
-            fullName === initialAssigneeValue ||
-            email === initialAssigneeValue ||
-            initialLower.includes(email.toLowerCase()) ||
-            initialLower.includes(u.name?.toLowerCase() || '')
-          );
-        });
-        nextAssignee = user?.id || '';
-      }
-    }
-    if (nextAssignee) setAssignee(nextAssignee);
-    else {
-      try {
-        const lookupTasks = (localTasks && localTasks.length) ? localTasks : (tasks && tasks.length ? tasks : []);
-        const tid = initialData.taskId || initialData.task_id || initialData.task || null;
-        if (tid) {
-          const parent = lookupTasks.find((t) => String(t.id) === String(tid));
-          if (parent && (parent.assignee || parent.responsible)) {
-            const parentAssignee = parent.assignee || parent.responsible || '';
-            if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(parentAssignee)) {
-              setAssignee(parentAssignee);
-            } else {
-              const parentUser = usersList.find((u) => {
-                const fullName = `${u.name || ''} ${u.lastname || ''}`.trim();
-                const email = u.email || '';
-                const parentLower = String(parentAssignee).toLowerCase();
-                return (
-                  String(u.id) === String(parentAssignee) ||
-                  u.name === parentAssignee ||
-                  fullName === parentAssignee ||
-                  email === parentAssignee ||
-                  parentLower.includes(email.toLowerCase()) ||
-                  parentLower.includes(u.name?.toLowerCase() || '')
-                );
-              });
-              if (parentUser?.id) setAssignee(parentUser.id);
-            }
-          }
-        }
-      } catch (e) {}
-    }
+    const lookupTasks = (localTasks && localTasks.length) ? localTasks : (tasks && tasks.length ? tasks : []);
+    setAssignee(resolveActivityAssigneeSelectValue(initialData, usersList, currentUserId, lookupTasks));
     setPriority(normalizePriority(initialData.priority ?? initialData.priority_level ?? 'normal'));
     setGoal(initialData.goal || initialData.goalId || '');
   }, [isOpen, initialData, keyAreas, availableLists]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (assignee) return;
+    const lookupTasks = (localTasks && localTasks.length) ? localTasks : (tasks && tasks.length ? tasks : []);
+    const nextAssignee = resolveActivityAssigneeSelectValue(initialData, usersList, currentUserId, lookupTasks);
+    if (nextAssignee) setAssignee(nextAssignee);
+  }, [isOpen, assignee, initialData, usersList, currentUserId, localTasks, tasks]);
 
   // Load key areas, tasks and goals when modal opens so Task and List dropdowns
   // are populated even if parent didn't pass full lists. This mirrors EditTaskModal.
@@ -220,22 +291,47 @@ export default function EditActivityModal({
         ]);
         if (ignore) return;
         setLocalKeyAreas(Array.isArray(areas) ? areas : []);
-        setLocalTasks(Array.isArray(fetchedTasks) ? fetchedTasks : []);
+        setLocalTasks(sanitizeTaskOptions(fetchedTasks || [], currentActivityId));
         setLocalGoals(Array.isArray(fetchedGoals) ? fetchedGoals : []);
-        // If a key area is already selected, set list names for it
-        try {
-          const kaId = initialData.key_area_id || initialData.keyAreaId || initialData.keyArea || null;
-          if (kaId) {
-            const selected = (areas || []).find((k) => String(k.id) === String(kaId));
-            if (selected && selected.listNames) setListNamesMap(selected.listNames || {});
-          }
-        } catch (e) {}
       } catch (e) {
         // non-fatal
       }
     })();
     return () => { ignore = true; };
-  }, [isOpen]);
+  }, [isOpen, currentActivityId]);
+
+  useEffect(() => {
+    const fallbackNames = normalizedParentListNames && Object.keys(normalizedParentListNames).length
+      ? normalizedParentListNames
+      : {};
+    const selectedArea = keyAreaId
+      ? (localKeyAreas && localKeyAreas.length ? localKeyAreas : keyAreas).find(
+          (area) => String(area.id) === String(keyAreaId)
+        )
+      : null;
+    const nextListNames = selectedArea?.listNames && Object.keys(selectedArea.listNames || {}).length
+      ? selectedArea.listNames
+      : fallbackNames;
+    setLocalListNames((prev) => (hasSameListNames(prev, nextListNames) ? prev : nextListNames));
+
+    const availableFromNames = Object.keys(nextListNames || {})
+      .map((n) => Number(n))
+      .filter((n) => !Number.isNaN(n) && n > 0);
+    const baseLists = Array.isArray(availableLists) ? availableLists : [1];
+    const currentList = Number(listIndex);
+    const mergedLists = [...new Set([
+      ...baseLists,
+      ...availableFromNames,
+      ...(Number.isNaN(currentList) || currentList <= 0 ? [] : [currentList]),
+    ])].sort((a, b) => a - b);
+
+    setLocalAvailableLists((prev) => {
+      if (prev.length === mergedLists.length && prev.every((value, idx) => Number(value) === Number(mergedLists[idx]))) {
+        return prev;
+      }
+      return mergedLists;
+    });
+  }, [keyAreaId, localKeyAreas, keyAreas, availableLists, listIndex, parentListNames]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -317,8 +413,14 @@ export default function EditActivityModal({
       notes: (description || '').trim(),
       // Backend expects camelCase date fields
       startDate: normStart,
+      start_date: normStart,
+      date_start: normStart,
       endDate: normEnd,
+      end_date: normEnd,
+      date_end: normEnd,
       deadline: normDeadline,
+      dueDate: normDeadline,
+      due_date: normDeadline,
       duration: duration || null,
       taskId: taskId || null,
       delegatedToUserId: delegatedToUserId,
@@ -538,7 +640,10 @@ export default function EditActivityModal({
                   <select name="list_index" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" value={listIndex} onChange={(e) => { setListIndex(e.target.value); setListError(''); }} disabled={!keyAreaId} required>
                     {!keyAreaId ? (<option value="">{t("editActivityModal.selectKeyAreaFirst")}</option>) : (<option value="">{t("editActivityModal.selectList")}</option>)}
                     {keyAreaId && localAvailableLists.map((n) => {
-                      const label = (localListNames && localListNames[n]) || t("createTaskModal.list", { n });
+                      const label =
+                        (localListNames && (localListNames[n] || localListNames[String(n)])) ||
+                        (normalizedParentListNames && (normalizedParentListNames[n] || normalizedParentListNames[String(n)])) ||
+                        t("createTaskModal.list", { n });
                       return (<option key={n} value={n}>{label}</option>);
                     })}
                   </select>

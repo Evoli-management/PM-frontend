@@ -26,10 +26,87 @@ const safeDate = (v) => {
   }
 };
 
-const now = new Date();
-const defaultDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-
 const _idsOf = (arr = []) => (Array.isArray(arr) ? arr.map((x) => String(x && x.id)).join(',') : '');
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const normalizeUserLookupValue = (value) => {
+  if (value === undefined || value === null) return '';
+  if (typeof value === 'object') {
+    return (
+      value.id ||
+      value.userId ||
+      value.user_id ||
+      value.name ||
+      value.username ||
+      value.email ||
+      ''
+    );
+  }
+  return String(value).trim();
+};
+
+const extractAssigneeCandidate = (item = {}) => {
+  const candidates = [
+    item.assigneeId,
+    item.assignee_id,
+    item.responsibleId,
+    item.responsible_id,
+    item.delegatedToUserId,
+    item.delegated_to_user_id,
+    item.assignee,
+    item.responsible,
+    item.assignee_name,
+    item.responsibleName,
+    item.responsible_name,
+    item.owner,
+    item.assigned_to,
+  ];
+  for (const candidate of candidates) {
+    const normalized = normalizeUserLookupValue(candidate);
+    if (normalized) return normalized;
+  }
+  return '';
+};
+
+const findUserIdFromValue = (value, users = [], currentUserId = null) => {
+  const normalized = normalizeUserLookupValue(value);
+  if (!normalized) return '';
+  if (String(normalized).toLowerCase() === 'me' && currentUserId) return String(currentUserId);
+  if (UUID_RE.test(normalized)) return normalized;
+
+  const target = String(normalized).toLowerCase();
+  const user = (users || []).find((u) => {
+    const candidates = [
+      u.id,
+      u.userId,
+      u.user_id,
+      u.name,
+      u.username,
+      u.email,
+      `${u.firstname || ''} ${u.lastname || ''}`.trim(),
+      `${u.name || u.firstname || ''} ${u.lastname || ''}`.trim(),
+    ]
+      .map((candidate) => String(candidate || '').trim())
+      .filter(Boolean);
+
+    return candidates.some((candidate) => {
+      const lower = candidate.toLowerCase();
+      return lower === target || target.includes(lower);
+    });
+  });
+
+  return user?.id ? String(user.id) : '';
+};
+
+const resolveAssigneeSelectValue = (item = {}, users = [], currentUserId = null, fallbackItem = null) => {
+  const direct = findUserIdFromValue(extractAssigneeCandidate(item), users, currentUserId);
+  if (direct) return direct;
+  if (fallbackItem) {
+    return findUserIdFromValue(extractAssigneeCandidate(fallbackItem), users, currentUserId);
+  }
+  return '';
+};
 
 // inline SVG icons (untyped)
 
@@ -100,41 +177,11 @@ export default function EditTaskModal({
   useEffect(() => {
     if (isOpen) resetPosition();
   }, [isOpen, resetPosition]);
-  // Helper to find user ID from assignee name or ID
-  const getInitialAssigneeId = () => {
-    const initial = initialData.assignee || initialData.assigneeId || initialData.assignee_id || '';
-    if (!initial) return '';
-    
-    // If it's already a UUID, return it
-    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(initial)) {
-      return initial;
-    }
-    
-    // Try to find user by name, email, or ID
-    const user = (users || []).find(u => {
-      const fullName = `${u.name || ''} ${u.lastname || ''}`.trim();
-      const email = u.email || '';
-      const initialLower = String(initial).toLowerCase();
-      
-      return (
-        String(u.id) === String(initial) ||
-        u.name === initial ||
-        fullName === initial ||
-        email === initial ||
-        // Match email or email-like strings (e.g., "Hussein husseinramdin@hotmail.com")
-        initialLower.includes(email.toLowerCase()) ||
-        initialLower.includes(u.name?.toLowerCase() || '')
-      );
-    });
-    
-    return user?.id || '';
-  };
-  
   const [title, setTitle] = useState(initialData.title || '');
   const [description, setDescription] = useState(initialData.description || '');
-  const [assignee, setAssignee] = useState(getInitialAssigneeId());
-  const [startDate, setStartDate] = useState(safeDate(initialData.start_date || initialData.startDate) || defaultDate);
-  const [endDate, setEndDate] = useState(safeDate(initialData.end_date || initialData.endDate) || defaultDate);
+  const [assignee, setAssignee] = useState(() => resolveAssigneeSelectValue(initialData, users, currentUserId));
+  const [startDate, setStartDate] = useState(safeDate(initialData.start_date || initialData.startDate) || '');
+  const [endDate, setEndDate] = useState(safeDate(initialData.end_date || initialData.endDate) || '');
   const [endAuto, setEndAuto] = useState(!(initialData.end_date || initialData.endDate));
   const [keyAreaError, setKeyAreaError] = useState('');
   const [listError, setListError] = useState('');
@@ -167,6 +214,7 @@ export default function EditTaskModal({
   const endRef = useRef(null);
   const deadlineRef = useRef(null);
   const usersLoadedRef = useRef(false);
+  const currentTaskId = initialData.id || initialData.taskId || initialData.task_id || initialData._id || null;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -175,39 +223,11 @@ export default function EditTaskModal({
     const nextDescription = initialData.description || '';
     if (description !== nextDescription) setDescription(nextDescription);
     
-    // Convert assignee name to user ID for select dropdown
-    const initialAssigneeValue = initialData.assignee || initialData.assigneeId || initialData.assignee_id || '';
-    let nextAssignee = '';
-    
-    if (initialAssigneeValue) {
-      // Check if it's already a UUID
-      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(initialAssigneeValue)) {
-        nextAssignee = initialAssigneeValue;
-      } else {
-        // Try to find user by name, email, or ID
-        const user = usersList.find(u => {
-          const fullName = `${u.name || ''} ${u.lastname || ''}`.trim();
-          const email = u.email || '';
-          const initialLower = String(initialAssigneeValue).toLowerCase();
-          
-          return (
-            String(u.id) === String(initialAssigneeValue) ||
-            u.name === initialAssigneeValue ||
-            fullName === initialAssigneeValue ||
-            email === initialAssigneeValue ||
-            // Match email or email-like strings
-            initialLower.includes(email.toLowerCase()) ||
-            initialLower.includes(u.name?.toLowerCase() || '')
-          );
-        });
-        nextAssignee = user?.id || '';
-      }
-    }
-    
+    const nextAssignee = resolveAssigneeSelectValue(initialData, usersList, currentUserId);
     if (assignee !== nextAssignee) setAssignee(nextAssignee);
-  const nextStart = safeDate(initialData.start_date || initialData.startDate) || defaultDate;
+  const nextStart = safeDate(initialData.start_date || initialData.startDate) || '';
   if (startDate !== nextStart) setStartDate(nextStart);
-  const nextEnd = safeDate(initialData.end_date || initialData.endDate) || defaultDate;
+  const nextEnd = safeDate(initialData.end_date || initialData.endDate) || '';
   if (endDate !== nextEnd) setEndDate(nextEnd);
   setEndAuto(!Boolean(initialData.end_date || initialData.endDate));
   setDeadlineAuto(true);
@@ -274,6 +294,16 @@ export default function EditTaskModal({
       }
     })();
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (assignee) return;
+    const fallbackTask = currentTaskId
+      ? (allTasks || []).find((task) => String(task.id || task.taskId || task.task_id || task._id) === String(currentTaskId))
+      : null;
+    const nextAssignee = resolveAssigneeSelectValue(initialData, usersList, currentUserId, fallbackTask);
+    if (nextAssignee) setAssignee(nextAssignee);
+  }, [isOpen, assignee, initialData, usersList, currentUserId, allTasks, currentTaskId]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -469,8 +499,12 @@ export default function EditTaskModal({
       assignee: assigneeName,
       delegatedToUserId: delegatedToUserId,
       start_date: startDate || null,
+      startDate: startDate || null,
       end_date: endDate || null,
+      endDate: endDate || null,
       deadline: deadline || null,
+      dueDate: deadline || null,
+      due_date: deadline || null,
       duration: duration || null,
       priority,
       status,
