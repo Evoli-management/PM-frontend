@@ -1436,7 +1436,7 @@ export default function KeyAreas() {
             try {
                 const svc = await getCalendarService();
                 const status = await svc.getSyncStatus();
-                if (!ignore) setSyncActive(!!(status?.syncToGoogle || status?.syncToOutlook));
+                if (!ignore) setSyncActive(!!(status?.google?.connected || status?.microsoft?.connected));
             } catch (_) {
                 if (!ignore) setSyncActive(false);
             }
