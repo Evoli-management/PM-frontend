@@ -770,10 +770,11 @@
     "statusOpen": "Open",
     "statusInProgress": "In progress",
     "statusBlocked": "Blocked",
-    "statusDone": "Done",
+    "statusDone": "Completed",
     "statusOther": "Other",
     "columns": "Columns",
     "showCompleted": "Show completed items",
+    "completed": "Completed",
     "activities": "Activities",
     "selectTask": "Select a task",
     "viewTriple": "Triple",
@@ -1608,6 +1609,7 @@
   "viewTabsNavigation": {
     "activeTasks": "ACTIVE TASKS",
     "allTasks": "ALL TASKS",
+    "completedTasks": "COMPLETED",
     "delegated": "DELEGATED",
     "todo": "TO-DO (RED)",
     "activityTrap": "ACTIVITY TRAP",
@@ -1629,7 +1631,7 @@
     "lowOpt": "Low",
     "openOpt": "Open",
     "inProgressOpt": "In progress",
-    "doneOpt": "Done",
+    "doneOpt": "Completed",
     "cancel": "Cancel",
     "saving": "Saving…",
     "save": "Save"
@@ -1670,7 +1672,7 @@
     "saving": "Saving...",
     "openOpt": "Open",
     "inProgressOpt": "In progress",
-    "doneOpt": "Done",
+    "doneOpt": "Completed",
     "highOpt": "High",
     "normalOpt": "Normal",
     "lowOpt": "Low"
@@ -1690,7 +1692,7 @@
     "lowOpt": "Low",
     "openOpt": "Open",
     "inProgressOpt": "In progress",
-    "doneOpt": "Done"
+    "doneOpt": "Completed"
   },
   "createTaskModal": {
     "createDontForget": "Create Don't forget task",
@@ -1712,7 +1714,7 @@
     "lowOpt": "Low",
     "openOpt": "Open",
     "inProgressOpt": "In Progress",
-    "doneOpt": "Done",
+    "doneOpt": "Completed",
     "selectKeyArea": "— Select Key Area —",
     "unassigned": "— Unassigned —",
     "selectGoal": "— Select Goal —",
@@ -1819,7 +1821,7 @@
     "noneOpt": "None",
     "openOpt": "Open",
     "inProgressOpt": "In Progress",
-    "doneOpt": "Done",
+    "doneOpt": "Completed",
     "cancelledOpt": "Cancelled",
     "highOpt": "High",
     "medOpt": "Medium",

@@ -140,6 +140,30 @@ export const toDateOnly = (val) => {
     }
 };
 
+export const applyStartEndDateRule = ({ startDate, endDate, changedKey, changedValue }) => {
+    let nextStart = toDateOnly(startDate) || "";
+    let nextEnd = toDateOnly(endDate) || "";
+    const nextValue = toDateOnly(changedValue) || "";
+    const key = String(changedKey || "");
+
+    if (key === "start_date" || key === "startDate") {
+        nextStart = nextValue;
+        if (nextValue && (!nextEnd || nextValue > nextEnd)) {
+            nextEnd = nextValue;
+        }
+    } else if (key === "end_date" || key === "endDate") {
+        nextEnd = nextValue;
+        if (nextValue && nextStart && nextValue < nextStart) {
+            nextStart = nextValue;
+        }
+    }
+
+    return {
+        startDate: nextStart,
+        endDate: nextEnd,
+    };
+};
+
 export const formatDuration = (start, end) => {
     const s = toDateOnly(start);
     const e = toDateOnly(end);
@@ -168,6 +192,23 @@ export const mapServerStatusToUi = (sv) => {
     if (s === "in_progress") return "in_progress";
     if (s === "completed" || s === "done") return "done";
     return "open";
+};
+
+export const getItemStatusFilterValue = (item = {}) => {
+    const rawStatus = String(item?.status ?? item?.state ?? item?.activity_status ?? '')
+        .toLowerCase()
+        .trim();
+    const isCompleted =
+        Boolean(item?.completed || item?.completionDate || item?.completion_date) ||
+        rawStatus === 'done' ||
+        rawStatus === 'completed' ||
+        rawStatus === 'closed' ||
+        rawStatus === 'archived';
+
+    if (isCompleted) return 'completed';
+    if (rawStatus === 'todo') return 'open';
+    if (rawStatus === 'in progress') return 'in_progress';
+    return rawStatus || 'open';
 };
 
 // UI color helpers return tailwind class strings for consistent badges/dots
@@ -332,6 +373,7 @@ export default {
     formatDuration,
     mapUiStatusToServer,
     mapServerStatusToUi,
+    getItemStatusFilterValue,
     normalizeActivity,
     resolveAssignee,
     selectedUserIdToPersistValue,

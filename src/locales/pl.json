@@ -774,6 +774,7 @@
     "statusOther": "Inne",
     "columns": "Kolumny",
     "showCompleted": "Pokaż ukończone elementy",
+    "completed": "Ukończone",
     "activities": "Aktywności",
     "selectTask": "Wybierz zadanie",
     "viewTriple": "Potroić",
@@ -1608,6 +1609,7 @@
   "viewTabsNavigation": {
     "activeTasks": "AKTYWNE ZADANIA",
     "allTasks": "WSZYSTKIE ZADANIA",
+    "completedTasks": "UKOŃCZONE",
     "delegated": "DELEGOWANY",
     "todo": "DO ZROBIENIA (CZERWONY)",
     "activityTrap": "PUŁAPKA AKTYWNOŚCI",

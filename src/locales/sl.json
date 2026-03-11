@@ -773,6 +773,7 @@
     "statusOther": "Drugo",
     "columns": "Stolpci",
     "showCompleted": "Pokaži dokončane elemente",
+    "completed": "Dokončano",
     "activities": "Aktivnosti",
     "selectTask": "Izberite nalogo",
     "viewTriple": "Trojni",
@@ -1607,6 +1608,7 @@
   "viewTabsNavigation": {
     "activeTasks": "AKTIVNE NALOGE",
     "allTasks": "VSE NALOGE",
+    "completedTasks": "DOKONČANO",
     "delegated": "DELEGIRANE",
     "todo": "ZA NAREDITI (RDEČE)",
     "activityTrap": "PAST AKTIVNOSTI",

@@ -774,6 +774,7 @@
     "statusOther": "Overige",
     "columns": "Columns",
     "showCompleted": "Show completed items",
+    "completed": "Voltooid",
     "activities": "Activiteiten",
     "selectTask": "Select a task",
     "viewTriple": "Triple",
@@ -1608,6 +1609,7 @@
   "viewTabsNavigation": {
     "activeTasks": "ACTIVE TASKS",
     "allTasks": "ALL TASKS",
+    "completedTasks": "VOLTOOID",
     "delegated": "DELEGATED",
     "todo": "TO-DO (RED)",
     "activityTrap": "ACTIVITY TRAP",

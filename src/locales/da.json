@@ -774,6 +774,7 @@
     "statusOther": "Andet",
     "columns": "Columns",
     "showCompleted": "Show completed items",
+    "completed": "Afsluttet",
     "activities": "Aktiviteter",
     "selectTask": "Select a task",
     "viewTriple": "Triple",
@@ -1608,6 +1609,7 @@
   "viewTabsNavigation": {
     "activeTasks": "ACTIVE TASKS",
     "allTasks": "ALL TASKS",
+    "completedTasks": "AFSLUTTET",
     "delegated": "DELEGATED",
     "todo": "TO-DO (RED)",
     "activityTrap": "ACTIVITY TRAP",

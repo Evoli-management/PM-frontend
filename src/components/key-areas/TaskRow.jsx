@@ -199,7 +199,16 @@ const TaskRow = ({
           </div>
         </div>
       </td>
-      <td className="px-3 py-2 align-top w-[240px] overflow-hidden">
+      <td
+        className={`px-3 py-2 align-top w-[240px] overflow-hidden ${disableOpen ? '' : 'cursor-pointer'}`.trim()}
+        onClick={disableOpen || editingKey === 'name' ? undefined : queueTitleOpen}
+        onDoubleClick={enableInlineEditing && !disableOpen ? (e) => {
+          try { if (clickTimer.current) { clearTimeout(clickTimer.current); clickTimer.current = null; } } catch (__) {}
+          e.stopPropagation();
+          setLocalValue(task.title || '');
+          setEditingKey('name');
+        } : undefined}
+      >
         <div className="flex items-start gap-2">
           {(() => {
             const lvl = getPriorityLevel ? getPriorityLevel(task.priority) : 2;
@@ -239,14 +248,7 @@ const TaskRow = ({
                 />
               ) : (
                 <div
-                  className={`max-w-[540px] cursor-pointer truncate text-sm ${String(task.status || "").toLowerCase() === 'done' ? 'text-slate-400 line-through' : 'text-slate-800'}`}
-                  onClick={queueTitleOpen}
-                  onDoubleClick={(e) => {
-                    try { if (clickTimer.current) { clearTimeout(clickTimer.current); clickTimer.current = null; } } catch (__) {}
-                    e.stopPropagation();
-                    setLocalValue(task.title || '');
-                    setEditingKey('name');
-                  }}
+                  className={`max-w-[540px] truncate text-sm ${String(task.status || "").toLowerCase() === 'done' ? 'text-slate-400 line-through' : 'text-slate-800'}`}
                   title="Double click to edit"
                 >
                   {task.title}
@@ -254,8 +256,7 @@ const TaskRow = ({
               )
             ) : (
               <div
-                className={`max-w-[540px] cursor-pointer truncate text-sm ${String(task.status || "").toLowerCase() === 'done' ? 'text-slate-400 line-through' : 'text-slate-800'}`}
-                onClick={queueTitleOpen}
+                className={`max-w-[540px] truncate text-sm ${String(task.status || "").toLowerCase() === 'done' ? 'text-slate-400 line-through' : 'text-slate-800'}`}
               >
                 {task.title}
               </div>

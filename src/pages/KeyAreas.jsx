@@ -40,7 +40,9 @@ import {
     mapUiStatusToServer,
     mapServerStatusToUi,
     normalizeActivity,
+    getItemStatusFilterValue,
     resolveAssignee,
+    applyStartEndDateRule,
 } from '../utils/keyareasHelpers';
 import { durationToTimeInputValue, parseDurationToMinutes } from '../utils/duration';
 
@@ -386,6 +388,23 @@ const normalizeTaskForUi = (task, fallbackKeyAreaId = null) => {
     };
 };
 
+const isTaskCompleted = (task) => {
+    const status = String(task?.status || "").toLowerCase();
+    if (status === "done" || status === "completed") return true;
+    return !status && Boolean(task?.completionDate || task?.completion_date);
+};
+
+const hasScheduledTaskDates = (task) =>
+    Boolean(toDateOnly(task?.start_date || task?.startDate) || toDateOnly(task?.end_date || task?.endDate));
+
+const TASK_STATUS_FILTER_VALUES = ["open", "in_progress", "completed"];
+const DEFAULT_TASK_STATUS_FILTER_VALUES = ["open", "in_progress"];
+const getInitialTaskStatusFilterValues = (activeFilter) => {
+    if (activeFilter === "all") return TASK_STATUS_FILTER_VALUES;
+    if (activeFilter === "completed") return ["completed"];
+    return DEFAULT_TASK_STATUS_FILTER_VALUES;
+};
+
 // Shared helpers (imported from utils/keyareasHelpers)
 
 // Minimal placeholders to keep non-list views functional
@@ -575,11 +594,14 @@ export default function KeyAreas() {
     })();
     const initialActiveFilter = (() => {
         const activeParam = params.get('active');
-        if (activeParam === 'active' || activeParam === 'all') return activeParam;
+        if (activeParam === 'active' || activeParam === 'all' || activeParam === 'completed') return activeParam;
         return 'active';
     })();
     const [viewTab, setViewTab] = useState(initialViewTab);
-    // Sub-filter for ACTIVE TASKS view: 'active' (no completed) or 'all' (including completed)
+    // Sub-filter for ACTIVE TASKS view:
+    // 'active' => not completed and has start/end date,
+    // 'all' => all tasks regardless of dates or completion state,
+    // 'completed' => completed tasks only.
     const [activeFilter, setActiveFilter] = useState(initialActiveFilter);
     const isGlobalTasksView = viewTab === 'delegated' || viewTab === 'todo' || viewTab === 'activity-trap';
     const [allTasks, setAllTasks] = useState([]);
@@ -889,6 +911,7 @@ export default function KeyAreas() {
     const [openActivitiesMenu, setOpenActivitiesMenu] = useState(null); // task id or null
     const [activitiesMenuPos, setActivitiesMenuPos] = useState({ top: 0, left: 0 });
     const prevViewTabRef = useRef(initialViewTab);
+    const prevActiveFilterRef = useRef(initialActiveFilter);
     const openingKaIdRef = useRef(null);
     const suppressKaParamOpenRef = useRef(false);
     const ActivityRowMenu = ({ activity, taskId }) => {
@@ -1095,6 +1118,15 @@ export default function KeyAreas() {
         const tid = String(taskId || activity?.taskId || activity?.task_id || '');
         if (!tid) return;
         const prevList = Array.isArray(activitiesByTask[tid]) ? activitiesByTask[tid].slice() : [];
+        const resolvedDates =
+            key === 'start_date' || key === 'end_date'
+                ? applyStartEndDateRule({
+                    startDate: activity?.start_date ?? activity?.startDate,
+                    endDate: activity?.end_date ?? activity?.endDate,
+                    changedKey: key,
+                    changedValue: value,
+                })
+                : null;
         const apiDateKeyMap = {
             start_date: 'startDate',
             end_date: 'endDate',
@@ -1105,6 +1137,15 @@ export default function KeyAreas() {
 
         const optimistic = (a) => {
             if (a.id !== activity.id) return a;
+            if (resolvedDates) {
+                return {
+                    ...a,
+                    start_date: resolvedDates.startDate || null,
+                    startDate: resolvedDates.startDate || null,
+                    end_date: resolvedDates.endDate || null,
+                    endDate: resolvedDates.endDate || null,
+                };
+            }
             if (key === 'status') return { ...a, status: value };
             if (key === 'priority') return { ...a, priority: value };
             if (key === 'start_date' || key === 'end_date' || key === 'deadline') return { ...a, [key]: value };
@@ -1144,7 +1185,22 @@ export default function KeyAreas() {
 
                 if (key === 'status') body.status = mapUiStatusToServer(value);
                 else if (key === 'priority') body.priority = value;
-                else if (apiDateKeyMap[key]) {
+                else if (resolvedDates) {
+                    const toIsoOrNull = (dateValue) => {
+                        if (!dateValue) return null;
+                        if (/^\d{4}-\d{2}-\d{2}$/.test(String(dateValue))) {
+                            try {
+                                const [y, m, d] = String(dateValue).split('-').map((s) => parseInt(s, 10));
+                                return new Date(Date.UTC(y, m - 1, d)).toISOString();
+                            } catch (err) {
+                                return String(dateValue);
+                            }
+                        }
+                        return String(dateValue);
+                    };
+                    body.startDate = toIsoOrNull(resolvedDates.startDate);
+                    body.endDate = toIsoOrNull(resolvedDates.endDate);
+                } else if (apiDateKeyMap[key]) {
                     const apiKey = apiDateKeyMap[key];
                     if (!value) body[apiKey] = null;
                     else if (/^\d{4}-\d{2}-\d{2}$/.test(String(value))) {
@@ -1215,10 +1271,31 @@ export default function KeyAreas() {
         } catch (_) {}
         return null;
     });
-    const [filterStatus, setFilterStatus] = useState("all");
+    const [filterStatuses, setFilterStatuses] = useState(() => getInitialTaskStatusFilterValues(initialActiveFilter));
     const [filterAssignee, setFilterAssignee] = useState("");
-    const [filterTag, setFilterTag] = useState("");
     const [view, setView] = useState("list");
+    useEffect(() => {
+        const prev = prevActiveFilterRef.current;
+        if (prev === activeFilter) return;
+
+        if (activeFilter === "all") {
+            setFilterStatuses(TASK_STATUS_FILTER_VALUES);
+        } else if (activeFilter === "completed") {
+            setFilterStatuses(["completed"]);
+        } else if (
+            activeFilter === "active" &&
+            (
+                prev === "completed" ||
+                filterStatuses.length === 0 ||
+                (filterStatuses.length === 1 && filterStatuses[0] === "completed")
+            )
+        ) {
+            setFilterStatuses(DEFAULT_TASK_STATUS_FILTER_VALUES);
+        }
+
+        prevActiveFilterRef.current = activeFilter;
+    }, [activeFilter, filterStatuses]);
+
     const defaultVisible = {
         responsible: true,
         status: true,
@@ -1230,13 +1307,6 @@ export default function KeyAreas() {
         duration: true,
         completed: true,
     };
-    const [showCompleted, setShowCompleted] = useState(() => {
-        try {
-            const raw = window.localStorage.getItem('keyareas.showCompleted');
-            if (raw !== null) return raw === 'true';
-        } catch (_) {}
-        return true;
-    });
     const [visibleColumns, setVisibleColumns] = useState(() => {
         try {
             const raw = window.localStorage.getItem('keyareas.visibleColumns');
@@ -1259,13 +1329,6 @@ export default function KeyAreas() {
             // ignore storage errors
         }
     }, [visibleColumns]);
-    // Persist showCompleted preference
-    useEffect(() => {
-        try {
-            window.localStorage.setItem('keyareas.showCompleted', String(!!showCompleted));
-        } catch (_) {}
-    }, [showCompleted]);
-
     // Persist task sort state to localStorage
     useEffect(() => {
         try {
@@ -1358,7 +1421,9 @@ export default function KeyAreas() {
     const [showViewMenu, setShowViewMenu] = useState(false);
     const viewMenuRef = useRef(null);
     const [showColumnsMenu, setShowColumnsMenu] = useState(false);
+    const [showStatusMenu, setShowStatusMenu] = useState(false);
     const columnsMenuRef = useRef(null);
+    const statusMenuRef = useRef(null);
     const columnsButtonRef = useRef(null);
     const columnsMenuPopupRef = useRef(null);
     const [columnsAnchor, setColumnsAnchor] = useState(null);
@@ -1412,7 +1477,7 @@ export default function KeyAreas() {
         if (viewParam && allowedViews.has(viewParam) && viewParam !== viewTab) {
             setViewTab(viewParam);
         }
-        if (activeParam && (activeParam === 'active' || activeParam === 'all') && activeParam !== activeFilter) {
+        if (activeParam && (activeParam === 'active' || activeParam === 'all' || activeParam === 'completed') && activeParam !== activeFilter) {
             setActiveFilter(activeParam);
         }
     }, [location.search]);
@@ -1888,10 +1953,28 @@ export default function KeyAreas() {
         const prev = Array.isArray(allTasks) ? allTasks.slice() : [];
         const prevTask = prev.find((t) => t.id === id);
         if (!prevTask) return;
+        const resolvedDates =
+            key === 'start_date' || key === 'end_date'
+                ? applyStartEndDateRule({
+                    startDate: prevTask.start_date ?? prevTask.startDate,
+                    endDate: prevTask.end_date ?? prevTask.endDate,
+                    changedKey: key,
+                    changedValue: value,
+                })
+                : null;
 
         // optimistic transform
         const optimistic = (t) => {
             if (t.id !== id) return t;
+            if (resolvedDates) {
+                return {
+                    ...t,
+                    start_date: resolvedDates.startDate || null,
+                    startDate: resolvedDates.startDate || null,
+                    end_date: resolvedDates.endDate || null,
+                    endDate: resolvedDates.endDate || null,
+                };
+            }
             if (key === 'priority') {
                 try { return { ...t, priority: getPriorityLevel(value) }; } catch (e) { return { ...t, priority: value }; }
             }
@@ -1946,8 +2029,10 @@ export default function KeyAreas() {
                 patch.delegatedToUserId = null;
             }
         }
-        else if (key === 'start_date') patch.startDate = value ? new Date(value).toISOString() : null;
-        else if (key === 'end_date') patch.endDate = value ? new Date(value).toISOString() : null;
+        else if (resolvedDates) {
+            patch.startDate = resolvedDates.startDate ? new Date(resolvedDates.startDate).toISOString() : null;
+            patch.endDate = resolvedDates.endDate ? new Date(resolvedDates.endDate).toISOString() : null;
+        }
         else if (key === 'dueDate' || key === 'deadline') patch.dueDate = value ? new Date(value).toISOString() : null;
         else if (key === 'duration') patch.duration = value;
         else if (key === 'priority') patch.priority = value;
@@ -2487,6 +2572,23 @@ export default function KeyAreas() {
             document.removeEventListener("keydown", handleKey);
         };
     }, [showColumnsMenu]);
+
+    useEffect(() => {
+        if (!showStatusMenu) return;
+        const handleClick = (e) => {
+            if (statusMenuRef.current && statusMenuRef.current.contains(e.target)) return;
+            setShowStatusMenu(false);
+        };
+        const handleKey = (e) => {
+            if (e.key === "Escape") setShowStatusMenu(false);
+        };
+        document.addEventListener("mousedown", handleClick);
+        document.addEventListener("keydown", handleKey);
+        return () => {
+            document.removeEventListener("mousedown", handleClick);
+            document.removeEventListener("keydown", handleKey);
+        };
+    }, [showStatusMenu]);
 
     // When columns menu is open, reposition it on scroll/resize so it follows the gear button
     useEffect(() => {
@@ -3156,14 +3258,12 @@ export default function KeyAreas() {
                 // Filter by list index
                 return (t.list_index || 1) === taskTab;
             });
-        // If not showing completed items, filter them out
-        // ALSO: if in 'active-tasks' tab and activeFilter is 'active', filter out completed tasks
-        if (!showCompleted || (viewTab === 'active-tasks' && activeFilter === 'active')) {
-            arr = arr.filter((t) => {
-                const s = String((t.status || "").toLowerCase());
-                const completed = s === 'done' || s === 'completed' || Boolean(t.completionDate);
-                return !completed;
-            });
+        if (viewTab === 'active-tasks') {
+            if (activeFilter === 'completed') {
+                arr = arr.filter((t) => isTaskCompleted(t));
+            } else if (activeFilter === 'active') {
+                arr = arr.filter((t) => !isTaskCompleted(t) && hasScheduledTaskDates(t));
+            }
         }
         if (!isSearch && searchTerm.trim()) {
             const q = searchTerm.trim().toLowerCase();
@@ -3171,9 +3271,16 @@ export default function KeyAreas() {
                 (t) => (t.title || "").toLowerCase().includes(q) || (t.description || "").toLowerCase().includes(q),
             );
         }
-        if (filterStatus && filterStatus !== "all") {
-            const fs = String(filterStatus).toLowerCase();
-            arr = arr.filter((t) => String(t.status || "").toLowerCase() === fs);
+        const hasAllStatusesSelected =
+            TASK_STATUS_FILTER_VALUES.length === filterStatuses.length &&
+            TASK_STATUS_FILTER_VALUES.every((status) => filterStatuses.includes(status));
+        if (!hasAllStatusesSelected) {
+            arr = arr.filter((t) => {
+                const normalizedStatus = isTaskCompleted(t)
+                    ? "completed"
+                    : getItemStatusFilterValue(t);
+                return filterStatuses.includes(normalizedStatus);
+            });
         }
         if (filterAssignee) {
             const selectedRaw = String(filterAssignee || "").trim();
@@ -3211,14 +3318,41 @@ export default function KeyAreas() {
                 return false;
             });
         }
-        if (filterTag.trim()) {
-            const ft = filterTag.trim().toLowerCase();
-            arr = arr.filter((t) => String(t.tags || "").toLowerCase().includes(ft));
-        }
         // Site-wide search already filtered by query in the async fetch; apply quadrant filter if set
         if (quadrant !== "all") arr = arr.filter((t) => String(t.eisenhower_quadrant || "") === quadrant);
         return arr;
-    }, [allTasks, taskTab, searchTerm, quadrant, siteSearch, searchResults, showCompleted, filterStatus, filterAssignee, filterTag, viewTab, activeFilter, selectedKA, users, currentUserId]);
+    }, [allTasks, taskTab, searchTerm, quadrant, siteSearch, searchResults, filterStatuses, filterAssignee, viewTab, activeFilter, selectedKA, users, currentUserId]);
+
+    const statusFilterOptions = useMemo(() => ([
+        { value: "open", label: "Open" },
+        { value: "in_progress", label: t("keyAreas.statusInProgress") },
+        { value: "completed", label: t("keyAreas.completed") },
+    ]), [t]);
+
+    const allStatusesSelected =
+        TASK_STATUS_FILTER_VALUES.length === filterStatuses.length &&
+        TASK_STATUS_FILTER_VALUES.every((status) => filterStatuses.includes(status));
+
+    const statusFilterLabel = allStatusesSelected
+        ? "All"
+        : filterStatuses.length === 0
+            ? "None"
+            : filterStatuses.length === 1
+                ? statusFilterOptions.find((option) => option.value === filterStatuses[0])?.label || filterStatuses[0]
+                : `${filterStatuses.length} selected`;
+
+    const toggleStatusFilter = useCallback((value) => {
+        if (value === "all") {
+            setFilterStatuses((prev) => (prev.length === TASK_STATUS_FILTER_VALUES.length ? [] : TASK_STATUS_FILTER_VALUES));
+            return;
+        }
+
+        setFilterStatuses((prev) => {
+            const exists = prev.includes(value);
+            if (exists) return prev.filter((status) => status !== value);
+            return [...prev, value];
+        });
+    }, []);
 
     const handleTaskSort = (field) => {
         if (taskSortField === field) {
@@ -4314,16 +4448,40 @@ export default function KeyAreas() {
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-slate-600">Status:</span>
-                                                    <select
-                                                        value={filterStatus}
-                                                        onChange={(e) => setFilterStatus(e.target.value)}
-                                                        className="border border-slate-200 rounded px-2 py-0.5 text-sm bg-white w-[100px]"
-                                                    >
-                                                        <option value="all">All</option>
-                                                        <option value="open">Open</option>
-                                                        <option value="in_progress">{t("keyAreas.statusInProgress")}</option>
-                                                        <option value="done">Done</option>
-                                                    </select>
+                                                    <div className="relative" ref={statusMenuRef}>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setShowStatusMenu((s) => !s)}
+                                                            className="border border-slate-200 rounded px-2 py-0.5 text-sm bg-white min-w-[100px] inline-flex items-center justify-between gap-2"
+                                                            aria-haspopup="menu"
+                                                            aria-expanded={showStatusMenu ? "true" : "false"}
+                                                        >
+                                                            <span className="truncate">{statusFilterLabel}</span>
+                                                            <span className="text-[10px]">▾</span>
+                                                        </button>
+                                                        {showStatusMenu && (
+                                                            <div className="absolute right-0 mt-1 w-44 rounded-md border border-slate-200 bg-white shadow-lg z-50 p-2">
+                                                                <label className="flex items-center gap-2 px-1 py-1 text-sm">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={allStatusesSelected}
+                                                                        onChange={() => toggleStatusFilter("all")}
+                                                                    />
+                                                                    <span>All</span>
+                                                                </label>
+                                                                {statusFilterOptions.map((option) => (
+                                                                    <label key={option.value} className="flex items-center gap-2 px-1 py-1 text-sm">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={filterStatuses.includes(option.value)}
+                                                                            onChange={() => toggleStatusFilter(option.value)}
+                                                                        />
+                                                                        <span>{option.label}</span>
+                                                                    </label>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-slate-600">Responsible:</span>
@@ -4337,15 +4495,6 @@ export default function KeyAreas() {
                                                             <option key={u.id} value={String(u.id)}>{u.name}</option>
                                                         ))}
                                                     </select>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-slate-600">Tag:</span>
-                                                    <input
-                                                        value={filterTag}
-                                                        onChange={(e) => setFilterTag(e.target.value)}
-                                                        className="border border-slate-200 rounded px-2 py-0.5 text-sm bg-white w-16"
-                                                        placeholder={t("keyAreas.tagPlaceholder")}
-                                                    />
                                                 </div>
                                             </div>
                                         )}
@@ -4404,14 +4553,6 @@ export default function KeyAreas() {
                                             {showColumnsMenu && (
                                                 <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded shadow z-50 p-3 text-sm">
                                                     <div className="font-medium mb-2">{t("keyAreas.columns")}</div>
-                                                    <label className="flex items-center gap-2 py-1">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={!!showCompleted}
-                                                            onChange={() => setShowCompleted((s) => !s)}
-                                                        />
-                                                        <span className="capitalize">{t("keyAreas.showCompleted")}</span>
-                                                    </label>
                                                     {Object.keys(visibleColumns).map((key) => (
                                                         <label key={key} className="flex items-center gap-2 py-1">
                                                             <input
@@ -4803,7 +4944,7 @@ export default function KeyAreas() {
                                                             </colgroup>
                                                             <thead className="bg-slate-50 border border-slate-200 text-slate-700">
                                                                 <tr>
-                                                                    <th className="px-3 py-2 text-left w-12">
+                                                                    <th className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left w-12">
                                                                         <input
                                                                             type="checkbox"
                                                                             aria-label="Select all visible"
@@ -4817,28 +4958,28 @@ export default function KeyAreas() {
                                                                         />
                                                                     </th>
                                                                     <th 
-                                                                        className="px-3 py-2 text-left font-semibold w-[240px] cursor-pointer hover:bg-slate-100"
+                                                                        className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[240px] cursor-pointer hover:bg-slate-100"
                                                                         onClick={() => handleTaskSort('title')}
                                                                     >
                                                                         Task {taskSortField === 'title' && (taskSortDirection === 'asc' ? '↑' : '↓')}
                                                                     </th>
                                                                     {visibleColumns.responsible && (
                                                                         <th 
-                                                                            className="px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
+                                                                            className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                             onClick={() => handleTaskSort('responsible')}
                                                                         >
                                                                             Responsible {taskSortField === 'responsible' && (taskSortDirection === 'asc' ? '↑' : '↓')}
                                                                         </th>
                                                                     )}
                                                                     <th 
-                                                                        className="px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
+                                                                        className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                         onClick={() => handleTaskSort('status')}
                                                                     >
                                                                         Status {taskSortField === 'status' && (taskSortDirection === 'asc' ? '↑' : '↓')}
                                                                     </th>
                                                                     {visibleColumns.priority && (
                                                                         <th 
-                                                                            className="px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
+                                                                            className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                             onClick={() => handleTaskSort('priority')}
                                                                         >
                                                                             Priority {taskSortField === 'priority' && (taskSortDirection === 'asc' ? '↑' : '↓')}
@@ -4846,7 +4987,7 @@ export default function KeyAreas() {
                                                                     )}
                                                                     {visibleColumns.quadrant && (
                                                                         <th 
-                                                                            className="px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
+                                                                            className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                             onClick={() => handleTaskSort('quadrant')}
                                                                         >
                                                                             Quadrant {taskSortField === 'quadrant' && (taskSortDirection === 'asc' ? '↑' : '↓')}
@@ -4855,7 +4996,7 @@ export default function KeyAreas() {
                                                                     {/* Goal and Tags columns removed per UX request */}
                                                                     {visibleColumns.start_date && (
                                                                         <th 
-                                                                            className="px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
+                                                                            className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                             onClick={() => handleTaskSort('start_date')}
                                                                         >
                                                                             Start Date {taskSortField === 'start_date' && (taskSortDirection === 'asc' ? '↑' : '↓')}
@@ -4863,7 +5004,7 @@ export default function KeyAreas() {
                                                                     )}
                                                                     {visibleColumns.end_date && (
                                                                         <th 
-                                                                            className="px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
+                                                                            className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                             onClick={() => handleTaskSort('end_date')}
                                                                         >
                                                                             End date {taskSortField === 'end_date' && (taskSortDirection === 'asc' ? '↑' : '↓')}
@@ -4871,7 +5012,7 @@ export default function KeyAreas() {
                                                                     )}
                                                                     {visibleColumns.deadline && (
                                                                         <th 
-                                                                            className="px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
+                                                                            className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                             onClick={() => handleTaskSort('deadline')}
                                                                         >
                                                                             Deadline {taskSortField === 'deadline' && (taskSortDirection === 'asc' ? '↑' : '↓')}
@@ -4879,7 +5020,7 @@ export default function KeyAreas() {
                                                                     )}
                                                                     {visibleColumns.duration && (
                                                                         <th 
-                                                                            className="px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
+                                                                            className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                             onClick={() => handleTaskSort('duration')}
                                                                         >
                                                                             Duration {taskSortField === 'duration' && (taskSortDirection === 'asc' ? '↑' : '↓')}
@@ -4887,7 +5028,7 @@ export default function KeyAreas() {
                                                                     )}
                                                                     {visibleColumns.completed && (
                                                                         <th 
-                                                                            className="px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
+                                                                            className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                             onClick={() => handleTaskSort('completed')}
                                                                         >
                                                                             Completed {taskSortField === 'completed' && (taskSortDirection === 'asc' ? '↑' : '↓')}
@@ -5012,11 +5153,13 @@ export default function KeyAreas() {
                                                                                                 savingActivityIds={savingActivityIds}
                                                                                                 setSavingActivityIds={setSavingActivityIds}
                                                                                                 getPriorityLevel={getPriorityLevel}
-                                                                                 addToast={addToast}
+                                                                                                addToast={addToast}
                                                                                                              enableInlineEditing={!showMassEdit}
                                                                                                              users={users}
                                                                                                              currentUserId={currentUserId}
                                                                                                              goals={goals}
+                                                                                                filterStatuses={filterStatuses}
+                                                                                                allStatusesSelected={allStatusesSelected}
                                                                                             />
                                                                                         </div>
                                                                                     </td>
@@ -5185,6 +5328,12 @@ export default function KeyAreas() {
                                                         {(() => {
                                                             const taskKey = String(selectedTaskInPanel.id);
                                                             let list = (activitiesByTask[taskKey] || []).slice();
+
+                                                            if (!allStatusesSelected) {
+                                                                list = list.filter((activity) =>
+                                                                    filterStatuses.includes(getItemStatusFilterValue(activity)),
+                                                                );
+                                                            }
                                                             
                                                             // Apply activity sorting
                                                             if (activitySortField && activitySortDirection) {
@@ -5266,7 +5415,7 @@ export default function KeyAreas() {
                                                                         </colgroup>
                                                                         <thead className="bg-slate-50 border border-slate-200 text-slate-700">
                                                                             <tr>
-                                                                                <th className="px-3 py-2 text-left w-12">
+                                                                                <th className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left w-12">
                                                                                     <input
                                                                                         type="checkbox"
                                                                                         aria-label="Select all visible activities"
@@ -5293,14 +5442,14 @@ export default function KeyAreas() {
                                                                                     />
                                                                                 </th>
                                                                                 <th 
-                                                                                    className="px-3 py-2 text-left font-semibold w-[240px] cursor-pointer hover:bg-slate-100"
+                                                                                    className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[240px] cursor-pointer hover:bg-slate-100"
                                                                                     onClick={() => handleActivitySort('name')}
                                                                                 >
                                                                                     Activity {activitySortField === 'name' && (activitySortDirection === 'asc' ? '↑' : '↓')}
                                                                                 </th>
                                                                                 {visibleColumns.responsible && (
                                                                                     <th 
-                                                                                        className="px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
+                                                                                        className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                                         onClick={() => handleActivitySort('responsible')}
                                                                                     >
                                                                                         Responsible {activitySortField === 'responsible' && (activitySortDirection === 'asc' ? '↑' : '↓')}
@@ -5308,7 +5457,7 @@ export default function KeyAreas() {
                                                                                 )}
                                                                                 {visibleColumns.status !== false && (
                                                                                     <th 
-                                                                                        className="px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
+                                                                                        className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                                         onClick={() => handleActivitySort('status')}
                                                                                     >
                                                                                         Status {activitySortField === 'status' && (activitySortDirection === 'asc' ? '↑' : '↓')}
@@ -5316,7 +5465,7 @@ export default function KeyAreas() {
                                                                                 )}
                                                                                 {visibleColumns.priority && (
                                                                                     <th 
-                                                                                        className="px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
+                                                                                        className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                                         onClick={() => handleActivitySort('priority')}
                                                                                     >
                                                                                         Priority {activitySortField === 'priority' && (activitySortDirection === 'asc' ? '↑' : '↓')}
@@ -5324,7 +5473,7 @@ export default function KeyAreas() {
                                                                                 )}
                                                                                 {visibleColumns.start_date && (
                                                                                     <th 
-                                                                                        className="px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
+                                                                                        className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                                         onClick={() => handleActivitySort('start_date')}
                                                                                     >
                                                                                         Start date {activitySortField === 'start_date' && (activitySortDirection === 'asc' ? '↑' : '↓')}
@@ -5332,7 +5481,7 @@ export default function KeyAreas() {
                                                                                 )}
                                                                                 {visibleColumns.end_date && (
                                                                                     <th 
-                                                                                        className="px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
+                                                                                        className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                                         onClick={() => handleActivitySort('end_date')}
                                                                                     >
                                                                                         End date {activitySortField === 'end_date' && (activitySortDirection === 'asc' ? '↑' : '↓')}
@@ -5340,7 +5489,7 @@ export default function KeyAreas() {
                                                                                 )}
                                                                                 {visibleColumns.deadline && (
                                                                                     <th 
-                                                                                        className="px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
+                                                                                        className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                                         onClick={() => handleActivitySort('deadline')}
                                                                                     >
                                                                                         Deadline {activitySortField === 'deadline' && (activitySortDirection === 'asc' ? '↑' : '↓')}
@@ -5348,7 +5497,7 @@ export default function KeyAreas() {
                                                                                 )}
                                                                                 {visibleColumns.duration && (
                                                                                     <th 
-                                                                                        className="px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
+                                                                                        className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                                         onClick={() => handleActivitySort('duration')}
                                                                                     >
                                                                                         Duration {activitySortField === 'duration' && (activitySortDirection === 'asc' ? '↑' : '↓')}
@@ -5356,7 +5505,7 @@ export default function KeyAreas() {
                                                                                 )}
                                                                                 {visibleColumns.completed && (
                                                                                     <th 
-                                                                                        className="px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
+                                                                                        className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
                                                                                         onClick={() => handleActivitySort('completed')}
                                                                                     >
                                                                                         Completed {activitySortField === 'completed' && (activitySortDirection === 'asc' ? '↑' : '↓')}
