@@ -288,6 +288,8 @@ export const buildCreateTaskPayload = ({
   goal,
   tags,
   assignee,
+  consultedIds = [],
+  informedIds = [],
   usersList = [],
   currentUserId = null,
 }) => {
@@ -313,6 +315,8 @@ export const buildCreateTaskPayload = ({
     goalId: normalizeGoalId(goal),
     goal_id: normalizeGoalId(goal),
     tags: (tags || '').trim(),
+    consulted: Array.isArray(consultedIds) ? consultedIds : [],
+    informed: Array.isArray(informedIds) ? informedIds : [],
   };
 };
 
@@ -391,6 +395,8 @@ export const buildTaskServiceCreateBodyFromModalPayload = (payload = {}, {
     keyAreaId: payload?.key_area_id || payload?.keyAreaId || undefined,
     listIndex: payload?.listIndex ?? payload?.list_index ?? undefined,
     delegatedToUserId: payload?.delegatedToUserId ?? null,
+    consulted: Array.isArray(payload?.consulted) ? payload.consulted : undefined,
+    informed: Array.isArray(payload?.informed) ? payload.informed : undefined,
   };
 
   Object.keys(body).forEach((key) => {

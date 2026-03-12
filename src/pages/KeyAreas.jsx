@@ -189,6 +189,8 @@ const api = {
                 return "medium";
             })(),
             delegatedToUserId: task.delegatedToUserId ?? null,
+            consulted: Array.isArray(task.consulted) ? task.consulted : [],
+            informed: Array.isArray(task.informed) ? task.informed : [],
             duration:
                 durationRaw === undefined
                     ? undefined
@@ -211,6 +213,8 @@ const api = {
             duration: created.duration ?? null,
             key_area_id: created.keyAreaId || payload.keyAreaId,
             goal_id: created.goalId ?? created.goal_id ?? payload.goalId ?? null,
+            consulted: Array.isArray(created.consulted) ? created.consulted : payload.consulted,
+            informed: Array.isArray(created.informed) ? created.informed : payload.informed,
             // expose list index to UI under both conventions
             list_index: typeof created.listIndex !== 'undefined' ? created.listIndex : (typeof created.list_index !== 'undefined' ? created.list_index : 1),
             listIndex: typeof created.listIndex !== 'undefined' ? created.listIndex : (typeof created.list_index !== 'undefined' ? created.list_index : 1),

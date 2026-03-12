@@ -406,8 +406,6 @@ export default function TaskFormFields({
               </div>
             ))}
           </div>
-
-          <p className="mt-4 text-sm text-slate-500">{t('createTaskModal.previewOnlyNote')}</p>
         </section>
       )}
     </div>
