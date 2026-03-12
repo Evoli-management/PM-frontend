@@ -110,6 +110,40 @@ const retryWithLegacyDurationIfNeeded = async (requestFactory, legacyFactory) =>
 
 const base = "/tasks";
 
+const normalizeTaskRaci = (task) => {
+    const raci = Array.isArray(task?.raci) ? task.raci : [];
+    return {
+        raci,
+        consulted: raci.filter((entry) => entry?.role === "consulted").map((entry) => entry.userId),
+        informed: raci.filter((entry) => entry?.role === "informed").map((entry) => entry.userId),
+    };
+};
+
+const normalizeTaskFromApi = (task) => {
+    const t = task || {};
+    const rawGoal = t.goal_id ?? t.goalId ?? t.goal ?? null;
+    let gid = null;
+    if (rawGoal) {
+        if (typeof rawGoal === 'object' && rawGoal !== null) {
+            gid = rawGoal.id || rawGoal.goal_id || null;
+        } else {
+            gid = rawGoal;
+        }
+    }
+    const raciFields = normalizeTaskRaci(t);
+    return {
+        ...t,
+        ...raciFields,
+        status: mapStatusFromApi(t.status),
+        priority: mapPriorityFromApi(t.priority),
+        duration: normalizeDurationFromApi(t.duration),
+        goal_id: gid || null,
+        list_index: typeof t.listIndex !== 'undefined' ? t.listIndex : (typeof t.list_index !== 'undefined' ? t.list_index : null),
+        listIndex: typeof t.listIndex !== 'undefined' ? t.listIndex : (typeof t.list_index !== 'undefined' ? t.list_index : null),
+        imported: typeof t.imported === 'boolean' ? t.imported : !!t.imported,
+    };
+};
+
 const taskService = {
     async list({ keyAreaId, unassigned, delegatedTo, withoutGoal, includeImported } = {}) {
         // In dev, bypass browser cache to avoid 304/Not Modified confusion after updates
@@ -124,29 +158,7 @@ const taskService = {
         // We use a cache-busting query param instead.
         try {
             const res = await apiClient.get(base, { params });
-            return res.data.map((t) => {
-                // normalize possible goal id shapes into `goal_id` so UI can reliably look up titles
-                const rawGoal = t.goal_id ?? t.goalId ?? t.goal ?? null;
-                let gid = null;
-                if (rawGoal) {
-                    if (typeof rawGoal === 'object' && rawGoal !== null) {
-                        gid = rawGoal.id || rawGoal.goal_id || null;
-                    } else {
-                        gid = rawGoal;
-                    }
-                }
-                return {
-                    ...t,
-                    status: mapStatusFromApi(t.status),
-                    priority: mapPriorityFromApi(t.priority),
-                    duration: normalizeDurationFromApi(t.duration),
-                    goal_id: gid || null,
-                    // support both camelCase and snake_case from server
-                    list_index: typeof t.listIndex !== 'undefined' ? t.listIndex : (typeof t.list_index !== 'undefined' ? t.list_index : null),
-                    listIndex: typeof t.listIndex !== 'undefined' ? t.listIndex : (typeof t.list_index !== 'undefined' ? t.list_index : null),
-                    imported: typeof t.imported === 'boolean' ? t.imported : !!t.imported,
-                };
-            });
+            return res.data.map((t) => normalizeTaskFromApi(t));
         } catch (e) {
             const status = e?.response?.status;
             const data = e?.response?.data;
@@ -160,21 +172,7 @@ const taskService = {
     },
     async get(id) {
         const res = await apiClient.get(`${base}/${id}`);
-        const t = res.data;
-        const rawGoal = t.goal_id ?? t.goalId ?? t.goal ?? null;
-        let gid = null;
-        if (rawGoal) {
-            if (typeof rawGoal === 'object' && rawGoal !== null) {
-                gid = rawGoal.id || rawGoal.goal_id || null;
-            } else {
-                gid = rawGoal;
-            }
-        }
-        return {
-            ...t, status: mapStatusFromApi(t.status), priority: mapPriorityFromApi(t.priority), duration: normalizeDurationFromApi(t.duration), goal_id: gid || null,
-            list_index: typeof t.listIndex !== 'undefined' ? t.listIndex : (typeof t.list_index !== 'undefined' ? t.list_index : null),
-            listIndex: typeof t.listIndex !== 'undefined' ? t.listIndex : (typeof t.list_index !== 'undefined' ? t.list_index : null),
-        };
+        return normalizeTaskFromApi(res.data);
     },
     async create(payload) {
         // Normalize list index key so backend DTO (which expects camelCase)
@@ -198,21 +196,7 @@ const taskService = {
             () => apiClient.post(base, primaryBody),
             durationProvided ? () => apiClient.post(base, legacyBody) : null,
         );
-        const t = res.data;
-        const rawGoal = t.goal_id ?? t.goalId ?? t.goal ?? null;
-        let gid = null;
-        if (rawGoal) {
-            if (typeof rawGoal === 'object' && rawGoal !== null) {
-                gid = rawGoal.id || rawGoal.goal_id || null;
-            } else {
-                gid = rawGoal;
-            }
-        }
-        return {
-            ...t, status: mapStatusFromApi(t.status), priority: mapPriorityFromApi(t.priority), duration: normalizeDurationFromApi(t.duration), goal_id: gid || null,
-            list_index: typeof t.listIndex !== 'undefined' ? t.listIndex : (typeof t.list_index !== 'undefined' ? t.list_index : null),
-            listIndex: typeof t.listIndex !== 'undefined' ? t.listIndex : (typeof t.list_index !== 'undefined' ? t.list_index : null),
-        };
+        return normalizeTaskFromApi(res.data);
     },
     async update(id, payload) {
         const data = { ...payload };
@@ -231,25 +215,21 @@ const taskService = {
             () => apiClient.put(`${base}/${id}`, primaryData),
             durationProvided ? () => apiClient.put(`${base}/${id}`, legacyData) : null,
         );
-        const t = res.data;
-        const rawGoal = t.goal_id ?? t.goalId ?? t.goal ?? null;
-        let gid = null;
-        if (rawGoal) {
-            if (typeof rawGoal === 'object' && rawGoal !== null) {
-                gid = rawGoal.id || rawGoal.goal_id || null;
-            } else {
-                gid = rawGoal;
-            }
-        }
-        return {
-            ...t, status: mapStatusFromApi(t.status), priority: mapPriorityFromApi(t.priority), duration: normalizeDurationFromApi(t.duration), goal_id: gid || null,
-            list_index: typeof t.listIndex !== 'undefined' ? t.listIndex : (typeof t.list_index !== 'undefined' ? t.list_index : null),
-            listIndex: typeof t.listIndex !== 'undefined' ? t.listIndex : (typeof t.list_index !== 'undefined' ? t.list_index : null),
-        };
+        return normalizeTaskFromApi(res.data);
     },
     async remove(id) {
         const res = await apiClient.delete(`${base}/${id}`);
         return res.data;
+    },
+    async getRaci(id) {
+        const res = await apiClient.get(`${base}/${id}/raci`);
+        return Array.isArray(res.data) ? res.data : [];
+    },
+    async setRaciRole(id, role, memberIds) {
+        const res = await apiClient.put(`${base}/${id}/raci/${role}`, {
+            members: Array.isArray(memberIds) ? memberIds : [],
+        });
+        return Array.isArray(res.data) ? res.data : [];
     },
 };
 

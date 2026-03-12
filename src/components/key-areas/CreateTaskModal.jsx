@@ -204,6 +204,8 @@ export default function CreateTaskModal({
       goal,
       tags,
       assignee,
+      consultedIds,
+      informedIds,
       usersList,
       currentUserId: resolvedCurrentUserId,
     });

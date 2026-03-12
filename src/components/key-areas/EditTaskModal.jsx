@@ -175,6 +175,34 @@ export default function EditTaskModal({
   }, [isOpen, assignee, initialData, usersList, currentUserId, allTasks, currentTaskId]);
 
   useEffect(() => {
+    if (!isOpen || !currentTaskId) return undefined;
+    let ignore = false;
+
+    (async () => {
+      try {
+        const entries = await taskService.getRaci(currentTaskId);
+        if (ignore || !Array.isArray(entries)) return;
+        setConsultedIds(
+          entries
+            .filter((entry) => entry?.role === 'consulted')
+            .map((entry) => String(entry.userId)),
+        );
+        setInformedIds(
+          entries
+            .filter((entry) => entry?.role === 'informed')
+            .map((entry) => String(entry.userId)),
+        );
+      } catch {
+        // Non-fatal: the modal can still edit core task fields.
+      }
+    })();
+
+    return () => {
+      ignore = true;
+    };
+  }, [isOpen, currentTaskId, setConsultedIds, setInformedIds]);
+
+  useEffect(() => {
     if (!isOpen) return;
     if (!endAuto) return;
     if (!startDate) return;
@@ -191,7 +219,7 @@ export default function EditTaskModal({
   const effectiveListIndex = isDontForgetMode && !keyAreaId ? undefined : listIndex;
 
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const dateValidation = validateTaskDateRange(startDate, endDate);
     if (!dateValidation.valid) return;
 
@@ -233,12 +261,22 @@ export default function EditTaskModal({
       console.warn('EditTaskModal: onSave prop not provided');
       return;
     }
-    onSave && onSave(payload);
+    await onSave(payload);
+    if (currentTaskId) {
+      try {
+        await Promise.all([
+          taskService.setRaciRole(currentTaskId, 'consulted', consultedIds),
+          taskService.setRaciRole(currentTaskId, 'informed', informedIds),
+        ]);
+      } catch (error) {
+        console.error('Failed to persist task consulted/informed members', error);
+      }
+    }
   };
 
-  const onSubmit = (e) => {
+  const onSubmit = async (e) => {
     e.preventDefault();
-    handleSave();
+    await handleSave();
   };
 
   const handleDelete = async () => {
