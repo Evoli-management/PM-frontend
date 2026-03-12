@@ -30,11 +30,24 @@ const getActivityService = async () => {
     _activityService = mod?.default || mod;
     return _activityService;
 };
+
+let _userProfileService = null;
+const getUserProfileService = async () => {
+    if (_userProfileService) return _userProfileService;
+    const mod = await import("../../services/userProfileService");
+    _userProfileService = mod?.default || mod;
+    return _userProfileService;
+};
 import elephantTaskService from "../../services/elephantTaskService";
 import AvailabilityBlock from "./AvailabilityBlock";
 import calendarService from "../../services/calendarService";
 import { useToast } from "../shared/ToastProvider.jsx";
 import { normalizeActivity, toDateOnly } from '../../utils/keyareasHelpers';
+import {
+    buildTaskServiceCreateBodyFromModalPayload,
+    buildTaskServiceUpdatePatchFromModalPayload,
+    normalizeGoalId,
+} from "../key-areas/taskFormLogic.js";
 import AppointmentModal from "./AppointmentModal";
 import DebugEventModal from "./DebugEventModal";
 import useCalendarPreferences from '../../hooks/useCalendarPreferences';
@@ -50,6 +63,52 @@ const EVENT_CATEGORIES = {
     red: { color: "bg-red-400", icon: "⛔" },
     custom: { color: "bg-gray-300", icon: "•" },
 };
+
+function buildTaskMetaMap(tasks = []) {
+    const map = {};
+    (Array.isArray(tasks) ? tasks : []).forEach((task) => {
+        if (!task?.id) return;
+        const keyAreaId =
+            task.keyAreaId ??
+            task.key_area_id ??
+            task.keyArea?.id ??
+            task.key_area?.id ??
+            null;
+        const listIndex =
+            task.listIndex ??
+            task.list_index ??
+            task.list ??
+            null;
+        map[String(task.id)] = { keyAreaId, listIndex };
+    });
+    return map;
+}
+
+function normalizeCalendarTodo(todo, taskMetaMap = {}) {
+    if (!todo || typeof todo !== "object") return todo;
+    const taskMeta = todo?.id ? taskMetaMap[String(todo.id)] : null;
+    const keyAreaId =
+        todo.keyAreaId ??
+        todo.key_area_id ??
+        todo.keyArea?.id ??
+        todo.key_area?.id ??
+        taskMeta?.keyAreaId ??
+        null;
+    const listIndex =
+        todo.listIndex ??
+        todo.list_index ??
+        todo.list ??
+        taskMeta?.listIndex ??
+        null;
+    return {
+        ...todo,
+        keyAreaId,
+        key_area_id: keyAreaId,
+        listIndex,
+        list_index: listIndex,
+        list: listIndex,
+    };
+}
 
 const CalendarContainer = () => {
     const { t } = useTranslation();
@@ -92,6 +151,7 @@ const CalendarContainer = () => {
     const [usersList, setUsersList] = useState([]);
     const [goalsList, setGoalsList] = useState([]);
     const [availableLists, setAvailableLists] = useState([1]);
+    const [currentUserId, setCurrentUserId] = useState(null);
     const [tasksList, setTasksList] = useState([]); // tasks used for modals (may include list_index)
     const [loading, setLoading] = useState(false);
     const [activitiesByTask, setActivitiesByTask] = useState({}); // { taskId: Activity[] }
@@ -134,6 +194,18 @@ const CalendarContainer = () => {
     const [syncActive, setSyncActive] = useState(false);
     const [refreshTick, setRefreshTick] = useState(0);
     const lastEventMoveRef = React.useRef({ key: "", at: 0 });
+
+    const listNormalizedTodosForRange = useCallback(async ({ from, to }) => {
+        const [tds, taskSvc] = await Promise.all([
+            calendarService.listTodos({ from, to }),
+            getTaskService(),
+        ]);
+        const tasks = await taskSvc.list().catch(() => []);
+        const taskMetaMap = buildTaskMetaMap(tasks);
+        return (Array.isArray(tds) ? tds : []).map((todo) =>
+            normalizeCalendarTodo(todo, taskMetaMap),
+        );
+    }, []);
 
     // Listen for global appointment create requests (Quick Actions)
     useEffect(() => {
@@ -205,6 +277,14 @@ const CalendarContainer = () => {
                 if (!ignore) setGoalsList(Array.isArray(gs) ? gs : []);
             } catch (e) {
                 console.warn('Failed to load goals for calendar', e);
+            }
+            try {
+                const profileSvc = await getUserProfileService();
+                const profile = await profileSvc?.getProfile?.();
+                if (!ignore) setCurrentUserId(profile?.id || profile?.userId || profile?.sub || null);
+            } catch (e) {
+                if (!ignore) setCurrentUserId(null);
+                console.warn('Failed to load current user for calendar', e);
             }
             // derive available lists from loaded key areas (max list count across areas)
             try {
@@ -339,7 +419,7 @@ const CalendarContainer = () => {
                 setLoading(true);
                 const [evs, tds, appointments] = await Promise.all([
                     calendarService.listEvents({ from: fromISO, to: toISO, view }),
-                    calendarService.listTodos({ from: fromISO, to: toISO }),
+                    listNormalizedTodosForRange({ from: fromISO, to: toISO }),
                     calendarService.listAppointments({ from: fromISO, to: toISO }),
                 ]);
                 
@@ -479,7 +559,7 @@ const CalendarContainer = () => {
         const fromISO = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 0, 0, 0).toISOString();
         const toISO = new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59).toISOString();
         try {
-            const tds = await calendarService.listTodos({ from: fromISO, to: toISO });
+            const tds = await listNormalizedTodosForRange({ from: fromISO, to: toISO });
             // Filter out completed tasks
             const activeTodos = (Array.isArray(tds) ? tds : []).filter((t) => {
                 const status = String(t.status || '').toLowerCase();
@@ -566,7 +646,15 @@ const CalendarContainer = () => {
                     const patch = { startDate: toISO(start), endDate: toISO(newEnd) };
                     const updated = await svc.update(taskId, patch);
                     // Update local todos
-                    setTodos((prev) => prev.map((t) => (String(t.id) === String(taskId) ? updated : t)));
+                    const normalizedUpdated = normalizeCalendarTodo(
+                        updated,
+                        buildTaskMetaMap([updated]),
+                    );
+                    setTodos((prev) =>
+                        prev.map((t) =>
+                            String(t.id) === String(taskId) ? normalizedUpdated : t
+                        )
+                    );
                     addToast({ title: t("calendarContainer.taskUpdated"), description: t("calendarContainer.taskMovedTo", { title: resolvedTask?.title || "", date: `${formatDate(start)} ${formatTime(`${String(start.getHours()).padStart(2,'0')}:${String(start.getMinutes()).padStart(2,'0')}`)}` }), variant: "success" });
                 } catch (err) {
                     console.warn("Failed to update task from drop", err);
@@ -2053,34 +2141,23 @@ const CalendarContainer = () => {
                                     } catch { return '09:30'; }
                                 })(),
                             }}
+                            keyAreas={keyAreas}
+                            users={usersList}
+                            goals={goalsList}
+                            availableLists={availableLists}
+                            currentUserId={currentUserId}
                             onSave={async (data) => {
                                 // data follows CreateTaskModal payload (title, description, date, time, dueDate, endDate, key_area_id, list_index, ...)
                                 try {
                                     const svc = await getTaskService();
-                                    const title = (data.title || data.name || '').trim();
-                                    if (!title) {
+                                    const body = buildTaskServiceCreateBodyFromModalPayload(data, {
+                                        defaultStatus: 'open',
+                                        defaultPriority: 'medium',
+                                    });
+                                    if (!body.title) {
                                         addToast({ title: 'Task title required', variant: 'error' });
                                         return;
                                     }
-                                    const toIsoDateTime = (dateStr, timeStr) => {
-                                        try {
-                                            if (!dateStr) return null;
-                                            if (timeStr) return new Date(`${dateStr}T${timeStr}`).toISOString();
-                                            return new Date(dateStr).toISOString();
-                                        } catch { return null; }
-                                    };
-                                    const body = {
-                                        title,
-                                        description: data.description || data.notes || null,
-                                        assignee: data.assignee || null,
-                                        startDate: toIsoDateTime(data.date || data.start_date, data.time) || undefined,
-                                        endDate: data.endDate || data.end_date ? (new Date(data.endDate || data.end_date)).toISOString() : undefined,
-                                        dueDate: data.dueDate || data.deadline ? (new Date(data.dueDate || data.deadline)).toISOString() : undefined,
-                                        status: data.status || 'open',
-                                        priority: data.priority || 'medium',
-                                        keyAreaId: data.key_area_id || data.keyAreaId || undefined,
-                                        listIndex: data.listIndex || data.list_index || undefined,
-                                    };
                                     const createdTask = await svc.create(body);
                                     addToast({ title: 'Task added', variant: 'success' });
 
@@ -2088,7 +2165,8 @@ const CalendarContainer = () => {
                                     setAddModalOpen(false);
                                 } catch (e) {
                                     console.error('Failed to create task from calendar modal', e);
-                                    addToast({ title: 'Failed to add', description: String(e?.message || e), variant: 'error' });
+                                    const details = e?.response?.data?.message || e?.response?.data?.error || e?.message || e;
+                                    addToast({ title: 'Failed to add', description: String(details), variant: 'error' });
                                 }
                             }}
                         />
@@ -2266,8 +2344,8 @@ const CalendarContainer = () => {
                         list: editItem.list_index || editItem.listIndex || editItem.list || 1,
                         priority: editItem.priority || editItem.priority_level || "medium",
                         duration: editItem.duration || editItem.duration_minutes || "",
-                        goal: editItem.goal || editItem.goal_id || editItem.goalId || "",
-                        goal_id: editItem.goal || editItem.goal_id || editItem.goalId || "",
+                        goal: normalizeGoalId(editItem.goal ?? editItem.goal_id ?? editItem.goalId) || "",
+                        goal_id: normalizeGoalId(editItem.goal ?? editItem.goal_id ?? editItem.goalId) || "",
                         assignee: editItem.assignee || "",
                         status: editItem.status || "todo",
                     }}
@@ -2275,45 +2353,14 @@ const CalendarContainer = () => {
                     users={usersList}
                     goals={goalsList}
                     availableLists={availableLists}
+                    isDontForgetMode={!(editItem.key_area_id || editItem.keyAreaId)}
+                    currentUserId={currentUserId}
                     onSave={async (payload) => {
                         try {
                             const id = editItem.id;
                             if (!id) return;
                             const taskIdStr = String(id);
-                            const patch = {};
-                            if (payload.title !== undefined) patch.title = payload.title;
-                            if (payload.description !== undefined) patch.description = payload.description;
-                            if (payload.assignee !== undefined) patch.assignee = payload.assignee;
-                            if (payload.status !== undefined) patch.status = payload.status;
-                            if (payload.priority !== undefined) patch.priority = payload.priority;
-                            if (
-                                payload.date !== undefined ||
-                                payload.time !== undefined ||
-                                payload.start_date !== undefined ||
-                                payload.startDate !== undefined
-                            ) {
-                                try {
-                                    if (payload.date && payload.time) {
-                                        patch.startDate = new Date(`${payload.date}T${payload.time}`).toISOString();
-                                    } else if (payload.start_date !== undefined) {
-                                        patch.startDate = payload.start_date ? new Date(payload.start_date).toISOString() : null;
-                                    } else if (payload.startDate !== undefined) {
-                                        patch.startDate = payload.startDate ? new Date(payload.startDate).toISOString() : null;
-                                    } else if (payload.date) {
-                                        patch.startDate = new Date(payload.date).toISOString();
-                                    }
-                                } catch (e) {}
-                            }
-                            if (payload.endDate !== undefined || payload.end_date !== undefined) {
-                                const endValue = payload.end_date !== undefined ? payload.end_date : payload.endDate;
-                                patch.endDate = endValue ? new Date(endValue).toISOString() : null;
-                            }
-                            if (payload.dueDate !== undefined || payload.deadline !== undefined) {
-                                const dueValue = payload.deadline !== undefined ? payload.deadline : payload.dueDate;
-                                patch.dueDate = dueValue ? new Date(dueValue).toISOString() : null;
-                            }
-                            if (payload.key_area_id || payload.keyAreaId) patch.keyAreaId = payload.key_area_id || payload.keyAreaId;
-                            if (payload.list_index !== undefined || payload.listIndex !== undefined) patch.listIndex = payload.list_index ?? payload.listIndex;
+                            const patch = buildTaskServiceUpdatePatchFromModalPayload(payload);
 
                             let updatedTask = null;
                             if (Object.keys(patch).length > 0) {
@@ -2324,10 +2371,14 @@ const CalendarContainer = () => {
                             if (updatedTask) {
                                 const nextKaId = updatedTask.keyAreaId || updatedTask.key_area_id || updatedTask.keyArea || null;
                                 const nextList = updatedTask.list_index || updatedTask.listIndex || updatedTask.list || null;
+                                const normalizedUpdatedTask = normalizeCalendarTodo(
+                                    updatedTask,
+                                    buildTaskMetaMap([updatedTask]),
+                                );
                                 // Keep task state in sync immediately.
                                 setTodos((prev) =>
                                     (Array.isArray(prev) ? prev : []).map((t) =>
-                                        String(t.id) === taskIdStr ? { ...t, ...updatedTask } : t
+                                        String(t.id) === taskIdStr ? { ...t, ...normalizedUpdatedTask } : t
                                     )
                                 );
                                 // When task key area/list changes, activities should instantly inherit it.
@@ -2363,7 +2414,8 @@ const CalendarContainer = () => {
                             addToast({ title: t("calendarContainer.taskUpdated"), variant: "success" });
                         } catch (e) {
                             console.error('Failed to update task from calendar modal', e);
-                            addToast({ title: 'Failed to update', description: String(e?.message || e), variant: 'error' });
+                            const details = e?.response?.data?.message || e?.response?.data?.error || e?.message || e;
+                            addToast({ title: 'Failed to update', description: String(details), variant: 'error' });
                         }
                     }}
                 />

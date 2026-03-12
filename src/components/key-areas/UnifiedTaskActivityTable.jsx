@@ -654,18 +654,18 @@ export default function UnifiedTaskActivityTable({
                     // Set assignee name for display
                     if (assigningToSelf) {
                         updates.assignee = 'Me';
-                        updates.delegatedToUserId = existingDelegatedToUserId || null;
+                        updates.delegatedToUserId = null;
                     } else {
                         updates.assignee = `${selectedUser.name || selectedUser.firstname || ''} ${selectedUser.lastname || ''}`.trim();
                         updates.delegatedToUserId = userId;
                     }
                 } else {
                     updates.assignee = value || '';
-                    updates.delegatedToUserId = existingDelegatedToUserId || null;
+                    updates.delegatedToUserId = null;
                 }
             } else if (item.type === 'task') {
                 updates.assignee = '';
-                updates.delegatedToUserId = item.delegatedToUserId || item.delegated_to_user_id || null;
+                updates.delegatedToUserId = null;
             } else if (item.type === 'activity') {
                 // For activities, use delegatedToUserId (auto-creates delegation)
                 if (value && String(value) !== String(currentUserId)) {
