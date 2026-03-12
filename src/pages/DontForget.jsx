@@ -10,6 +10,14 @@ import { FiAlertTriangle, FiClock } from "react-icons/fi";
 import { FaCheck, FaExclamation, FaLongArrowAltDown, FaTimes, FaTrash, FaBars, FaCog, FaSearch } from "react-icons/fa";
 import CreateTaskModal from "../components/key-areas/CreateTaskModal.jsx";
 import EditTaskModal from "../components/key-areas/EditTaskModal.jsx";
+import {
+    buildTaskServiceCreateBodyFromModalPayload,
+    buildTaskServiceUpdatePatchFromModalPayload,
+    getTaskDeadlinePatch,
+    getTaskEndDatePatch,
+    getTaskStartDatePatch,
+    resolveEditTaskAssignment,
+} from "../components/key-areas/taskFormLogic.js";
 import BulkFieldPickerModal from "../components/shared/BulkFieldPickerModal.jsx";
 import MassActionMenu from "../components/shared/MassActionMenu.jsx";
 import TaskRow from "../components/key-areas/TaskRow.jsx";
@@ -48,6 +56,14 @@ const getGoalService = async () => {
     const mod = await import("../services/goalService");
     _goalService = mod;
     return _goalService;
+};
+
+let _userProfileService = null;
+const getUserProfileService = async () => {
+    if (_userProfileService) return _userProfileService;
+    const mod = await import("../services/userProfileService");
+    _userProfileService = mod.default || mod;
+    return _userProfileService;
 };
 
 let _calendarService = null;
@@ -116,6 +132,7 @@ export default function DontForget() {
     // Users and goals to pre-populate selects in Create/Edit modals
     const [users, setUsers] = useState([]);
     const [goals, setGoals] = useState([]);
+    const [currentUserId, setCurrentUserId] = useState(null);
     const { addToast } = useToast ? useToast() : { addToast: () => { } };
     useEffect(() => {
         if (viewMode !== "dont-forget") return;
@@ -254,6 +271,24 @@ export default function DontForget() {
                     setUsers([]);
                     setGoals([]);
                 }
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [viewMode]);
+
+    useEffect(() => {
+        if (viewMode !== "dont-forget") return;
+        let cancelled = false;
+        (async () => {
+            try {
+                const pSvc = await getUserProfileService();
+                const profile = await pSvc.getProfile();
+                const id = profile?.id || profile?.userId || profile?.sub || null;
+                if (!cancelled && id) setCurrentUserId(id);
+            } catch (e) {
+                if (!cancelled) setCurrentUserId(null);
             }
         })();
         return () => {
@@ -491,39 +526,6 @@ export default function DontForget() {
 
     // Activity composer/refresh handlers removed: DontForget does not fetch activities
 
-    // Fallback: listen for global edit requests dispatched by TaskFullView
-    useEffect(() => {
-        if (viewMode !== 'dont-forget') return;
-        const handler = (ev) => {
-            const tsk = ev && ev.detail ? ev.detail : null;
-            if (!tsk) return;
-            try {
-                // eslint-disable-next-line no-console
-                console.log('[DontForget] global ka-request-edit-task received for', tsk && tsk.id);
-            } catch (e) { }
-            const form = {
-                name: tsk.name || "",
-                notes: tsk.notes || "",
-                assignee: tsk.assignee || "",
-                status: tsk.status || "open",
-                priority: getPriorityLevel(tsk.priority),
-                start_date: tsk.start_date || "",
-                end_date: tsk.end_date || "",
-                dueDate: tsk.dueDate || "",
-                duration: tsk.duration || "",
-                keyAreaId: null,
-                listIndex: tsk.listIndex || 1,
-                goal: tsk.goal || "",
-                tags: tsk.tags || "",
-                time: tsk.time || "",
-                completionDate: tsk.completionDate || null,
-            };
-            setEditModal({ open: true, id: tsk.id, form });
-            setMassEditingMode(false);
-        };
-        window.addEventListener('ka-request-edit-task', handler);
-        return () => window.removeEventListener('ka-request-edit-task', handler);
-    }, [viewMode]);
     // When true, the EditTaskModal is being used to edit multiple selected tasks
     const [massEditingMode, setMassEditingMode] = useState(false);
     const [showMassFieldPicker, setShowMassFieldPicker] = useState(false);
@@ -837,48 +839,18 @@ export default function DontForget() {
         const name = (payload?.name ?? payload?.title ?? dfName).trim();
         if (!name) return;
         try {
-            // Map UI values to backend enums where applicable
-            const statusMap = {
-                open: "todo",
-                "in progress": "in_progress",
-                done: "completed",
-                cancelled: "cancelled",
-            };
-            const mappedStatus = payload?.status ? statusMap[payload.status] : undefined;
-            const mappedPriority = payload?.priority === "normal" ? "medium" : payload?.priority;
-
-            const body = {
-                title: name,
-                description: payload?.notes || payload?.description || "",
-                assignee: payload?.assignee || "",
-                startDate: payload?.start_date ? new Date(payload.start_date).toISOString() : undefined,
-                endDate: payload?.end_date ? new Date(payload.end_date).toISOString() : undefined,
-                // support both deadline (from CreateTaskModal) and dueDate
-                dueDate: payload?.dueDate
-                    ? new Date(payload.dueDate).toISOString()
-                    : payload?.deadline
-                        ? new Date(payload.deadline).toISOString()
-                        : undefined,
-                duration: payload?.duration ? String(payload.duration) : undefined,
-                goalId: payload?.goal_id || payload?.goalId || payload?.goal || null,
-                // Only include status/priority if provided, else let backend defaults apply
-                ...(mappedStatus ? { status: mappedStatus } : {}),
-                ...(mappedPriority ? { priority: mappedPriority } : {}),
-            };
+            const body = buildTaskServiceCreateBodyFromModalPayload(payload, { fallbackTitle: name });
             try {
                 // Debug: log payload being sent to the API
                 // eslint-disable-next-line no-console
                 console.log('[DontForget] creating task payload', body);
             } catch (e) { }
-            // support keyArea naming variants
-            if (payload?.keyAreaId) body.keyAreaId = payload.keyAreaId;
-            if (payload?.key_area_id) body.keyAreaId = payload.key_area_id;
             try {
                 const created = await (await getTaskService()).create(body);
                 // Debug: log selected listIndex from payload and created response
                 try { console.log('[DontForget] payload.listIndex', payload?.listIndex, 'payload.list_index', payload?.list_index); } catch (e) { }
                 // Push to local list
-                if (!payload?.keyAreaId) {
+                if (!(payload?.keyAreaId || payload?.key_area_id)) {
                     const newItem = {
                         id: created.id,
                         name: created.title,
@@ -1022,10 +994,11 @@ export default function DontForget() {
     const handleMassFieldSave = async (field, value) => {
         const payload = {};
         if (field === 'assignee') {
-            const selectedUser = users.find((user) => String(user.id || user.member_id) === String(value));
-            payload.assignee = selectedUser
-                ? `${selectedUser.name || selectedUser.firstname || ''} ${selectedUser.lastname || ''}`.trim()
-                : '';
+            const assignment = value
+                ? resolveEditTaskAssignment({ assignee: value, usersList: users, currentUserId })
+                : { assignee: null, delegatedToUserId: null };
+            payload.assignee = assignment.assignee;
+            payload.delegatedToUserId = assignment.delegatedToUserId;
         } else if (field === 'status') {
             payload.status = value;
         } else if (field === 'duration') {
@@ -1134,10 +1107,56 @@ export default function DontForget() {
         const prevTasks = tasks;
         const prevTask = tasks.find((t) => t.id === id);
         if (!prevTask) return;
+        const currentDates = {
+            startDate: prevTask.start_date || prevTask.startDate || "",
+            endDate: prevTask.end_date || prevTask.endDate || "",
+            deadline: prevTask.deadline || prevTask.dueDate || prevTask.due_date || "",
+        };
+        const resolvedDates =
+            key === 'start_date'
+                ? getTaskStartDatePatch({
+                    ...currentDates,
+                    endAuto: !currentDates.endDate,
+                    deadlineAuto: !currentDates.deadline,
+                }, value || '')
+                : key === 'end_date'
+                    ? getTaskEndDatePatch({ startDate: currentDates.startDate }, value || '')
+                    : key === 'dueDate' || key === 'deadline'
+                        ? getTaskDeadlinePatch(value || '')
+                        : null;
+        const nextDates = resolvedDates
+            ? {
+                startDate: Object.prototype.hasOwnProperty.call(resolvedDates, 'startDate') ? (resolvedDates.startDate || "") : currentDates.startDate,
+                endDate: Object.prototype.hasOwnProperty.call(resolvedDates, 'endDate') ? (resolvedDates.endDate || "") : currentDates.endDate,
+                deadline: Object.prototype.hasOwnProperty.call(resolvedDates, 'deadline') ? (resolvedDates.deadline || "") : currentDates.deadline,
+            }
+            : null;
+        const assignment =
+            key === 'assignee'
+                ? (value
+                    ? resolveEditTaskAssignment({ assignee: value, usersList: users, currentUserId })
+                    : { assignee: null, delegatedToUserId: null })
+                : null;
 
         // Local optimistic transform for display
         const optimistic = (t) => {
             if (t.id !== id) return t;
+            if (nextDates) {
+                return {
+                    ...t,
+                    start_date: nextDates.startDate,
+                    end_date: nextDates.endDate,
+                    dueDate: nextDates.deadline,
+                    deadline: nextDates.deadline,
+                };
+            }
+            if (assignment) {
+                return {
+                    ...t,
+                    assignee: assignment.assignee || "",
+                    delegatedToUserId: assignment.delegatedToUserId ?? null,
+                };
+            }
             if (key === 'priority') {
                 try {
                     // store normalized numeric priority for consistent rendering
@@ -1156,10 +1175,15 @@ export default function DontForget() {
         const patch = {};
         if (key === 'name') patch.title = value;
         else if (key === 'notes') patch.description = value;
-        else if (key === 'assignee') patch.assignee = value;
-        else if (key === 'start_date') patch.startDate = value ? new Date(value).toISOString() : null;
-        else if (key === 'end_date') patch.endDate = value ? new Date(value).toISOString() : null;
-        else if (key === 'dueDate' || key === 'deadline') patch.dueDate = value ? new Date(value).toISOString() : null;
+        else if (assignment) {
+            patch.assignee = assignment.assignee;
+            patch.delegatedToUserId = assignment.delegatedToUserId;
+        }
+        else if (nextDates) {
+            patch.startDate = nextDates.startDate ? new Date(nextDates.startDate).toISOString() : null;
+            patch.endDate = nextDates.endDate ? new Date(nextDates.endDate).toISOString() : null;
+            patch.dueDate = nextDates.deadline ? new Date(nextDates.deadline).toISOString() : null;
+        }
         else if (key === 'duration') patch.duration = value;
         else if (key === 'priority') patch.priority = value;
         else if (key === 'status') patch.status = value;
@@ -1178,10 +1202,12 @@ export default function DontForget() {
                             ...t,
                             name: updated.title || t.name,
                             notes: updated.description || t.notes || "",
-                            assignee: updated.assignee || t.assignee || "",
-                            start_date: updated.startDate ? updated.startDate.slice(0, 10) : (patch.startDate === null ? "" : t.start_date),
-                            end_date: updated.endDate ? updated.endDate.slice(0, 10) : (patch.endDate === null ? "" : t.end_date),
-                            dueDate: updated.dueDate ? updated.dueDate.slice(0, 10) : (patch.dueDate === null ? "" : t.dueDate),
+                            assignee: updated.assignee ?? (patch.assignee === null ? "" : (assignment?.assignee || t.assignee || "")),
+                            delegatedToUserId: updated.delegatedToUserId ?? patch.delegatedToUserId ?? t.delegatedToUserId ?? null,
+                            start_date: updated.startDate ? updated.startDate.slice(0, 10) : (nextDates ? nextDates.startDate : (patch.startDate === null ? "" : t.start_date)),
+                            end_date: updated.endDate ? updated.endDate.slice(0, 10) : (nextDates ? nextDates.endDate : (patch.endDate === null ? "" : t.end_date)),
+                            dueDate: updated.dueDate ? updated.dueDate.slice(0, 10) : (nextDates ? nextDates.deadline : (patch.dueDate === null ? "" : t.dueDate)),
+                            deadline: updated.dueDate ? updated.dueDate.slice(0, 10) : (nextDates ? nextDates.deadline : (t.deadline || "")),
                             duration: updated.duration || t.duration || "",
                             status: updated.status || t.status,
                             priority: typeof updated.priority !== 'undefined' ? getPriorityLevel(updated.priority) : t.priority,
@@ -1370,23 +1396,12 @@ export default function DontForget() {
         // payload shape follows EditTaskModal's onSave (title, description, start_date, end_date, deadline, etc.)
         const id = editModal.id;
         if (!id) return;
-        const patch = {};
-        if (payload.title !== undefined) patch.title = payload.title;
-        if (payload.description !== undefined) patch.description = payload.description;
-        if (payload.assignee !== undefined) patch.assignee = payload.assignee;
-        if (payload.status !== undefined) patch.status = payload.status;
-        if (payload.priority !== undefined) patch.priority = payload.priority;
-        if (payload.start_date !== undefined)
-            patch.startDate = payload.start_date ? new Date(payload.start_date).toISOString() : null;
-        if (payload.end_date !== undefined) patch.endDate = payload.end_date ? new Date(payload.end_date).toISOString() : null;
-        if (payload.deadline !== undefined) patch.dueDate = payload.deadline ? new Date(payload.deadline).toISOString() : null;
-        if (payload.duration !== undefined) patch.duration = payload.duration;
-        if (payload.key_area_id) patch.keyAreaId = payload.key_area_id;
+        const patch = buildTaskServiceUpdatePatchFromModalPayload(payload);
 
         try {
             const updated = await (await getTaskService()).update(id, patch);
             // If moved to a Key Area, remove from DF and open in Key Areas
-            if (payload.key_area_id) {
+            if (payload.key_area_id || payload.keyAreaId) {
                 setTasks((prev) => prev.filter((t) => t.id !== id));
                 try {
                     setDfTaskListMap((prev) => {
@@ -1394,7 +1409,7 @@ export default function DontForget() {
                         return rest;
                     });
                 } catch (e) { }
-                navigate({ pathname: "/key-areas", search: `?ka=${payload.key_area_id}&openKA=1&task=${id}` });
+                navigate({ pathname: "/key-areas", search: `?ka=${payload.key_area_id || payload.keyAreaId}&openKA=1&task=${id}` });
             } else {
                 setTasks((prev) =>
                     prev.map((t) =>
@@ -1418,18 +1433,19 @@ export default function DontForget() {
                                     }
                                     return 3;
                                 })(updated.eisenhowerQuadrant, payload.quadrant || t.quadrant),
-                                goal: payload.goal || t.goal,
+                                goal: payload.goal || payload.goal_id || payload.goalId || t.goal,
                                 tags: payload.tags || t.tags,
                                 time: payload.time || t.time,
-                                listIndex: payload.list_index || t.listIndex || 1,
+                                listIndex: payload.list_index ?? payload.listIndex ?? t.listIndex ?? 1,
                             }
                             : t,
                     ),
                 );
                 // Persist any list_index changes from external edit modal
                 try {
-                    if (payload.list_index !== undefined) {
-                        setDfTaskListMap((prev) => ({ ...(prev || {}), [id]: payload.list_index }));
+                    if (payload.list_index !== undefined || payload.listIndex !== undefined) {
+                        const nextListIndex = payload.list_index ?? payload.listIndex;
+                        setDfTaskListMap((prev) => ({ ...(prev || {}), [id]: nextListIndex }));
                     }
                 } catch (e) { }
             }
@@ -1445,23 +1461,10 @@ export default function DontForget() {
     const handleMassEditSave = async (payload) => {
         if (selectedIds.size === 0) return;
         const ids = Array.from(selectedIds);
+        const patch = buildTaskServiceUpdatePatchFromModalPayload(payload);
         try {
             await Promise.all(
                 ids.map(async (id) => {
-                    const patch = {};
-                    if (payload.title !== undefined) patch.title = payload.title;
-                    if (payload.description !== undefined) patch.description = payload.description;
-                    if (payload.assignee !== undefined) patch.assignee = payload.assignee;
-                    if (payload.status !== undefined) patch.status = payload.status;
-                    if (payload.priority !== undefined) patch.priority = payload.priority;
-                    if (payload.start_date !== undefined)
-                        patch.startDate = payload.start_date ? new Date(payload.start_date).toISOString() : null;
-                    if (payload.end_date !== undefined)
-                        patch.endDate = payload.end_date ? new Date(payload.end_date).toISOString() : null;
-                    if (payload.deadline !== undefined)
-                        patch.dueDate = payload.deadline ? new Date(payload.deadline).toISOString() : null;
-                    if (payload.duration !== undefined) patch.duration = payload.duration;
-                    if (payload.key_area_id) patch.keyAreaId = payload.key_area_id;
                     try {
                         if (Object.keys(patch).length > 0) await (await getTaskService()).update(id, patch);
                     } catch (e) {
@@ -1485,17 +1488,17 @@ export default function DontForget() {
                         if (payload.assignee !== undefined) u.assignee = payload.assignee || "";
                         if (payload.status !== undefined) u.status = payload.status || u.status;
                         if (payload.priority !== undefined) u.priority = payload.priority || u.priority;
-                        if (payload.list_index !== undefined) u.listIndex = payload.list_index || u.listIndex;
-                        if (payload.goal_id !== undefined) u.goal = payload.goal_id || u.goal;
+                        if (payload.list_index !== undefined || payload.listIndex !== undefined) u.listIndex = payload.list_index ?? payload.listIndex ?? u.listIndex;
+                        if (payload.goal_id !== undefined || payload.goalId !== undefined || payload.goal !== undefined) u.goal = payload.goal_id ?? payload.goalId ?? payload.goal ?? u.goal;
                         if (payload.tags !== undefined) u.tags = payload.tags || u.tags;
-                        if (payload.key_area_id) return null; // remove moved tasks
+                        if (payload.key_area_id || payload.keyAreaId) return null; // remove moved tasks
                         return u;
                     })
                     .filter(Boolean),
             );
 
             // If tasks were moved to a key area, remove them from DF view
-            if (payload.key_area_id) {
+            if (payload.key_area_id || payload.keyAreaId) {
                 setTasks((prev) => prev.filter((t) => !selectedIds.has(t.id)));
                 // Remove mapping for moved tasks
                 try {
@@ -1511,11 +1514,12 @@ export default function DontForget() {
 
             // If mass edit included list_index updates, persist them
             try {
-                if (payload.list_index !== undefined) {
+                if (payload.list_index !== undefined || payload.listIndex !== undefined) {
+                    const nextListIndex = payload.list_index ?? payload.listIndex;
                     setDfTaskListMap((prev) => {
                         const next = { ...(prev || {}) };
                         ids.forEach((id) => {
-                            next[id] = payload.list_index;
+                            next[id] = nextListIndex;
                         });
                         return next;
                     });
@@ -1598,7 +1602,7 @@ export default function DontForget() {
                                     task={selectedTask}
                                     goals={goals}
                                     users={users}
-                                    currentUserId={null}
+                                    currentUserId={currentUserId}
                                     // DontForget does not fetch activities; provide empty map
                                     activitiesByTask={{}}
                                     onBack={() => setSelectedTask(null)}
@@ -2120,7 +2124,7 @@ export default function DontForget() {
                                                                 enableInlineEditing={!massEditingMode}
                                                                 isSaving={savingIds.has(task.id)}
                                                                 users={users}
-                                                                currentUserId={null}
+                                                                currentUserId={currentUserId}
                                                                 isSelected={isSelected(task.id)}
                                                                 onToggleSelect={() => toggleSelect(task.id)}
                                                                 onOpenTask={() => openFullTaskView(task)}
@@ -2183,16 +2187,7 @@ export default function DontForget() {
                                             isOpen={Boolean(showComposer)}
                                             initialData={{ list_index: selectedDfList || (availableDfLists && availableDfLists[0]) || 1 }}
                                             onSave={(data) => {
-                                                // CreateTaskModal returns fields like title, deadline, key_area_id, list_index
-                                                // normalize names to the existing addDontForgetTask expectations
-                                                const mapped = {
-                                                    ...data,
-                                                    name: data?.title || data?.name,
-                                                    dueDate: data?.dueDate || data?.deadline,
-                                                    keyAreaId: data?.keyAreaId || data?.key_area_id || null,
-                                                    listIndex: data?.listIndex || data?.list_index,
-                                                };
-                                                addDontForgetTask(mapped);
+                                                addDontForgetTask(data);
                                                 setShowComposer(false);
                                             }}
                                             onCancel={() => setShowComposer(false)}
@@ -2203,7 +2198,7 @@ export default function DontForget() {
                                             users={users}
                                             goals={goals}
                                             isDontForgetMode={true}
-                                            currentUserId={null}
+                                            currentUserId={currentUserId}
                                         />
 
                                         <BulkFieldPickerModal
@@ -2246,6 +2241,7 @@ export default function DontForget() {
                                             modalTitle={massEditingMode ? t("dontForget.massEditingTitle", { n: selectedIds.size }) : t("dontForget.editTaskTitle")}
                                             visibleFields={massEditingMode && massEditField ? [massEditField] : null}
                                             isDontForgetMode={true}
+                                            currentUserId={currentUserId}
                                         />
 
                                         {/* Activity composer removed from DontForget */}
@@ -2262,6 +2258,7 @@ export default function DontForget() {
                                             users={users}
                                             goals={goals}
                                             isDontForgetMode={true}
+                                            currentUserId={currentUserId}
                                         />
                                     </div>
                                 </div>

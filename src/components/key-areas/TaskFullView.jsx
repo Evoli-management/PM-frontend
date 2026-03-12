@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import { FaChevronLeft, FaStop, FaEllipsisV, FaSave, FaTag, FaTrash, FaEdit, FaAngleDoubleLeft, FaUserPlus } from 'react-icons/fa';
 import EmptyState from '../../components/goals/EmptyState.jsx';
-import TaskSlideOver from './TaskSlideOver';
 import { useToast } from '../../components/shared/ToastProvider.jsx';
 import {
     toDateOnly,
@@ -20,6 +19,7 @@ import {
     getPriorityLabel,
     getInProgressLabel,
 } from '../../utils/keyareasHelpers';
+import { resolveEditTaskAssignment } from './taskFormLogic.js';
 
 const CreateActivityModal = React.lazy(() => import('../../components/modals/CreateActivityFormModal.jsx'));
 const EditActivityModal = React.lazy(() => import('./EditActivityModal.jsx'));
@@ -158,13 +158,11 @@ export default function TaskFullView({
     const savingActivityIds = savingActivityIdsProp ?? savingActivityIdsLocal;
     const setSavingActivityIds = setSavingActivityIdsProp ?? setSavingActivityIdsLocal;
     const [tab, setTab] = useState(initialTab || "activities");
-    const [isEditing, setIsEditing] = useState(false);
     const [form, setForm] = useState(task || null);
     const [menuOpen, setMenuOpen] = useState(false);
     const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
     const menuRef = useRef(null);
     const [newActivity, setNewActivity] = useState("");
-    const [showDetailsPopup, setShowDetailsPopup] = useState(false);
     const [openActivityRows, setOpenActivityRows] = useState(new Set());
     const [activityModal, setActivityModal] = useState({ open: false, item: null });
     const [localUsers, setLocalUsers] = useState(users || []);
@@ -423,49 +421,35 @@ export default function TaskFullView({
             // so when changing responsible from the full-task view we update the
             // parent task's assignee instead. This avoids a 400 Bad Request.
             const ts = await getTaskService();
-            // sel may be user id; map to name or 'Me' when possible
-            let valueToSend = sel;
-            let userIdToDelegate = null;
-            
-            // Check if sel is a user ID and get both name and ID
-            const selectedUser = localUsers.length 
-                ? localUsers.find(u => String(u.id || u.member_id) === String(sel))
-                : users.find(u => String(u.id || u.member_id) === String(sel));
-            
-            if (selectedUser) {
-                userIdToDelegate = selectedUser.id || selectedUser.member_id;
-                // Convert ID to name for display
-                if (String(userIdToDelegate) === String(currentUserId)) {
-                    valueToSend = 'Me';
-                } else {
-                    valueToSend = `${selectedUser.name || selectedUser.firstname || ''} ${selectedUser.lastname || ''}`.trim();
-                }
-            }
+            const usersList = (localUsers.length ? localUsers : users).map((user) => ({
+                ...user,
+                id: user.id || user.member_id,
+                name: user.name || `${user.firstname || ''} ${user.lastname || ''}`.trim(),
+            }));
+            const assignment = resolveEditTaskAssignment({
+                assignee: sel,
+                usersList,
+                currentUserId,
+            });
             
             // Update the task with both assignee name and delegatedToUserId (auto-creates delegation)
             // eslint-disable-next-line no-console
             console.debug('[TaskFullView] updating task assignee', task.id, { 
-                assignee: valueToSend,
-                delegatedToUserId: userIdToDelegate 
+                assignee: assignment.assignee,
+                delegatedToUserId: assignment.delegatedToUserId,
             });
             
             const updatePayload = { 
-                assignee: valueToSend 
+                assignee: assignment.assignee,
+                delegatedToUserId: assignment.delegatedToUserId,
             };
-            
-            // Only add delegatedToUserId if it's a different user (creates delegation with accept/reject)
-            if (userIdToDelegate && String(userIdToDelegate) !== String(currentUserId)) {
-                updatePayload.delegatedToUserId = userIdToDelegate;
-            }
-            
+
             const updatedTask = await ts.update(task.id, updatePayload);
             // eslint-disable-next-line no-console
             console.debug('[TaskFullView] task update response', updatedTask);
             // Also apply the normalized assignee value into the local activity list
-            setList((prevList) => prevList.map((a) => (a.id === id ? { ...a, assignee: valueToSend } : a)));
+            setList((prevList) => prevList.map((a) => (a.id === id ? { ...a, assignee: assignment.assignee || '' } : a)));
             try { window.dispatchEvent(new CustomEvent('ka-activities-updated', { detail: { refresh: true, taskId: String(task.id), list } })); } catch (e) {}
-            // Notify other parts of the app that the task was updated so they can refresh local cache
-            try { window.dispatchEvent(new CustomEvent('ka-task-updated', { detail: { task: updatedTask } })); } catch (e) {}
         } catch (e) {
             console.error('Failed to update activity assignee', e);
             setList(prev);
@@ -624,12 +608,6 @@ export default function TaskFullView({
         return names[String(n)] || `List ${n}`;
     };
 
-    const save = async () => {
-        if (onSave) { await onSave(form); }
-        setIsEditing(false);
-        if (onBack) onBack();
-    };
-
     return (
         <div className="bg-white rounded-xl border border-slate-200">
             
@@ -692,26 +670,13 @@ export default function TaskFullView({
                                                 className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
                                                 onClick={() => {
                                                     setMenuOpen(false);
-                                                    // Prefer delegating edit handling to parent (e.g. DontForget)
-                                                    // which will open the shared EditTaskModal. Fall back to
-                                                    // the component's internal edit mode only when the parent
-                                                    // handler isn't provided.
-                                                    // Debug: log edit request and dispatch a global fallback event
-                                                    // so pages that don't pass `onRequestEdit` can still handle it.
+                                                    // Prefer delegating edit handling to the parent, which
+                                                    // opens the shared EditTaskModal for the current surface.
                                                     try {
                                                         // eslint-disable-next-line no-console
                                                         console.log('[TaskFullView] Edit requested for task', task && task.id);
                                                     } catch (e) {}
-                                                    if (typeof onRequestEdit === 'function') {
-                                                        onRequestEdit(task);
-                                                    } else {
-                                                        // Dispatch a global event as a fallback so parent pages
-                                                        // (like DontForget) can listen and open the shared modal.
-                                                        try {
-                                                            window.dispatchEvent(new CustomEvent('ka-request-edit-task', { detail: task }));
-                                                        } catch (e) {}
-                                                        setIsEditing(true);
-                                                    }
+                                                    onRequestEdit && onRequestEdit(task);
                                                 }}
                                             >
                                                 {t("taskFullView.editDetails")}
@@ -750,24 +715,6 @@ export default function TaskFullView({
                     </div>
                 </div>
             </div>
-
-            {showDetailsPopup && (
-                <TaskSlideOver
-                    task={task}
-                    goals={goals}
-                    listNames={listNames}
-                    kaId={selectedKA?.id}
-                    listNumbers={listNumbers}
-                    readOnly={readOnly}
-                    initialTab="details"
-                    hideActivitiesTab
-                    onClose={() => setShowDetailsPopup(false)}
-                    onSave={async (payload) => { if (onSave) await onSave(payload); setShowDetailsPopup(false); }}
-                    onDelete={async (tsk) => { if (onDelete) await onDelete(tsk); setShowDetailsPopup(false); }}
-                    savingActivityIds={savingActivityIds}
-                    setSavingActivityIds={setSavingActivityIds}
-                />
-            )}
 
             {delegateModalOpen && (
                 <Suspense fallback={<div role="status" aria-live="polite" className="p-4">Loading…</div>}>

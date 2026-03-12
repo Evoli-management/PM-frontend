@@ -5,7 +5,6 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useToast } from '../components/shared/ToastProvider.jsx';
 import { useFormattedDate } from '../hooks/useFormattedDate';
 import Sidebar from '../components/shared/Sidebar';
-import TaskFormModal from '../components/key-areas/TaskFormModal';
 import CreateTaskModal from '../components/key-areas/CreateTaskModal';
 import KeyAreasList from '../components/key-areas/KeyAreasList';
 import CreateActivityFormModal from '../components/modals/CreateActivityFormModal';
@@ -18,7 +17,6 @@ import EmptyState from '../components/goals/EmptyState.jsx';
 import TaskRow from '../components/key-areas/TaskRow';
 import ViewTabsNavigation from '../components/key-areas/ViewTabsNavigation';
 import ActivityList from '../components/key-areas/ActivityList';
-import TaskSlideOver from '../components/key-areas/TaskSlideOver';
 import TaskFullView from '../components/key-areas/TaskFullView';
 import UnifiedTaskActivityTable from '../components/key-areas/UnifiedTaskActivityTable';
 import TripleViewLayout from '../components/key-areas/TripleViewLayout';
@@ -45,6 +43,7 @@ import {
     applyStartEndDateRule,
 } from '../utils/keyareasHelpers';
 import { durationToTimeInputValue, parseDurationToMinutes } from '../utils/duration';
+import { buildInlineTaskFieldUpdate } from '../components/key-areas/taskFormLogic.js';
 
 // Lazy getters for services to allow code-splitting and avoid circular imports
 let _taskService = null;
@@ -565,8 +564,6 @@ const CalendarView = ({ tasks = [], onSelect, selectedIds = new Set(), toggleSel
     );
 };
 
-/* SlideOver is now extracted to src/components/key-areas/TaskSlideOver.jsx */
-
 /* Full page TaskFullView has been moved to src/components/key-areas/TaskFullView.jsx */
 
 /* --------------------------------- Screen -------------------------------- */
@@ -734,7 +731,6 @@ export default function KeyAreas() {
             title: task.title || task.name || "",
             description: task.description || "",
             list_index: task.list_index || task.listIndex || 1,
-            category: task.category || "Key Areas",
             goal_id: task.goal_id || task.goalId || "",
             start_date: toDateOnly(task.start_date) || toDateOnly(task.startDate) || "",
             deadline: toDateOnly(task.deadline) || toDateOnly(task.dueDate) || "",
@@ -747,11 +743,6 @@ export default function KeyAreas() {
                 return 2;
             })(task.priority),
             tags: task.tags || "",
-            recurrence: task.recurrence || "",
-            attachments: task.attachments || "",
-            attachmentsFiles: task.attachments
-                ? task.attachments.split(",").filter(Boolean).map((n) => ({ name: n }))
-                : [],
             assignee: task.assignee || "",
             key_area_id: task.key_area_id || task.keyAreaId || selectedKA?.id || null,
             list: "",
@@ -785,7 +776,6 @@ export default function KeyAreas() {
             title: normalizedActivity.text || "",
             description: normalizedActivity.description || normalizedActivity.notes || "",
             list_index: normalizedActivity.list || normalizedActivity.list_index || 1,
-            category: "Key Areas",
             goal_id: normalizedActivity.goal || normalizedActivity.goalId || normalizedActivity.goal_id || "",
             start_date: toDateOnly(normalizedActivity.start_date) || "",
             deadline: toDateOnly(normalizedActivity.deadline) || "",
@@ -798,9 +788,6 @@ export default function KeyAreas() {
                 return 2;
             })(normalizedActivity.priority),
             tags: "",
-            recurrence: "",
-            attachments: "",
-            attachmentsFiles: [],
             assignee: normalizedActivity.assignee || normalizedActivity.responsible || "",
             key_area_id: normalizedActivity.key_area_id || selectedKA?.id || null,
             list: normalizedActivity.list || "",
@@ -1432,7 +1419,6 @@ export default function KeyAreas() {
     const [columnsAnchor, setColumnsAnchor] = useState(null);
     const [openListMenu, setOpenListMenu] = useState(null); // list number for context menu
     const [listMenuPos, setListMenuPos] = useState({ top: 0, left: 0 }); // popup menu position
-    const composerModalRef = useRef(null);
     const tabsRef = useRef(null);
     // Mass edit UI toggle and anchor
     const [showMassEdit, setShowMassEdit] = useState(false);
@@ -1781,7 +1767,6 @@ export default function KeyAreas() {
                 title: task.title || "",
                 description: task.description || "",
                 list_index: task.list_index || 1,
-                category: task.category || "Key Areas",
                 goal_id: task.goal_id || "",
                 start_date: toDateOnly(task.start_date) || "",
                 deadline: toDateOnly(task.deadline) || "",
@@ -1794,14 +1779,6 @@ export default function KeyAreas() {
                                                 return 2;
                                             })(task.priority),
                 tags: task.tags || "",
-                recurrence: task.recurrence || "",
-                attachments: task.attachments || "",
-                attachmentsFiles: task.attachments
-                    ? task.attachments
-                          .split(",")
-                          .filter(Boolean)
-                          .map((n) => ({ name: n }))
-                    : [],
                 assignee: task.assignee || "",
                 key_area_id: task.key_area_id || selectedKA?.id || null,
                 list: "",
@@ -1851,7 +1828,6 @@ export default function KeyAreas() {
                 title: norm.text || "",
                 description: norm.description || norm.notes || "",
                 list_index: norm.list || norm.list_index || 1,
-                category: "Key Areas",
                 goal_id: norm.goal || norm.goalId || norm.goal_id || "",
                 start_date: toDateOnly(norm.start_date) || "",
                 deadline: toDateOnly(norm.deadline) || "",
@@ -1864,9 +1840,6 @@ export default function KeyAreas() {
                     return 2;
                 })(norm.priority),
                 tags: "",
-                recurrence: "",
-                attachments: "",
-                attachmentsFiles: [],
                 assignee: norm.assignee || norm.responsible || "",
                 key_area_id: norm.key_area_id || selectedKA?.id || null,
                 list: norm.list || "",
@@ -1956,99 +1929,33 @@ export default function KeyAreas() {
         const prev = Array.isArray(allTasks) ? allTasks.slice() : [];
         const prevTask = prev.find((t) => t.id === id);
         if (!prevTask) return;
-        const resolvedDates =
-            key === 'start_date' || key === 'end_date' || key === 'deadline' || key === 'dueDate'
-                ? applyStartEndDateRule({
-                    startDate: prevTask.start_date ?? prevTask.startDate,
-                    endDate: prevTask.end_date ?? prevTask.endDate,
-                    deadline: prevTask.deadline ?? prevTask.dueDate ?? prevTask.due_date,
-                    changedKey: key,
-                    changedValue: value,
-                })
-                : null;
+        const inlineUpdate = buildInlineTaskFieldUpdate({
+            task: prevTask,
+            key,
+            value,
+            usersList: users || [],
+            currentUserId,
+            getPriorityLevel,
+        });
 
         // optimistic transform
         const optimistic = (t) => {
             if (t.id !== id) return t;
-            if (resolvedDates) {
-                return {
-                    ...t,
-                    start_date: resolvedDates.startDate || null,
-                    startDate: resolvedDates.startDate || null,
-                    end_date: resolvedDates.endDate || null,
-                    endDate: resolvedDates.endDate || null,
-                    deadline: resolvedDates.deadline || null,
-                    dueDate: resolvedDates.deadline || null,
-                    due_date: resolvedDates.deadline || null,
-                };
-            }
-            if (key === 'priority') {
-                try { return { ...t, priority: getPriorityLevel(value) }; } catch (e) { return { ...t, priority: value }; }
-            }
-            if (key === 'assignee') {
-                const selectedUser = (users || []).find((u) => String(u.id || u.member_id) === String(value));
-                if (selectedUser) {
-                    const selectedUserId = selectedUser.id || selectedUser.member_id;
-                    const assigningToSelf = currentUserId && String(selectedUserId) === String(currentUserId);
-                    const displayName =
-                        assigningToSelf
-                            ? 'Me'
-                            : (selectedUser.name || `${selectedUser.firstname || ''} ${selectedUser.lastname || ''}`.trim() || t.assignee || '');
-                    return {
-                        ...t,
-                        assignee: displayName,
-                        delegatedToUserId:
-                            assigningToSelf
-                                ? null
-                                : selectedUserId,
-                    };
-                }
-                return { ...t, assignee: '', delegatedToUserId: null };
-            }
-            return { ...t, [key]: value };
+            return { ...t, ...inlineUpdate.optimistic };
         };
         setAllTasks((prev) => prev.map(optimistic));
         markSaving(id, 2000);
+
+        if (!inlineUpdate.persist || !inlineUpdate.patch) {
+            return;
+        }
 
         // build patch - always preserve list_index and key_area_id
         const patch = {
             list_index: prevTask.list_index || prevTask.list || 1,
             key_area_id: prevTask.key_area_id || prevTask.keyAreaId || null,
+            ...inlineUpdate.patch,
         };
-        
-        if (key === 'name') patch.title = value;
-        else if (key === 'notes') patch.description = value;
-        else if (key === 'assignee') {
-            const selectedUser = (users || []).find((u) => String(u.id || u.member_id) === String(value));
-            if (selectedUser) {
-                const selectedUserId = selectedUser.id || selectedUser.member_id;
-                const assigningToSelf = currentUserId && String(selectedUserId) === String(currentUserId);
-                patch.assignee =
-                    assigningToSelf
-                        ? 'Me'
-                        : (selectedUser.name || `${selectedUser.firstname || ''} ${selectedUser.lastname || ''}`.trim() || null);
-                patch.delegatedToUserId =
-                    assigningToSelf
-                        ? null
-                        : selectedUserId;
-            } else {
-                patch.assignee = null;
-                patch.delegatedToUserId = null;
-            }
-        }
-        else if (resolvedDates) {
-            patch.startDate = resolvedDates.startDate ? new Date(resolvedDates.startDate).toISOString() : null;
-            patch.endDate = resolvedDates.endDate ? new Date(resolvedDates.endDate).toISOString() : null;
-            patch.dueDate = resolvedDates.deadline ? new Date(resolvedDates.deadline).toISOString() : null;
-        }
-        else if (key === 'dueDate' || key === 'deadline') patch.dueDate = value ? new Date(value).toISOString() : null;
-        else if (key === 'duration') patch.duration = value;
-        else if (key === 'priority') patch.priority = value;
-        else if (key === 'status') patch.status = value;
-        else {
-            // UI-only field; nothing to persist
-            return;
-        }
 
         try {
             const updated = await api.updateTask(id, patch);
@@ -2069,7 +1976,6 @@ export default function KeyAreas() {
         title: "",
         description: "",
         list_index: 1,
-        category: "Key Areas",
         goal_id: "",
         start_date: "",
         deadline: "",
@@ -2077,9 +1983,6 @@ export default function KeyAreas() {
         status: "open",
         priority: "normal",
         tags: "",
-        recurrence: "",
-        attachments: "",
-        attachmentsFiles: [],
         assignee: "",
         _endAuto: true, // internal flag: keep end date synced to start date until user changes it
     });
@@ -3611,171 +3514,6 @@ export default function KeyAreas() {
         clearSelection();
     };
 
-    const onCreateTask = async (e) => {
-    e.preventDefault();
-    if (!selectedKA && !editingTaskId && !editingActivityViaTaskModal) return;
-    const f = new FormData(e.currentTarget);
-        const title = (f.get("title") || "").toString().trim();
-        if (!title) return;
-
-        // Only the requested fields
-        const description = (f.get("description") || "").toString();
-        const list = (f.get("list") || "").toString(); // UI-only
-        const assignee = (f.get("assignee") || "").toString();
-        const priorityRaw = (f.get("priority") || "normal").toString().toLowerCase();
-        const priority = priorityRaw === "normal" ? "medium" : priorityRaw; // map to API enum
-        const goal = (f.get("goal") || "").toString(); // UI-only
-        const start_date = f.get("start_date") ? toDateOnly(f.get("start_date")) : null;
-        const end_date = f.get("end_date") ? toDateOnly(f.get("end_date")) : null;
-        const deadline = f.get("deadline") ? toDateOnly(f.get("deadline")) : null;
-        const finish_date = f.get("finish_date") ? toDateOnly(f.get("finish_date")) : null; // UI-only
-        const duration = (f.get("duration") || "").toString();
-
-        const payload = {
-            key_area_id: editingTaskId ? taskForm.key_area_id || selectedKA?.id : selectedKA.id,
-            title,
-            description,
-            assignee,
-            start_date,
-            end_date,
-            deadline,
-            duration,
-            priority,
-            // UI-only fields kept for potential future use; not persisted by backend
-            list,
-            goal,
-            finish_date,
-        };
-        // Determine whether this submission is intended to edit an activity.
-        // Prefer explicit FormData marker (set when opening via activity editor) as a fallback
-        const isEditingActivity = !!editingActivityViaTaskModal || !!f.get('__editing_activity');
-        // If we're editing an activity via the Task modal, translate payload and update the activity instead
-        if (isEditingActivity) {
-            try {
-                const svc = await getActivityService();
-                const activityId = (editingActivityViaTaskModal && editingActivityViaTaskModal.id) || null;
-                // If state lost, attempt to find id via form (not ideal) — fallback: abort
-                if (!activityId) {
-                    console.error("No activity id available for activity edit");
-                    alert(t("keyAreas.alertActivityIdUnknown"));
-                    return;
-                }
-                const mapPriorityToApi = (p) => {
-                    if (p === undefined || p === null || p === '') return undefined;
-                    const num = Number(p);
-                    if (!Number.isNaN(num)) {
-                        if (num <= 1) return "low";
-                        if (num >= 3) return "high";
-                        return "normal";
-                    }
-                    const s = String(p).toLowerCase();
-                    if (s === "low" || s === "normal" || s === "high") return s;
-                    if (s === "medium" || s === "med") return "normal";
-                    return undefined;
-                };
-                const body = {
-                    text: title,
-                    completed: (f.get("status") || "open").toString() === "done",
-                    priority: mapPriorityToApi(priority),
-                };
-                // attach to task if available
-                const tid = editingActivityViaTaskModal.taskId || activityAttachTaskId || null;
-                if (tid) body.taskId = tid;
-                await svc.update(activityId, body);
-                // refresh activity lists
-                if (body.taskId) await refreshActivitiesForTask(body.taskId);
-                else await refreshAllActivities();
-                window.dispatchEvent(new CustomEvent("ka-activities-updated", { detail: { refresh: true, taskId: body.taskId || undefined } }));
-                setEditingActivityViaTaskModal(null);
-                setShowTaskComposer(false);
-                return;
-            } catch (err) {
-                console.error("Failed to update activity via task modal", err);
-                alert(t("keyAreas.alertSaveActivityFailed"));
-                return;
-            }
-        }
-        if (editingTaskId) {
-            // Update existing task
-            const updated = await api.updateTask(editingTaskId, { id: editingTaskId, ...payload });
-            setAllTasks((prev) => prev.map((t) => (String(t.id) === String(editingTaskId) ? { ...t, ...updated } : t)));
-        } else {
-            const created = await api.createTask(payload);
-            setAllTasks((prev) => [...prev, created]);
-        }
-        setEditingTaskId(null);
-    setShowTaskComposer(false);
-    setEditingActivityViaTaskModal(null);
-    };
-
-    // Create Activity using the same UI fields; persist only supported backend fields
-    const onCreateActivity = async (e) => {
-        e.preventDefault();
-        const f = new FormData(e.currentTarget);
-        const title = (f.get("title") || "").toString().trim();
-        if (!title) return;
-
-        try {
-            const svc = await getActivityService();
-            if (editingActivityId) {
-                await svc.update(editingActivityId, { text: title });
-                const tid = activityAttachTaskId;
-                if (tid) {
-                    try {
-                        const list = await svc.list({ taskId: tid });
-                        setActivitiesByTask((prev) => ({ ...prev, [String(tid)]: Array.isArray(list) ? list.map(normalizeActivity) : [] }));
-                    } catch {}
-                }
-                window.dispatchEvent(
-                    new CustomEvent("ka-activities-updated", {
-                        detail: { refresh: true, taskId: activityAttachTaskId || undefined },
-                    }),
-                );
-            } else {
-                const payload = { text: title };
-                if (activityAttachTaskId) payload.taskId = activityAttachTaskId;
-                const created = await svc.create(payload);
-                // Update local state immediately for the specific task (if attached)
-                if (activityAttachTaskId) {
-                    try {
-                        const list = await svc.list({ taskId: activityAttachTaskId });
-                        setActivitiesByTask((prev) => ({
-                            ...prev,
-                            [String(activityAttachTaskId)]: Array.isArray(list) ? list.map(normalizeActivity) : [],
-                        }));
-                    } catch {}
-                }
-                // Also broadcast a refresh event for any open views
-                window.dispatchEvent(
-                    new CustomEvent("ka-activities-updated", {
-                        detail: { refresh: true, taskId: activityAttachTaskId || undefined },
-                    }),
-                );
-            }
-            setShowActivityComposer(false);
-            setActivityForm({
-                title: "",
-                description: "",
-                list: "",
-                key_area_id: null,
-                assignee: "",
-                priority: "normal",
-                goal: "",
-                start_date: "",
-                end_date: "",
-                deadline: "",
-                finish_date: "",
-                duration: "",
-                _endAuto: true,
-            });
-            setActivityAttachTaskId(null);
-            setEditingActivityId(null);
-        } catch (err) {
-            console.error("Failed to create activity", err);
-            alert(t("keyAreas.alertCreateActivityFailed"));
-        }
-    };
-
     const handleBulkDeleteSelected = async () => {
         if (selectedIds.size === 0) return;
         const confirmed = window.confirm("Delete selected tasks?");
@@ -4664,7 +4402,6 @@ export default function KeyAreas() {
                                             title: task.title || task.name || "",
                                             description: task.description || "",
                                             list_index: task.list_index || task.listIndex || 1,
-                                            category: task.category || "Key Areas",
                                             goal_id: task.goal_id || "",
                                             start_date: toDateOnly(task.start_date) || toDateOnly(task.startDate) || "",
                                             deadline: toDateOnly(task.deadline) || toDateOnly(task.dueDate) || "",
@@ -4677,11 +4414,6 @@ export default function KeyAreas() {
                                                 return 2;
                                             })(task.priority),
                                             tags: task.tags || "",
-                                            recurrence: task.recurrence || "",
-                                            attachments: task.attachments || "",
-                                            attachmentsFiles: task.attachments
-                                                ? task.attachments.split(",").filter(Boolean).map((n) => ({ name: n }))
-                                                : [],
                                             assignee: task.assignee || "",
                                             key_area_id: (selectedKA && selectedKA.id) || task.key_area_id || task.keyAreaId || null,
                                             list: "",
@@ -4749,7 +4481,6 @@ export default function KeyAreas() {
                                                             title: "",
                                                             description: "",
                                                             list_index: taskTab || 1,
-                                                            category: "Key Areas",
                                                             goal_id: "",
                                                             start_date: "",
                                                             deadline: "",
@@ -4757,9 +4488,6 @@ export default function KeyAreas() {
                                                             status: "open",
                                                             priority: "normal",
                                                             tags: "",
-                                                            recurrence: "",
-                                                            attachments: "",
-                                                            attachmentsFiles: [],
                                                             assignee: "",
                                                             duration: "",
                                                             // Prefill key area with the currently selected Key Area for new task creation.
@@ -5110,7 +4838,6 @@ export default function KeyAreas() {
                                                                                         title: t.title || t.name || "",
                                                                                         description: t.description || t.notes || "",
                                                                                         list_index: t.list_index || t.listIndex || 1,
-                                                                                        category: t.category || "Key Areas",
                                                                                         goal_id: t.goal_id || t.goalId || t.goal || "",
                                                                                         start_date: toDateOnly(t.start_date) || toDateOnly(t.startDate) || "",
                                                                                         deadline: toDateOnly(t.deadline) || toDateOnly(t.dueDate) || "",
@@ -5123,11 +4850,6 @@ export default function KeyAreas() {
                                                                                             return 2;
                                                                                         })(t.priority),
                                                                                         tags: t.tags || "",
-                                                                                        recurrence: t.recurrence || "",
-                                                                                        attachments: t.attachments || "",
-                                                                                        attachmentsFiles: t.attachments
-                                                                                            ? t.attachments.split(",").filter(Boolean).map((n) => ({ name: n }))
-                                                                                            : [],
                                                                                         assignee: t.assignee || "",
                                                                                         key_area_id: t.key_area_id || t.keyAreaId || selectedKA?.id || null,
                                                                                         list: "",

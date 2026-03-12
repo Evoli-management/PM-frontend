@@ -495,6 +495,8 @@ const TaskRow = ({
               className="absolute opacity-0"
               style={{ width: 0, height: 0 }}
               value={toDateOnly(task.deadline || task.dueDate) || ''}
+              min={toDateOnly(task.start_date || task.startDate) || undefined}
+              max={toDateOnly(task.end_date || task.endDate) || undefined}
               onChange={async (e) => {
                 const v = e.target.value || '';
                 try { await updateField && updateField(task.id, 'dueDate', v); } catch (e) {}
