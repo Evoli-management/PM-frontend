@@ -1,7 +1,9 @@
 export { default } from "./DontForget.jsx";
 import { useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "../components/shared/Sidebar.jsx";
+import DurationPicker from "../components/shared/DurationPicker.jsx";
 import { toDateOnly } from "../utils/keyareasHelpers";
+import { durationToTimeInputValue } from "../utils/duration";
 import { formatKeyAreaLabel } from "../utils/keyAreaDisplay";
 import { useToast } from "../components/shared/ToastProvider.jsx";
 import { FiAlertTriangle, FiClock } from "react-icons/fi";
@@ -859,13 +861,15 @@ export default function Tasks() {
                                             </div>
                                             <div>
                                                 <label className="block text-xs text-blue-900">Duration</label>
-                                                <input
+                                                <DurationPicker
                                                     value={massEdit.duration}
-                                                    onChange={(e) =>
-                                                        setMassEdit((m) => ({ ...m, duration: e.target.value }))
+                                                    onChange={(nextValue) =>
+                                                        setMassEdit((m) => ({ ...m, duration: nextValue }))
                                                     }
-                                                    className="w-full border rounded px-2 py-1"
-                                                    placeholder="e.g., 1h, 1d"
+                                                    compact
+                                                    className="w-full"
+                                                    hoursAriaLabel="Mass edit duration hours"
+                                                    minutesAriaLabel="Mass edit duration minutes"
                                                 />
                                             </div>
                                             <div>
@@ -1139,7 +1143,7 @@ export default function Tasks() {
                                                             {task.dueDate || ""}
                                                         </td>
                                                         <td className="px-2 sm:px-3 py-2 align-top text-slate-800 text-xs sm:text-sm hidden xl:table-cell">
-                                                            {String(task.duration ?? task.duration_minutes ?? "").trim() || "—"}
+                                                            {durationToTimeInputValue(task.duration ?? task.duration_minutes) || String(task.duration ?? task.duration_minutes ?? "").trim() || "—"}
                                                         </td>
                                                         <td className="px-2 sm:px-3 py-2 align-top text-slate-800 text-xs sm:text-sm hidden xl:table-cell">
                                                             {toDateOnly(task.completionDate || task.completion_date) || "—"}
@@ -1464,16 +1468,18 @@ export default function Tasks() {
                                                             <label className="text-xs font-semibold text-slate-900 block">
                                                                 Duration
                                                             </label>
-                                                            <input
+                                                            <DurationPicker
                                                                 value={editModal.form?.duration || ""}
-                                                                onChange={(e) =>
+                                                                onChange={(nextValue) =>
                                                                     setEditModal((m) => ({
                                                                         ...m,
-                                                                        form: { ...m.form, duration: e.target.value },
+                                                                        form: { ...m.form, duration: nextValue },
                                                                     }))
                                                                 }
-                                                                className="mt-0.5 w-full rounded-md border-0 bg-transparent px-1.5 py-1 text-xs h-8"
-                                                                placeholder="e.g., 1h, 1d"
+                                                                compact
+                                                                className="mt-0.5 w-full"
+                                                                hoursAriaLabel="Task edit duration hours"
+                                                                minutesAriaLabel="Task edit duration minutes"
                                                             />
                                                         </div>
                                                         <div className="bg-slate-50 border border-slate-200 rounded-md p-1.5">

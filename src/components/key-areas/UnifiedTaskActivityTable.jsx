@@ -1536,8 +1536,12 @@ export default function UnifiedTaskActivityTable({
                                                     type="date"
                                                     className="w-full border rounded px-2 py-1 text-xs"
                                                     value={editValue}
-                                                    onChange={(e) => setEditValue(e.target.value)}
-                                                    onBlur={() => saveEdit(item, 'startDate', editValue)}
+                                                    onChange={(e) => {
+                                                        const nextValue = e.target.value;
+                                                        setEditValue(nextValue);
+                                                        void saveEdit(item, 'startDate', nextValue);
+                                                    }}
+                                                    onBlur={cancelEdit}
                                                     onClick={(e) => e.stopPropagation()}
                                                 />
                                             ) : (
@@ -1559,8 +1563,12 @@ export default function UnifiedTaskActivityTable({
                                                     type="date"
                                                     className="w-full border rounded px-2 py-1 text-xs"
                                                     value={editValue}
-                                                    onChange={(e) => setEditValue(e.target.value)}
-                                                    onBlur={() => saveEdit(item, 'endDate', editValue)}
+                                                    onChange={(e) => {
+                                                        const nextValue = e.target.value;
+                                                        setEditValue(nextValue);
+                                                        void saveEdit(item, 'endDate', nextValue);
+                                                    }}
+                                                    onBlur={cancelEdit}
                                                     onClick={(e) => e.stopPropagation()}
                                                 />
                                             ) : (
@@ -1582,8 +1590,12 @@ export default function UnifiedTaskActivityTable({
                                                     type="date"
                                                     className="w-full border rounded px-2 py-1 text-xs"
                                                     value={editValue}
-                                                    onChange={(e) => setEditValue(e.target.value)}
-                                                    onBlur={() => saveEdit(item, 'deadline', editValue)}
+                                                    onChange={(e) => {
+                                                        const nextValue = e.target.value;
+                                                        setEditValue(nextValue);
+                                                        void saveEdit(item, 'deadline', nextValue);
+                                                    }}
+                                                    onBlur={cancelEdit}
                                                     onClick={(e) => e.stopPropagation()}
                                                 />
                                             ) : (

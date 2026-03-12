@@ -1,5 +1,5 @@
 import apiClient from "./apiClient";
-import { parseDurationToMinutes } from "../utils/duration";
+import { normalizeDurationForApi, durationToTimeInputValue, isDurationInputValid } from "../utils/duration";
 
 // Map FE status → BE enum
 // FE uses: open | in_progress | done | cancelled (shown as "blocked")
@@ -45,58 +45,12 @@ const mapPriorityFromApi = (p) => {
     return v; // high|low remain as-is
 };
 
-const minutesToMeridiem = (minutes) => {
-    if (!Number.isFinite(minutes) || minutes < 0 || minutes > (23 * 60 + 59)) return null;
-    const hour24 = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    const meridiem = hour24 >= 12 ? "pm" : "am";
-    const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
-    return `${hour12}:${String(mins).padStart(2, "0")}${meridiem}`;
-};
-
-const normalizeDurationToMeridiem = (value) => {
-    if (value === undefined) return undefined;
-    if (value === null) return null;
-
-    const raw = String(value).trim();
-    if (!raw) return null;
-
-    const meridiemMatch = raw.match(/^([1-9]|1[0-2]):([0-5]\d)\s*(am|pm)$/i);
-    if (meridiemMatch) {
-        return `${Number(meridiemMatch[1])}:${meridiemMatch[2]}${meridiemMatch[3].toLowerCase()}`;
-    }
-
-    const minutes = parseDurationToMinutes(raw);
-    if (minutes === null) return raw;
-
-    return minutesToMeridiem(minutes) || raw;
-};
-
-const normalizeDurationToCompact = (value) => {
-    if (value === undefined) return undefined;
-    if (value === null) return null;
-
-    const raw = String(value).trim();
-    if (!raw) return null;
-
-    if (/^(\d+[hm])+$/i.test(raw)) return raw.toLowerCase();
-
-    const minutes = parseDurationToMinutes(raw);
-    if (minutes === null) return raw;
-
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    if (hours > 0 && mins > 0) return `${hours}h${mins}m`;
-    if (hours > 0) return `${hours}h`;
-    return `${mins}m`;
-};
-
 const normalizeDurationFromApi = (value) => {
     if (value === undefined) return undefined;
     if (value === null) return null;
     const raw = String(value).trim();
     if (!raw) return null;
-    return normalizeDurationToMeridiem(raw) || raw;
+    return durationToTimeInputValue(raw) || raw;
 };
 
 const retryWithLegacyDurationIfNeeded = async (requestFactory, legacyFactory) => {
@@ -182,19 +136,18 @@ const taskService = {
             body.listIndex = body.list_index;
         }
         const durationProvided = Object.prototype.hasOwnProperty.call(body, 'duration');
+        if (durationProvided && body.duration !== null && body.duration !== undefined && String(body.duration).trim() && !isDurationInputValid(body.duration)) {
+            throw new Error("Duration must use HH:MM format, for example 01:00 or 01:30.");
+        }
         const primaryBody = {
             ...body,
-            ...(durationProvided ? { duration: normalizeDurationToMeridiem(body.duration) } : {}),
+            ...(durationProvided ? { duration: normalizeDurationForApi(body.duration) } : {}),
             status: mapStatusToApi(body.status),
             priority: mapPriorityToApi(body.priority),
         };
-        const legacyBody = {
-            ...primaryBody,
-            ...(durationProvided ? { duration: normalizeDurationToCompact(body.duration) } : {}),
-        };
         const res = await retryWithLegacyDurationIfNeeded(
             () => apiClient.post(base, primaryBody),
-            durationProvided ? () => apiClient.post(base, legacyBody) : null,
+            null,
         );
         return normalizeTaskFromApi(res.data);
     },
@@ -205,15 +158,16 @@ const taskService = {
             data.listIndex = data.list_index;
         }
         const durationProvided = Object.prototype.hasOwnProperty.call(data, 'duration');
+        if (durationProvided && data.duration !== null && data.duration !== undefined && String(data.duration).trim() && !isDurationInputValid(data.duration)) {
+            throw new Error("Duration must use HH:MM format, for example 01:00 or 01:30.");
+        }
         const primaryData = { ...data };
-        if (durationProvided) primaryData.duration = normalizeDurationToMeridiem(data.duration);
+        if (durationProvided) primaryData.duration = normalizeDurationForApi(data.duration);
         if (primaryData.status) primaryData.status = mapStatusToApi(primaryData.status);
         if (primaryData.priority) primaryData.priority = mapPriorityToApi(primaryData.priority);
-        const legacyData = { ...primaryData };
-        if (durationProvided) legacyData.duration = normalizeDurationToCompact(data.duration);
         const res = await retryWithLegacyDurationIfNeeded(
             () => apiClient.put(`${base}/${id}`, primaryData),
-            durationProvided ? () => apiClient.put(`${base}/${id}`, legacyData) : null,
+            null,
         );
         return normalizeTaskFromApi(res.data);
     },

@@ -775,7 +775,7 @@ export default function Navbar() {
     })();
     const activeKeyAreaFilter = (() => {
         const params = new URLSearchParams(location.search || '');
-        return params.get('active') || 'active';
+        return params.get('active') || 'all';
     })();
     const activeTasksLabel = activeKeyAreaFilter === 'all' ? t('navbar.tabAllTasks') : t('navbar.tabActiveTasks');
     const activeTeamsTab = (() => {

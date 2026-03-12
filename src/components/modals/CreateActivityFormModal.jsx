@@ -7,7 +7,8 @@ import { useDraggable } from '../../hooks/useDraggable'
 import { useResizable } from '../../hooks/useResizable'
 import usersService from '../../services/usersService'
 import { formatKeyAreaLabel } from '../../utils/keyAreaDisplay'
-import { durationToTimeInputValue } from '../../utils/duration'
+import { durationToTimeInputValue, isDurationInputValid } from '../../utils/duration'
+import DurationPicker from '../shared/DurationPicker.jsx'
 
 // A clean reusable Create Activity form modal. Use this file if the original got corrupted.
 export default function CreateActivityFormModal({
@@ -322,6 +323,11 @@ export default function CreateActivityFormModal({
     }
 
     // Build payload with only fields the backend accepts (CreateActivityDto)
+    if (duration && String(duration).trim() && !isDurationInputValid(duration)) {
+      alert('Duration must use HH:MM format, for example 01:00 or 01:30.');
+      return;
+    }
+
     const payload = {};
     
     // Required field
@@ -495,13 +501,12 @@ export default function CreateActivityFormModal({
 
             <div>
               <label className="text-sm font-medium text-slate-700">{t('createActivityModal.durationLabel')}</label>
-              <input
-                name="duration"
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 mt-0"
-                type="time"
-                step="60"
+              <DurationPicker
                 value={duration}
-                onChange={(e) => setDuration(e.target.value)}
+                onChange={setDuration}
+                className="mt-0"
+                hoursAriaLabel="Activity duration hours"
+                minutesAriaLabel="Activity duration minutes"
               />
             </div>
           </div>

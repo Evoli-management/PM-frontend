@@ -1888,7 +1888,7 @@
     "deadlineLabel": "Deadline",
     "finishDateLabel": "Date (finish)",
     "durationLabel": "Duration",
-    "durationPlaceholder": "e.g., 1h, 1d",
+    "durationPlaceholder": "e.g., 01:00, 01:30",
     "listLabel": "List",
     "listPlaceholder": "List name",
     "keyAreaLabel": "Key Area",

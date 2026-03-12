@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FaSave, FaTimes } from "react-icons/fa";
+import DurationPicker from "../shared/DurationPicker.jsx";
 // Load keyAreaService on demand to reduce initial bundle weight
 let _keyAreaService = null;
 const getKeyAreaService = async () => {
@@ -318,12 +319,14 @@ export default function DontForgetComposer({ open, onClose, onAdd, defaultList =
                             {/* Duration */}
                             <div className="flex flex-col">
                                 <label className="text-xs font-semibold text-slate-700">{t("dontForgetComposer.durationLabel")}</label>
-                                <div className="relative mt-1">
-                                    <input
+                                <div className="mt-1">
+                                    <DurationPicker
                                         value={duration}
-                                        onChange={(e) => setDuration(e.target.value)}
-                                        className="h-9 w-full rounded-md border border-slate-300 pl-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        placeholder={t("dontForgetComposer.durationPlaceholder")}
+                                        onChange={setDuration}
+                                        compact
+                                        className="w-full"
+                                        hoursAriaLabel="Don't Forget duration hours"
+                                        minutesAriaLabel="Don't Forget duration minutes"
                                     />
                                 </div>
                             </div>

@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { FaSpinner, FaCheckCircle, FaRegCircle, FaAlignJustify, FaTag, FaTrash, FaEdit, FaAngleDoubleRight, FaChevronUp, FaChevronDown, FaEllipsisV } from 'react-icons/fa';
 import { toDateOnly, getPriorityLabel, mapUiStatusToServer, getStatusColorClass, getPriorityColorClass, resolveAssignee } from '../../utils/keyareasHelpers';
 import { durationToTimeInputValue } from '../../utils/duration';
+import DurationPicker from '../shared/DurationPicker.jsx';
 
 const ActivityRow = ({
   a,
@@ -340,29 +341,27 @@ const ActivityRow = ({
           <div className="text-xs text-slate-500">{t("createTaskModal.durationLabel")}</div>
           {typeof updateField === 'function' ? (
             editingKey === 'duration' ? (
-              <input
-                autoFocus
-                type="time"
-                step="60"
-                className="border rounded px-1 py-0.5 text-sm"
+              <DurationPicker
                 value={localValue}
-                onChange={(e) => setLocalValue(e.target.value)}
-                onBlur={async (e) => {
-                  const nextValue = e.target.value;
-                  setEditingKey(null);
-                  if (nextValue !== durationInputValue) {
-                    try { await updateField && updateField(a.id, 'duration', nextValue || null); } catch (err) {}
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    e.currentTarget.blur();
-                  } else if (e.key === 'Escape') {
+                onChange={setLocalValue}
+                onClose={async (reason, nextValue) => {
+                  if (reason !== 'done') {
                     setLocalValue(durationInputValue);
                     setEditingKey(null);
+                    return;
+                  }
+                  setLocalValue(nextValue || '');
+                  setEditingKey(null);
+                  if ((nextValue || '') !== durationInputValue) {
+                    try { await updateField(a.id, 'duration', nextValue || null); } catch (err) {}
                   }
                 }}
+                compact
+                autoFocus
+                className="w-full"
+                allowClear
+                hoursAriaLabel="Activity duration hours"
+                minutesAriaLabel="Activity duration minutes"
               />
             ) : (
               <button
@@ -374,11 +373,11 @@ const ActivityRow = ({
                 }}
                 title="Edit duration"
               >
-                {durationRaw || '—'}
+                {durationInputValue || durationRaw || '—'}
               </button>
             )
           ) : (
-            <div>{durationRaw || '—'}</div>
+            <div>{durationInputValue || durationRaw || '—'}</div>
           )}
 
           <div className="text-xs text-slate-500">{t("activityRow.deadline")}</div>

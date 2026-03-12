@@ -47,7 +47,7 @@ export const validateTaskDuration = (value) => {
   const trimmed = value.trim();
   if (!trimmed) return { valid: true };
   if (isDurationInputValid(trimmed)) return { valid: true };
-  return { valid: false, error: 'Duration format invalid. Examples: 01:30, 1h30m, 1h 30m, 1hr 30min, 45m.' };
+  return { valid: false, error: 'Duration format invalid. Use HH:MM, for example 01:00, 01:30, or 02:00.' };
 };
 
 export const getTaskStartDatePatch = ({
