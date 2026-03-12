@@ -60,6 +60,9 @@ const TaskRow = ({
   const menuBtnRef = useRef(null);
   const [editingKey, setEditingKey] = useState(null);
   const [localValue, setLocalValue] = useState("");
+  const taskDurationRaw = String(task.duration ?? task.duration_minutes ?? '').trim();
+  const taskDurationValue = durationToTimeInputValue(task.duration ?? task.duration_minutes);
+  const [durationDisplay, setDurationDisplay] = useState(taskDurationValue || taskDurationRaw || '');
   const clickTimer = useRef(null);
   const dateInputRefs = useRef({});
   const lastDateCommitRef = useRef({});
@@ -117,6 +120,10 @@ const TaskRow = ({
       }
     };
   }, []);
+
+  useEffect(() => {
+    setDurationDisplay(taskDurationValue || taskDurationRaw || '');
+  }, [taskDurationRaw, taskDurationValue]);
 
   const queueTitleOpen = (e) => {
     try { e.stopPropagation(); } catch (__) {}
@@ -528,10 +535,7 @@ const TaskRow = ({
         <td className="px-3 py-2 align-top text-slate-800 w-[96px]">
           <div className="w-full text-left">
             {(() => {
-              const raw = task.duration ?? task.duration_minutes ?? '';
-              const val = String(raw ?? '').trim();
-              const normalized = durationToTimeInputValue(raw);
-              if (!enableInlineEditing) return val || '—';
+              if (!enableInlineEditing) return durationDisplay || '—';
               if (editingKey === 'duration') {
                 return (
                   <DurationPicker
@@ -539,13 +543,14 @@ const TaskRow = ({
                     onChange={(nextValue) => setLocalValue(nextValue)}
                     onClose={async (reason, nextValue) => {
                       if (reason !== 'done') {
-                        setLocalValue(normalized);
+                        setLocalValue(taskDurationValue);
                         setEditingKey(null);
                         return;
                       }
                       setLocalValue(nextValue || '');
+                      setDurationDisplay(nextValue || '');
                       setEditingKey(null);
-                      if ((nextValue || '') !== normalized && typeof updateField === 'function') {
+                      if ((nextValue || '') !== taskDurationValue && typeof updateField === 'function') {
                         try { await updateField(task.id, 'duration', nextValue || null); } catch (e) {}
                       }
                     }}
@@ -564,12 +569,12 @@ const TaskRow = ({
                   className="w-full rounded px-1 text-left hover:bg-slate-50"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setLocalValue(normalized);
+                    setLocalValue(durationToTimeInputValue(durationDisplay) || taskDurationValue);
                     setEditingKey('duration');
                   }}
                   title="Edit duration"
                 >
-                  {normalized || val || '—'}
+                  {durationDisplay || '—'}
                 </button>
               );
             })()}

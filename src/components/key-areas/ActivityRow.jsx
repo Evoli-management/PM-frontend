@@ -42,6 +42,7 @@ const ActivityRow = ({
   const endDateValue = toDateOnly(a.end_date || a.endDate) || '';
   const durationRaw = String(a.duration ?? '').trim();
   const durationInputValue = durationToTimeInputValue(a.duration);
+  const [durationDisplay, setDurationDisplay] = useState(durationInputValue || durationRaw || '');
   useEffect(() => {
     if (!menuOpen) return;
     const onDown = (e) => {
@@ -85,6 +86,10 @@ const ActivityRow = ({
       window.removeEventListener('scroll', updatePlacement, true);
     };
   }, [menuOpen]);
+
+  useEffect(() => {
+    setDurationDisplay(durationInputValue || durationRaw || '');
+  }, [durationInputValue, durationRaw]);
   return (
     <div key={a.id} className="bg-white rounded border border-slate-200 p-2 mb-2">
       <div className="flex flex-col">
@@ -351,6 +356,7 @@ const ActivityRow = ({
                     return;
                   }
                   setLocalValue(nextValue || '');
+                  setDurationDisplay(nextValue || '');
                   setEditingKey(null);
                   if ((nextValue || '') !== durationInputValue) {
                     try { await updateField(a.id, 'duration', nextValue || null); } catch (err) {}
@@ -368,16 +374,16 @@ const ActivityRow = ({
                 className="hover:bg-slate-50 rounded px-1"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setLocalValue(durationInputValue);
+                  setLocalValue(durationToTimeInputValue(durationDisplay) || durationInputValue);
                   setEditingKey('duration');
                 }}
                 title="Edit duration"
               >
-                {durationInputValue || durationRaw || '—'}
+                {durationDisplay || '—'}
               </button>
             )
           ) : (
-            <div>{durationInputValue || durationRaw || '—'}</div>
+            <div>{durationDisplay || '—'}</div>
           )}
 
           <div className="text-xs text-slate-500">{t("activityRow.deadline")}</div>
