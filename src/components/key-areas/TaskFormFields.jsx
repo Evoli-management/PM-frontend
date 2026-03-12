@@ -2,6 +2,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaInfoCircle, FaRegCalendarAlt, FaUser, FaUsers } from 'react-icons/fa';
 import { formatKeyAreaLabel } from '../../utils/keyAreaDisplay';
+import DurationPicker from '../shared/DurationPicker.jsx';
 
 const IconChevron = (props) => (
   <svg viewBox="0 0 24 24" aria-hidden="true" {...props}>
@@ -274,13 +275,13 @@ export default function TaskFormFields({
           {showField('duration') && (
             <div>
               <label className={labelCls}>{t('createTaskModal.estimatedDurationLabel', 'Est. Duration')}</label>
-              <input
-                name="duration"
-                type="time"
-                step="60"
-                className={inputCls}
+              <DurationPicker
                 value={duration}
-                onChange={(event) => onDurationChange?.(event.target.value)}
+                onChange={onDurationChange}
+                className="w-full"
+                triggerClassName={selectCls}
+                hoursAriaLabel="Task duration hours"
+                minutesAriaLabel="Task duration minutes"
               />
             </div>
           )}
@@ -373,6 +374,7 @@ export default function TaskFormFields({
                   <button
                     type="button"
                     className={`${memberFieldCls} text-left text-base transition-colors hover:border-slate-400 ${value.length ? 'text-slate-900' : 'text-slate-400'}`}
+                    style={{ borderStyle: 'solid', borderWidth: 1, borderColor: '#cbd5e1' }}
                     onClick={() => setOpenMembersRole?.((current) => (current === role ? null : role))}
                   >
                     {formatMemberSummary?.(value)}

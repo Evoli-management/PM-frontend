@@ -7,6 +7,7 @@ import { getQuadrantColorClass } from '../../utils/keyareasHelpers';
 import { FaEdit, FaTrash, FaEllipsisV } from 'react-icons/fa';
 import { useFormattedDate } from '../../hooks/useFormattedDate';
 import { durationToTimeInputValue } from '../../utils/duration';
+import DurationPicker from '../shared/DurationPicker.jsx';
 
 const TaskRow = ({
   t: task,
@@ -61,6 +62,7 @@ const TaskRow = ({
   const [localValue, setLocalValue] = useState("");
   const clickTimer = useRef(null);
   const dateInputRefs = useRef({});
+  const lastDateCommitRef = useRef({});
   
   const menuRef = useRef(null);
   useEffect(() => {
@@ -124,6 +126,24 @@ const TaskRow = ({
       clickTimer.current = null;
       onRowClick(task);
     }, 180);
+  };
+
+  const commitDateFieldChange = async (field, rawValue) => {
+    if (typeof updateField !== 'function') return;
+    const value = rawValue || '';
+    const stamp = `${field}:${value}`;
+    if (lastDateCommitRef.current[field] === stamp) return;
+    lastDateCommitRef.current[field] = stamp;
+    setEditingKey(null);
+    try {
+      await updateField(task.id, field, value);
+    } finally {
+      setTimeout(() => {
+        if (lastDateCommitRef.current[field] === stamp) {
+          delete lastDateCommitRef.current[field];
+        }
+      }, 0);
+    }
   };
 
   
@@ -411,10 +431,8 @@ const TaskRow = ({
               className="absolute opacity-0"
               style={{ width: 0, height: 0 }}
               value={toDateOnly(task.start_date) || ''}
-              onChange={async (e) => {
-                const v = e.target.value || '';
-                try { await updateField && updateField(task.id, 'start_date', v); } catch (e) {}
-              }}
+              onInput={(e) => { void commitDateFieldChange('start_date', e.target.value); }}
+              onChange={(e) => { void commitDateFieldChange('start_date', e.target.value); }}
               onBlur={() => setEditingKey(null)}
               onClick={(e) => e.stopPropagation()}
             />
@@ -453,10 +471,8 @@ const TaskRow = ({
               className="absolute opacity-0"
               style={{ width: 0, height: 0 }}
               value={toDateOnly(task.end_date) || ''}
-              onChange={async (e) => {
-                const v = e.target.value || '';
-                try { await updateField && updateField(task.id, 'end_date', v); } catch (e) {}
-              }}
+              onInput={(e) => { void commitDateFieldChange('end_date', e.target.value); }}
+              onChange={(e) => { void commitDateFieldChange('end_date', e.target.value); }}
               onBlur={() => setEditingKey(null)}
               onClick={(e) => e.stopPropagation()}
             />
@@ -497,10 +513,8 @@ const TaskRow = ({
               value={toDateOnly(task.deadline || task.dueDate) || ''}
               min={toDateOnly(task.start_date || task.startDate) || undefined}
               max={toDateOnly(task.end_date || task.endDate) || undefined}
-              onChange={async (e) => {
-                const v = e.target.value || '';
-                try { await updateField && updateField(task.id, 'dueDate', v); } catch (e) {}
-              }}
+              onInput={(e) => { void commitDateFieldChange('dueDate', e.target.value); }}
+              onChange={(e) => { void commitDateFieldChange('dueDate', e.target.value); }}
               onBlur={() => setEditingKey(null)}
               onClick={(e) => e.stopPropagation()}
             />
@@ -520,30 +534,27 @@ const TaskRow = ({
               if (!enableInlineEditing) return val || '—';
               if (editingKey === 'duration') {
                 return (
-                  <input
-                    autoFocus
-                    type="time"
-                    step="60"
-                    className="w-full rounded border border-slate-300 px-1 py-0.5 text-sm"
+                  <DurationPicker
                     value={localValue}
-                    onChange={(e) => setLocalValue(e.target.value)}
-                    onBlur={async (e) => {
-                      const nextValue = e.target.value;
+                    onChange={(nextValue) => setLocalValue(nextValue)}
+                    onClose={async (reason, nextValue) => {
+                      if (reason !== 'done') {
+                        setLocalValue(normalized);
+                        setEditingKey(null);
+                        return;
+                      }
+                      setLocalValue(nextValue || '');
                       setEditingKey(null);
-                      if (nextValue !== normalized && typeof updateField === 'function') {
+                      if ((nextValue || '') !== normalized && typeof updateField === 'function') {
                         try { await updateField(task.id, 'duration', nextValue || null); } catch (e) {}
                       }
                     }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        e.currentTarget.blur();
-                      } else if (e.key === 'Escape') {
-                        setLocalValue(normalized);
-                        setEditingKey(null);
-                      }
-                    }}
-                    onClick={(e) => e.stopPropagation()}
+                    compact
+                    autoFocus
+                    className="w-full"
+                    allowClear
+                    hoursAriaLabel="Task duration hours"
+                    minutesAriaLabel="Task duration minutes"
                   />
                 );
               }
@@ -558,7 +569,7 @@ const TaskRow = ({
                   }}
                   title="Edit duration"
                 >
-                  {val || '—'}
+                  {normalized || val || '—'}
                 </button>
               );
             })()}

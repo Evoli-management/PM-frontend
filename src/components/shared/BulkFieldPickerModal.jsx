@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import Modal from './Modal';
 import { FaCheck } from 'react-icons/fa';
 import { useFormattedDate } from '../../hooks/useFormattedDate';
+import DurationPicker from './DurationPicker.jsx';
 
 const IconChevron = (props) => (
   <svg viewBox="0 0 24 24" aria-hidden="true" {...props}>
@@ -187,7 +188,6 @@ export default function BulkFieldPickerModal({
   const [selectedField, setSelectedField] = useState('');
   const [fieldValue, setFieldValue] = useState('');
   const [dateAutoFill, setDateAutoFill] = useState({ end_date: true, deadline: true });
-  const durationInputRef = useRef(null);
   const startDateInputRef = useRef(null);
   const endDateInputRef = useRef(null);
   const deadlineInputRef = useRef(null);
@@ -566,13 +566,12 @@ export default function BulkFieldPickerModal({
           <label className="mb-1 block text-sm font-medium text-slate-700">
             Duration
           </label>
-          <input
-            ref={durationInputRef}
-            type="time"
-            step="60"
+          <DurationPicker
             value={typeof fieldValue === 'string' ? fieldValue : ''}
-            onChange={(e) => setFieldValue(e.target.value)}
-            className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-200"
+            onChange={setFieldValue}
+            className="w-full"
+            hoursAriaLabel="Bulk edit duration hours"
+            minutesAriaLabel="Bulk edit duration minutes"
           />
         </div>
       );

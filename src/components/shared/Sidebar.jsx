@@ -125,6 +125,26 @@ export default function Sidebar({
     const navigate = useNavigate();
     const calendarEnabled = isFeatureEnabled("calendar");
 
+    const buildKeyAreasSearch = ({ kaId = null, openKA = false, includeIdeasSelection = false } = {}) => {
+        const currentParams = new URLSearchParams(location.search || "");
+        const nextParams = new URLSearchParams();
+
+        nextParams.set("view", "active-tasks");
+        nextParams.set("active", currentParams.get("active") || "all");
+
+        if (kaId) {
+            nextParams.set("ka", String(kaId));
+        }
+        if (openKA) {
+            nextParams.set("openKA", "1");
+        }
+        if (includeIdeasSelection) {
+            nextParams.set("select", "ideas");
+        }
+
+        return `?${nextParams.toString()}`;
+    };
+
     // Drag and drop handlers
     const handleDragStart = (e, ka, index) => {
         setDraggedItem({ ka, index });
@@ -212,10 +232,10 @@ export default function Sidebar({
                 if (keyAreasList && keyAreasList.length > 0) {
                     const first = [...keyAreasList].sort((a, b) => (a.position || 0) - (b.position || 0))[0];
                     openedFirstId = first?.id;
-                    navigate({ pathname: item.to, search: `?ka=${first.id}&openKA=1` });
+                    navigate({ pathname: item.to, search: buildKeyAreasSearch({ kaId: first.id, openKA: true }) });
                 } else {
                     openFirstKARef.current = true;
-                    navigate({ pathname: item.to, search: "?openKA=1" });
+                    navigate({ pathname: item.to, search: buildKeyAreasSearch({ openKA: true }) });
                 }
             } else {
                 navigate({ pathname: item.to, search: "" });
@@ -225,10 +245,10 @@ export default function Sidebar({
                 if (keyAreasList && keyAreasList.length > 0) {
                     const first = [...keyAreasList].sort((a, b) => (a.position || 0) - (b.position || 0))[0];
                     openedFirstId = first?.id;
-                    window.location.href = `${item.to}?ka=${first.id}&openKA=1`;
+                    window.location.href = `${item.to}${buildKeyAreasSearch({ kaId: first.id, openKA: true })}`;
                 } else {
                     openFirstKARef.current = true;
-                    window.location.href = `${item.to}?openKA=1`;
+                    window.location.href = `${item.to}${buildKeyAreasSearch({ openKA: true })}`;
                 }
             } else {
                 window.location.href = `${item.to}`;
@@ -260,9 +280,9 @@ export default function Sidebar({
                     return String(a.title || "").localeCompare(String(b.title || ""));
                 })[0];
                 try {
-                    navigate({ pathname: "/key-areas", search: `?ka=${first.id}&openKA=1` });
+                    navigate({ pathname: "/key-areas", search: buildKeyAreasSearch({ kaId: first.id, openKA: true }) });
                 } catch {
-                    window.location.href = `/key-areas?ka=${first.id}&openKA=1`;
+                    window.location.href = `/key-areas${buildKeyAreasSearch({ kaId: first.id, openKA: true })}`;
                 }
                 try {
                     window.dispatchEvent(new CustomEvent("sidebar-open-ka", { detail: { id: first.id } }));
@@ -491,7 +511,7 @@ export default function Sidebar({
                                                                         <Link
                                                                             to={{
                                                                                 pathname: "/key-areas",
-                                                                                search: `?ka=${ka.id}`,
+                                                                                search: buildKeyAreasSearch({ kaId: ka.id }),
                                                                             }}
                                                                             onClick={(e) => {
                                                                                 // Prevent navigation if we're dragging

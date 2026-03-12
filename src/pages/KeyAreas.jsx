@@ -13,6 +13,7 @@ import EditTaskModal from '../components/key-areas/EditTaskModal';
 import BulkFieldPickerModal from '../components/shared/BulkFieldPickerModal';
 import MassActionMenu from '../components/shared/MassActionMenu.jsx';
 import EditActivityModal from '../components/key-areas/EditActivityModal';
+import DurationPicker from '../components/shared/DurationPicker.jsx';
 import EmptyState from '../components/goals/EmptyState.jsx';
 import TaskRow from '../components/key-areas/TaskRow';
 import ViewTabsNavigation from '../components/key-areas/ViewTabsNavigation';
@@ -391,6 +392,71 @@ const normalizeTaskForUi = (task, fallbackKeyAreaId = null) => {
     };
 };
 
+const mergeTaskUpdateForUi = (task, updates = {}) => {
+    if (!task) return task;
+    const next = { ...task, ...updates };
+
+    if (
+        Object.prototype.hasOwnProperty.call(updates, 'startDate') ||
+        Object.prototype.hasOwnProperty.call(updates, 'start_date') ||
+        Object.prototype.hasOwnProperty.call(updates, 'date_start')
+    ) {
+        const startValue = toDateOnly(updates.startDate ?? updates.start_date ?? updates.date_start) || null;
+        next.startDate = startValue;
+        next.start_date = startValue;
+    }
+
+    if (
+        Object.prototype.hasOwnProperty.call(updates, 'endDate') ||
+        Object.prototype.hasOwnProperty.call(updates, 'end_date') ||
+        Object.prototype.hasOwnProperty.call(updates, 'date_end')
+    ) {
+        const endValue = toDateOnly(updates.endDate ?? updates.end_date ?? updates.date_end) || null;
+        next.endDate = endValue;
+        next.end_date = endValue;
+    }
+
+    if (
+        Object.prototype.hasOwnProperty.call(updates, 'deadline') ||
+        Object.prototype.hasOwnProperty.call(updates, 'dueDate') ||
+        Object.prototype.hasOwnProperty.call(updates, 'due_date')
+    ) {
+        const deadlineValue = toDateOnly(updates.deadline ?? updates.dueDate ?? updates.due_date) || null;
+        next.deadline = deadlineValue;
+        next.dueDate = deadlineValue;
+        next.due_date = deadlineValue;
+    }
+
+    if (
+        Object.prototype.hasOwnProperty.call(updates, 'listIndex') ||
+        Object.prototype.hasOwnProperty.call(updates, 'list_index')
+    ) {
+        const listIndexValue = updates.listIndex ?? updates.list_index ?? 1;
+        next.listIndex = listIndexValue;
+        next.list_index = listIndexValue;
+    }
+
+    if (
+        Object.prototype.hasOwnProperty.call(updates, 'keyAreaId') ||
+        Object.prototype.hasOwnProperty.call(updates, 'key_area_id')
+    ) {
+        const keyAreaValue = updates.keyAreaId ?? updates.key_area_id ?? null;
+        next.keyAreaId = keyAreaValue;
+        next.key_area_id = keyAreaValue;
+    }
+
+    if (
+        Object.prototype.hasOwnProperty.call(updates, 'goalId') ||
+        Object.prototype.hasOwnProperty.call(updates, 'goal_id')
+    ) {
+        const goalValue = updates.goalId ?? updates.goal_id ?? null;
+        next.goalId = goalValue;
+        next.goal_id = goalValue;
+    }
+
+    return normalizeTaskForUi(next, task.key_area_id || task.keyAreaId || null);
+};
+
 const isTaskCompleted = (task) => {
     const status = String(task?.status || "").toLowerCase();
     if (status === "done" || status === "completed") return true;
@@ -596,11 +662,11 @@ export default function KeyAreas() {
     const initialActiveFilter = (() => {
         const activeParam = params.get('active');
         if (activeParam === 'active' || activeParam === 'all' || activeParam === 'completed') return activeParam;
-        return 'active';
+        return 'all';
     })();
     const [viewTab, setViewTab] = useState(initialViewTab);
     // Sub-filter for ACTIVE TASKS view:
-    // 'active' => not completed and has start/end date,
+    // 'active' => not completed and has scheduled dates,
     // 'all' => all tasks regardless of dates or completion state,
     // 'completed' => completed tasks only.
     const [activeFilter, setActiveFilter] = useState(initialActiveFilter);
@@ -1472,6 +1538,12 @@ export default function KeyAreas() {
         }
         if (activeParam && (activeParam === 'active' || activeParam === 'all' || activeParam === 'completed') && activeParam !== activeFilter) {
             setActiveFilter(activeParam);
+        } else if (
+            !activeParam &&
+            (viewParam === 'active-tasks' || (!viewParam && viewTab === 'active-tasks')) &&
+            activeFilter !== 'all'
+        ) {
+            setActiveFilter('all');
         }
     }, [location.search]);
 
@@ -2445,6 +2517,8 @@ export default function KeyAreas() {
         const next = new URLSearchParams(location.search || "");
         next.set("ka", String(first.id));
         next.set("openKA", "1");
+        if (!next.get("view")) next.set("view", "active-tasks");
+        if (!next.get("active")) next.set("active", "all");
         navigate({ pathname: "/key-areas", search: `?${next.toString()}` }, { replace: true });
         try {
             window.dispatchEvent(new CustomEvent("sidebar-open-ka", { detail: { id: first.id } }));
@@ -2988,33 +3062,13 @@ export default function KeyAreas() {
             setSelectedActivityIdsInPanel(new Set());
             setSelectedActivityCountInPanel(0);
             setSelectedKA(ka);
-            // Load tasks based on the view mode (all vs activity-trap)
-            const opts = {};
-            if (viewTab === 'activity-trap') {
-                opts.withoutGoal = true;
-            }
-            const t = await api.listTasks(ka.id, opts);
-            try { console.info('KeyAreas.openKA loaded tasks', { kaId: String(ka.id), count: Array.isArray(t) ? t.length : 0, viewTab }); } catch (__) {}
-            setAllTasks(t);
-            // refresh activities for these tasks
-            try {
-                const svc = await getActivityService();
-                const entries = await Promise.all(
-                    (t || []).map(async (row) => {
-                        try {
-                            const list = await svc.list({ taskId: row.id });
-                            return [String(row.id), Array.isArray(list) ? list.map(normalizeActivity) : []];
-                        } catch {
-                            return [String(row.id), []];
-                        }
-                    }),
-                );
-                setActivitiesByTask(Object.fromEntries(entries));
-            } catch (e) {
-                // ignore activity load failures; UI will show zeroes
-            }
+            // Reset task data immediately so the view does not momentarily show
+            // stale rows from the previous tab/filter while the canonical loader runs.
+            setAllTasks([]);
+            setActivitiesByTask({});
             setTaskTab(1);
-            // Opening a Key Area should always land in Active Tasks context.
+            // Opening a Key Area should always land in the Active Tasks context.
+            // Preserve the current sub-filter; initial page entry establishes the default.
             setViewTab('active-tasks');
             setSearchTerm("");
             setSiteSearch("");
@@ -5478,30 +5532,27 @@ export default function KeyAreas() {
                                                                                         <td className="px-3 py-2 align-top text-slate-800 w-[96px]">
                                                                                             <div className="w-full text-left">
                                                                                                 {activityDurationEdit.id === a.id ? (
-                                                                                                    <input
-                                                                                                        autoFocus
-                                                                                                        type="time"
-                                                                                                        step="60"
-                                                                                                        className="w-full rounded border border-slate-300 px-1 py-0.5 text-sm"
+                                                                                                    <DurationPicker
                                                                                                         value={activityDurationEdit.value}
-                                                                                                        onChange={(e) => setActivityDurationEdit({ id: a.id, value: e.target.value })}
-                                                                                                        onBlur={(e) => {
-                                                                                                            const nextValue = e.target.value;
+                                                                                                        onChange={(nextValue) => setActivityDurationEdit({ id: a.id, value: nextValue })}
+                                                                                                        onClose={(reason, nextValue) => {
+                                                                                                            if (reason !== 'done') {
+                                                                                                                setActivityDurationEdit({ id: null, value: '' });
+                                                                                                                return;
+                                                                                                            }
                                                                                                             const currentValue = durationToTimeInputValue(a.duration);
                                                                                                             setActivityDurationEdit({ id: null, value: '' });
-                                                                                                            if (nextValue !== currentValue) {
+                                                                                                            if ((nextValue || '') !== currentValue) {
                                                                                                                 updateActivityField(a, selectedTaskInPanel?.id, 'duration', nextValue || null);
                                                                                                             }
                                                                                                         }}
-                                                                                                        onKeyDown={(e) => {
-                                                                                                            if (e.key === 'Enter') {
-                                                                                                                e.preventDefault();
-                                                                                                                e.currentTarget.blur();
-                                                                                                            } else if (e.key === 'Escape') {
-                                                                                                                setActivityDurationEdit({ id: null, value: '' });
-                                                                                                            }
-                                                                                                        }}
+                                                                                                        compact
+                                                                                                        autoFocus
+                                                                                                        className="w-full"
+                                                                                                        allowClear
                                                                                                         disabled={savingActivityIds.has(a.id)}
+                                                                                                        hoursAriaLabel="Activity duration hours"
+                                                                                                        minutesAriaLabel="Activity duration minutes"
                                                                                                     />
                                                                                                 ) : (
                                                                                                     <button
@@ -5516,7 +5567,7 @@ export default function KeyAreas() {
                                                                                                         disabled={savingActivityIds.has(a.id)}
                                                                                                         title="Edit duration"
                                                                                                     >
-                                                                                                        {String(a.duration ?? '').trim() || '—'}
+                                                                                                        {durationToTimeInputValue(a.duration) || String(a.duration ?? '').trim() || '—'}
                                                                                                     </button>
                                                                                                 )}
                                                                                             </div>
@@ -5631,11 +5682,22 @@ export default function KeyAreas() {
                                             }
                                         }}
                                         onTaskUpdate={async (id, updatedTask) => {
+                                            const previousTask = delegatedTasks.find((task) => String(task.id) === String(id));
+                                            if (previousTask) {
+                                                setDelegatedTasks((prev) =>
+                                                    prev.map((task) =>
+                                                        String(task.id) === String(id)
+                                                            ? mergeTaskUpdateForUi(task, updatedTask)
+                                                            : task,
+                                                    ),
+                                                );
+                                            }
                                             try {
                                                 await api.updateTask(id, updatedTask);
                                                 await refreshDelegatedData();
                                             } catch (error) {
                                                 console.error('Failed to update task:', error);
+                                                await refreshDelegatedData();
                                             }
                                         }}
                                         onTaskDelete={async (id) => {
@@ -5693,11 +5755,22 @@ export default function KeyAreas() {
                                                 }
                                             }}
                                             onTaskUpdate={async (id, updatedTask) => {
+                                                const previousTask = delegatedTasks.find((task) => String(task.id) === String(id));
+                                                if (previousTask) {
+                                                    setDelegatedTasks((prev) =>
+                                                        prev.map((task) =>
+                                                            String(task.id) === String(id)
+                                                                ? mergeTaskUpdateForUi(task, updatedTask)
+                                                                : task,
+                                                        ),
+                                                    );
+                                                }
                                                 try {
                                                     await api.updateTask(id, updatedTask);
                                                     await refreshDelegatedData();
                                                 } catch (error) {
                                                     console.error('Failed to update task:', error);
+                                                    await refreshDelegatedData();
                                                 }
                                             }}
                                             onTaskDelete={async (id) => {
@@ -5749,6 +5822,21 @@ export default function KeyAreas() {
                                         onTaskEdit={editUnifiedTask}
                                         onActivityEdit={editUnifiedActivity}
                                         onTaskUpdate={async (id, updatedTask) => {
+                                            const previousTask = allTasks.find((task) => String(task.id) === String(id));
+                                            if (previousTask) {
+                                                setAllTasks((prev) =>
+                                                    prev.map((task) =>
+                                                        String(task.id) === String(id)
+                                                            ? mergeTaskUpdateForUi(task, updatedTask)
+                                                            : task,
+                                                    ),
+                                                );
+                                                setSelectedTaskFull((prevTask) =>
+                                                    prevTask && String(prevTask.id) === String(id)
+                                                        ? mergeTaskUpdateForUi(prevTask, updatedTask)
+                                                        : prevTask,
+                                                );
+                                            }
                                             try {
                                                 // If delegation happened, refresh the task list for the current view
                                                 if (updatedTask.delegatedToUserId) {
@@ -5790,6 +5878,18 @@ export default function KeyAreas() {
                                                 }
                                             } catch (error) {
                                                 console.error('Failed to update task:', error);
+                                                if (previousTask) {
+                                                    setAllTasks((prev) =>
+                                                        prev.map((task) =>
+                                                            String(task.id) === String(id) ? previousTask : task,
+                                                        ),
+                                                    );
+                                                    setSelectedTaskFull((prevTask) =>
+                                                        prevTask && String(prevTask.id) === String(id)
+                                                            ? previousTask
+                                                            : prevTask,
+                                                    );
+                                                }
                                             }
                                         }}
                                         onTaskDelete={async (id) => {

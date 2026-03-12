@@ -1,3 +1,54 @@
+export const STRICT_DURATION_RE = /^([0-9]{1,2}):([0-5]\d)$/;
+
+const parseLegacyMeridiemToMinutes = (value) => {
+  const raw = String(value ?? '').trim().toLowerCase();
+  if (!raw) return null;
+  const meridiemMatch = raw.match(/^([1-9]|1[0-2]):([0-5]\d)\s*(am|pm)$/);
+  if (!meridiemMatch) return null;
+
+  const hour12 = parseInt(meridiemMatch[1], 10);
+  const minute = parseInt(meridiemMatch[2], 10);
+  const meridiem = meridiemMatch[3];
+  if (!Number.isFinite(hour12) || !Number.isFinite(minute)) return null;
+
+  let hour24 = hour12 % 12;
+  if (meridiem === 'pm') hour24 += 12;
+  return hour24 * 60 + minute;
+};
+
+const formatMinutesAsClockDuration = (minutes) => {
+  if (!Number.isFinite(minutes) || minutes < 0) return '';
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+};
+
+const formatMinutesAsCompactDuration = (minutes, { spaced = false } = {}) => {
+  if (!Number.isFinite(minutes) || minutes < 0) return '';
+  if (minutes === 0) return '0m';
+
+  const parts = [];
+  let remaining = Math.round(minutes);
+
+  const days = Math.floor(remaining / (24 * 60));
+  if (days > 0) {
+    parts.push(`${days}d`);
+    remaining -= days * 24 * 60;
+  }
+
+  const hours = Math.floor(remaining / 60);
+  if (hours > 0) {
+    parts.push(`${hours}h`);
+    remaining -= hours * 60;
+  }
+
+  if (remaining > 0) {
+    parts.push(`${remaining}m`);
+  }
+
+  return spaced ? parts.join(' ') : parts.join('');
+};
+
 export const parseDurationToMinutes = (value) => {
   if (value === null || typeof value === 'undefined') return null;
   if (typeof value === 'number') {
@@ -7,17 +58,6 @@ export const parseDurationToMinutes = (value) => {
 
   const raw = String(value).trim().toLowerCase();
   if (!raw) return null;
-
-  const meridiemMatch = raw.match(/^([1-9]|1[0-2]):([0-5]\d)\s*(am|pm)$/);
-  if (meridiemMatch) {
-    const hour12 = parseInt(meridiemMatch[1], 10);
-    const minute = parseInt(meridiemMatch[2], 10);
-    const meridiem = meridiemMatch[3];
-    if (!Number.isFinite(hour12) || !Number.isFinite(minute)) return null;
-    let hour24 = hour12 % 12;
-    if (meridiem === 'pm') hour24 += 12;
-    return hour24 * 60 + minute;
-  }
 
   // Accept HH:mm (time-picker style) as duration.
   const hhmm = raw.match(/^(\d{1,2}):([0-5]\d)$/);
@@ -34,6 +74,7 @@ export const parseDurationToMinutes = (value) => {
 
   const normalized = raw
     .replace(/\band\b/g, ' ')
+    .replace(/days?/g, 'd')
     .replace(/hours?/g, 'h')
     .replace(/hrs?/g, 'h')
     .replace(/minutes?/g, 'm')
@@ -43,11 +84,13 @@ export const parseDurationToMinutes = (value) => {
   let total = 0;
   let matched = false;
 
-  const remainder = normalized.replace(/(\d+)\s*(h|m)/g, (_, num, unit) => {
+  const remainder = normalized.replace(/(\d+)\s*(d|h|m)/g, (_, num, unit) => {
     matched = true;
     const amount = parseInt(num, 10);
     if (!Number.isFinite(amount)) return _;
-    total += unit === 'h' ? amount * 60 : amount;
+    if (unit === 'd') total += amount * 24 * 60;
+    else if (unit === 'h') total += amount * 60;
+    else total += amount;
     return ' ';
   });
 
@@ -63,13 +106,18 @@ export const isDurationInputValid = (value) => {
   if (value === null || typeof value === 'undefined') return true;
   const asString = String(value).trim();
   if (!asString) return true;
-  return parseDurationToMinutes(asString) !== null;
+  return STRICT_DURATION_RE.test(asString);
 };
 
 export const durationToTimeInputValue = (value) => {
   if (value === null || typeof value === 'undefined') return '';
   const raw = String(value).trim();
   if (!raw) return '';
+
+  const legacyMinutes = parseLegacyMeridiemToMinutes(raw);
+  if (legacyMinutes !== null) {
+    return formatMinutesAsClockDuration(legacyMinutes);
+  }
 
   const asHHMM = raw.match(/^(\d{1,2}):([0-5]\d)$/);
   if (asHHMM) {
@@ -81,9 +129,23 @@ export const durationToTimeInputValue = (value) => {
   }
 
   const mins = parseDurationToMinutes(raw);
-  if (mins === null) return '';
-  if (mins > 23 * 60 + 59) return '';
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  if (mins === null) return raw;
+  if (/^\d+$/.test(raw)) {
+    return formatMinutesAsCompactDuration(mins, { spaced: true });
+  }
+  if (/[dhm]/i.test(raw)) {
+    return formatMinutesAsCompactDuration(mins, { spaced: true });
+  }
+  return formatMinutesAsClockDuration(mins);
+};
+
+export const normalizeDurationForApi = (value) => {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+
+  const raw = String(value).trim();
+  if (!raw) return null;
+  const strictMatch = raw.match(STRICT_DURATION_RE);
+  if (!strictMatch) return raw;
+  return `${strictMatch[1].padStart(2, '0')}:${strictMatch[2]}`;
 };

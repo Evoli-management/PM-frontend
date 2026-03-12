@@ -9,7 +9,8 @@ import { useResizable } from '../../hooks/useResizable';
 import { FaSave, FaTrash } from 'react-icons/fa';
 import activityService from '../../services/activityService';
 import { formatKeyAreaLabel } from '../../utils/keyAreaDisplay';
-import { durationToTimeInputValue } from '../../utils/duration';
+import { durationToTimeInputValue, isDurationInputValid } from '../../utils/duration';
+import DurationPicker from '../shared/DurationPicker.jsx';
 
 // ---- helpers (JS only) ----
 const safeDate = (v) => {
@@ -392,6 +393,11 @@ export default function EditActivityModal({
     const normEnd = toDateOnly(endDate) || null;
     const normDeadline = toDateOnly(deadline) || null;
 
+    if (duration && String(duration).trim() && !isDurationInputValid(duration)) {
+      alert('Duration must use HH:MM format, for example 01:00 or 01:30.');
+      return;
+    }
+
   // Handle assignee - convert user ID to delegatedToUserId for auto-delegation
   let delegatedToUserId = null;
   
@@ -606,13 +612,12 @@ export default function EditActivityModal({
 
               <div>
                 <label className="text-sm font-medium text-slate-700">{t("createTaskModal.durationLabel")}</label>
-                <input
-                  name="duration"
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 mt-0"
-                  type="time"
-                  step="60"
+                <DurationPicker
                   value={duration}
-                  onChange={(e) => setDuration(e.target.value)}
+                  onChange={setDuration}
+                  className="mt-0"
+                  hoursAriaLabel="Activity duration hours"
+                  minutesAriaLabel="Activity duration minutes"
                 />
               </div>
             </div>
