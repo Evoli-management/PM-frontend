@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
-import { CheckCircle2, User, Mail, Lock, Eye, EyeOff, Info } from "lucide-react";
+import { CheckCircle2, User, Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { getFriendlyErrorMessage, getErrorSuggestion } from "../utils/errorMessages";
+import { getFriendlyErrorMessage } from "../utils/errorMessages";
 import TermsOfServiceModal from "../components/modals/TermsOfServiceModal";
 import PrivacyPolicyModal from "../components/modals/PrivacyPolicyModal";
 // authService is imported dynamically at call sites to allow code-splitting
@@ -494,43 +494,6 @@ export default function Registration() {
                                 >
                                     {submitting ? t('registration.signingUp') : t('registration.signUpBtn')}
                                 </button>
-
-                                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <button
-                                        aria-label="Continue with Google"
-                                        className="w-full inline-flex items-center justify-center gap-3 border rounded h-10 sm:h-12 bg-gray-100 hover:bg-gray-200"
-                                    >
-                                        <img
-                                            src={`${import.meta.env.BASE_URL}google.svg`}
-                                            alt="Google"
-                                            width={20}
-                                            height={20}
-                                            loading="eager"
-                                            className="object-contain"
-                                            onError={(e) => {
-                                                e.currentTarget.style.display = "none";
-                                            }}
-                                        />
-                                        <span className="text-sm">{t('registration.continueGoogle')}</span>
-                                    </button>
-                                    <button
-                                        aria-label="Continue with Microsoft"
-                                        className="w-full inline-flex items-center justify-center gap-3 border rounded h-10 sm:h-12 bg-gray-100 hover:bg-gray-200"
-                                    >
-                                        <img
-                                            src={`${import.meta.env.BASE_URL}microsoft.svg`}
-                                            alt="Microsoft"
-                                            width={20}
-                                            height={20}
-                                            loading="eager"
-                                            className="object-contain"
-                                            onError={(e) => {
-                                                e.currentTarget.style.display = "none";
-                                            }}
-                                        />
-                                        <span className="text-sm">{t('registration.continueMicrosoft')}</span>
-                                    </button>
-                                </div>
 
                                 {formErrors.general && (
                                     <p className="text-red-600 text-sm text-center mt-2">{formErrors.general}</p>

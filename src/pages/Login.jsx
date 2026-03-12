@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEnvelope, faLock, faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
-import { getFriendlyErrorMessage, getErrorSuggestion } from "../utils/errorMessages";
+import { getFriendlyErrorMessage } from "../utils/errorMessages";
 import { useTranslation } from "react-i18next";
 // authService is imported dynamically at call sites to allow code-splitting
 
@@ -26,10 +26,6 @@ const LoginPage = () => {
     const [mfaPendingToken, setMfaPendingToken] = useState("");
     const [mfaCode, setMfaCode] = useState("");
     const [trustDevice, setTrustDevice] = useState(false);
-
-    const handleForgotPassword = () => {
-        navigate("/PasswordPageForget");
-    };
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -175,19 +171,6 @@ const LoginPage = () => {
         }
     };
 
-    const handleSocialLogin = (provider) => {
-        setLoading(true);
-        setError("");
-        setTimeout(() => {
-            setLoading(false);
-            if (provider === "Google" || provider === "Microsoft") {
-                navigate("/");
-            } else {
-                setError("Social login failed. Try again.");
-            }
-        }, 1200);
-    };
-
     // MFA verification screen
     if (mfaRequired) {
         return (
@@ -326,43 +309,6 @@ const LoginPage = () => {
                         >
                             {loading ? t('login.loading') : t('login.submit')}
                         </button>
-                        <div className="w-full flex items-center justify-center gap-4 my-6 text-sm text-black font-semibold">
-                            <span className="flex-1 h-[1px] bg-black"></span>
-                            <span>or continue</span>
-                            <span className="flex-1 h-[1px] bg-black"></span>
-                        </div>
-                        <div className="flex flex-col sm:flex-row justify-center items-center gap-4 w-full">
-                            <button
-                                type="button"
-                                onClick={() => handleSocialLogin("Google")}
-                                className={`flex items-center justify-center border border-gray-300 rounded-lg w-full sm:w-1/2 h-12 bg-gray-100 transition hover:bg-gray-200 ${loading ? "opacity-60 cursor-not-allowed" : ""}`}
-                                disabled={loading}
-                                aria-label="Login with Google"
-                            >
-                                <img
-                                    src="/PM-frontend/google.svg"
-                                    alt="Google"
-                                    loading="lazy"
-                                    className="w-5 h-5 mr-2"
-                                />
-                                <span className="text-gray-700 font-medium">Login with Google</span>
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => handleSocialLogin("Microsoft")}
-                                className={`flex items-center justify-center border border-gray-300 rounded-lg w-full sm:w-1/2 h-12 bg-gray-100 transition hover:bg-gray-200 ${loading ? "opacity-60 cursor-not-allowed" : ""}`}
-                                disabled={loading}
-                                aria-label="Login with Microsoft"
-                            >
-                                <img
-                                    src="/PM-frontend/microsoft.svg"
-                                    alt="Microsoft"
-                                    loading="lazy"
-                                    className="w-5 h-5 mr-2"
-                                />
-                                <span className="text-gray-700 font-medium">Login with Microsoft</span>
-                            </button>
-                        </div>
                         <p className="text-sm text-center mt-4 text-black font-semibold">
                             Not registered yet?{" "}
                             <Link to="/registration" className="text-blue-600 hover:text-blue-800 underline">
