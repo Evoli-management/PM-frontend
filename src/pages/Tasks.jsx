@@ -435,6 +435,7 @@ export default function Tasks() {
     };
     const updateField = async (id, key, value) => {
         const patch = {};
+        const previousTasks = Array.isArray(tasks) ? tasks.slice() : [];
         if (key === "name") patch.title = value;
         else if (key === "notes") patch.description = value;
         else if (key === "assignee") patch.assignee = value;
@@ -450,6 +451,18 @@ export default function Tasks() {
             return;
         }
         try {
+            if (key === "duration") {
+                setTasks((prev) =>
+                    prev.map((t) =>
+                        t.id === id
+                            ? {
+                                  ...t,
+                                  duration: value || "",
+                              }
+                            : t,
+                    ),
+                );
+            }
             const updated = await (await getTaskService()).update(id, patch);
             setTasks((prev) =>
                 prev.map((t) =>
@@ -471,6 +484,9 @@ export default function Tasks() {
             markSaving(id);
         } catch (e) {
             console.error("Failed to update field", e);
+            if (key === "duration") {
+                setTasks(previousTasks);
+            }
         }
     };
     // Row expansion removed in DF view
