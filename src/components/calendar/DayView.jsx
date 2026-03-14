@@ -213,17 +213,47 @@ export default function DayView({
     setMobileDragItem(null);
   };
 
+  const resolveDaySlotAtPoint = (x, y) => {
+    try {
+      const el = document.elementFromPoint(x, y);
+      const slotEl = el?.closest?.("[data-day-slot-hour][data-day-slot-minute][data-day-slot-key]");
+      if (!slotEl) return null;
+      const h = Number(slotEl.getAttribute("data-day-slot-hour"));
+      const m = Number(slotEl.getAttribute("data-day-slot-minute"));
+      const key = String(slotEl.getAttribute("data-day-slot-key") || "");
+      if (!Number.isFinite(h) || !Number.isFinite(m) || !key) return null;
+      return { h, m, key };
+    } catch (_) {
+      return null;
+    }
+  };
+
   useEffect(() => {
     if (!mobileDragItem) return;
-    const clearMobileDrag = () => {
+    const onPointerMove = (ev) => {
+      const hit = resolveDaySlotAtPoint(ev.clientX, ev.clientY);
+      setDragOverSlot(hit ? hit.key : null);
+    };
+    const onPointerUp = (ev) => {
+      const hit = resolveDaySlotAtPoint(ev.clientX, ev.clientY);
+      if (hit) {
+        applyMobileDropOnSlot(hit.h, hit.m);
+        return;
+      }
       setDragOverSlot(null);
       setMobileDragItem(null);
     };
-    window.addEventListener("pointercancel", clearMobileDrag, { once: true });
-    window.addEventListener("pointerup", clearMobileDrag, { once: true });
+    const onPointerCancel = () => {
+      setDragOverSlot(null);
+      setMobileDragItem(null);
+    };
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp, { once: true });
+    window.addEventListener("pointercancel", onPointerCancel, { once: true });
     return () => {
-      window.removeEventListener("pointercancel", clearMobileDrag);
-      window.removeEventListener("pointerup", clearMobileDrag);
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerCancel);
     };
   }, [mobileDragItem]);
 
@@ -1488,6 +1518,9 @@ export default function DayView({
                               key={slotKey}
                               role="button"
                               tabIndex={0}
+                              data-day-slot-key={slotKey}
+                              data-day-slot-hour={h}
+                              data-day-slot-minute={minute}
                               className={`w-full ${borderClasses} transition-colors ${(isDraggedOver || isHoverPreview) ? 'bg-blue-100 border-blue-300' : ''}`}
                               style={{ height: segmentHeight, cursor: "pointer", backgroundColor: (isDraggedOver || isHoverPreview) ? undefined : (slotIsWorking ? '#ffffff' : '#f1f5f9') }}
                               onClick={(e) => {
