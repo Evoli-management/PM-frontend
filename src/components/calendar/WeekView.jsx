@@ -99,6 +99,7 @@ const WeekView = ({
   const [hoveredQuickCreateCell, setHoveredQuickCreateCell] = useState(null);
   const [dragOverTimeSlot, setDragOverTimeSlot] = useState(null);
   const [dragOverBottomDayKey, setDragOverBottomDayKey] = useState(null);
+  const [mobileDragItem, setMobileDragItem] = useState(null);
 
   // Fixed time column width; day columns will flex to fill available space
   const TIME_COL_PX = 48;
@@ -672,6 +673,60 @@ const WeekView = ({
       console.warn("Drop failed", err);
     }
   };
+
+  const isTouchOrPenPointer = (e) => {
+    const pt = String(e?.pointerType || "").toLowerCase();
+    return pt === "touch" || pt === "pen";
+  };
+
+  const beginMobileDrag = (e, payload) => {
+    if (!isTouchOrPenPointer(e)) return;
+    try {
+      e.preventDefault();
+      e.stopPropagation();
+    } catch (_) {}
+    setMobileDragItem(payload);
+  };
+
+  const applyMobileDropToSlot = (day, slot) => {
+    if (!mobileDragItem) return;
+    const [h, m] = String(slot || "00:00").split(":");
+    const date = new Date(day.getFullYear(), day.getMonth(), day.getDate(), Number(h), Number(m));
+    if (mobileDragItem.kind === "task" && typeof onTaskDrop === "function") {
+      onTaskDrop(mobileDragItem.id, date, mobileDragItem.dropEffect || "copy", mobileDragItem.text || "Task");
+    } else if (mobileDragItem.kind === "activity" && typeof onActivityDrop === "function") {
+      onActivityDrop(mobileDragItem.id, date, mobileDragItem.dropEffect || "copy", mobileDragItem.text || "Activity");
+    }
+    setDragOverTimeSlot(null);
+    setMobileDragItem(null);
+  };
+
+  const applyMobileDropToBottomDay = (day) => {
+    if (!mobileDragItem) return;
+    const date = resolveDropDateForDay(day, mobileDragItem.sourceIso || null);
+    if (mobileDragItem.kind === "task" && typeof onTaskDrop === "function") {
+      onTaskDrop(mobileDragItem.id, date, mobileDragItem.dropEffect || "move", mobileDragItem.text || "Task");
+    } else if (mobileDragItem.kind === "activity" && typeof onActivityDrop === "function") {
+      onActivityDrop(mobileDragItem.id, date, mobileDragItem.dropEffect || "move", mobileDragItem.text || "Activity");
+    }
+    setDragOverBottomDayKey(null);
+    setMobileDragItem(null);
+  };
+
+  useEffect(() => {
+    if (!mobileDragItem) return;
+    const clearMobileDrag = () => {
+      setDragOverTimeSlot(null);
+      setDragOverBottomDayKey(null);
+      setMobileDragItem(null);
+    };
+    window.addEventListener("pointercancel", clearMobileDrag, { once: true });
+    window.addEventListener("pointerup", clearMobileDrag, { once: true });
+    return () => {
+      window.removeEventListener("pointercancel", clearMobileDrag);
+      window.removeEventListener("pointerup", clearMobileDrag);
+    };
+  }, [mobileDragItem]);
 
   const handleBottomColumnDrop = (e, day) => {
     try {
@@ -2541,6 +2596,17 @@ const WeekView = ({
                                 }
                               }}
                               onDrop={(e) => handleDrop(e, date, slot)}
+                              onPointerEnter={() => {
+                                if (mobileDragItem) setDragOverTimeSlot(slotDragKey);
+                              }}
+                              onPointerUp={(e) => {
+                                if (!mobileDragItem) return;
+                                try {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                } catch (_) {}
+                                applyMobileDropToSlot(date, slot);
+                              }}
                               onClick={(e) => {
                                 try { e.stopPropagation(); } catch {}
                                 const [h, m] = slot.split(":");
@@ -2829,6 +2895,18 @@ const WeekView = ({
                         }
                       }}
                       onDrop={(e) => handleBottomColumnDrop(e, date)}
+                      onPointerEnter={() => {
+                        if (!mobileDragItem) return;
+                        setDragOverBottomDayKey(`${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`);
+                      }}
+                      onPointerUp={(e) => {
+                        if (!mobileDragItem) return;
+                        try {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        } catch (_) {}
+                        applyMobileDropToBottomDay(date);
+                      }}
                       onMouseMove={(e) => {
                         const dayKey = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
                         try {
@@ -2919,6 +2997,21 @@ const WeekView = ({
                                 key={`task-${t.id}`}
                                 data-week-item-row="true"
                                 draggable
+                                onPointerDown={(e) => {
+                                  beginMobileDrag(e, {
+                                    kind: "task",
+                                    id: String(t.id),
+                                    text: String(t.title || t.name || "Task"),
+                                    sourceIso:
+                                      t.startDate ||
+                                      t.start_date ||
+                                      t.date ||
+                                      t.dueDate ||
+                                      t.due_date ||
+                                      null,
+                                    dropEffect: "move",
+                                  });
+                                }}
                                 onDragStart={(e) => {
                                   try {
                                     const taskStart =
@@ -3037,6 +3130,23 @@ const WeekView = ({
                               key={`act-${a.id}`}
                               data-week-item-row="true"
                               draggable
+                              onPointerDown={(e) => {
+                                beginMobileDrag(e, {
+                                  kind: "activity",
+                                  id: String(a.id || ""),
+                                  text: String(a.text || a.title || "Activity"),
+                                  sourceIso:
+                                    a.date ||
+                                    a.startDate ||
+                                    a.start_date ||
+                                    a.dueDate ||
+                                    a.due_date ||
+                                    a.createdAt ||
+                                    a.created_at ||
+                                    null,
+                                  dropEffect: "move",
+                                });
+                              }}
                               onDragStart={(e) => {
                                 try {
                                   const activityStart =
