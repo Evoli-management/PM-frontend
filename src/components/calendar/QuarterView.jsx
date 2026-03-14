@@ -209,12 +209,18 @@ export default function QuarterView({
                     span,
                     createdAt: new Date(ev?.createdAt || ev?.created_at || 0).getTime(),
                     startTs: new Date(ev?.start || ev?.startDate || ev?.start_at || 0).getTime(),
+                    endTs: new Date(ev?.end || ev?.endDate || ev?.end_at || 0).getTime(),
                     title: String(ev?.title || ''),
                 };
             })
             .filter(Boolean)
             .sort((a, b) => {
                 if (a.startTs !== b.startTs) return a.startTs - b.startTs;
+                // For events starting the same day, place shorter spans first so
+                // nested bars occupy middle lanes in dense overlaps.
+                const ae = Number.isNaN(a.endTs) ? Number.POSITIVE_INFINITY : a.endTs;
+                const be = Number.isNaN(b.endTs) ? Number.POSITIVE_INFINITY : b.endTs;
+                if (ae !== be) return ae - be;
                 const ac = Number.isNaN(a.createdAt) ? Number.POSITIVE_INFINITY : a.createdAt;
                 const bc = Number.isNaN(b.createdAt) ? Number.POSITIVE_INFINITY : b.createdAt;
                 if (ac !== bc) return ac - bc;
@@ -236,7 +242,8 @@ export default function QuarterView({
         }
 
         const maxLaneCount = Math.max(1, laneEnds.length);
-        return { laneByKey, maxLaneCount };
+        const items = source.map((item) => ({ key: item.key, lane: laneByKey.get(item.key) ?? 0, span: item.span }));
+        return { laneByKey, maxLaneCount, items };
     }, [events]);
 
     // Helper to get week number for a given date
@@ -1007,10 +1014,38 @@ export default function QuarterView({
                                                                     }));
                                                                     const visibleEvents = dayEventsWithLane
                                                                         .sort((a, b) => a.lane - b.lane);
-                                                                    // Keep lane columns stable across the quarter so bars
-                                                                    // remain straight vertically and don't shift when
-                                                                    // neighboring events start/end on nearby dates.
-                                                                    const laneCount = Math.max(1, quarterEventLanes.maxLaneCount || 1);
+                                                                    // Keep lane slots persistent within the day using global
+                                                                    // lane ids. This preserves consistent bar width/position
+                                                                    // across a span even when some overlapping events end.
+                                                                    const laneCountVisible = Math.max(
+                                                                        1,
+                                                                        visibleEvents.reduce(
+                                                                            (m, entry) => Math.max(m, Number(entry?.lane) || 0),
+                                                                            0
+                                                                        ) + 1
+                                                                    );
+                                                                    const activeSpans = visibleEvents
+                                                                        .map(({ ev, eventKey }, idx) => {
+                                                                            const raw = eventSpanByDate(ev);
+                                                                            const key = eventKey || getEventKey(ev, idx);
+                                                                            const preview = allDaySpanPreview[key];
+                                                                            if (preview?.start && preview?.end) return { start: preview.start, end: preview.end };
+                                                                            return raw;
+                                                                        })
+                                                                        .filter((s) => s?.start && s?.end);
+                                                                    const laneCountCluster = activeSpans.length
+                                                                        ? Math.max(
+                                                                            1,
+                                                                            (Array.isArray(quarterEventLanes.items) ? quarterEventLanes.items : [])
+                                                                                .filter((it) =>
+                                                                                    activeSpans.some(
+                                                                                        (s) => it?.span?.start <= s.end && it?.span?.end >= s.start
+                                                                                    )
+                                                                                )
+                                                                                .reduce((m, it) => Math.max(m, Number(it?.lane) || 0), 0) + 1
+                                                                        )
+                                                                        : 1;
+                                                                    const laneCount = Math.max(laneCountVisible, laneCountCluster);
                                                                     const ACTION_GUTTER_WIDTH = 8;
                                                                     return (
                                                                         <div
@@ -1044,6 +1079,11 @@ export default function QuarterView({
                                                                                         : rawSpan;
                                                                                     const startsHere = span ? sameDateOnly(span.start, dayOnly) : false;
                                                                                     const endsHere = span ? sameDateOnly(span.end, dayOnly) : false;
+                                                                                    // Preserve row separator visibility at event
+                                                                                    // boundaries while keeping multi-day bars
+                                                                                    // visually continuous through middle days.
+                                                                                    const topInsetPx = startsHere ? 1 : 0;
+                                                                                    const bottomInsetPx = endsHere ? 1 : 0;
                                                                                     const colIndex = Math.max(0, Math.min(laneCount - 1, Number(lane) || 0));
                                                                                     const kindKey = ev.kind || ev.type || ev.kindName || null;
                                                                                     const cat =
@@ -1092,8 +1132,8 @@ export default function QuarterView({
                                                                                             className={`group text-left px-2 text-[12px] font-medium text-white ${bgClass || ''}`}
                                                                                             style={{
                                                                                                 position: 'absolute',
-                                                                                                top: 0,
-                                                                                                bottom: 0,
+                                                                                                top: `${topInsetPx}px`,
+                                                                                                bottom: `${bottomInsetPx}px`,
                                                                                                 left: useFullWidthSingle ? 0 : `calc(${(colIndex * 100) / laneCount}% + 1px)`,
                                                                                                 width: useFullWidthSingle ? '100%' : `calc(${100 / laneCount}% - 2px)`,
                                                                                                 ...(finalBg ? { backgroundColor: finalBg, border: `1px solid ${finalBg}`, color: textColor } : {}),

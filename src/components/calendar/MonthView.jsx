@@ -641,6 +641,7 @@ export default function MonthView({
     (Array.isArray(events) ? events : []).forEach((t) => {
       const kindLower = String(t?.kind || "").toLowerCase();
       if (kindLower === "appointment" || kindLower === "appointment_exception") return;
+      const isAllDayLike = Boolean(t?.allDay || t?.all_day);
       const sIso = t.start || t.startAt || t.start_at || t.startDate || t.start_date || null;
       const eIso = t.end || t.endAt || t.end_at || t.endDate || t.end_date || null;
       let s = parseDateOnly(sIso);
@@ -655,7 +656,7 @@ export default function MonthView({
       if (!e) e = s;
 
       const spanDays = Math.max(1, Math.round((e - s) / (24 * 60 * 60 * 1000)) + 1);
-      if (spanDays < 2) return;
+      if (spanDays < 2 && !isAllDayLike) return;
       const startKey = `${s.getFullYear()}-${String(s.getMonth() + 1).padStart(2, "0")}-${String(
         s.getDate()
       ).padStart(2, "0")}`;

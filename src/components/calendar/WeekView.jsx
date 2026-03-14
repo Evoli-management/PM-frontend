@@ -118,6 +118,9 @@ const WeekView = ({
   const quickAddMenuRef = useRef(null);
   const LEFT_QUICK_ADD_MENU_KEY = "__left_quick_add__";
   const [columnWidth, setColumnWidth] = useState(null);
+  const allDayTrackRef = useRef(null);
+  const [allDayTrackWidth, setAllDayTrackWidth] = useState(0);
+  const [allDayColumnEdges, setAllDayColumnEdges] = useState([]);
   const [keyAreaMap, setKeyAreaMap] = useState({});
   const [keyAreaOrderMap, setKeyAreaOrderMap] = useState({});
   const [taskMetaMap, setTaskMetaMap] = useState({});
@@ -420,6 +423,57 @@ const WeekView = ({
       window.removeEventListener("resize", measure);
     };
   }, [weekScrollRef.current, workWeek]);
+
+  // Measure all-day track width and exact day column edges from header cells
+  // so bars align to real rendered columns.
+  useEffect(() => {
+    const trackEl = allDayTrackRef.current;
+    const headerEl = headerBlockRef.current;
+    if (!trackEl) return;
+    const measure = () => {
+      try {
+        const trackRect = trackEl.getBoundingClientRect();
+        const trackWidth = Math.max(0, trackRect.width || trackEl.clientWidth || 0);
+        setAllDayTrackWidth(trackWidth);
+
+        const dayHeaders = Array.from(headerEl?.querySelectorAll?.("thead tr th") || []).slice(
+          1,
+          1 + daysCount
+        );
+        if (dayHeaders.length !== daysCount) {
+          setAllDayColumnEdges([]);
+          return;
+        }
+
+        const starts = dayHeaders.map((th) => {
+          const r = th.getBoundingClientRect();
+          return r.left - trackRect.left;
+        });
+        const lastRect = dayHeaders[dayHeaders.length - 1].getBoundingClientRect();
+        const rawEdges = [...starts, lastRect.right - trackRect.left];
+
+        // Clamp and enforce monotonic edges within track bounds.
+        const normalized = [];
+        let prev = 0;
+        for (let i = 0; i < rawEdges.length; i += 1) {
+          const v = Math.max(0, Math.min(trackWidth, Number(rawEdges[i]) || 0));
+          const next = i === 0 ? v : Math.max(prev, v);
+          normalized.push(next);
+          prev = next;
+        }
+        setAllDayColumnEdges(normalized);
+      } catch (_) {}
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(trackEl);
+    if (headerEl) ro.observe(headerEl);
+    window.addEventListener("resize", measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [workWeek]);
 
   // Calculate week start (Monday) and days (respect workWeek preference)
   const weekStart = new Date(currentDate || new Date());
@@ -1212,7 +1266,7 @@ const WeekView = ({
                       colSpan={daysCount}
                     >
                       {/* keep as you had (multi-day bars renderer) */}
-                      <div style={{ position: "relative", minHeight: 32 }}>
+                      <div ref={allDayTrackRef} style={{ position: "relative", minHeight: 32 }}>
                         {todayColumnIndex >= 0 ? (
                           <div
                             aria-hidden="true"
@@ -1320,18 +1374,18 @@ const WeekView = ({
                                 if (String(t?.kind || "").toLowerCase() === "appointment") return false;
                                 const s = resolveStartRaw(t);
                                 const e = resolveEndRaw(t);
+                                const isAllDayLike = Boolean(t?.allDay || t?.all_day);
                                 const treatAsDateOnly = Boolean(
-                                  t?.allDay || t?.all_day || isDateOnlyLike(s) || isDateOnlyLike(e)
+                                  isAllDayLike || isDateOnlyLike(s) || isDateOnlyLike(e)
                                 );
                                 const sStart = toDayStart(s, treatAsDateOnly);
-                                const eStartDay = toDayStart(e, treatAsDateOnly);
                                 const eEnd = toDayEnd(e, treatAsDateOnly);
-                                if (!sStart || !eStartDay || !eEnd) return false;
+                                if (!sStart || !eEnd) return false;
                                 if (!(sStart <= endOfWeek && eEnd >= weekStart)) return false;
-                                if (eStartDay.getTime() <= sStart.getTime()) return false;
+                                if (eEnd.getTime() < sStart.getTime()) return false;
                                 const startIndex = dayDiff(sStart, weekStart);
                                 const endIndex = dayDiff(eEnd, weekStart);
-                                return endIndex > startIndex;
+                                return isAllDayLike ? endIndex >= startIndex : endIndex > startIndex;
                               } catch {
                                 return false;
                               }
@@ -1475,6 +1529,7 @@ const WeekView = ({
                                     const t = entry.task;
                                     const leftPct = (entry.startIndex / daysCount) * 100;
                                     const widthPct = ((entry.endIndex - entry.startIndex + 1) / daysCount) * 100;
+                                    const isSingleDay = entry.startIndex === entry.endIndex;
                                     const continuesLeft = entry.rawStartIndex < 0;
                                     const continuesRight = entry.rawEndIndex > daysCount - 1;
 
@@ -1493,12 +1548,49 @@ const WeekView = ({
                                     const style = useTailwindClass ? undefined : { backgroundColor: finalBg, borderColor: finalBg, color: textColor };
 
                                     const topPx = BAR_TOP + entry.lane * (BAR_HEIGHT + BAR_GAP);
+                                    const barEdgeInsetPx = 6;
+                                    const hasColumnEdges =
+                                      Array.isArray(allDayColumnEdges) && allDayColumnEdges.length === daysCount + 1;
+                                    const effectiveColWidth =
+                                      Number.isFinite(allDayTrackWidth) && allDayTrackWidth > 0
+                                        ? allDayTrackWidth / Math.max(1, daysCount)
+                                        : columnWidth;
+                                    const hasMeasuredColumnWidth = Number.isFinite(effectiveColWidth) && effectiveColWidth > 0;
+                                    const spanCols = entry.endIndex - entry.startIndex + 1;
+                                    const trackWidthPx =
+                                      Number.isFinite(allDayTrackWidth) && allDayTrackWidth > 0
+                                        ? allDayTrackWidth
+                                        : hasMeasuredColumnWidth
+                                          ? effectiveColWidth * Math.max(1, daysCount)
+                                          : 0;
+                                    let barLeft = `calc(${leftPct}% + ${barEdgeInsetPx}px)`;
+                                    let barWidth = `calc(${widthPct}% - ${barEdgeInsetPx * 2}px)`;
+                                    if (hasMeasuredColumnWidth) {
+                                      const baseLeftPx = hasColumnEdges
+                                        ? Number(allDayColumnEdges[entry.startIndex]) || 0
+                                        : entry.startIndex * effectiveColWidth;
+                                      const baseRightPx = hasColumnEdges
+                                        ? Number(allDayColumnEdges[entry.endIndex + 1]) || baseLeftPx
+                                        : (entry.endIndex + 1) * effectiveColWidth;
+                                      const baseWidthPx = Math.max(0, baseRightPx - baseLeftPx);
+                                      const rawLeftPx = baseLeftPx + barEdgeInsetPx;
+                                      const rawWidthPx = Math.max(0, baseWidthPx - barEdgeInsetPx * 2);
+                                      const clampedLeftPx =
+                                        trackWidthPx > 0
+                                          ? Math.max(0, Math.min(rawLeftPx, Math.max(0, trackWidthPx - 1)))
+                                          : Math.max(0, rawLeftPx);
+                                      const maxWidthFromLeft =
+                                        trackWidthPx > 0 ? Math.max(0, trackWidthPx - clampedLeftPx) : Math.max(0, rawWidthPx);
+                                      const clampedWidthPx = Math.max(0, Math.min(rawWidthPx, maxWidthFromLeft));
+                                      barLeft = `${clampedLeftPx}px`;
+                                      barWidth = `${clampedWidthPx}px`;
+                                    }
                                     const barStyle = {
-                                      left: `${leftPct}%`,
+                                      left: barLeft,
                                       top: `${topPx}px`,
-                                      width: `${widthPct}%`,
+                                      width: barWidth,
                                       height: `${BAR_HEIGHT}px`,
-                                      zIndex: 10,
+                                      zIndex: 30,
                                       boxSizing: "border-box",
                                       paddingRight: continuesRight ? "56px" : "32px",
                                       paddingLeft: continuesLeft ? "18px" : undefined,
