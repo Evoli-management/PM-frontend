@@ -171,29 +171,103 @@ export default function DayView({
   const justResizedRef = useRef(false);
   // State to track which time slot is being dragged over
   const [dragOverSlot, setDragOverSlot] = useState(null);
+  const dragOverSlotRef = useRef(null);
   const [hoveredQuickCreateSlot, setHoveredQuickCreateSlot] = useState(null);
   const [allDayOverflowOpen, setAllDayOverflowOpen] = useState(false);
   const [allDayOverflowItems, setAllDayOverflowItems] = useState([]);
   const allDayPopupRef = useRef(null);
   const autoScrolledDayKeyRef = useRef(null);
   const [mobileDragItem, setMobileDragItem] = useState(null);
+  const [mobileDragPending, setMobileDragPending] = useState(null);
+  const mobileDragItemRef = useRef(null);
+  const mobileDragPendingRef = useRef(null);
+  const mobileDropHandledRef = useRef(false);
+  const lastMobileDragStartRef = useRef(0);
 
-  const isTouchOrPenPointer = (e) => {
+  const hasCoarsePointer = () => {
+    try {
+      if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
+        return window.matchMedia("(any-pointer: coarse)").matches;
+      }
+    } catch (_) {}
+    return false;
+  };
+
+  const isCompactViewport = () => {
+    try {
+      return typeof window !== "undefined" && window.innerWidth <= 1024;
+    } catch (_) {
+      return false;
+    }
+  };
+
+  const isMobileLikeInputEvent = (e) => {
+    if (e?.touches || e?.changedTouches) return true;
     const pt = String(e?.pointerType || "").toLowerCase();
-    return pt === "touch" || pt === "pen";
+    if (pt === "touch" || pt === "pen") return true;
+    if (pt === "mouse" && isCompactViewport()) return true;
+    if ((typeof navigator !== "undefined" && (navigator.maxTouchPoints || 0) > 0) || hasCoarsePointer()) {
+      return true;
+    }
+    return false;
+  };
+
+  const isNestedInteractiveTarget = (e) => {
+    try {
+      const target = e?.target;
+      const currentTarget = e?.currentTarget;
+      if (!target || !currentTarget || typeof target.closest !== "function") return false;
+      const interactive = target.closest("button, a, input, textarea, select, summary, details, [role='button']");
+      return Boolean(interactive && interactive !== currentTarget && currentTarget.contains(interactive));
+    } catch (_) {
+      return false;
+    }
+  };
+
+  const getPointFromInputEvent = (e) => {
+    try {
+      if (e?.touches?.[0]) {
+        return { x: Number(e.touches[0].clientX), y: Number(e.touches[0].clientY) };
+      }
+      if (e?.changedTouches?.[0]) {
+        return { x: Number(e.changedTouches[0].clientX), y: Number(e.changedTouches[0].clientY) };
+      }
+      if (Number.isFinite(e?.clientX) && Number.isFinite(e?.clientY)) {
+        return { x: Number(e.clientX), y: Number(e.clientY) };
+      }
+    } catch (_) {}
+    return null;
   };
 
   const beginMobileDrag = (e, payload) => {
-    if (!isTouchOrPenPointer(e)) return;
-    try {
-      e.preventDefault();
-      e.stopPropagation();
-    } catch (_) {}
+    if (!isMobileLikeInputEvent(e)) return;
+    if (isNestedInteractiveTarget(e)) return;
+    const point = getPointFromInputEvent(e);
+    if (!point) return;
+    const now = Date.now();
+    if (now - lastMobileDragStartRef.current < 80) return;
+    lastMobileDragStartRef.current = now;
+    mobileDropHandledRef.current = false;
+    const pending = {
+      payload,
+      startX: point.x,
+      startY: point.y,
+    };
+    mobileDragPendingRef.current = pending;
+    setMobileDragPending(pending);
+  };
+
+  const activateMobileDrag = (payload) => {
+    mobileDropHandledRef.current = false;
+    mobileDragPendingRef.current = null;
+    mobileDragItemRef.current = payload;
     setMobileDragItem(payload);
+    setMobileDragPending(null);
   };
 
   const applyMobileDropOnSlot = (h, minute) => {
-    if (!mobileDragItem) return;
+    const dragItem = mobileDragItemRef.current || mobileDragItem;
+    if (!dragItem) return;
     const base = currentDate || new Date();
     const dt = new Date(
       base.getFullYear(),
@@ -204,19 +278,25 @@ export default function DayView({
       0,
       0
     );
-    if (mobileDragItem.kind === "task" && typeof onTaskDrop === "function") {
-      onTaskDrop(mobileDragItem.id, dt, mobileDragItem.dropEffect || "copy", mobileDragItem.text || "Task");
-    } else if (mobileDragItem.kind === "activity" && typeof onActivityDrop === "function") {
-      onActivityDrop(mobileDragItem.id, dt, mobileDragItem.dropEffect || "copy", mobileDragItem.text || "Activity");
+    if (dragItem.kind === "task" && typeof onTaskDrop === "function") {
+      onTaskDrop(dragItem.id, dt, dragItem.dropEffect || "copy", dragItem.text || "Task");
+    } else if (dragItem.kind === "activity" && typeof onActivityDrop === "function") {
+      onActivityDrop(dragItem.id, dt, dragItem.dropEffect || "copy", dragItem.text || "Activity");
     }
     setDragOverSlot(null);
+    mobileDragItemRef.current = null;
     setMobileDragItem(null);
   };
 
   const resolveDaySlotAtPoint = (x, y) => {
     try {
-      const el = document.elementFromPoint(x, y);
-      const slotEl = el?.closest?.("[data-day-slot-hour][data-day-slot-minute][data-day-slot-key]");
+      const stack =
+        typeof document.elementsFromPoint === "function"
+          ? document.elementsFromPoint(x, y)
+          : [document.elementFromPoint(x, y)].filter(Boolean);
+      const slotEl = stack.find((node) =>
+        node?.closest?.("[data-day-slot-hour][data-day-slot-minute][data-day-slot-key]")
+      )?.closest?.("[data-day-slot-hour][data-day-slot-minute][data-day-slot-key]");
       if (!slotEl) return null;
       const h = Number(slotEl.getAttribute("data-day-slot-hour"));
       const m = Number(slotEl.getAttribute("data-day-slot-minute"));
@@ -228,34 +308,148 @@ export default function DayView({
     }
   };
 
+  const resolveDaySlotFromKey = (key) => {
+    try {
+      if (!key) return null;
+      const [hRaw, mRaw] = String(key).split("-");
+      const h = Number(hRaw);
+      const m = Number(mRaw);
+      if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+      return { h, m, key: String(key) };
+    } catch (_) {
+      return null;
+    }
+  };
+
   useEffect(() => {
-    if (!mobileDragItem) return;
-    const onPointerMove = (ev) => {
-      const hit = resolveDaySlotAtPoint(ev.clientX, ev.clientY);
+    dragOverSlotRef.current = dragOverSlot;
+  }, [dragOverSlot]);
+
+  useEffect(() => {
+    mobileDragItemRef.current = mobileDragItem;
+  }, [mobileDragItem]);
+
+  useEffect(() => {
+    mobileDragPendingRef.current = mobileDragPending;
+  }, [mobileDragPending]);
+
+  useEffect(() => {
+    if (!mobileDragItemRef.current && !mobileDragPendingRef.current) return;
+    const pointFromTouchLike = (ev) => {
+      return getPointFromInputEvent(ev);
+    };
+    const DRAG_THRESHOLD_PX = 8;
+    const updateHoverFromPoint = (x, y) => {
+      const hit = resolveDaySlotAtPoint(x, y);
       setDragOverSlot(hit ? hit.key : null);
+      return hit;
+    };
+    const onPointerMove = (ev) => {
+      const pending = mobileDragPendingRef.current;
+      if (pending) {
+        const dx = ev.clientX - pending.startX;
+        const dy = ev.clientY - pending.startY;
+        if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
+        try {
+          ev.preventDefault();
+          ev.stopPropagation();
+        } catch (_) {}
+        activateMobileDrag(pending.payload);
+      }
+      if (mobileDragItemRef.current || mobileDragPendingRef.current) {
+        updateHoverFromPoint(ev.clientX, ev.clientY);
+      }
+    };
+    const onTouchMove = (ev) => {
+      const pt = pointFromTouchLike(ev);
+      if (!pt) return;
+      const pending = mobileDragPendingRef.current;
+      if (pending) {
+        const dx = pt.x - pending.startX;
+        const dy = pt.y - pending.startY;
+        if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
+        try {
+          ev.preventDefault();
+          ev.stopPropagation();
+        } catch (_) {}
+        activateMobileDrag(pending.payload);
+      }
+      if (mobileDragItemRef.current || mobileDragPendingRef.current) {
+        updateHoverFromPoint(pt.x, pt.y);
+      }
     };
     const onPointerUp = (ev) => {
-      const hit = resolveDaySlotAtPoint(ev.clientX, ev.clientY);
+      if (!mobileDragItemRef.current && mobileDragPendingRef.current) {
+        mobileDragPendingRef.current = null;
+        setMobileDragPending(null);
+        setDragOverSlot(null);
+        return;
+      }
+      if (mobileDropHandledRef.current) return;
+      mobileDropHandledRef.current = true;
+      const hit = resolveDaySlotAtPoint(ev.clientX, ev.clientY) || resolveDaySlotFromKey(dragOverSlotRef.current);
       if (hit) {
         applyMobileDropOnSlot(hit.h, hit.m);
         return;
       }
       setDragOverSlot(null);
+      mobileDragItemRef.current = null;
+      setMobileDragItem(null);
+    };
+    const onTouchEnd = (ev) => {
+      if (!mobileDragItemRef.current && mobileDragPendingRef.current) {
+        mobileDragPendingRef.current = null;
+        setMobileDragPending(null);
+        setDragOverSlot(null);
+        return;
+      }
+      if (mobileDropHandledRef.current) return;
+      mobileDropHandledRef.current = true;
+      const pt = pointFromTouchLike(ev);
+      const hit = pt
+        ? (resolveDaySlotAtPoint(pt.x, pt.y) || resolveDaySlotFromKey(dragOverSlotRef.current))
+        : resolveDaySlotFromKey(dragOverSlotRef.current);
+      if (hit) {
+        applyMobileDropOnSlot(hit.h, hit.m);
+        return;
+      }
+      setDragOverSlot(null);
+      mobileDragItemRef.current = null;
       setMobileDragItem(null);
     };
     const onPointerCancel = () => {
+      mobileDragPendingRef.current = null;
+      setMobileDragPending(null);
+      if (mobileDropHandledRef.current) return;
+      mobileDropHandledRef.current = true;
       setDragOverSlot(null);
+      mobileDragItemRef.current = null;
+      setMobileDragItem(null);
+    };
+    const onTouchCancel = () => {
+      mobileDragPendingRef.current = null;
+      setMobileDragPending(null);
+      if (mobileDropHandledRef.current) return;
+      mobileDropHandledRef.current = true;
+      setDragOverSlot(null);
+      mobileDragItemRef.current = null;
       setMobileDragItem(null);
     };
     window.addEventListener("pointermove", onPointerMove);
     window.addEventListener("pointerup", onPointerUp, { once: true });
     window.addEventListener("pointercancel", onPointerCancel, { once: true });
+    window.addEventListener("touchmove", onTouchMove, { passive: false });
+    window.addEventListener("touchend", onTouchEnd, { once: true });
+    window.addEventListener("touchcancel", onTouchCancel, { once: true });
     return () => {
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
       window.removeEventListener("pointercancel", onPointerCancel);
+      window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("touchend", onTouchEnd);
+      window.removeEventListener("touchcancel", onTouchCancel);
     };
-  }, [mobileDragItem]);
+  }, [mobileDragItem, mobileDragPending]);
 
   // Keep the "now" line in sync with wall clock time.
   useEffect(() => {
@@ -770,7 +964,15 @@ export default function DayView({
               return (
                 <div
                   key={t.id}
-                  draggable={true}
+                  draggable={!isCompactViewport()}
+                  onTouchStart={(e) => {
+                    beginMobileDrag(e, {
+                      kind: "task",
+                      id: String(t.id),
+                      text: String(t.title || t.name || "Task"),
+                      dropEffect: "copy",
+                    });
+                  }}
                   onPointerDown={(e) => {
                     beginMobileDrag(e, {
                       kind: "task",
@@ -788,6 +990,7 @@ export default function DayView({
                     } catch (_) {}
                   }}
                   className="group px-1.5 py-1 text-xs cursor-grab active:cursor-grabbing w-full flex items-center gap-2 border-b border-sky-200 transition-colors hover:bg-sky-50"
+                  style={{ touchAction: "none", userSelect: "none", WebkitUserSelect: "none" }}
                   title={`Drag to calendar to create appointment • ${t.title || t.name || 'Untitled'}`}
                 >
                   <span
@@ -904,7 +1107,15 @@ export default function DayView({
                 return (
                   <div
                     key={a.id || i}
-                    draggable={true}
+                    draggable={!isCompactViewport()}
+                    onTouchStart={(e) => {
+                      beginMobileDrag(e, {
+                        kind: "activity",
+                        id: String(a.id || ""),
+                        text: String(a.text || a.title || "Activity"),
+                        dropEffect: "copy",
+                      });
+                    }}
                     onPointerDown={(e) => {
                       beginMobileDrag(e, {
                         kind: "activity",
@@ -926,6 +1137,7 @@ export default function DayView({
                       if (onActivityClick) onActivityClick(a);
                     }}
                     className="group px-1.5 py-1 text-xs cursor-grab active:cursor-grabbing w-full flex items-center gap-2 border-b border-sky-200 transition-colors hover:bg-sky-50"
+                    style={{ touchAction: "none", userSelect: "none", WebkitUserSelect: "none" }}
                     title={`Drag to calendar to create appointment • ${a.text || a.desc || a.note || 'Activity'}`}
                   >
                     <FaBars className="w-4 h-4 shrink-0" style={{ color: accentColor }} aria-hidden="true" />
@@ -1257,10 +1469,19 @@ export default function DayView({
 
                               return (
                                 <div key={`allday-${t.id || title}`} className="w-full">
-                                  <button
-                                    type="button"
+                                  <div
+                                    role="button"
+                                    tabIndex={0}
                                     onClick={(e) => {
                                       try { e.stopPropagation(); } catch (_) {}
+                                      if (onEventClick) onEventClick(t);
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key !== 'Enter' && e.key !== ' ') return;
+                                      try {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                      } catch (_) {}
                                       if (onEventClick) onEventClick(t);
                                     }}
                                     className={`w-full group flex items-center gap-2 px-2.5 py-0 rounded text-[11px] overflow-hidden ${useCategoryClass ? bgClass : ''}`}
@@ -1309,7 +1530,7 @@ export default function DayView({
                                         </svg>
                                       ) : ''}
                                     </span>
-                                  </button>
+                                  </div>
                                 </div>
                               );
                             } catch (_) { return null; }
@@ -1418,7 +1639,11 @@ export default function DayView({
               <div
                 ref={scrollContainerRef}
                 className="day-timeslots-scroll flex-1 flex min-h-0 relative z-0 pr-0"
-                style={{ overflowX: "hidden", overflowY: "auto" }}
+                style={{
+                  overflowX: "hidden",
+                  overflowY: "auto",
+                  touchAction: (mobileDragItem || mobileDragPending) ? "none" : "auto",
+                }}
               >
                 {/* LEFT TIME COLUMN – clearer hourly rows */}
                 <div className="w-12 bg-white text-xs text-gray-500 min-h-0">

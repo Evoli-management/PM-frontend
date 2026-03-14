@@ -617,6 +617,10 @@ const CalendarContainer = () => {
             // No business-hours restriction; compute end as simple duration offset
             const end = new Date(start.getTime() + defaultMinutes * 60000);
             const taskId = typeof taskOrId === "string" ? taskOrId : taskOrId?.id;
+            const resolvedTask =
+                typeof taskOrId === "string"
+                    ? (todos || []).find((t) => String(t.id) === String(taskOrId)) || null
+                    : (typeof taskOrId === "object" ? taskOrId : null);
             const effect = String(dropEffect || "").toLowerCase();
             const isCopyDrop = effect.includes("copy");
             const isMoveDrop = effect.includes("move") || effect === "all";
@@ -660,17 +664,6 @@ const CalendarContainer = () => {
 
             // Otherwise create a calendar appointment (existing behavior / copy-from-list)
             // Resolve the task first - look it up in todos if we only have an id
-            let resolvedTask = null;
-            if (typeof taskOrId === "string") {
-                try {
-                    resolvedTask = (todos || []).find((t) => String(t.id) === String(taskOrId));
-                } catch (_) {
-                    resolvedTask = null;
-                }
-            } else if (typeof taskOrId === "object") {
-                resolvedTask = taskOrId;
-            }
-
             // Extract title from resolved task, handling both 'title' and 'name' fields
             // Use fallbackText if task resolution failed
             let title = "Task";
@@ -785,6 +778,12 @@ const CalendarContainer = () => {
 
             // If an existing activity id was dropped, update its date
             const activityId = typeof activityOrObj === "string" ? activityOrObj : activityOrObj?.id;
+            const resolvedActivity =
+                typeof activityOrObj === "string"
+                    ? (weekActivities || []).find((a) => String(a.id) === String(activityOrObj)) ||
+                      (unattachedActivities || []).find((a) => String(a.id) === String(activityOrObj)) ||
+                      null
+                    : (typeof activityOrObj === "object" ? activityOrObj : null);
             const effect = String(dropEffect || "").toLowerCase();
             const isCopyDrop = effect.includes("copy");
             const isMoveDrop = effect.includes("move") || effect === "all";
@@ -807,19 +806,6 @@ const CalendarContainer = () => {
             }
 
             // Resolve the activity first - look it up if we only have an id
-            let resolvedActivity = null;
-            if (typeof activityOrObj === "string") {
-                try {
-                    resolvedActivity = (weekActivities || []).find((a) => String(a.id) === String(activityOrObj)) ||
-                        (unattachedActivities || []).find((a) => String(a.id) === String(activityOrObj)) ||
-                        null;
-                } catch (_) {
-                    resolvedActivity = null;
-                }
-            } else if (typeof activityOrObj === "object") {
-                resolvedActivity = activityOrObj;
-            }
-
             // Extract title from resolved activity, handling both 'text' and 'title' fields
             // Use fallbackText if activity resolution failed
             let title = "Activity";
