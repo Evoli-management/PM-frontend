@@ -100,6 +100,13 @@ const WeekView = ({
   const [dragOverTimeSlot, setDragOverTimeSlot] = useState(null);
   const [dragOverBottomDayKey, setDragOverBottomDayKey] = useState(null);
   const [mobileDragItem, setMobileDragItem] = useState(null);
+  const [mobileDragPending, setMobileDragPending] = useState(null);
+  const mobileDragItemRef = useRef(null);
+  const mobileDragPendingRef = useRef(null);
+  const mobileDropHandledRef = useRef(false);
+  const dragOverTimeSlotRef = useRef(null);
+  const dragOverBottomDayKeyRef = useRef(null);
+  const lastMobileDragStartRef = useRef(0);
 
   // Fixed time column width; day columns will flex to fill available space
   const TIME_COL_PX = 48;
@@ -674,42 +681,113 @@ const WeekView = ({
     }
   };
 
-  const isTouchOrPenPointer = (e) => {
+  const hasCoarsePointer = () => {
+    try {
+      if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
+        return window.matchMedia("(any-pointer: coarse)").matches;
+      }
+    } catch (_) {}
+    return false;
+  };
+
+  const isCompactViewport = () => {
+    try {
+      return typeof window !== "undefined" && window.innerWidth <= 1024;
+    } catch (_) {
+      return false;
+    }
+  };
+
+  const isMobileLikeInputEvent = (e) => {
+    if (e?.touches || e?.changedTouches) return true;
     const pt = String(e?.pointerType || "").toLowerCase();
-    return pt === "touch" || pt === "pen";
+    if (pt === "touch" || pt === "pen") return true;
+    if (pt === "mouse" && isCompactViewport()) return true;
+    if ((typeof navigator !== "undefined" && (navigator.maxTouchPoints || 0) > 0) || hasCoarsePointer()) {
+      return true;
+    }
+    return false;
+  };
+
+  const isNestedInteractiveTarget = (e) => {
+    try {
+      const target = e?.target;
+      const currentTarget = e?.currentTarget;
+      if (!target || !currentTarget || typeof target.closest !== "function") return false;
+      const interactive = target.closest("button, a, input, textarea, select, summary, details, [role='button']");
+      return Boolean(interactive && interactive !== currentTarget && currentTarget.contains(interactive));
+    } catch (_) {
+      return false;
+    }
+  };
+
+  const getPointFromInputEvent = (e) => {
+    try {
+      if (e?.touches?.[0]) {
+        return { x: Number(e.touches[0].clientX), y: Number(e.touches[0].clientY) };
+      }
+      if (e?.changedTouches?.[0]) {
+        return { x: Number(e.changedTouches[0].clientX), y: Number(e.changedTouches[0].clientY) };
+      }
+      if (Number.isFinite(e?.clientX) && Number.isFinite(e?.clientY)) {
+        return { x: Number(e.clientX), y: Number(e.clientY) };
+      }
+    } catch (_) {}
+    return null;
   };
 
   const beginMobileDrag = (e, payload) => {
-    if (!isTouchOrPenPointer(e)) return;
-    try {
-      e.preventDefault();
-      e.stopPropagation();
-    } catch (_) {}
+    if (!isMobileLikeInputEvent(e)) return;
+    if (isNestedInteractiveTarget(e)) return;
+    const point = getPointFromInputEvent(e);
+    if (!point) return;
+    const now = Date.now();
+    if (now - lastMobileDragStartRef.current < 80) return;
+    lastMobileDragStartRef.current = now;
+    mobileDropHandledRef.current = false;
+    const pending = {
+      payload,
+      startX: point.x,
+      startY: point.y,
+    };
+    mobileDragPendingRef.current = pending;
+    setMobileDragPending(pending);
+  };
+
+  const activateMobileDrag = (payload) => {
+    mobileDropHandledRef.current = false;
+    mobileDragPendingRef.current = null;
+    mobileDragItemRef.current = payload;
     setMobileDragItem(payload);
+    setMobileDragPending(null);
   };
 
   const applyMobileDropToSlot = (day, slot) => {
-    if (!mobileDragItem) return;
+    const dragItem = mobileDragItemRef.current || mobileDragItem;
+    if (!dragItem) return;
     const [h, m] = String(slot || "00:00").split(":");
     const date = new Date(day.getFullYear(), day.getMonth(), day.getDate(), Number(h), Number(m));
-    if (mobileDragItem.kind === "task" && typeof onTaskDrop === "function") {
-      onTaskDrop(mobileDragItem.id, date, mobileDragItem.dropEffect || "copy", mobileDragItem.text || "Task");
-    } else if (mobileDragItem.kind === "activity" && typeof onActivityDrop === "function") {
-      onActivityDrop(mobileDragItem.id, date, mobileDragItem.dropEffect || "copy", mobileDragItem.text || "Activity");
+    if (dragItem.kind === "task" && typeof onTaskDrop === "function") {
+      onTaskDrop(dragItem.id, date, "copy", dragItem.text || "Task");
+    } else if (dragItem.kind === "activity" && typeof onActivityDrop === "function") {
+      onActivityDrop(dragItem.id, date, "copy", dragItem.text || "Activity");
     }
     setDragOverTimeSlot(null);
+    mobileDragItemRef.current = null;
     setMobileDragItem(null);
   };
 
   const applyMobileDropToBottomDay = (day) => {
-    if (!mobileDragItem) return;
-    const date = resolveDropDateForDay(day, mobileDragItem.sourceIso || null);
-    if (mobileDragItem.kind === "task" && typeof onTaskDrop === "function") {
-      onTaskDrop(mobileDragItem.id, date, mobileDragItem.dropEffect || "move", mobileDragItem.text || "Task");
-    } else if (mobileDragItem.kind === "activity" && typeof onActivityDrop === "function") {
-      onActivityDrop(mobileDragItem.id, date, mobileDragItem.dropEffect || "move", mobileDragItem.text || "Activity");
+    const dragItem = mobileDragItemRef.current || mobileDragItem;
+    if (!dragItem) return;
+    const date = resolveDropDateForDay(day, dragItem.sourceIso || null);
+    if (dragItem.kind === "task" && typeof onTaskDrop === "function") {
+      onTaskDrop(dragItem.id, date, dragItem.dropEffect || "move", dragItem.text || "Task");
+    } else if (dragItem.kind === "activity" && typeof onActivityDrop === "function") {
+      onActivityDrop(dragItem.id, date, dragItem.dropEffect || "move", dragItem.text || "Activity");
     }
     setDragOverBottomDayKey(null);
+    mobileDragItemRef.current = null;
     setMobileDragItem(null);
   };
 
@@ -723,20 +801,47 @@ const WeekView = ({
     }
   };
 
+  const resolveWeekSlotFromKey = (slotKey) => {
+    try {
+      if (!slotKey) return null;
+      const [dayKey, slot] = String(slotKey).split("|");
+      if (!dayKey || !slot) return null;
+      return { type: "slot", dayKey, slot, slotKey: String(slotKey) };
+    } catch (_) {
+      return null;
+    }
+  };
+
+  useEffect(() => {
+    dragOverTimeSlotRef.current = dragOverTimeSlot;
+  }, [dragOverTimeSlot]);
+
+  useEffect(() => {
+    dragOverBottomDayKeyRef.current = dragOverBottomDayKey;
+  }, [dragOverBottomDayKey]);
+
+  useEffect(() => {
+    mobileDragItemRef.current = mobileDragItem;
+  }, [mobileDragItem]);
+
+  useEffect(() => {
+    mobileDragPendingRef.current = mobileDragPending;
+  }, [mobileDragPending]);
+
   const resolveWeekDropTargetAtPoint = (x, y) => {
     try {
-      const el = document.elementFromPoint(x, y);
-      const slotEl = el?.closest?.("[data-week-slot-day][data-week-slot-time][data-week-slot-key]");
+      const stack =
+        typeof document.elementsFromPoint === "function"
+          ? document.elementsFromPoint(x, y)
+          : [document.elementFromPoint(x, y)].filter(Boolean);
+      const slotEl = stack.find((node) =>
+        node?.closest?.("[data-week-slot-day][data-week-slot-time][data-week-slot-key]")
+      )?.closest?.("[data-week-slot-day][data-week-slot-time][data-week-slot-key]");
       if (slotEl) {
         const dayKey = String(slotEl.getAttribute("data-week-slot-day") || "");
         const slot = String(slotEl.getAttribute("data-week-slot-time") || "");
         const slotKey = String(slotEl.getAttribute("data-week-slot-key") || "");
         if (dayKey && slot && slotKey) return { type: "slot", dayKey, slot, slotKey };
-      }
-      const dayEl = el?.closest?.("[data-week-bottom-day]");
-      if (dayEl) {
-        const dayKey = String(dayEl.getAttribute("data-week-bottom-day") || "");
-        if (dayKey) return { type: "bottom-day", dayKey };
       }
       return null;
     } catch (_) {
@@ -745,24 +850,70 @@ const WeekView = ({
   };
 
   useEffect(() => {
-    if (!mobileDragItem) return;
-    const onPointerMove = (ev) => {
-      const hit = resolveWeekDropTargetAtPoint(ev.clientX, ev.clientY);
+    if (!mobileDragItemRef.current && !mobileDragPendingRef.current) return;
+    const pointFromTouchLike = (ev) => {
+      return getPointFromInputEvent(ev);
+    };
+    const DRAG_THRESHOLD_PX = 8;
+    const updateHoverFromPoint = (x, y) => {
+      const hit = resolveWeekDropTargetAtPoint(x, y);
       if (!hit) {
         setDragOverTimeSlot(null);
         setDragOverBottomDayKey(null);
-        return;
+        return null;
       }
       if (hit.type === "slot") {
         setDragOverTimeSlot(hit.slotKey);
         setDragOverBottomDayKey(null);
-        return;
+        return hit;
       }
       setDragOverTimeSlot(null);
       setDragOverBottomDayKey(hit.dayKey);
+      return hit;
+    };
+    const onPointerMove = (ev) => {
+      const pending = mobileDragPendingRef.current;
+      if (pending) {
+        const dx = ev.clientX - pending.startX;
+        const dy = ev.clientY - pending.startY;
+        if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
+        try {
+          ev.preventDefault();
+          ev.stopPropagation();
+        } catch (_) {}
+        activateMobileDrag(pending.payload);
+      }
+      if (mobileDragItemRef.current || mobileDragPendingRef.current) updateHoverFromPoint(ev.clientX, ev.clientY);
+    };
+    const onTouchMove = (ev) => {
+      const pt = pointFromTouchLike(ev);
+      if (!pt) return;
+      const pending = mobileDragPendingRef.current;
+      if (pending) {
+        const dx = pt.x - pending.startX;
+        const dy = pt.y - pending.startY;
+        if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
+        try {
+          ev.preventDefault();
+          ev.stopPropagation();
+        } catch (_) {}
+        activateMobileDrag(pending.payload);
+      }
+      if (mobileDragItemRef.current || mobileDragPendingRef.current) updateHoverFromPoint(pt.x, pt.y);
     };
     const onPointerUp = (ev) => {
-      const hit = resolveWeekDropTargetAtPoint(ev.clientX, ev.clientY);
+      if (!mobileDragItemRef.current && mobileDragPendingRef.current) {
+        mobileDragPendingRef.current = null;
+        setMobileDragPending(null);
+        setDragOverTimeSlot(null);
+        setDragOverBottomDayKey(null);
+        return;
+      }
+      if (mobileDropHandledRef.current) return;
+      mobileDropHandledRef.current = true;
+      const hit =
+        resolveWeekDropTargetAtPoint(ev.clientX, ev.clientY) ||
+        resolveWeekSlotFromKey(dragOverTimeSlotRef.current);
       if (hit?.type === "slot") {
         const day = parseDayKeyToDate(hit.dayKey);
         if (day) {
@@ -770,31 +921,72 @@ const WeekView = ({
           return;
         }
       }
-      if (hit?.type === "bottom-day") {
+      setDragOverTimeSlot(null);
+      setDragOverBottomDayKey(null);
+      mobileDragItemRef.current = null;
+      setMobileDragItem(null);
+    };
+    const onTouchEnd = (ev) => {
+      if (!mobileDragItemRef.current && mobileDragPendingRef.current) {
+        mobileDragPendingRef.current = null;
+        setMobileDragPending(null);
+        setDragOverTimeSlot(null);
+        setDragOverBottomDayKey(null);
+        return;
+      }
+      if (mobileDropHandledRef.current) return;
+      mobileDropHandledRef.current = true;
+      const pt = pointFromTouchLike(ev);
+      const hit =
+        (pt ? resolveWeekDropTargetAtPoint(pt.x, pt.y) : null) ||
+        resolveWeekSlotFromKey(dragOverTimeSlotRef.current);
+      if (hit?.type === "slot") {
         const day = parseDayKeyToDate(hit.dayKey);
         if (day) {
-          applyMobileDropToBottomDay(day);
+          applyMobileDropToSlot(day, hit.slot);
           return;
         }
       }
       setDragOverTimeSlot(null);
       setDragOverBottomDayKey(null);
+      mobileDragItemRef.current = null;
       setMobileDragItem(null);
     };
     const onPointerCancel = () => {
+      mobileDragPendingRef.current = null;
+      setMobileDragPending(null);
+      if (mobileDropHandledRef.current) return;
+      mobileDropHandledRef.current = true;
       setDragOverTimeSlot(null);
       setDragOverBottomDayKey(null);
+      mobileDragItemRef.current = null;
+      setMobileDragItem(null);
+    };
+    const onTouchCancel = () => {
+      mobileDragPendingRef.current = null;
+      setMobileDragPending(null);
+      if (mobileDropHandledRef.current) return;
+      mobileDropHandledRef.current = true;
+      setDragOverTimeSlot(null);
+      setDragOverBottomDayKey(null);
+      mobileDragItemRef.current = null;
       setMobileDragItem(null);
     };
     window.addEventListener("pointermove", onPointerMove);
     window.addEventListener("pointerup", onPointerUp, { once: true });
     window.addEventListener("pointercancel", onPointerCancel, { once: true });
+    window.addEventListener("touchmove", onTouchMove, { passive: false });
+    window.addEventListener("touchend", onTouchEnd, { once: true });
+    window.addEventListener("touchcancel", onTouchCancel, { once: true });
     return () => {
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
       window.removeEventListener("pointercancel", onPointerCancel);
+      window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("touchend", onTouchEnd);
+      window.removeEventListener("touchcancel", onTouchCancel);
     };
-  }, [mobileDragItem]);
+  }, [mobileDragItem, mobileDragPending]);
 
   const handleBottomColumnDrop = (e, day) => {
     try {
@@ -1049,8 +1241,8 @@ const WeekView = ({
       <div className="p-0 flex flex-col h-full min-h-0" style={{ overflow: "hidden", position: "relative" }}>
         {/* Header */}
         <CalendarViewTopSection elephantTaskRow={elephantTaskRow} elephantTopGapClass="mt-1" showElephantSeparator={false}>
-        <div className="day-header-controls flex items-center justify-between min-h-[34px]">
-          <div className="flex items-center gap-2">
+        <div className="day-header-controls flex flex-col gap-2 min-h-[34px] sm:flex-row sm:items-center sm:justify-between">
+          <div className="order-1 flex items-center gap-2 flex-wrap">
             <button
               className="day-header-btn px-2 py-0.5 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
               style={{ minWidth: 34, minHeight: 34 }}
@@ -1128,7 +1320,7 @@ const WeekView = ({
             </button>
           </div>
 
-          <h2 className="text-xl font-bold flex items-center gap-2">
+          <h2 className="order-3 text-base font-bold flex items-center gap-2 flex-wrap min-w-0 sm:order-2 sm:text-xl">
             {weekLabel}
             {(loading || prefsLoading) && (
               <span className="text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-0.5">
@@ -1137,12 +1329,12 @@ const WeekView = ({
             )}
           </h2>
 
-          <div className="flex items-center gap-2">
+          <div className="order-2 flex items-center gap-2 flex-wrap sm:order-3 sm:justify-end">
             <div
               role="group"
               aria-label="Week length"
               tabIndex={0}
-              className="inline-flex items-center rounded bg-white border border-slate-200 shadow-sm mr-2"
+              className="inline-flex items-center rounded bg-white border border-slate-200 shadow-sm"
               onKeyDown={(e) => {
                 try {
                   if (e.key === "ArrowLeft" || e.key === "ArrowDown") {
@@ -2626,11 +2818,11 @@ const WeekView = ({
                           const slotDragKey = `${dayKey}|${slot}`;
                           const isDragOverSlot = dragOverTimeSlot === slotDragKey;
                           return (
-                            <div
-                              key={dIdx}
-                              data-week-slot-key={slotDragKey}
-                              data-week-slot-day={dayKey}
-                              data-week-slot-time={slot}
+                              <div
+                                key={dIdx}
+                                data-week-slot-key={slotDragKey}
+                                data-week-slot-day={dayKey}
+                                data-week-slot-time={slot}
                               className="px-2 align-top group flex items-center relative overflow-visible"
                               style={{
                                 flex: "1 1 0",
@@ -2644,6 +2836,7 @@ const WeekView = ({
                                     ? "rgba(191, 219, 254, 0.65)"
                                     : (slotIsWorking ? "#ffffff" : NON_WORK_BG),
                                 opacity: slotIsWorking ? 1 : NON_WORK_OPACITY,
+                                touchAction: (mobileDragItem || mobileDragPending) ? "none" : "auto",
                                 borderTopStyle: !isHourBoundary && (isHalfHourBoundary || isQuarterHourBoundary)
                                   ? (isHalfHourBoundary ? "solid" : "dotted")
                                   : undefined,
@@ -2967,18 +3160,6 @@ const WeekView = ({
                         }
                       }}
                       onDrop={(e) => handleBottomColumnDrop(e, date)}
-                      onPointerEnter={() => {
-                        if (!mobileDragItem) return;
-                        setDragOverBottomDayKey(`${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`);
-                      }}
-                      onPointerUp={(e) => {
-                        if (!mobileDragItem) return;
-                        try {
-                          e.preventDefault();
-                          e.stopPropagation();
-                        } catch (_) {}
-                        applyMobileDropToBottomDay(date);
-                      }}
                       onMouseMove={(e) => {
                         const dayKey = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
                         try {
@@ -3068,7 +3249,22 @@ const WeekView = ({
                               <div
                                 key={`task-${t.id}`}
                                 data-week-item-row="true"
-                                draggable
+                                draggable={!isCompactViewport()}
+                                onTouchStart={(e) => {
+                                  beginMobileDrag(e, {
+                                    kind: "task",
+                                    id: String(t.id),
+                                    text: String(t.title || t.name || "Task"),
+                                    sourceIso:
+                                      t.startDate ||
+                                      t.start_date ||
+                                      t.date ||
+                                      t.dueDate ||
+                                      t.due_date ||
+                                      null,
+                                    dropEffect: "move",
+                                  });
+                                }}
                                 onPointerDown={(e) => {
                                   beginMobileDrag(e, {
                                     kind: "task",
@@ -3104,6 +3300,7 @@ const WeekView = ({
                                   }
                                 }}
                                 className="group px-1.5 py-1 text-xs cursor-grab active:cursor-grabbing min-w-0 flex items-center gap-0.5 border-b border-sky-200 transition-colors hover:bg-sky-50 shrink-0 min-h-[28px]"
+                                style={{ touchAction: "none", userSelect: "none", WebkitUserSelect: "none" }}
                                 title={t.title || t.name}
                               >
                                 <span
@@ -3201,7 +3398,24 @@ const WeekView = ({
                             <div
                               key={`act-${a.id}`}
                               data-week-item-row="true"
-                              draggable
+                              draggable={!isCompactViewport()}
+                              onTouchStart={(e) => {
+                                beginMobileDrag(e, {
+                                  kind: "activity",
+                                  id: String(a.id || ""),
+                                  text: String(a.text || a.title || "Activity"),
+                                  sourceIso:
+                                    a.date ||
+                                    a.startDate ||
+                                    a.start_date ||
+                                    a.dueDate ||
+                                    a.due_date ||
+                                    a.createdAt ||
+                                    a.created_at ||
+                                    null,
+                                  dropEffect: "move",
+                                });
+                              }}
                               onPointerDown={(e) => {
                                 beginMobileDrag(e, {
                                   kind: "activity",
@@ -3241,6 +3455,7 @@ const WeekView = ({
                                 }
                               }}
                               className="group px-1.5 py-1 text-xs w-full flex items-center gap-2 border-b border-sky-200 transition-colors hover:bg-sky-50 shrink-0 min-h-[28px]"
+                              style={{ touchAction: "none", userSelect: "none", WebkitUserSelect: "none" }}
                               title={a.text || a.title}
                             >
                               <FaBars className="w-3 h-3 shrink-0" style={{ color: accentColor }} aria-hidden="true" />

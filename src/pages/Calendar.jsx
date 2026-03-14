@@ -20,7 +20,10 @@ export default function Calendar() {
     }, []);
 
     return (
-        <div className="h-[calc(100vh-72px)] bg-[#EDEDED] overflow-hidden">
+        <div
+            className="h-[calc(100dvh-72px)] md:h-[calc(100vh-72px)] bg-[#EDEDED] overflow-hidden"
+            style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+        >
             <div className="flex w-full h-full min-h-0 overflow-hidden">
                 <Sidebar
                     user={{ name: "User" }}
