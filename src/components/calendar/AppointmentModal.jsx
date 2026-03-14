@@ -280,6 +280,7 @@ const buildRecurringPattern = ({
         event = null,
         defaultDurationMinutes = 30,
         allDayDefault = false,
+        forceCreateAsEvent = false,
         onClose,
         onCreated,
     onUpdated,
@@ -395,11 +396,12 @@ const buildRecurringPattern = ({
         const s = combineDateTime(startDateStr, startTimeStr);
         const e = combineDateTime(endDateStr, endTimeStr);
         const createAsEvent =
-            allDayDefault || (s && e ? getCalendarDayDiff(s, e) >= 1 : false);
+            forceCreateAsEvent || allDayDefault || (s && e ? getCalendarDayDiff(s, e) >= 1 : false);
         return createAsEvent ? "Event" : "Appointment";
     }, [
         isEdit,
         isAppointmentLikeEvent,
+        forceCreateAsEvent,
         allDayDefault,
         startDateStr,
         startTimeStr,
@@ -675,7 +677,7 @@ const buildRecurringPattern = ({
             }
 
             const calendarDayDiff = getCalendarDayDiff(s, e);
-            const submitAsEvent = allDayDefault || calendarDayDiff >= 1;
+            const submitAsEvent = forceCreateAsEvent || allDayDefault || calendarDayDiff >= 1;
             submitKindLabel = submitAsEvent ? "event" : "appointment";
 
             if (recurrenceType && recurrenceType !== "none") {

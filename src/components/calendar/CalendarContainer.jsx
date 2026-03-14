@@ -229,7 +229,7 @@ const CalendarContainer = () => {
         return () => window.removeEventListener('open-create-appointment', handler);
     }, []);
 
-    // Load persisted view/date on mount
+    // Load persisted view on mount, but always anchor to today's date/time.
     useEffect(() => {
         try {
             const savedView = localStorage.getItem("calendar:view");
@@ -239,12 +239,8 @@ const CalendarContainer = () => {
             ) {
                 setView(savedView);
             }
-            const savedDate = localStorage.getItem("calendar:date");
-            if (savedDate) {
-                const d = new Date(savedDate);
-                if (!isNaN(d.getTime())) setCurrentDate(d);
-            }
         } catch {}
+        setCurrentDate(new Date());
         setPrefsLoaded(true);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -317,16 +313,15 @@ const CalendarContainer = () => {
         return () => { ignore = true; };
     }, [addModalOpen]);
 
-    // Persist view/date
+    // Persist view preference
     useEffect(() => {
         if (!prefsLoaded) return;
         try {
             localStorage.setItem("calendar:view", view);
-            localStorage.setItem("calendar:date", currentDate.toISOString());
             // persist workWeek preference as well
             try { localStorage.setItem('calendar:workWeek', workWeek ? 'true' : 'false'); } catch (_) {}
         } catch {}
-    }, [view, currentDate, prefsLoaded]);
+    }, [view, prefsLoaded, workWeek]);
 
     useEffect(() => {
         try {
@@ -1725,19 +1720,8 @@ const CalendarContainer = () => {
         if (!VIEWS.includes(nextView)) return;
         if (nextView === view) return;
         setView(nextView);
-        if (options?.date) {
-            const d = new Date(options.date);
-            if (!Number.isNaN(d.getTime())) {
-                setCurrentDate(d);
-                return;
-            }
-        }
-        // Keep the current anchor date when no explicit target date is provided.
-        // This avoids jump-to-today flashes when child views report their active view on mount.
-        setCurrentDate((prev) => {
-            const d = prev ? new Date(prev) : new Date();
-            return Number.isNaN(d.getTime()) ? new Date() : d;
-        });
+        // Requirement: switching views always re-focuses today.
+        setCurrentDate(new Date());
     }, [view]);
 
     // Human-readable label for current range (day/week/month/quarter)
@@ -2177,6 +2161,7 @@ const CalendarContainer = () => {
                 <AppointmentModal
                     startDate={appointmentInitialStart}
                     allDayDefault={appointmentInitialAllDay}
+                    forceCreateAsEvent={appointmentInitialAllDay}
                     defaultDurationMinutes={30}
                     users={usersList}
                     goals={goalsList}

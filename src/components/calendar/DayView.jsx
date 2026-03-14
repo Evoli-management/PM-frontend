@@ -1120,7 +1120,8 @@ export default function DayView({
                               const sdDay = new Date(sd.getFullYear(), sd.getMonth(), sd.getDate(), 0, 0, 0, 0);
                               const edDay = new Date(ed.getFullYear(), ed.getMonth(), ed.getDate(), 0, 0, 0, 0);
                               const dayDiff = Math.floor((edDay.getTime() - sdDay.getTime()) / (24 * 60 * 60 * 1000));
-                              if (dayDiff < 1) return false;
+                              const isAllDayLike = Boolean(t?.allDay || t?.all_day);
+                              if (!isAllDayLike && dayDiff < 1) return false;
 
                               const edAdjusted = adjustEndInclusive(ed);
                               return sd <= dayEnd && edAdjusted >= dayStart;
