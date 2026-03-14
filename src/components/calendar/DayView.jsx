@@ -176,6 +176,56 @@ export default function DayView({
   const [allDayOverflowItems, setAllDayOverflowItems] = useState([]);
   const allDayPopupRef = useRef(null);
   const autoScrolledDayKeyRef = useRef(null);
+  const [mobileDragItem, setMobileDragItem] = useState(null);
+
+  const isTouchOrPenPointer = (e) => {
+    const pt = String(e?.pointerType || "").toLowerCase();
+    return pt === "touch" || pt === "pen";
+  };
+
+  const beginMobileDrag = (e, payload) => {
+    if (!isTouchOrPenPointer(e)) return;
+    try {
+      e.preventDefault();
+      e.stopPropagation();
+    } catch (_) {}
+    setMobileDragItem(payload);
+  };
+
+  const applyMobileDropOnSlot = (h, minute) => {
+    if (!mobileDragItem) return;
+    const base = currentDate || new Date();
+    const dt = new Date(
+      base.getFullYear(),
+      base.getMonth(),
+      base.getDate(),
+      h,
+      minute,
+      0,
+      0
+    );
+    if (mobileDragItem.kind === "task" && typeof onTaskDrop === "function") {
+      onTaskDrop(mobileDragItem.id, dt, mobileDragItem.dropEffect || "copy", mobileDragItem.text || "Task");
+    } else if (mobileDragItem.kind === "activity" && typeof onActivityDrop === "function") {
+      onActivityDrop(mobileDragItem.id, dt, mobileDragItem.dropEffect || "copy", mobileDragItem.text || "Activity");
+    }
+    setDragOverSlot(null);
+    setMobileDragItem(null);
+  };
+
+  useEffect(() => {
+    if (!mobileDragItem) return;
+    const clearMobileDrag = () => {
+      setDragOverSlot(null);
+      setMobileDragItem(null);
+    };
+    window.addEventListener("pointercancel", clearMobileDrag, { once: true });
+    window.addEventListener("pointerup", clearMobileDrag, { once: true });
+    return () => {
+      window.removeEventListener("pointercancel", clearMobileDrag);
+      window.removeEventListener("pointerup", clearMobileDrag);
+    };
+  }, [mobileDragItem]);
 
   // Keep the "now" line in sync with wall clock time.
   useEffect(() => {
@@ -691,6 +741,14 @@ export default function DayView({
                 <div
                   key={t.id}
                   draggable={true}
+                  onPointerDown={(e) => {
+                    beginMobileDrag(e, {
+                      kind: "task",
+                      id: String(t.id),
+                      text: String(t.title || t.name || "Task"),
+                      dropEffect: "copy",
+                    });
+                  }}
                   onDragStart={(e) => {
                     try {
                       e.dataTransfer.setData("taskId", String(t.id));
@@ -817,6 +875,14 @@ export default function DayView({
                   <div
                     key={a.id || i}
                     draggable={true}
+                    onPointerDown={(e) => {
+                      beginMobileDrag(e, {
+                        kind: "activity",
+                        id: String(a.id || ""),
+                        text: String(a.text || a.title || "Activity"),
+                        dropEffect: "copy",
+                      });
+                    }}
                     onDragStart={(e) => {
                       try {
                         e.dataTransfer.setData("activityId", String(a.id || ""));
@@ -1443,10 +1509,21 @@ export default function DayView({
                               onMouseEnter={() => {
                                 setHoveredQuickCreateSlot({ index: slotIndex, segmentsPerHour });
                               }}
+                              onPointerEnter={() => {
+                                if (mobileDragItem) setDragOverSlot(slotKey);
+                              }}
                               onMouseLeave={() => {
                                 setHoveredQuickCreateSlot((prev) =>
                                   prev && prev.index === slotIndex && prev.segmentsPerHour === segmentsPerHour ? null : prev
                                 );
+                              }}
+                              onPointerUp={(e) => {
+                                if (!mobileDragItem) return;
+                                try {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                } catch (_) {}
+                                applyMobileDropOnSlot(h, minute);
                               }}
                               onKeyDown={(e) => {
                                 if (e.key === "Enter" || e.key === " ") {
