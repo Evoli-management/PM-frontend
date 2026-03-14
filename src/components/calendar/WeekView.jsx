@@ -713,18 +713,86 @@ const WeekView = ({
     setMobileDragItem(null);
   };
 
+  const parseDayKeyToDate = (dayKey) => {
+    try {
+      const [y, m, d] = String(dayKey || "").split("-").map((v) => Number(v));
+      if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return null;
+      return new Date(y, m, d, 0, 0, 0, 0);
+    } catch (_) {
+      return null;
+    }
+  };
+
+  const resolveWeekDropTargetAtPoint = (x, y) => {
+    try {
+      const el = document.elementFromPoint(x, y);
+      const slotEl = el?.closest?.("[data-week-slot-day][data-week-slot-time][data-week-slot-key]");
+      if (slotEl) {
+        const dayKey = String(slotEl.getAttribute("data-week-slot-day") || "");
+        const slot = String(slotEl.getAttribute("data-week-slot-time") || "");
+        const slotKey = String(slotEl.getAttribute("data-week-slot-key") || "");
+        if (dayKey && slot && slotKey) return { type: "slot", dayKey, slot, slotKey };
+      }
+      const dayEl = el?.closest?.("[data-week-bottom-day]");
+      if (dayEl) {
+        const dayKey = String(dayEl.getAttribute("data-week-bottom-day") || "");
+        if (dayKey) return { type: "bottom-day", dayKey };
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  };
+
   useEffect(() => {
     if (!mobileDragItem) return;
-    const clearMobileDrag = () => {
+    const onPointerMove = (ev) => {
+      const hit = resolveWeekDropTargetAtPoint(ev.clientX, ev.clientY);
+      if (!hit) {
+        setDragOverTimeSlot(null);
+        setDragOverBottomDayKey(null);
+        return;
+      }
+      if (hit.type === "slot") {
+        setDragOverTimeSlot(hit.slotKey);
+        setDragOverBottomDayKey(null);
+        return;
+      }
+      setDragOverTimeSlot(null);
+      setDragOverBottomDayKey(hit.dayKey);
+    };
+    const onPointerUp = (ev) => {
+      const hit = resolveWeekDropTargetAtPoint(ev.clientX, ev.clientY);
+      if (hit?.type === "slot") {
+        const day = parseDayKeyToDate(hit.dayKey);
+        if (day) {
+          applyMobileDropToSlot(day, hit.slot);
+          return;
+        }
+      }
+      if (hit?.type === "bottom-day") {
+        const day = parseDayKeyToDate(hit.dayKey);
+        if (day) {
+          applyMobileDropToBottomDay(day);
+          return;
+        }
+      }
       setDragOverTimeSlot(null);
       setDragOverBottomDayKey(null);
       setMobileDragItem(null);
     };
-    window.addEventListener("pointercancel", clearMobileDrag, { once: true });
-    window.addEventListener("pointerup", clearMobileDrag, { once: true });
+    const onPointerCancel = () => {
+      setDragOverTimeSlot(null);
+      setDragOverBottomDayKey(null);
+      setMobileDragItem(null);
+    };
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp, { once: true });
+    window.addEventListener("pointercancel", onPointerCancel, { once: true });
     return () => {
-      window.removeEventListener("pointercancel", clearMobileDrag);
-      window.removeEventListener("pointerup", clearMobileDrag);
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerCancel);
     };
   }, [mobileDragItem]);
 
@@ -2560,6 +2628,9 @@ const WeekView = ({
                           return (
                             <div
                               key={dIdx}
+                              data-week-slot-key={slotDragKey}
+                              data-week-slot-day={dayKey}
+                              data-week-slot-time={slot}
                               className="px-2 align-top group flex items-center relative overflow-visible"
                               style={{
                                 flex: "1 1 0",
@@ -2879,6 +2950,7 @@ const WeekView = ({
                   return (
                     <td
                       key={`col-${dIdx}`}
+                      data-week-bottom-day={`${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`}
                       className="week-bottom-list-cell relative align-top p-2 h-full overflow-visible cursor-pointer"
                       title="Double-click to create task or activity"
                       onDragOver={(e) => {
