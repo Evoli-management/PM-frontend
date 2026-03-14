@@ -825,6 +825,7 @@
       "goal": "Doelen",
       "keyArea": "Sleutelgebieden",
       "appointment": "Appointments",
+      "event": "Events",
       "user": "Users",
       "other": "Overige"
     }
@@ -1035,7 +1036,7 @@
     "author2": "HR Manager, InnovateX"
   },
   "navbar": {
-    "searchPlaceholder": "Search across pages, tasks, activities, goals, key areas, and appointments...",
+    "searchPlaceholder": "Search across pages, tasks, activities, goals, key areas, appointments, and events...",
     "searching": "Zoeken...",
     "searchResults": "Zoekresultaten",
     "noResults": "Geen resultaten",
@@ -1074,6 +1075,7 @@
     "categoryGoals": "Doelen",
     "categoryKeyAreas": "Sleutelgebieden",
     "categoryAppointments": "Appointments",
+    "categoryEvents": "Events",
     "categoryUsers": "Users",
     "categoryOther": "Overige",
     "widgetMyDay": "My Day",

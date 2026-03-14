@@ -178,6 +178,19 @@ export default function Navbar() {
         return values.reduce((max, v) => Math.max(max, scoreStringMatch(v, query, { shortQuery })), 0);
     };
 
+    const getCalendarSearchRange = () => {
+        const now = new Date();
+        return {
+            from: new Date(Date.UTC(now.getUTCFullYear() - 5, 0, 1, 0, 0, 0, 0)).toISOString(),
+            to: new Date(Date.UTC(now.getUTCFullYear() + 5, 11, 31, 23, 59, 59, 999)).toISOString(),
+        };
+    };
+
+    const isAppointmentLikeCalendarItem = (item) => {
+        const kind = String(item?.kind || "").toLowerCase();
+        return kind === "appointment" || kind === "appointment_exception";
+    };
+
     // Handle global search functionality across entire system
     const handleSearch = async (searchTerm) => {
         if (!searchTerm.trim()) {
@@ -224,14 +237,17 @@ export default function Navbar() {
         setSearchLoading(true);
 
         try {
-            const [tasks, activities, goals, keyAreas, appointments, users] = await Promise.all([
+            const calendarRange = getCalendarSearchRange();
+            const [tasks, activities, goals, keyAreas, calendarItems, users] = await Promise.all([
                 taskService.list().catch(() => []),
                 activityService.list().catch(() => []),
                 goalService.getGoals().catch(() => []),
                 keyAreaService.list().catch(() => []),
-                calendarService.listAppointments().catch(() => []),
+                calendarService.listEvents(calendarRange).catch(() => []),
                 usersService.list().catch(() => []),
             ]);
+            const appointments = (calendarItems || []).filter(isAppointmentLikeCalendarItem);
+            const events = (calendarItems || []).filter((item) => !isAppointmentLikeCalendarItem(item));
 
             const nonUserFieldExcludes = [/assignee/i, /assigned/i, /user/i, /member/i, /owner/i, /email/i, /avatar/i, /delegat/i];
             const rankAndLimit = (items, scorer) =>
@@ -323,6 +339,22 @@ export default function Navbar() {
                         route: `/calendar?id=${appointment.id}`,
                         type: "appointment",
                         description: appointment.description || appointment.notes || 'Calendar Appointment',
+                    });
+                });
+
+            rankAndLimit(events, (event) => {
+                const primaryFields = shortQuery ? ["title", "summary"] : ["title", "summary", "description", "notes", "location"];
+                const primary = getPrimaryScore(event, primaryFields, searchLower, { shortQuery });
+                if (primary > 0) return primary + 200;
+                if (shortQuery) return 0;
+                return deepMatchScore(event, searchLower, { ignoreKeyPatterns: nonUserFieldExcludes });
+            })
+                .forEach((event) => {
+                    pushResult({
+                        title: event.title || event.summary || 'Untitled Event',
+                        route: `/calendar?id=${event.id}`,
+                        type: "event",
+                        description: event.description || event.notes || event.location || 'Calendar Event',
                     });
                 });
 
@@ -796,6 +828,7 @@ export default function Navbar() {
         goal: t("navbar.categoryGoals"),
         "key-area": t("navbar.categoryKeyAreas"),
         appointment: t("navbar.categoryAppointments"),
+        event: t("navbar.categoryEvents"),
         user: t("navbar.categoryUsers"),
         other: t("navbar.categoryOther"),
     };
@@ -836,7 +869,7 @@ export default function Navbar() {
         }
         return out.filter((col) => col.length > 0);
     };
-    const resultCategoryOrder = ["task", "activity", "goal", "key-area", "appointment", "user", "page", "other"];
+    const resultCategoryOrder = ["task", "activity", "goal", "key-area", "appointment", "event", "user", "page", "other"];
     const visibleResultCategories = resultCategoryOrder.filter(
         (type) => Array.isArray(groupedSearchResults[type]) && groupedSearchResults[type].length > 0
     );

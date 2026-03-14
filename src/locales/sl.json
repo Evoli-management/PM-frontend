@@ -824,6 +824,7 @@
       "goal": "Cilji",
       "keyArea": "Ključna področja",
       "appointment": "Sestanki",
+      "event": "Dogodki",
       "user": "Uporabniki",
       "other": "Ostalo"
     }
@@ -1034,7 +1035,7 @@
     "author2": "HR menedžer, InnovateX"
   },
   "navbar": {
-    "searchPlaceholder": "Iskanje med stranmi, nalogami, aktivnostmi, cilji, ključnimi področji in termini...",
+    "searchPlaceholder": "Iskanje med stranmi, nalogami, aktivnostmi, cilji, ključnimi področji, termini in dogodki...",
     "searching": "Iskanje...",
     "searchResults": "Rezultati iskanja",
     "noResults": "Ni rezultatov",
@@ -1073,6 +1074,7 @@
     "categoryGoals": "Cilji",
     "categoryKeyAreas": "Ključna področja",
     "categoryAppointments": "Termini",
+    "categoryEvents": "Dogodki",
     "categoryUsers": "Uporabniki",
     "categoryOther": "Drugo",
     "widgetMyDay": "Moj dan",

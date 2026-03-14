@@ -825,6 +825,7 @@
       "goal": "Cele",
       "keyArea": "Kluczowe Obszary",
       "appointment": "Spotkania",
+      "event": "Wydarzenia",
       "user": "Użytkownicy",
       "other": "Inne"
     }
@@ -1035,7 +1036,7 @@
     "author2": "Menedżer HR, InnovateX"
   },
   "navbar": {
-    "searchPlaceholder": "Przeszukuj strony, zadania, działania, cele, kluczowe obszary i spotkania...",
+    "searchPlaceholder": "Przeszukuj strony, zadania, działania, cele, kluczowe obszary, spotkania i wydarzenia...",
     "searching": "Wyszukiwanie...",
     "searchResults": "Wyniki wyszukiwania",
     "noResults": "Brak wyników",
@@ -1074,6 +1075,7 @@
     "categoryGoals": "Cele",
     "categoryKeyAreas": "Kluczowe Obszary",
     "categoryAppointments": "Spotkania",
+    "categoryEvents": "Wydarzenia",
     "categoryUsers": "Użytkownicy",
     "categoryOther": "Inne",
     "widgetMyDay": "Mój dzień",
