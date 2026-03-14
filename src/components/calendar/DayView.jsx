@@ -1233,7 +1233,8 @@ export default function DayView({
         .day-timeslots-wrap:hover .day-timeslots-scroll::-webkit-scrollbar-track { background: transparent; }
       `}</style>
       <CalendarViewTopSection
-        left={<div className="flex items-center gap-2">
+        controlsClassName="day-header-controls flex flex-col gap-2 min-h-[34px] sm:flex-row sm:items-center sm:justify-between"
+        left={<div className="order-1 flex items-center gap-2 flex-wrap">
           <button
             onClick={goPrevDay}
             className="day-header-btn px-2 py-0.5 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
@@ -1263,8 +1264,8 @@ export default function DayView({
             {tr("dayView.today")}
           </button>
         </div>}
-        center={<h2 className="text-base font-bold flex items-center gap-2">{headerDate}</h2>}
-        right={<div className="flex items-center gap-2">
+        center={<h2 className="order-3 text-base font-bold flex items-center gap-2 flex-wrap min-w-0 sm:order-2">{headerDate}</h2>}
+        right={<div className="order-2 flex items-center gap-2 flex-wrap sm:order-3 sm:justify-end">
           <div className="relative" ref={slotMenuRef}>
             <button
               type="button"

@@ -1241,8 +1241,8 @@ const WeekView = ({
       <div className="p-0 flex flex-col h-full min-h-0" style={{ overflow: "hidden", position: "relative" }}>
         {/* Header */}
         <CalendarViewTopSection elephantTaskRow={elephantTaskRow} elephantTopGapClass="mt-1" showElephantSeparator={false}>
-        <div className="day-header-controls flex items-center justify-between min-h-[34px]">
-          <div className="flex items-center gap-2">
+        <div className="day-header-controls flex flex-col gap-2 min-h-[34px] sm:flex-row sm:items-center sm:justify-between">
+          <div className="order-1 flex items-center gap-2 flex-wrap">
             <button
               className="day-header-btn px-2 py-0.5 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
               style={{ minWidth: 34, minHeight: 34 }}
@@ -1320,7 +1320,7 @@ const WeekView = ({
             </button>
           </div>
 
-          <h2 className="text-xl font-bold flex items-center gap-2">
+          <h2 className="order-3 text-base font-bold flex items-center gap-2 flex-wrap min-w-0 sm:order-2 sm:text-xl">
             {weekLabel}
             {(loading || prefsLoading) && (
               <span className="text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-0.5">
@@ -1329,12 +1329,12 @@ const WeekView = ({
             )}
           </h2>
 
-          <div className="flex items-center gap-2">
+          <div className="order-2 flex items-center gap-2 flex-wrap sm:order-3 sm:justify-end">
             <div
               role="group"
               aria-label="Week length"
               tabIndex={0}
-              className="inline-flex items-center rounded bg-white border border-slate-200 shadow-sm mr-2"
+              className="inline-flex items-center rounded bg-white border border-slate-200 shadow-sm"
               onKeyDown={(e) => {
                 try {
                   if (e.key === "ArrowLeft" || e.key === "ArrowDown") {

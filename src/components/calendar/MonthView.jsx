@@ -365,7 +365,10 @@ export default function MonthView({
 
   const DATE_COL_WIDTH = 76;
   const ALL_DAY_COL_WIDTH = 80;
-  const ROW_HEIGHT = 30;
+  const ROW_HEIGHT =
+    typeof window !== "undefined" && window.innerWidth < 768 ? 36 : 30;
+  const isCompactViewport =
+    typeof window !== "undefined" && window.innerWidth < 768;
   const HOUR_COL_WIDTH = slotSizeMinutes === 15 ? 220 : 125;
   const rightTableMinWidth = Math.max(800, HOUR_SLOTS.length * HOUR_COL_WIDTH);
   const MONTH_HLINE = "rgba(148,163,184,0.3)";
@@ -1587,7 +1590,7 @@ export default function MonthView({
   };
 
   return (
-    <>
+    <div className="w-full h-full min-h-0 flex flex-col">
       <style>{`
         @keyframes blinkRow {
           0% { background-color: rgba(59,130,246,0.12) !important; box-shadow: none !important; }
@@ -1893,6 +1896,8 @@ export default function MonthView({
                 overflowY: "hidden",
                 width: "100%",
                 minWidth: 0,
+                touchAction: isCompactViewport ? "pan-x pan-y" : undefined,
+                overscrollBehaviorX: isCompactViewport ? "contain" : undefined,
               }}
               onWheel={(e) => {
                 try {
@@ -2018,16 +2023,20 @@ export default function MonthView({
         {/* BODY: vertical scroll container */}
         <div
           ref={rightVScrollRef}
-          className="relative mv-vscroll"
+          className="relative mv-vscroll flex-1 min-h-0"
           style={{
-            height: "calc(100vh - 240px)",
-            maxHeight: "calc(100vh - 240px)",
+            height: isCompactViewport ? undefined : "calc(100vh - 240px)",
+            maxHeight: isCompactViewport ? undefined : "calc(100vh - 240px)",
             minHeight: 0,
+            overflowY: isCompactViewport ? "auto" : undefined,
             overflowX: "hidden",
             paddingBottom: BOTTOM_SCROLL_SAFE_GAP,
             maxWidth: "100vw",
             position: "relative",
             scrollBehavior: "smooth",
+            WebkitOverflowScrolling: isCompactViewport ? "touch" : undefined,
+            touchAction: isCompactViewport ? "pan-y" : undefined,
+            overscrollBehaviorY: isCompactViewport ? "contain" : undefined,
           }}
         >
           <div
@@ -2489,6 +2498,9 @@ export default function MonthView({
                 marginTop: 0,
                 width: "100%",
                 minWidth: 0,
+                WebkitOverflowScrolling: isCompactViewport ? "touch" : undefined,
+                touchAction: isCompactViewport ? "pan-x pan-y" : undefined,
+                overscrollBehaviorX: isCompactViewport ? "contain" : undefined,
               }}
               onScroll={(e) => {
                 try {
@@ -2717,6 +2729,9 @@ export default function MonthView({
             style={{
               overflowX: "auto",
               overflowY: "hidden",
+              WebkitOverflowScrolling: isCompactViewport ? "touch" : undefined,
+              touchAction: isCompactViewport ? "pan-x pan-y" : undefined,
+              overscrollBehaviorX: isCompactViewport ? "contain" : undefined,
               width: "100%",
               height: BOTTOM_HSCROLL_HEIGHT,
             }}
@@ -2737,6 +2752,6 @@ export default function MonthView({
 
       </div>
       </div>
-    </>
+    </div>
   );
 }
