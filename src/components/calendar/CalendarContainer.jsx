@@ -333,28 +333,73 @@ const CalendarContainer = () => {
             localStorage.setItem("calendar:slotSizeMinutes", String(slotSizeMinutes));
         } catch {}
     }, [slotSizeMinutes]);
-    // Poll sync status every 30s; refresh calendar only when lastSyncAt changes
+    // SSE stream: refresh calendar immediately when the backend pushes a sync event.
+    // Falls back to 15s polling if SSE is unavailable (no token, network error, etc.).
     useEffect(() => {
-        const lastSyncAt = { google: null, microsoft: null };
+        let abortController = null;
+        let fallbackId = null;
+        let active = true;
 
-        const check = async () => {
+        const startSSE = async () => {
+            const token = localStorage.getItem('access_token');
+            if (!token) return false;
+            const apiBase = import.meta.env.VITE_API_BASE_URL ||
+                (import.meta.env.DEV ? '/api' : 'https://practicalmanager-4241d0bfc5ed.herokuapp.com/api');
             try {
-                const status = await calendarService.getSyncStatus();
-                let changed = false;
-                for (const provider of ['google', 'microsoft']) {
-                    const ts = status?.[provider]?.lastSyncAt || null;
-                    if (ts && ts !== lastSyncAt[provider]) {
-                        lastSyncAt[provider] = ts;
-                        changed = true;
+                abortController = new AbortController();
+                const response = await fetch(`${apiBase}/calendar/sync/events`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                    signal: abortController.signal,
+                });
+                if (!response.ok || !response.body) return false;
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                // eslint-disable-next-line no-constant-condition
+                while (active) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    const text = decoder.decode(value, { stream: true });
+                    if (text.includes('data:')) {
+                        if (active) setRefreshTick((t) => t + 1);
                     }
                 }
-                if (changed) setRefreshTick((t) => t + 1);
-            } catch (_) {}
+                return true;
+            } catch (_) {
+                return false;
+            }
         };
 
-        check();
-        const id = setInterval(check, 10 * 1000);
-        return () => clearInterval(id);
+        const run = async () => {
+            const ok = await startSSE();
+            if (!ok && active) {
+                // SSE unavailable — fall back to polling every 15s
+                const lastSyncAt = { google: null, microsoft: null };
+                const check = async () => {
+                    try {
+                        const status = await calendarService.getSyncStatus();
+                        let changed = false;
+                        for (const provider of ['google', 'microsoft']) {
+                            const ts = status?.[provider]?.lastSyncAt || null;
+                            if (ts && ts !== lastSyncAt[provider]) {
+                                lastSyncAt[provider] = ts;
+                                changed = true;
+                            }
+                        }
+                        if (changed) setRefreshTick((t) => t + 1);
+                    } catch (_) {}
+                };
+                check();
+                fallbackId = setInterval(check, 15 * 1000);
+            }
+        };
+
+        run();
+
+        return () => {
+            active = false;
+            abortController?.abort();
+            if (fallbackId) clearInterval(fallbackId);
+        };
     }, []);
 
     // persist workWeek preference when changed
