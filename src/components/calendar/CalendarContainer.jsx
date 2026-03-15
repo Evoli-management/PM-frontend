@@ -372,7 +372,9 @@ const CalendarContainer = () => {
                     if (done) break;
                     const text = decoder.decode(value, { stream: true });
                     // 'ping' is the keepalive — ignore it; anything else is a real sync event
-                    if (text.includes('data:') && !text.includes('data:ping') && !text.includes('"ping"')) {
+                    // Real sync events carry JSON (e.g. data: {"provider":"graph"}).
+                    // Keepalive pings send data: ping — no JSON, no { character.
+                    if (text.includes('data: {')) {
                         if (active) setRefreshTick((t) => t + 1);
                     }
                 }
@@ -423,7 +425,9 @@ const CalendarContainer = () => {
                     const { done, value } = await reader.read();
                     if (done) break;
                     const text = decoder.decode(value, { stream: true });
-                    if (text.includes('data:') && !text.includes('data:ping') && !text.includes('"ping"')) {
+                    // Real sync events carry JSON (e.g. data: {"provider":"graph"}).
+                    // Keepalive pings send data: ping — no JSON, no { character.
+                    if (text.includes('data: {')) {
                         if (active) setRefreshTick((t) => t + 1);
                     }
                 }
