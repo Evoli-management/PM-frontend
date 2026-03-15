@@ -105,6 +105,9 @@ export const Integrations = ({ showToast }) => {
             await calendarService.triggerSync();
             showToast && showToast(t("integrations.syncCompleted"), 'success');
             await loadStatus();
+            // Notify the calendar view to reload its events so newly synced
+            // appointments appear immediately without a page refresh.
+            window.dispatchEvent(new CustomEvent('calendar-sync-completed'));
         } catch {
             showToast && showToast(t("integrations.syncFailed"), 'error');
         } finally {

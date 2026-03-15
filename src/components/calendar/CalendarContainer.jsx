@@ -190,8 +190,6 @@ const CalendarContainer = () => {
             return false;
         }
     });
-    // Real-time refresh support (polling when external sync is enabled)
-    const [syncActive, setSyncActive] = useState(false);
     const [refreshTick, setRefreshTick] = useState(0);
     const lastEventMoveRef = React.useRef({ key: "", at: 0 });
 
@@ -227,6 +225,13 @@ const CalendarContainer = () => {
         };
         window.addEventListener('open-create-appointment', handler);
         return () => window.removeEventListener('open-create-appointment', handler);
+    }, []);
+
+    // Refresh calendar data when an external sync completes (e.g. manual sync from Integrations page)
+    useEffect(() => {
+        const handler = () => setRefreshTick((t) => t + 1);
+        window.addEventListener('calendar-sync-completed', handler);
+        return () => window.removeEventListener('calendar-sync-completed', handler);
     }, []);
 
     // Load persisted view on mount, but always anchor to today's date/time.
@@ -328,28 +333,29 @@ const CalendarContainer = () => {
             localStorage.setItem("calendar:slotSizeMinutes", String(slotSizeMinutes));
         } catch {}
     }, [slotSizeMinutes]);
-    // Check if external sync is enabled to start auto-refresh
+    // Poll sync status every 30s; refresh calendar only when lastSyncAt changes
     useEffect(() => {
-        let ignore = false;
-        (async () => {
+        const lastSyncAt = { google: null, microsoft: null };
+
+        const check = async () => {
             try {
                 const status = await calendarService.getSyncStatus();
-                if (!ignore) setSyncActive(!!(status?.google?.connected || status?.microsoft?.connected));
-            } catch (_) {
-                if (!ignore) setSyncActive(false);
-            }
-        })();
-        return () => { ignore = true; };
-    }, []);
+                let changed = false;
+                for (const provider of ['google', 'microsoft']) {
+                    const ts = status?.[provider]?.lastSyncAt || null;
+                    if (ts && ts !== lastSyncAt[provider]) {
+                        lastSyncAt[provider] = ts;
+                        changed = true;
+                    }
+                }
+                if (changed) setRefreshTick((t) => t + 1);
+            } catch (_) {}
+        };
 
-    // Auto-refresh interval when sync is active
-    useEffect(() => {
-        if (!syncActive) return;
-        const id = setInterval(() => {
-            setRefreshTick((t) => t + 1);
-        }, 5000); // refresh every 5s
+        check();
+        const id = setInterval(check, 30 * 1000);
         return () => clearInterval(id);
-    }, [syncActive]);
+    }, []);
 
     // persist workWeek preference when changed
     useEffect(() => {

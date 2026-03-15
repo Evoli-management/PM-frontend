@@ -19,9 +19,7 @@ export const syncService = {
    * Trigger manual sync for a provider (Google Tasks or Microsoft To Do)
    */
   async triggerManualSync(provider) {
-    // POST to /sync/manual endpoint (assumed backend route)
-    // Adjust endpoint as needed to match backend
-    const response = await axios.post(`${API_URL}/sync/manual`, { provider });
+    const response = await axios.post(`${API_URL}/calendar/sync/trigger`, { provider });
     return response.data;
   },
   /**
