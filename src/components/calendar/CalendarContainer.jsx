@@ -334,70 +334,110 @@ const CalendarContainer = () => {
         } catch {}
     }, [slotSizeMinutes]);
     // SSE stream: refresh calendar immediately when the backend pushes a sync event.
-    // Falls back to 15s polling if SSE is unavailable (no token, network error, etc.).
+    // The backend sends a keepalive 'ping' every 20s so Heroku's 30s idle timeout
+    // never closes the connection. If it does drop anyway, we reconnect automatically.
+    // Falls back to 15s polling only if SSE cannot be established at all.
     useEffect(() => {
         let abortController = null;
         let fallbackId = null;
+        let reconnectId = null;
         let active = true;
+        let sseWorking = false;
 
-        const startSSE = async () => {
+        const apiBase = import.meta.env.VITE_API_BASE_URL ||
+            (import.meta.env.DEV ? '/api' : 'https://practicalmanager-4241d0bfc5ed.herokuapp.com/api');
+
+        const scheduleReconnect = () => {
+            if (!active) return;
+            clearTimeout(reconnectId);
+            reconnectId = setTimeout(connectSSE, 3000);
+        };
+
+        const connectSSE = async () => {
             const token = localStorage.getItem('access_token');
-            if (!token) return false;
-            const apiBase = import.meta.env.VITE_API_BASE_URL ||
-                (import.meta.env.DEV ? '/api' : 'https://practicalmanager-4241d0bfc5ed.herokuapp.com/api');
+            if (!token || !active) return;
+            abortController?.abort();
+            abortController = new AbortController();
+            try {
+                const response = await fetch(`${apiBase}/calendar/sync/events`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                    signal: abortController.signal,
+                });
+                if (!response.ok || !response.body) { scheduleReconnect(); return; }
+                sseWorking = true;
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                while (active) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    const text = decoder.decode(value, { stream: true });
+                    // 'ping' is the keepalive — ignore it; anything else is a real sync event
+                    if (text.includes('data:') && !text.includes('data:ping') && !text.includes('"ping"')) {
+                        if (active) setRefreshTick((t) => t + 1);
+                    }
+                }
+                // Stream ended — reconnect
+                if (active) scheduleReconnect();
+            } catch (_) {
+                if (active) scheduleReconnect();
+            }
+        };
+
+        const startFallbackPolling = () => {
+            if (fallbackId) return;
+            const lastSyncAt = { google: null, microsoft: null };
+            const check = async () => {
+                if (sseWorking) return;
+                try {
+                    const status = await calendarService.getSyncStatus();
+                    let changed = false;
+                    for (const provider of ['google', 'microsoft']) {
+                        const ts = status?.[provider]?.lastSyncAt || null;
+                        if (ts && ts !== lastSyncAt[provider]) {
+                            lastSyncAt[provider] = ts;
+                            changed = true;
+                        }
+                    }
+                    if (changed) setRefreshTick((t) => t + 1);
+                } catch (_) {}
+            };
+            check();
+            fallbackId = setInterval(check, 15 * 1000);
+        };
+
+        // First attempt — if it fails immediately, start fallback polling
+        (async () => {
+            const token = localStorage.getItem('access_token');
+            if (!token) { startFallbackPolling(); return; }
             try {
                 abortController = new AbortController();
                 const response = await fetch(`${apiBase}/calendar/sync/events`, {
                     headers: { Authorization: `Bearer ${token}` },
                     signal: abortController.signal,
                 });
-                if (!response.ok || !response.body) return false;
+                if (!response.ok || !response.body) { startFallbackPolling(); scheduleReconnect(); return; }
+                sseWorking = true;
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
-                // eslint-disable-next-line no-constant-condition
                 while (active) {
                     const { done, value } = await reader.read();
                     if (done) break;
                     const text = decoder.decode(value, { stream: true });
-                    if (text.includes('data:')) {
+                    if (text.includes('data:') && !text.includes('data:ping') && !text.includes('"ping"')) {
                         if (active) setRefreshTick((t) => t + 1);
                     }
                 }
-                return true;
+                if (active) scheduleReconnect();
             } catch (_) {
-                return false;
+                startFallbackPolling();
+                if (active) scheduleReconnect();
             }
-        };
-
-        const run = async () => {
-            const ok = await startSSE();
-            if (!ok && active) {
-                // SSE unavailable — fall back to polling every 15s
-                const lastSyncAt = { google: null, microsoft: null };
-                const check = async () => {
-                    try {
-                        const status = await calendarService.getSyncStatus();
-                        let changed = false;
-                        for (const provider of ['google', 'microsoft']) {
-                            const ts = status?.[provider]?.lastSyncAt || null;
-                            if (ts && ts !== lastSyncAt[provider]) {
-                                lastSyncAt[provider] = ts;
-                                changed = true;
-                            }
-                        }
-                        if (changed) setRefreshTick((t) => t + 1);
-                    } catch (_) {}
-                };
-                check();
-                fallbackId = setInterval(check, 15 * 1000);
-            }
-        };
-
-        run();
+        })();
 
         return () => {
             active = false;
             abortController?.abort();
+            clearTimeout(reconnectId);
             if (fallbackId) clearInterval(fallbackId);
         };
     }, []);
