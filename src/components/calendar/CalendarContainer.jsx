@@ -353,7 +353,7 @@ const CalendarContainer = () => {
         };
 
         check();
-        const id = setInterval(check, 30 * 1000);
+        const id = setInterval(check, 10 * 1000);
         return () => clearInterval(id);
     }, []);
 
