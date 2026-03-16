@@ -2487,6 +2487,7 @@
     "syncStarted": "Sinhronizacija začeta…",
     "syncCompleted": "Sinhronizacija končana!",
     "syncFailed": "Sinhronizacija ni uspela",
+    "statusLoadFailed": "Ni bilo mogoče naložiti stanja integracije",
     "googleConnected": "Google povezan! Sinhronizacija poteka…",
     "microsoftConnected": "Microsoft povezan! Sinhronizacija poteka…",
     "googleDisconnected": "Google odklopljen",

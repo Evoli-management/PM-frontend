@@ -2491,6 +2491,7 @@
     "syncStarted": "Sync started…",
     "syncCompleted": "Sync completed!",
     "syncFailed": "Sync failed",
+    "statusLoadFailed": "Kan integratiestatus niet laden",
     "googleConnected": "Google connected! Syncing now…",
     "microsoftConnected": "Microsoft connected! Syncing now…",
     "googleDisconnected": "Google disconnected",

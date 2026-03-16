@@ -2491,6 +2491,7 @@
     "syncStarted": "Sincronizzazione avviata...",
     "syncCompleted": "Sincronizzazione completata!",
     "syncFailed": "Sincronizzazione non riuscita",
+    "statusLoadFailed": "Impossibile caricare lo stato dell'integrazione",
     "googleConnected": "Google connesso! Sincronizzazione ora...",
     "microsoftConnected": "Microsoft connesso! Sincronizzazione ora...",
     "googleDisconnected": "Google si è disconnesso",
