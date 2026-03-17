@@ -93,6 +93,17 @@ export default function PendingDelegationsSection({
     }
   };
 
+  // Reload tasks when key area changes and we're in add-to-task mode
+  React.useEffect(() => {
+    if (acceptMode === 'add-to-task' && selectedKeyArea && !String(selectedKeyArea).startsWith('__missing_')) {
+      loadTasksForKeyArea(selectedKeyArea);
+    } else {
+      setAvailableTasks([]);
+    }
+    // Always clear selected task when key area changes
+    setSelectedTaskForActivity('');
+  }, [selectedKeyArea, acceptMode]);
+
   const handleAcceptClick = async (item) => {
     setAcceptingItem(item);
     setSelectedKeyArea('');
@@ -464,7 +475,13 @@ export default function PendingDelegationsSection({
                         name="accept-mode"
                         value="add-to-task"
                         checked={acceptMode === 'add-to-task'}
-                        onChange={(e) => setAcceptMode(e.target.value)}
+                        onChange={(e) => {
+                          setAcceptMode(e.target.value);
+                          // Load tasks for the selected key area when switching to add-to-task mode
+                          if (e.target.value === 'add-to-task' && selectedKeyArea) {
+                            loadTasksForKeyArea(selectedKeyArea);
+                          }
+                        }}
                         className="mr-2"
                       />
                       <span className="text-sm text-gray-700">
