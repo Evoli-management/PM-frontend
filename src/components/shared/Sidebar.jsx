@@ -129,8 +129,12 @@ export default function Sidebar({
         const currentParams = new URLSearchParams(location.search || "");
         const nextParams = new URLSearchParams();
 
-        nextParams.set("view", "active-tasks");
-        nextParams.set("active", currentParams.get("active") || "all");
+        const allowedViews = new Set(['active-tasks', 'delegated', 'todo', 'activity-trap', 'my-focus']);
+        const currentView = currentParams.get('view');
+        const viewToUse = currentView && allowedViews.has(currentView) ? currentView : 'active-tasks';
+
+        nextParams.set('view', viewToUse);
+        nextParams.set('active', currentParams.get('active') || 'all');
 
         if (kaId) {
             nextParams.set("ka", String(kaId));

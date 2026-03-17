@@ -69,6 +69,7 @@ export default function useKeyAreasSelection({
         if (openingKaIdRef.current === nextId) return;
 
         const isSameKa = selectedKA && String(selectedKA.id) === nextId;
+        const isGlobalTasksView = viewTab === 'delegated' || viewTab === 'todo' || viewTab === 'activity-trap';
         const needsContextReset =
             viewTab !== 'active-tasks' ||
             !!selectedTaskFull ||
@@ -88,7 +89,9 @@ export default function useKeyAreasSelection({
             setAllTasks([]);
             setActivitiesByTask({});
             setTaskTab(1);
-            setViewTab('active-tasks');
+            // Only switch back to active tasks if we are already in that view.
+            // Otherwise, stay in the current global view (delegated / todo / activity-trap).
+            if (!isGlobalTasksView) setViewTab('active-tasks');
             setSearchTerm('');
             setSiteSearch('');
             setQuadrant('all');

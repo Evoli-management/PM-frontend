@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import taskDelegationService from '../../../services/taskDelegationService';
 import activityDelegationService from '../../../services/activityDelegationService';
 import api from '../api/keyAreasPageApi.js';
@@ -115,9 +115,18 @@ export default function useKeyAreasTaskData({
         }
     }, [allTasks]);
 
+    const lastRefreshTaskKeys = useRef('');
+
     useEffect(() => {
+        const currentKeys = Array.isArray(allTasks)
+            ? allTasks.map((t) => String(t.id)).sort().join(',')
+            : '';
+
+        if (currentKeys === lastRefreshTaskKeys.current) return;
+        lastRefreshTaskKeys.current = currentKeys;
+
         refreshAllActivities();
-    }, [allTasks.length, refreshAllActivities]);
+    }, [allTasks, refreshAllActivities]);
 
     useEffect(() => {
         const handler = (e) => {
