@@ -10,6 +10,7 @@ import { FaSave, FaTrash } from 'react-icons/fa';
 import activityService from '../../services/activityService';
 import { formatKeyAreaLabel } from '../../utils/keyAreaDisplay';
 import { durationToTimeInputValue, isDurationInputValid } from '../../utils/duration';
+import { validateTaskDeadline } from './taskFormLogic.js';
 import DurationPicker from '../shared/DurationPicker.jsx';
 
 // ---- helpers (JS only) ----
@@ -381,12 +382,20 @@ export default function EditActivityModal({
     if (!isOpen) return;
     if (!deadlineAuto) return;
     if (!endDate) return;
-    if (deadline !== endDate) setDeadline(endDate);
+    // Removed auto-sync of deadline to endDate
+    // if (deadline !== endDate) setDeadline(endDate);
   }, [isOpen, endDate, deadline, deadlineAuto]);
 
   if (!isOpen) return null;
 
   const handleSave = () => {
+    // Validate deadline is within start and end dates
+    const deadlineValidation = validateTaskDeadline(startDate, endDate, deadline);
+    if (!deadlineValidation.valid) {
+      alert(deadlineValidation.error);
+      return;
+    }
+
     // Activities don't require key area or list - they're attached to tasks which have those
     // Normalize dates to date-only strings (YYYY-MM-DD) to avoid timezone shifts
     const normStart = toDateOnly(startDate) || null;
