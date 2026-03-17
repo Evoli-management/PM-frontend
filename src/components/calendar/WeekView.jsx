@@ -1684,6 +1684,18 @@ const WeekView = ({
                               return new Date(s.getFullYear(), s.getMonth(), s.getDate(), 23, 59, 59, 999);
                             };
 
+                            // For all-day events the backend stores end as exclusive next-day midnight.
+                            // Subtract 1 day so the event displays only on the intended day(s).
+                            const toAllDayDisplayEnd = (raw) => {
+                              if (!raw) return raw;
+                              const d = new Date(raw);
+                              if (isNaN(d.getTime())) return raw;
+                              if (d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0) {
+                                d.setUTCDate(d.getUTCDate() - 1);
+                                return d.toISOString();
+                              }
+                              return raw;
+                            };
                             const weekTasks = (Array.isArray(events) ? events : []).filter((t) => {
                               try {
                                 const s = resolveStartRaw(t);
@@ -1693,7 +1705,7 @@ const WeekView = ({
                                   isAllDayLike || isDateOnlyLike(s) || isDateOnlyLike(e)
                                 );
                                 const sStart = toDayStart(s, treatAsDateOnly);
-                                const eEnd = toDayEnd(e, treatAsDateOnly);
+                                const eEnd = toDayEnd(isAllDayLike ? toAllDayDisplayEnd(e) : e, treatAsDateOnly);
                                 if (!sStart || !eEnd) return false;
                                 if (!(sStart <= endOfWeek && eEnd >= weekStart)) return false;
                                 if (eEnd.getTime() < sStart.getTime()) return false;
@@ -1709,11 +1721,12 @@ const WeekView = ({
                               .map((t) => {
                                 const s = resolveStartRaw(t);
                                 const e = resolveEndRaw(t);
+                                const isAllDayLike = Boolean(t?.allDay || t?.all_day);
                                 const treatAsDateOnly = Boolean(
-                                  t?.allDay || t?.all_day || isDateOnlyLike(s) || isDateOnlyLike(e)
+                                  isAllDayLike || isDateOnlyLike(s) || isDateOnlyLike(e)
                                 );
                                 const sStart = toDayStart(s, treatAsDateOnly);
-                                const eEnd = toDayEnd(e, treatAsDateOnly);
+                                const eEnd = toDayEnd(isAllDayLike ? toAllDayDisplayEnd(e) : e, treatAsDateOnly);
                                 if (!sStart || !eEnd) return null;
                                 const rawStartIndex = dayDiff(sStart, weekStart);
                                 const rawEndIndex = dayDiff(eEnd, weekStart);
