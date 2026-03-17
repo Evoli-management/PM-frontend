@@ -773,6 +773,7 @@ const buildRecurringPattern = ({
                               start: toOffsetISO(s),
                               end: toOffsetISO(e),
                               timezone,
+                              allDay: isAllDay,
                               goalId: goalId || null,
                               keyAreaId: keyAreaId || null,
                           }
