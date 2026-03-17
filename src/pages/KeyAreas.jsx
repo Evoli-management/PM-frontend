@@ -1,50 +1,47 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
-import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useToast } from '../components/shared/ToastProvider.jsx';
 import { useFormattedDate } from '../hooks/useFormattedDate';
 import Sidebar from '../components/shared/Sidebar';
-import CreateTaskModal from '../components/key-areas/CreateTaskModal';
-import KeyAreasList from '../components/key-areas/KeyAreasList';
-import CreateActivityFormModal from '../components/modals/CreateActivityFormModal';
-import KeyAreaModal from '../components/key-areas/KeyAreaModal';
-import EditTaskModal from '../components/key-areas/EditTaskModal';
-import BulkFieldPickerModal from '../components/shared/BulkFieldPickerModal';
-import MassActionMenu from '../components/shared/MassActionMenu.jsx';
-import EditActivityModal from '../components/key-areas/EditActivityModal';
-import DurationPicker from '../components/shared/DurationPicker.jsx';
-import EmptyState from '../components/goals/EmptyState.jsx';
-import TaskRow from '../components/key-areas/TaskRow';
-import ViewTabsNavigation from '../components/key-areas/ViewTabsNavigation';
-import ActivityList from '../components/key-areas/ActivityList';
-import TaskFullView from '../components/key-areas/TaskFullView';
-import UnifiedTaskActivityTable from '../components/key-areas/UnifiedTaskActivityTable';
-import TripleViewLayout from '../components/key-areas/TripleViewLayout';
-import TaskListPanel from '../components/key-areas/TaskListPanel';
-import ActivityListPanel from '../components/key-areas/ActivityListPanel';
+import KeyAreasGlobalTables from '../components/key-areas/KeyAreasGlobalTables.jsx';
+import KeyAreasHeaderBar from '../components/key-areas/KeyAreasHeaderBar.jsx';
+import KeyAreasActivityPanel from '../components/key-areas/KeyAreasActivityPanel.jsx';
+import ActivityRowMenu from '../components/key-areas/ActivityRowMenu.jsx';
+import KeyAreasActivitiesPopover from '../components/key-areas/KeyAreasActivitiesPopover.jsx';
+import KeyAreasLandingShell from '../components/key-areas/KeyAreasLandingShell.jsx';
+import KeyAreasModalStack from '../components/key-areas/KeyAreasModalStack.jsx';
+import KeyAreasTaskPanel from '../components/key-areas/KeyAreasTaskPanel.jsx';
+import KeyAreasTaskFullSection from '../components/key-areas/KeyAreasTaskFullSection.jsx';
 import ResizablePanels from '../components/key-areas/ResizablePanels';
-import KeyAreasTripleView from '../components/key-areas/KeyAreasTripleView';
-import taskDelegationService from '../services/taskDelegationService';
-import activityDelegationService from '../services/activityDelegationService';
-import { FaTimes, FaSave, FaTag, FaTrash, FaAngleDoubleLeft, FaChevronLeft, FaChevronDown, FaStop, FaEllipsisV, FaEdit, FaSearch, FaPlus, FaBars, FaLock, FaExclamationCircle } from 'react-icons/fa';
 import '../styles/triple-view.css';
 import {
     safeParseDate,
-    nullableString,
     computeEisenhowerQuadrant,
     getPriorityLevel,
     toDateOnly,
-    formatDuration,
-    mapUiStatusToServer,
     mapServerStatusToUi,
     normalizeActivity,
-    getItemStatusFilterValue,
-    resolveAssignee,
-    applyStartEndDateRule,
 } from '../utils/keyareasHelpers';
-import { durationToTimeInputValue, parseDurationToMinutes } from '../utils/duration';
-import { buildInlineTaskFieldUpdate } from '../components/key-areas/taskFormLogic.js';
+import api from '../features/key-areas/api/keyAreasPageApi.js';
+import useKeyAreasBootstrap from '../features/key-areas/hooks/useKeyAreasBootstrap.js';
+import useKeyAreaLists from '../features/key-areas/hooks/useKeyAreaLists.js';
+import useKeyAreasBulkActions from '../features/key-areas/hooks/useKeyAreasBulkActions.js';
+import useKeyAreasComposer from '../features/key-areas/hooks/useKeyAreasComposer.js';
+import useKeyAreasComposerSync from '../features/key-areas/hooks/useKeyAreasComposerSync.js';
+import useKeyAreasCrud from '../features/key-areas/hooks/useKeyAreasCrud.js';
+import useKeyAreasMenus from '../features/key-areas/hooks/useKeyAreasMenus.js';
+import useKeyAreasMutations from '../features/key-areas/hooks/useKeyAreasMutations.js';
+import useKeyAreasPageSync from '../features/key-areas/hooks/useKeyAreasPageSync.js';
+import useKeyAreasSearchAndEvents from '../features/key-areas/hooks/useKeyAreasSearchAndEvents.js';
+import useKeyAreasSelection from '../features/key-areas/hooks/useKeyAreasSelection.js';
+import useKeyAreasTaskData from '../features/key-areas/hooks/useKeyAreasTaskData.js';
+import useKeyAreasTaskViewModel from '../features/key-areas/hooks/useKeyAreasTaskViewModel.js';
+import {
+    normalizeActivityWithTask,
+    normalizeTaskForUi,
+    mergeTaskUpdateForUi,
+} from '../features/key-areas/adapters/taskActivityAdapters.js';
 
 // Lazy getters for services to allow code-splitting and avoid circular imports
 let _taskService = null;
@@ -71,567 +68,12 @@ const getActivityService = async () => {
     return _activityService;
 };
 
-let _usersService = null;
-const getUsersService = async () => {
-    if (_usersService) return _usersService;
-    const mod = await import('../services/usersService');
-    _usersService = mod.default || mod;
-    return _usersService;
-};
-
-let _userProfileService = null;
-const getUserProfileService = async () => {
-    if (_userProfileService) return _userProfileService;
-    const mod = await import('../services/userProfileService');
-    _userProfileService = mod.default || mod;
-    return _userProfileService;
-};
-
 let _calendarService = null;
 const getCalendarService = async () => {
     if (_calendarService) return _calendarService;
     const mod = await import('../services/calendarService');
     _calendarService = mod.default || mod;
     return _calendarService;
-};
-
-const api = {
-    async listKeyAreas() {
-        try {
-            return await (await getKeyAreaService()).list({ includeTaskCount: true });
-        } catch (e) {
-            // if unauthorized, let global axios handler redirect to login
-            if (e?.response?.status === 401) {
-                throw e;
-            }
-            // surface errors to caller; do not use local cache
-            throw e;
-        }
-    },
-    async listGoals() {
-        try {
-            const mod = await import('../services/goalService');
-            const fn = mod?.getGoals || mod?.default?.getGoals || mod?.default;
-            if (typeof fn === 'function') {
-                return await fn({ status: 'active' });
-            }
-            // fallback: call default export if it returns an object with getGoals
-            return [];
-        } catch (e) {
-            console.error('Failed to load goals', e);
-            return [];
-        }
-    },
-    async updateKeyArea(id, data) {
-        // Only update via backend; no local fallbacks
-        return await (await getKeyAreaService()).update(id, data);
-    },
-    async createKeyArea(data) {
-        // Only create via backend; no local fallbacks
-        return await (await getKeyAreaService()).create(data);
-    },
-    async deleteKeyArea(id) {
-        await (await getKeyAreaService()).remove(id);
-        return true;
-    },
-    async listTasks(keyAreaId, opts = {}) {
-        // Fetch from backend and normalize for UI
-        try {
-            const rows = await (await getTaskService()).list({ keyAreaId, withoutGoal: opts.withoutGoal });
-            return (Array.isArray(rows) ? rows : []).map((t) => ({
-                ...t,
-                // `taskService.list` already maps backend enums to FE-friendly values
-                status: t.status,
-                // normalize for UI naming
-                due_date: t.dueDate || t.due_date || null,
-                deadline: t.dueDate || t.due_date || null,
-                start_date: t.startDate || t.start_date || null,
-                end_date: t.endDate || t.end_date || null,
-                // expose completion date for UI (nullable ISO string)
-                completionDate: t.completionDate || t.completion_date || null,
-                assignee: t.assignee ?? null,
-                duration: t.duration ?? null,
-                key_area_id: t.keyAreaId || t.key_area_id || keyAreaId,
-                // Ensure list_index is always present
-                list_index: t.listIndex ?? t.list_index ?? 1,
-                listIndex: t.listIndex ?? t.list_index ?? 1,
-                // Ensure goal_id is normalized
-                goal_id: t.goalId ?? t.goal_id ?? null,
-            }));
-        } catch (e) {
-            if (e?.response?.status === 401) throw e;
-            console.error("Failed to list tasks", e);
-            return [];
-        }
-    },
-    async createTask(task) {
-        const durationRaw = task.duration ?? task.duration_minutes;
-        const payload = {
-            keyAreaId: task.key_area_id || task.keyAreaId || task.key_area || task.keyArea,
-            goalId: task.goal_id || task.goalId || task.goal || null,
-            title: task.title,
-            description: nullableString(task.description),
-            assignee: nullableString(task.assignee),
-            startDate: toDateOnly(task.start_date ?? task.startDate),
-            dueDate: toDateOnly(task.deadline ?? task.due_date ?? task.dueDate),
-            endDate: toDateOnly(task.end_date ?? task.endDate),
-            status: (() => {
-                const s = String(task.status || "todo").toLowerCase();
-                if (s === "open") return "todo";
-                if (s === "blocked") return "cancelled";
-                if (s === "done" || s === "closed" || s === "completed") return "completed";
-                if (s === "cancelled" || s === "canceled") return "cancelled";
-                if (s === "in_progress") return "in_progress";
-                return "todo";
-            })(),
-            priority: (() => {
-                const p = String(task.priority || "medium").toLowerCase();
-                if (p === "low" || p === "medium" || p === "high") return p;
-                return "medium";
-            })(),
-            delegatedToUserId: task.delegatedToUserId ?? null,
-            consulted: Array.isArray(task.consulted) ? task.consulted : [],
-            informed: Array.isArray(task.informed) ? task.informed : [],
-            duration:
-                durationRaw === undefined
-                    ? undefined
-                    : durationRaw === null
-                        ? null
-                        : String(durationRaw).trim() || null,
-            // Accept client-provided list index when creating so server persists list membership
-            listIndex: typeof task.list_index !== 'undefined' ? task.list_index : (typeof task.listIndex !== 'undefined' ? task.listIndex : undefined),
-        };
-    const created = await (await getTaskService()).create(payload);
-        // normalize for UI
-        return {
-            ...created,
-            status: "open",
-            due_date: created.dueDate || null,
-            deadline: created.dueDate || null,
-            start_date: created.startDate || null,
-            end_date: created.endDate || null,
-            assignee: created.assignee ?? payload.assignee ?? null,
-            duration: created.duration ?? null,
-            key_area_id: created.keyAreaId || payload.keyAreaId,
-            goal_id: created.goalId ?? created.goal_id ?? payload.goalId ?? null,
-            consulted: Array.isArray(created.consulted) ? created.consulted : payload.consulted,
-            informed: Array.isArray(created.informed) ? created.informed : payload.informed,
-            // expose list index to UI under both conventions
-            list_index: typeof created.listIndex !== 'undefined' ? created.listIndex : (typeof created.list_index !== 'undefined' ? created.list_index : 1),
-            listIndex: typeof created.listIndex !== 'undefined' ? created.listIndex : (typeof created.list_index !== 'undefined' ? created.list_index : 1),
-        };
-    },
-    async updateTask(id, task) {
-        const durationRaw = task.duration ?? task.duration_minutes;
-        const payload = {
-            keyAreaId: task.key_area_id || task.keyAreaId || task.key_area || task.keyArea,
-            goalId: task.goal_id || task.goalId || task.goal || null,
-            title: task.title,
-            description: nullableString(task.description, true),
-            assignee: nullableString(task.assignee, true),
-            startDate:
-                task.start_date !== undefined || task.startDate !== undefined
-                    ? (toDateOnly(task.start_date ?? task.startDate) || null)
-                    : undefined,
-            dueDate:
-                task.deadline !== undefined || task.due_date !== undefined || task.dueDate !== undefined
-                    ? (toDateOnly(task.deadline ?? task.due_date ?? task.dueDate) || null)
-                    : undefined,
-            endDate:
-                task.end_date !== undefined || task.endDate !== undefined
-                    ? (toDateOnly(task.end_date ?? task.endDate) || null)
-                    : undefined,
-            duration:
-                durationRaw === undefined
-                    ? undefined
-                    : durationRaw === null
-                        ? null
-                        : String(durationRaw).trim() || null,
-            // Ensure client-side list membership is sent to the backend when present
-            listIndex: typeof task.list_index !== 'undefined' ? task.list_index : (typeof task.listIndex !== 'undefined' ? task.listIndex : undefined),
-            status: (() => {
-                const s = String(task.status || "").toLowerCase();
-                if (!s) return undefined;
-                if (s === "open") return "todo";
-                if (s === "blocked") return "cancelled";
-                if (s === "done" || s === "closed" || s === "completed") return "completed";
-                if (s === "cancelled" || s === "canceled") return "cancelled";
-                if (s === "in_progress") return "in_progress";
-                return undefined;
-            })(),
-            priority: (() => {
-                const raw = task.priority;
-                if (raw === undefined || raw === null || raw === "") return undefined;
-                // numeric mapping (1|2|3)
-                const n = Number(raw);
-                if (!Number.isNaN(n)) {
-                    if (n === 1) return "low";
-                    if (n === 3) return "high";
-                    return "medium"; // 2 or others → medium
-                }
-                const p = String(raw).toLowerCase();
-                if (p === "med" || p === "medium" || p === "normal") return "medium";
-                if (p === "low") return "low";
-                if (p === "high") return "high";
-                return undefined;
-            })(),
-        };
-        if (Object.prototype.hasOwnProperty.call(task, 'delegatedToUserId') || Object.prototype.hasOwnProperty.call(task, 'delegated_to_user_id')) {
-            payload.delegatedToUserId = task.delegatedToUserId ?? task.delegated_to_user_id ?? null;
-        }
-    const updated = await (await getTaskService()).update(id, payload);
-        // Normalize BE response back to UI shape
-                const normalized = {
-                    ...updated,
-                    // `taskService.update` already returns FE-friendly status strings
-                    status: updated.status || "open",
-            due_date: updated.dueDate || null,
-            deadline: updated.dueDate || null,
-            start_date: updated.startDate || null,
-            end_date: updated.endDate || null,
-            assignee: updated.assignee ?? payload.assignee ?? null,
-            duration: updated.duration ?? null,
-            key_area_id: updated.keyAreaId || payload.keyAreaId,
-            delegatedToUserId:
-                updated.delegatedToUserId ??
-                updated.delegated_to_user_id ??
-                payload.delegatedToUserId ??
-                null,
-            // Ensure list_index from server response or payload is preserved
-            list_index: updated.listIndex ?? updated.list_index ?? payload.listIndex ?? payload.list_index ?? 1,
-            listIndex: updated.listIndex ?? updated.list_index ?? payload.listIndex ?? payload.list_index ?? 1,
-            // Ensure goal_id is preserved
-            goal_id: updated.goalId ?? updated.goal_id ?? payload.goalId ?? payload.goal_id ?? null,
-        };
-        // Carry over UI-only fields not persisted by backend so table/view keeps them
-        const uiOnly = ((t) => ({
-            tags: t.tags ?? "",
-            recurrence: t.recurrence ?? "",
-            attachments: t.attachments ?? "",
-            attachmentsFiles: t.attachmentsFiles ?? [],
-            eisenhower_quadrant:
-                t.eisenhower_quadrant ??
-                computeEisenhowerQuadrant({
-                    deadline: normalized.due_date || normalized.deadline,
-                    end_date: normalized.end_date,
-                    start_date: normalized.start_date,
-                    priority: normalized.priority,
-                    status: normalized.status,
-                    key_area_id: normalized.key_area_id,
-                }),
-            category: t.category ?? "Key Areas",
-        }))(task || {});
-        return { ...normalized, ...uiOnly };
-    },
-    async deleteTask(id) {
-        const svc = await getTaskService();
-        await svc.remove(id);
-        return true;
-    },
-};
-
-const normalizeActivityWithTask = (activity, task) => {
-    const norm = normalizeActivity(activity || {});
-    if (!norm) return norm;
-
-    const taskId = task?.id ?? task?.task_id ?? task?.taskId ?? null;
-    const keyAreaId =
-        norm.key_area_id ??
-        task?.key_area_id ??
-        task?.keyAreaId ??
-        task?.keyArea ??
-        null;
-    const listIndex =
-        norm.list ??
-        task?.list_index ??
-        task?.listIndex ??
-        task?.list ??
-        null;
-    const goalId =
-        norm.goal_id ??
-        norm.goalId ??
-        task?.goal_id ??
-        task?.goalId ??
-        task?.goal ??
-        null;
-    const assignee = norm.assignee ?? task?.assignee ?? null;
-
-    return {
-        ...norm,
-        title: norm.title || norm.text || norm.activity_name || norm.name || '',
-        name: norm.name || norm.title || norm.text || norm.activity_name || '',
-        taskId: norm.taskId || taskId || null,
-        key_area_id: keyAreaId,
-        keyAreaId,
-        list: listIndex,
-        list_index: listIndex,
-        listIndex,
-        goal_id: goalId,
-        goalId,
-        assignee,
-        responsible: norm.responsible ?? assignee ?? null,
-    };
-};
-
-const normalizeTaskForUi = (task, fallbackKeyAreaId = null) => {
-    if (!task) return task;
-    return {
-        ...task,
-        status: task.status || "open",
-        due_date: task.dueDate || task.due_date || null,
-        deadline: task.dueDate || task.due_date || null,
-        start_date: task.startDate || task.start_date || null,
-        end_date: task.endDate || task.end_date || null,
-        completionDate: task.completionDate || task.completion_date || null,
-        assignee: task.assignee ?? null,
-        duration: task.duration ?? null,
-        key_area_id: task.keyAreaId || task.key_area_id || fallbackKeyAreaId,
-        list_index: task.listIndex ?? task.list_index ?? 1,
-        listIndex: task.listIndex ?? task.list_index ?? 1,
-        goal_id: task.goalId ?? task.goal_id ?? null,
-    };
-};
-
-const mergeTaskUpdateForUi = (task, updates = {}) => {
-    if (!task) return task;
-    const next = { ...task, ...updates };
-
-    if (
-        Object.prototype.hasOwnProperty.call(updates, 'startDate') ||
-        Object.prototype.hasOwnProperty.call(updates, 'start_date') ||
-        Object.prototype.hasOwnProperty.call(updates, 'date_start')
-    ) {
-        const startValue = toDateOnly(updates.startDate ?? updates.start_date ?? updates.date_start) || null;
-        next.startDate = startValue;
-        next.start_date = startValue;
-    }
-
-    if (
-        Object.prototype.hasOwnProperty.call(updates, 'endDate') ||
-        Object.prototype.hasOwnProperty.call(updates, 'end_date') ||
-        Object.prototype.hasOwnProperty.call(updates, 'date_end')
-    ) {
-        const endValue = toDateOnly(updates.endDate ?? updates.end_date ?? updates.date_end) || null;
-        next.endDate = endValue;
-        next.end_date = endValue;
-    }
-
-    if (
-        Object.prototype.hasOwnProperty.call(updates, 'deadline') ||
-        Object.prototype.hasOwnProperty.call(updates, 'dueDate') ||
-        Object.prototype.hasOwnProperty.call(updates, 'due_date')
-    ) {
-        const deadlineValue = toDateOnly(updates.deadline ?? updates.dueDate ?? updates.due_date) || null;
-        next.deadline = deadlineValue;
-        next.dueDate = deadlineValue;
-        next.due_date = deadlineValue;
-    }
-
-    if (
-        Object.prototype.hasOwnProperty.call(updates, 'listIndex') ||
-        Object.prototype.hasOwnProperty.call(updates, 'list_index')
-    ) {
-        const listIndexValue = updates.listIndex ?? updates.list_index ?? 1;
-        next.listIndex = listIndexValue;
-        next.list_index = listIndexValue;
-    }
-
-    if (
-        Object.prototype.hasOwnProperty.call(updates, 'keyAreaId') ||
-        Object.prototype.hasOwnProperty.call(updates, 'key_area_id')
-    ) {
-        const keyAreaValue = updates.keyAreaId ?? updates.key_area_id ?? null;
-        next.keyAreaId = keyAreaValue;
-        next.key_area_id = keyAreaValue;
-    }
-
-    if (
-        Object.prototype.hasOwnProperty.call(updates, 'goalId') ||
-        Object.prototype.hasOwnProperty.call(updates, 'goal_id')
-    ) {
-        const goalValue = updates.goalId ?? updates.goal_id ?? null;
-        next.goalId = goalValue;
-        next.goal_id = goalValue;
-    }
-
-    return normalizeTaskForUi(next, task.key_area_id || task.keyAreaId || null);
-};
-
-const isTaskCompleted = (task) => {
-    const status = String(task?.status || "").toLowerCase();
-    if (status === "done" || status === "completed") return true;
-    return !status && Boolean(task?.completionDate || task?.completion_date);
-};
-
-const hasScheduledTaskDates = (task) =>
-    Boolean(toDateOnly(task?.start_date || task?.startDate) || toDateOnly(task?.end_date || task?.endDate));
-
-const TASK_STATUS_FILTER_VALUES = ["open", "in_progress", "completed"];
-const DEFAULT_TASK_STATUS_FILTER_VALUES = ["open", "in_progress"];
-const getInitialTaskStatusFilterValues = (activeFilter) => {
-    if (activeFilter === "all") return TASK_STATUS_FILTER_VALUES;
-    if (activeFilter === "completed") return ["completed"];
-    return DEFAULT_TASK_STATUS_FILTER_VALUES;
-};
-
-// Shared helpers (imported from utils/keyareasHelpers)
-
-// Minimal placeholders to keep non-list views functional
-const KanbanView = ({ tasks = [], onSelect, selectedIds = new Set(), toggleSelect = () => {}, onStatusChange = () => {} }) => {
-    const cols = [
-        { key: "open", label: t("keyAreas.statusOpen") },
-        { key: "in_progress", label: t("keyAreas.statusInProgress") },
-        { key: "blocked", label: t("keyAreas.statusBlocked") },
-        { key: "done", label: t("keyAreas.statusDone") },
-    ];
-    const groups = cols.map((c) => ({
-        ...c,
-        items: tasks.filter((t) => String(t.status || "open").toLowerCase() === c.key),
-    }));
-    const leftovers = tasks.filter((t) => !cols.some((c) => String(t.status || "open").toLowerCase() === c.key));
-    if (leftovers.length) groups.push({ key: "other", label: t("keyAreas.statusOther"), items: leftovers });
-
-    const priorityBadge = (p) => {
-        const lvl = getPriorityLevel(p);
-        if (lvl === 2) return null;
-        if (lvl === 3) {
-            return (
-                <img src={`${import.meta.env.BASE_URL}high-priority.svg`} alt="High priority" className="inline-block w-2 h-4" title="Priority: High" />
-            );
-        }
-        return (
-            <img src={`${import.meta.env.BASE_URL}low-priority-down.svg`} alt="Low priority" className="inline-block w-2 h-4" title="Priority: Low" />
-        );
-    };
-
-    return (
-        <div className="p-2 overflow-auto">
-            <DndContext
-                sensors={useSensors(
-                    useSensor(PointerSensor),
-                    useSensor(KeyboardSensor, {
-                        coordinateGetter: sortableKeyboardCoordinates,
-                    })
-                )}
-                collisionDetection={closestCenter}
-                onDragEnd={({ active, over }) => {
-                    if (!over || active.id === over.id) return;
-                    const oldIdx = keyAreas.findIndex((ka) => ka.id === active.id);
-                    const newIdx = keyAreas.findIndex((ka) => ka.id === over.id);
-                    // Prevent moving 'Ideas' or moving anything to 'Ideas' position
-                    if (keyAreas[oldIdx]?.is_fixed || keyAreas[newIdx]?.is_fixed) return;
-                    const newOrder = arrayMove(keyAreas, oldIdx, newIdx);
-                    setKeyAreas(newOrder);
-                    // TODO: Persist new order to backend
-                }}
-            >
-                <SortableContext items={keyAreas.filter(ka => !ka.is_fixed).map(ka => ka.id)}>
-                    {keyAreas.map((ka, idx) => (
-                        ka.is_fixed ? (
-                            <FixedKeyAreaRow key={ka.id} ka={ka} onOpen={openKA} />
-                        ) : (
-                            <SortableKeyAreaRow key={ka.id} ka={ka} idx={idx} moveKeyArea={moveKeyArea} onOpen={openKA} />
-                        )
-                    ))}
-                </SortableContext>
-            </DndContext>
-        </div>
-    );
-};
-
-const CalendarView = ({ tasks = [], onSelect, selectedIds = new Set(), toggleSelect = () => {}, onStatusChange = () => {} }) => {
-    // Group by deadline date (YYYY-MM-DD); undated last
-    const byDate = tasks.reduce((acc, t) => {
-        const key = toDateOnly(t.deadline) || "No date";
-        acc[key] = acc[key] || [];
-        acc[key].push(t);
-        return acc;
-    }, {});
-    const keys = Object.keys(byDate).sort((a, b) => {
-        if (a === "No date") return 1;
-        if (b === "No date") return -1;
-        return a.localeCompare(b);
-    });
-
-    const fmt = (d) => {
-        if (d === "No date") return d;
-        try {
-            const dd = new Date(d + "T00:00:00");
-            return dd.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
-        } catch {
-            return d;
-        }
-    };
-
-    return (
-        <div className="p-2 space-y-3">
-            {keys.map((k) => (
-                <div key={k} className="bg-white border border-slate-200 rounded-lg">
-                    <div className="px-3 py-2 border-b border-slate-200 text-xs font-semibold text-slate-700">
-                        {fmt(k)}
-                    </div>
-                    <div className="p-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                        {byDate[k].map((t) => (
-                            <div
-                                key={t.id}
-                                className="px-2 py-2 bg-slate-50 border border-slate-200 rounded-md hover:bg-slate-100"
-                                title={t.title}
-                            >
-                                <div className="flex items-start gap-2">
-                                    <input
-                                        type="checkbox"
-                                        aria-label={`Select ${t.title}`}
-                                        className="mt-0.5"
-                                        checked={selectedIds.has(t.id)}
-                                        onChange={() => toggleSelect(t.id)}
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => onSelect && onSelect(t)}
-                                        className="flex-1 text-left"
-                                    >
-                                        <div className={`font-medium truncate ${String(t.status || "").toLowerCase() === 'done' ? 'text-slate-400 line-through' : 'text-slate-900'}`}>{t.title}</div>
-                                        <div className="text-[11px] text-slate-500 mt-0.5 truncate capitalize">
-                                            {String(t.status || "open").replace("_", " ")}
-                                        </div>
-                                        
-                                        {/* Show read-only completion date when present */}
-                                        {t.completionDate ? (
-                                            <div className="text-[11px] text-slate-500 mt-1 truncate">
-                                                Completed: {formatDate(t.completionDate || t.completion_date)}
-                                            </div>
-                                        ) : null}
-                                    </button>
-
-                                    {/* Inline 3-option status control (open / in_progress / done) */}
-                                    <div className="ml-2 w-36">
-                                        <select
-                                            aria-label={`Change status for ${t.title}`}
-                                            className="w-full rounded-md border border-slate-300 bg-white p-1.5 text-sm"
-                                            value={String(t.status || "open").toLowerCase()}
-                                            onChange={async (e) => {
-                                                const next = e.target.value;
-                                                try {
-                                                    // optimistic UI update handled by parent callback
-                                                    onStatusChange && onStatusChange(t.id, next);
-                                                } catch (err) {
-                                                    console.error("Failed to update status", err);
-                                                }
-                                            }}
-                                        >
-                                            <option value="open">Open</option>
-                                            <option value="in_progress">In progress</option>
-                                            <option value="done">Done</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            ))}
-        </div>
-    );
 };
 
 /* Full page TaskFullView has been moved to src/components/key-areas/TaskFullView.jsx */
@@ -642,8 +84,6 @@ export default function KeyAreas() {
     const location = useLocation();
     const navigate = useNavigate();
     const { formatDate } = useFormattedDate();
-    const [loading, setLoading] = useState(true);
-    const [keyAreas, setKeyAreas] = useState([]);
     const [filter, setFilter] = useState("");
     const [showForm, setShowForm] = useState(false);
     const [editing, setEditing] = useState(null);
@@ -671,13 +111,15 @@ export default function KeyAreas() {
     // 'completed' => completed tasks only.
     const [activeFilter, setActiveFilter] = useState(initialActiveFilter);
     const isGlobalTasksView = viewTab === 'delegated' || viewTab === 'todo' || viewTab === 'activity-trap';
-    const [allTasks, setAllTasks] = useState([]);
-    const [syncActive, setSyncActive] = useState(false);
-    const [refreshTick, setRefreshTick] = useState(0);
-    const [delegatedTasks, setDelegatedTasks] = useState([]);
-    const [delegatedActivities, setDelegatedActivities] = useState([]);
-    const [pendingDelegationsLoading, setPendingDelegationsLoading] = useState(false);
-    const [savingIds, setSavingIds] = useState(new Set());
+    const { refreshTick } = useKeyAreasPageSync({
+        activeFilter,
+        getCalendarService,
+        location,
+        navigate,
+        setActiveFilter,
+        setViewTab,
+        viewTab,
+    });
     // Handler: change a task's status (UI value: open | in_progress | done)
     const handleTaskStatusChange = async (id, uiStatus) => {
         // optimistic update: set status locally (completionDate will be reconciled from server)
@@ -733,10 +175,6 @@ export default function KeyAreas() {
         }
     };
     const [searchTerm, setSearchTerm] = useState("");
-    // site-wide search state (moved to top bar). When non-empty, triggers searchResults fetch
-    const [siteSearch, setSiteSearch] = useState("");
-    const [searchResults, setSearchResults] = useState([]);
-    const [isSearching, setIsSearching] = useState(false);
     const [quadrant, setQuadrant] = useState("all");
     const [selectedTask, setSelectedTask] = useState(null);
     const [slideOverInitialTab, setSlideOverInitialTab] = useState("details");
@@ -749,6 +187,40 @@ export default function KeyAreas() {
     const [selectedActivityIdsInPanel, setSelectedActivityIdsInPanel] = useState(new Set());
     const [showActivityMassFieldPicker, setShowActivityMassFieldPicker] = useState(false);
     const [panelTargetActivityId, setPanelTargetActivityId] = useState(null);
+    const {
+        allTasks,
+        setAllTasks,
+        delegatedTasks,
+        setDelegatedTasks,
+        delegatedActivities,
+        setDelegatedActivities,
+        pendingDelegationsLoading,
+        activitiesByTask,
+        setActivitiesByTask,
+        refreshDelegatedData,
+        refreshActivitiesForTask,
+    } = useKeyAreasTaskData({
+        viewTab,
+        selectedKA,
+        selectedTaskFullId: selectedTaskFull?.id,
+        refreshTick,
+    });
+    const {
+        isSearching,
+        searchResults,
+        setSiteSearch,
+        siteSearch,
+    } = useKeyAreasSearchAndEvents({
+        activitiesByTask,
+        allTasks,
+        api,
+        getActivityService,
+        getPriorityLevel,
+        selectedKA,
+        setActivitiesByTask,
+        setAllTasks,
+        toDateOnly,
+    });
 
     const resolveTaskForUnifiedActivity = useCallback(async (activity) => {
         const normalizedActivity = normalizeActivity(activity || {});
@@ -902,32 +374,6 @@ export default function KeyAreas() {
         [],
     );
 
-    const refreshDelegatedData = useCallback(async ({ showLoading = false } = {}) => {
-        if (showLoading) setPendingDelegationsLoading(true);
-        try {
-            const [delegatedToMe, delegatedToMeActivities] = await Promise.all([
-                taskDelegationService.getDelegatedToMe(),
-                activityDelegationService.getDelegatedToMe(),
-            ]);
-
-            const nextTasks = Array.isArray(delegatedToMe) ? delegatedToMe : [];
-            const nextActivities = Array.isArray(delegatedToMeActivities) ? delegatedToMeActivities : [];
-
-            setDelegatedTasks(nextTasks);
-            setDelegatedActivities(nextActivities);
-            setAllTasks(nextTasks);
-            setActivitiesByTask({});
-        } catch (e) {
-            console.error('Failed to load delegated tasks', e);
-            setDelegatedTasks([]);
-            setDelegatedActivities([]);
-            setAllTasks([]);
-            setActivitiesByTask({});
-        } finally {
-            if (showLoading) setPendingDelegationsLoading(false);
-        }
-    }, []);
-
     const pendingDelegations = useMemo(
         () => [
             ...delegatedTasks
@@ -955,152 +401,29 @@ export default function KeyAreas() {
         () => delegatedActivities.filter((item) => getDelegationStatus(item) === 'accepted'),
         [delegatedActivities, getDelegationStatus],
     );
-    const [panelViewMode, setPanelViewMode] = useState(() => {
-        try {
-            return window.localStorage.getItem("keyareas.panelViewMode") || "triple";
-        } catch {
-            return "triple";
-        }
-    });
-    const [showPanelViewMenu, setShowPanelViewMenu] = useState(false);
-    const panelViewMenuRef = useRef(null);
-    // Inline Activities popover state
-    const [openActivitiesMenu, setOpenActivitiesMenu] = useState(null); // task id or null
-    const [activitiesMenuPos, setActivitiesMenuPos] = useState({ top: 0, left: 0 });
+    const {
+        activitiesMenuPos,
+        columnsMenuRef,
+        listMenuPos,
+        openActivitiesMenu,
+        openListMenu,
+        panelViewMenuRef,
+        panelViewMode,
+        setActivitiesMenuPos,
+        setOpenActivitiesMenu,
+        setOpenListMenu,
+        setListMenuPos,
+        setPanelViewMode,
+        setShowColumnsMenu,
+        setShowPanelViewMenu,
+        setShowStatusMenu,
+        showColumnsMenu,
+        showPanelViewMenu,
+        showStatusMenu,
+        statusMenuRef,
+        tabsRef,
+    } = useKeyAreasMenus();
     const prevViewTabRef = useRef(initialViewTab);
-    const prevActiveFilterRef = useRef(initialActiveFilter);
-    const openingKaIdRef = useRef(null);
-    const suppressKaParamOpenRef = useRef(false);
-    const ActivityRowMenu = ({ activity, taskId }) => {
-        const [open, setOpen] = useState(false);
-        const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
-        const btnRef = useRef(null);
-        const menuRef = useRef(null);
-
-        const updateMenuPos = () => {
-            const btn = btnRef.current;
-            if (!btn) return;
-            const menuWidth = menuRef.current?.offsetWidth || 176;
-            const rect = btn.getBoundingClientRect();
-            const scrollHost =
-                btn.closest('.overflow-x-auto') ||
-                btn.closest('.overflow-auto') ||
-                btn.closest('[class*="overflow"]');
-            const hostRect = scrollHost?.getBoundingClientRect?.() || null;
-            let left = rect.left;
-            const minLeft = hostRect ? hostRect.left + 8 : 8;
-            const maxLeft = hostRect
-                ? hostRect.right - menuWidth - 8
-                : window.innerWidth - menuWidth - 8;
-            if (left > maxLeft) left = Math.max(minLeft, maxLeft);
-            if (left < minLeft) left = minLeft;
-            const top = rect.bottom + 4;
-            setMenuPos({ top, left });
-        };
-
-        useEffect(() => {
-            if (!open) return;
-            const onDown = (e) => {
-                if (menuRef.current && menuRef.current.contains(e.target)) return;
-                if (btnRef.current && btnRef.current.contains(e.target)) return;
-                setOpen(false);
-            };
-            const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
-            const onReposition = () => updateMenuPos();
-            updateMenuPos();
-            document.addEventListener('mousedown', onDown);
-            document.addEventListener('keydown', onKey);
-            window.addEventListener('resize', onReposition);
-            window.addEventListener('scroll', onReposition, true);
-            return () => {
-                document.removeEventListener('mousedown', onDown);
-                document.removeEventListener('keydown', onKey);
-                window.removeEventListener('resize', onReposition);
-                window.removeEventListener('scroll', onReposition, true);
-            };
-        }, [open]);
-
-        const toggle = (e) => {
-            e.stopPropagation();
-            setOpen((s) => !s);
-        };
-
-        const handleEdit = () => {
-            setOpen(false);
-            try {
-                window.dispatchEvent(new CustomEvent('ka-open-activity-editor', { detail: { activity, taskId } }));
-            } catch (e) {}
-        };
-
-        const handleDelete = async () => {
-            setOpen(false);
-            if (!confirm(`Delete activity "${(activity?.text || activity?.activity_name || 'Untitled activity')}"?`)) return;
-            try {
-                const activityService = await getActivityService();
-                await activityService.remove(activity.id);
-                setActivitiesByTask((prev) => {
-                    const key = String(taskId || activity.task_id || activity.taskId || '');
-                    if (!key) return prev;
-                    const updated = { ...prev };
-                    updated[key] = (updated[key] || []).filter((a) => a.id !== activity.id);
-                    return updated;
-                });
-            } catch (error) {
-                console.error('Failed to delete activity:', error);
-            }
-        };
-
-        const handleConvert = () => {
-            setOpen(false);
-            try {
-                window.dispatchEvent(new CustomEvent('ka-create-task-from-activity', { detail: { taskId, activity } }));
-            } catch (e) {}
-        };
-
-        return (
-            <div className="inline-block relative">
-                <button
-                    type="button"
-                    ref={btnRef}
-                    aria-haspopup="menu"
-                    aria-expanded={open}
-                    onClick={toggle}
-                    className="p-1 rounded hover:bg-slate-100 text-slate-600"
-                    title="More actions"
-                >
-                    <FaEllipsisV />
-                </button>
-                {open && createPortal(
-                    <div
-                        ref={menuRef}
-                        style={{ position: 'fixed', top: menuPos.top, left: menuPos.left, zIndex: 1000, minWidth: 176 }}
-                        className="bg-white border border-slate-200 rounded shadow"
-                    >
-                        <button type="button" className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm hover:bg-slate-50" onClick={handleEdit}>
-                            <FaEdit className="text-slate-600" />
-                            <span>Edit</span>
-                        </button>
-                        <button type="button" className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50" onClick={handleDelete}>
-                            <FaTrash />
-                            <span>{t("keyAreas.deleteActivity")}</span>
-                        </button>
-                        <button type="button" className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50" onClick={handleConvert}>
-                            <FaAngleDoubleLeft />
-                            <span>{t("keyAreas.convertToTask")}</span>
-                        </button>
-                    </div>,
-                    document.body,
-                )}
-            </div>
-        );
-    };
-
-    useEffect(() => {
-        try {
-            window.localStorage.setItem("keyareas.panelViewMode", panelViewMode);
-        } catch {}
-    }, [panelViewMode]);
-
     useEffect(() => {
         if (panelViewMode === "simple") {
             setSelectedTaskInPanel(null);
@@ -1133,371 +456,79 @@ export default function KeyAreas() {
         prevViewTabRef.current = viewTab;
     }, [viewTab]);
 
-    useEffect(() => {
-        if (!showPanelViewMenu) return;
-        const handleClick = (e) => {
-            if (!panelViewMenuRef.current) return;
-            if (!panelViewMenuRef.current.contains(e.target)) setShowPanelViewMenu(false);
-        };
-        const handleKey = (e) => {
-            if (e.key === "Escape") setShowPanelViewMenu(false);
-        };
-        document.addEventListener("mousedown", handleClick);
-        document.addEventListener("keydown", handleKey);
-        return () => {
-            document.removeEventListener("mousedown", handleClick);
-            document.removeEventListener("keydown", handleKey);
-        };
-    }, [showPanelViewMenu]);
-
-    const saveActivityName = async (activity, taskId, value) => {
-        const trimmed = String(value || '').trim();
-        setActivityNameEditId(null);
-        if (!trimmed) return;
-        const current = (activity?.text || activity?.activity_name || '').trim();
-        if (trimmed === current) return;
-        try {
-            const svc = await getActivityService();
-            const result = await svc.update(activity.id, { text: trimmed });
-            setActivitiesByTask((prev) => {
-                const key = String(taskId || activity.taskId || activity.task_id || '');
-                if (!key) return prev;
-                const updated = { ...prev };
-                updated[key] = (updated[key] || []).map((a) => (a.id === activity.id ? { ...a, ...result } : a));
-                return updated;
-            });
-        } catch (error) {
-            console.error('Failed to update activity name:', error);
-        }
-    };
-
-    const updateActivityField = async (activity, taskId, key, value) => {
-        const tid = String(taskId || activity?.taskId || activity?.task_id || '');
-        if (!tid) return;
-        const prevList = Array.isArray(activitiesByTask[tid]) ? activitiesByTask[tid].slice() : [];
-        const resolvedDates =
-            key === 'start_date' || key === 'end_date' || key === 'deadline'
-                ? applyStartEndDateRule({
-                    startDate: activity?.start_date ?? activity?.startDate,
-                    endDate: activity?.end_date ?? activity?.endDate,
-                    deadline: activity?.deadline,
-                    changedKey: key,
-                    changedValue: value,
-                })
-                : null;
-        const apiDateKeyMap = {
-            start_date: 'startDate',
-            end_date: 'endDate',
-            startDate: 'startDate',
-            endDate: 'endDate',
-            deadline: 'deadline',
-        };
-
-        const optimistic = (a) => {
-            if (a.id !== activity.id) return a;
-            if (resolvedDates) {
-                return {
-                    ...a,
-                    start_date: resolvedDates.startDate || null,
-                    startDate: resolvedDates.startDate || null,
-                    end_date: resolvedDates.endDate || null,
-                    endDate: resolvedDates.endDate || null,
-                    deadline: resolvedDates.deadline || null,
-                };
-            }
-            if (key === 'status') return { ...a, status: value };
-            if (key === 'priority') return { ...a, priority: value };
-            if (key === 'start_date' || key === 'end_date' || key === 'deadline') return { ...a, [key]: value };
-            if (key === 'assignee') {
-                const selectedUser = (users || []).find((u) => String(u.id || u.member_id) === String(value));
-                if (selectedUser) {
-                    const selectedUserId = selectedUser.id || selectedUser.member_id;
-                    const displayName =
-                        currentUserId && String(selectedUserId) === String(currentUserId)
-                            ? 'Me'
-                            : (selectedUser.name || `${selectedUser.firstname || ''} ${selectedUser.lastname || ''}`.trim() || a.assignee || '');
-                    return { ...a, assignee: displayName };
-                }
-                return { ...a, assignee: value || '' };
-            }
-            return { ...a, [key]: value };
-        };
-
-        setActivitiesByTask((prev) => ({ ...prev, [tid]: (prev[tid] || []).map(optimistic) }));
-        setSavingActivityIds((s) => new Set([...s, activity.id]));
-
-        try {
-            if (key === 'assignee') {
-                const svc = await getActivityService();
-                const updated = await svc.update(activity.id, {
-                    delegatedToUserId: value || null,
-                });
-                const norm = normalizeActivity(updated || {});
-                setActivitiesByTask((prev) => ({
-                    ...prev,
-                    [tid]: (prev[tid] || []).map((a) => (a.id === activity.id ? { ...a, ...norm } : a)),
-                }));
-                addToast && addToast({ title: t('keyAreas.toastSaved'), variant: 'success' });
-            } else {
-                const svc = await getActivityService();
-                const body = {};
-
-                if (key === 'status') body.status = mapUiStatusToServer(value);
-                else if (key === 'priority') body.priority = value;
-                else if (resolvedDates) {
-                    const toIsoOrNull = (dateValue) => {
-                        if (!dateValue) return null;
-                        if (/^\d{4}-\d{2}-\d{2}$/.test(String(dateValue))) {
-                            try {
-                                const [y, m, d] = String(dateValue).split('-').map((s) => parseInt(s, 10));
-                                return new Date(Date.UTC(y, m - 1, d)).toISOString();
-                            } catch (err) {
-                                return String(dateValue);
-                            }
-                        }
-                        return String(dateValue);
-                    };
-                    body.startDate = toIsoOrNull(resolvedDates.startDate);
-                    body.endDate = toIsoOrNull(resolvedDates.endDate);
-                    body.deadline = toIsoOrNull(resolvedDates.deadline);
-                } else if (apiDateKeyMap[key]) {
-                    const apiKey = apiDateKeyMap[key];
-                    if (!value) body[apiKey] = null;
-                    else if (/^\d{4}-\d{2}-\d{2}$/.test(String(value))) {
-                        try {
-                            const [y, m, d] = String(value).split('-').map((s) => parseInt(s, 10));
-                            body[apiKey] = new Date(Date.UTC(y, m - 1, d)).toISOString();
-                        } catch (err) {
-                            body[apiKey] = String(value);
-                        }
-                    } else {
-                        body[apiKey] = String(value);
-                    }
-                } else body[key] = value;
-
-                const updated = await svc.update(activity.id, body);
-                const norm = normalizeActivity(updated || {});
-                setActivitiesByTask((prev) => ({
-                    ...prev,
-                    [tid]: (prev[tid] || []).map((a) => (a.id === activity.id ? { ...a, ...norm } : a)),
-                }));
-                addToast && addToast({ title: t('keyAreas.toastSaved'), variant: 'success' });
-            }
-        } catch (error) {
-            console.error('Failed to update activity', error);
-            setActivitiesByTask((prev) => ({ ...prev, [tid]: prevList }));
-            addToast && addToast({ title: t('keyAreas.toastUpdateActivityFailed'), variant: 'error' });
-        } finally {
-            setSavingActivityIds((s) => {
-                const copy = new Set(s);
-                copy.delete(activity.id);
-                return copy;
-            });
-        }
-    };
-
-    // Mass edit selection & form state
-    const [selectedIds, setSelectedIds] = useState(new Set());
-    const [bulkForm, setBulkForm] = useState({
-        assignee: "",
-        status: "",
-        priority: "",
-        start_date: "",
-        deadline: "",
-        end_date: "",
-    });
-    const [sortBy, setSortBy] = useState("manual");
-    const [taskSortField, setTaskSortField] = useState(() => {
-        try {
-            return window.localStorage.getItem('keyareas.taskSortField') || null;
-        } catch (_) {}
-        return null;
-    });
-    const [taskSortDirection, setTaskSortDirection] = useState(() => {
-        try {
-            return window.localStorage.getItem('keyareas.taskSortDirection') || null;
-        } catch (_) {}
-        return null;
-    });
-    const [activitySortField, setActivitySortField] = useState(() => {
-        try {
-            return window.localStorage.getItem('keyareas.activitySortField') || null;
-        } catch (_) {}
-        return null;
-    });
-    const [activitySortDirection, setActivitySortDirection] = useState(() => {
-        try {
-            return window.localStorage.getItem('keyareas.activitySortDirection') || null;
-        } catch (_) {}
-        return null;
-    });
-    const [filterStatuses, setFilterStatuses] = useState(() => getInitialTaskStatusFilterValues(initialActiveFilter));
-    const [filterAssignee, setFilterAssignee] = useState("");
-    const [view, setView] = useState("list");
-    useEffect(() => {
-        const prev = prevActiveFilterRef.current;
-        if (prev === activeFilter) return;
-
-        if (activeFilter === "all") {
-            setFilterStatuses(TASK_STATUS_FILTER_VALUES);
-        } else if (activeFilter === "completed") {
-            setFilterStatuses(["completed"]);
-        } else if (
-            activeFilter === "active" &&
-            (
-                prev === "completed" ||
-                filterStatuses.length === 0 ||
-                (filterStatuses.length === 1 && filterStatuses[0] === "completed")
-            )
-        ) {
-            setFilterStatuses(DEFAULT_TASK_STATUS_FILTER_VALUES);
-        }
-
-        prevActiveFilterRef.current = activeFilter;
-    }, [activeFilter, filterStatuses]);
-
-    const defaultVisible = {
-        responsible: true,
-        status: true,
-        priority: true,
-        quadrant: true,
-        start_date: true,
-        end_date: true,
-        deadline: true,
-        duration: true,
-        completed: true,
-    };
-    const [visibleColumns, setVisibleColumns] = useState(() => {
-        try {
-            const raw = window.localStorage.getItem('keyareas.visibleColumns');
-            if (raw) {
-                const parsed = JSON.parse(raw);
-                // merge with defaults so newly-added keys default to true
-                return { ...defaultVisible, ...parsed };
-            }
-        } catch (e) {
-            // ignore
-        }
-        return defaultVisible;
-    });
-
-    // Persist visibleColumns to localStorage so user selection survives refresh
-    useEffect(() => {
-        try {
-            window.localStorage.setItem('keyareas.visibleColumns', JSON.stringify(visibleColumns));
-        } catch (e) {
-            // ignore storage errors
-        }
-    }, [visibleColumns]);
-    // Persist task sort state to localStorage
-    useEffect(() => {
-        try {
-            if (taskSortField) {
-                window.localStorage.setItem('keyareas.taskSortField', taskSortField);
-            } else {
-                window.localStorage.removeItem('keyareas.taskSortField');
-            }
-        } catch (_) {}
-    }, [taskSortField]);
-
-    useEffect(() => {
-        try {
-            if (taskSortDirection) {
-                window.localStorage.setItem('keyareas.taskSortDirection', taskSortDirection);
-            } else {
-                window.localStorage.removeItem('keyareas.taskSortDirection');
-            }
-        } catch (_) {}
-    }, [taskSortDirection]);
-
-    useEffect(() => {
-        try {
-            if (activitySortField) {
-                window.localStorage.setItem('keyareas.activitySortField', activitySortField);
-            } else {
-                window.localStorage.removeItem('keyareas.activitySortField');
-            }
-        } catch (_) {}
-    }, [activitySortField]);
-
-    useEffect(() => {
-        try {
-            if (activitySortDirection) {
-                window.localStorage.setItem('keyareas.activitySortDirection', activitySortDirection);
-            } else {
-                window.localStorage.removeItem('keyareas.activitySortDirection');
-            }
-        } catch (_) {}
-    }, [activitySortDirection]);
-
-    // When siteSearch changes, perform a site-wide search across all Key Areas (debounced)
-    useEffect(() => {
-        const q = String(siteSearch || "").trim();
-        let cancelled = false;
-        let timer = null;
-        if (q.length < 2) {
-            setSearchResults([]);
-            setIsSearching(false);
-            return () => {};
-        }
-        setIsSearching(true);
-        timer = setTimeout(async () => {
-            try {
-                const kas = await api.listKeyAreas();
-                const tasksLists = await Promise.all((kas || []).map((k) => api.listTasks(k.id)));
-                const combined = (tasksLists || []).flat().map((t) => ({ ...t, key_area_id: t.key_area_id || t.keyAreaId || t.key_area }));
-                const ql = q.toLowerCase();
-                const filtered = (combined || []).filter((t) => {
-                    const title = (t.title || t.name || '').toLowerCase();
-                    const desc = (t.description || t.notes || '').toLowerCase();
-                    return title.includes(ql) || desc.includes(ql);
-                });
-                if (!cancelled) setSearchResults(filtered);
-            } catch (e) {
-                if (!cancelled) setSearchResults([]);
-            } finally {
-                if (!cancelled) setIsSearching(false);
-            }
-        }, 300);
-        return () => {
-            cancelled = true;
-            if (timer) clearTimeout(timer);
-        };
-    }, [siteSearch]);
-    const [goals, setGoals] = useState([]);
-    const [showMobileSidebar, setShowMobileSidebar] = useState(false);
-    const [showTaskComposer, setShowTaskComposer] = useState(false);
-    const [editingTaskId, setEditingTaskId] = useState(null);
-    const [editingActivityViaTaskModal, setEditingActivityViaTaskModal] = useState(null); // { id, taskId }
-    const [showActivityComposer, setShowActivityComposer] = useState(false);
-    const [editingActivityId, setEditingActivityId] = useState(null);
     const [activityNameEditId, setActivityNameEditId] = useState(null);
     const [activityNameEditValue, setActivityNameEditValue] = useState('');
     const [activityDateEditId, setActivityDateEditId] = useState(null);
     const [activityDurationEdit, setActivityDurationEdit] = useState({ id: null, value: '' });
     const activityDateRefs = useRef({});
     const [showTaskHelp, setShowTaskHelp] = useState(false);
-    const [listNames, setListNames] = useState({}); // { [keyAreaId]: { [index]: name } }
-    const [showViewMenu, setShowViewMenu] = useState(false);
-    const viewMenuRef = useRef(null);
-    const [showColumnsMenu, setShowColumnsMenu] = useState(false);
-    const [showStatusMenu, setShowStatusMenu] = useState(false);
-    const columnsMenuRef = useRef(null);
-    const statusMenuRef = useRef(null);
-    const columnsButtonRef = useRef(null);
-    const columnsMenuPopupRef = useRef(null);
-    const [columnsAnchor, setColumnsAnchor] = useState(null);
-    const [openListMenu, setOpenListMenu] = useState(null); // list number for context menu
-    const [listMenuPos, setListMenuPos] = useState({ top: 0, left: 0 }); // popup menu position
-    const tabsRef = useRef(null);
-    // Mass edit UI toggle and anchor
-    const [showMassEdit, setShowMassEdit] = useState(false);
-    const [showMassEditModal, setShowMassEditModal] = useState(false);
-    const [showMassFieldPicker, setShowMassFieldPicker] = useState(false);
-    const [massEditField, setMassEditField] = useState(null);
-    const tasksDisplayRef = useRef(null);
-    const [users, setUsers] = useState([]);
-    const [currentUserId, setCurrentUserId] = useState(null);
+    // Toasts and saving state for activity updates
+    const { addToast } = useToast ? useToast() : { addToast: () => {} };
+    const {
+        activityAttachTaskId,
+        setActivityAttachTaskId,
+        activityForm,
+        setActivityForm,
+        editingActivityId,
+        setEditingActivityId,
+        editingActivityViaTaskModal,
+        setEditingActivityViaTaskModal,
+        editingTaskId,
+        setEditingTaskId,
+        showActivityComposer,
+        setShowActivityComposer,
+        showEditActivityModal,
+        setShowEditActivityModal,
+        showTaskComposer,
+        setShowTaskComposer,
+        taskForm,
+        setTaskForm,
+    } = useKeyAreasComposer({
+        selectedKA,
+        allTasks,
+        setAllTasks,
+        setActivitiesByTask,
+    });
+    useKeyAreasComposerSync({
+        activityForm,
+        setActivityAttachTaskId,
+        setActivityForm,
+        setEditingActivityViaTaskModal,
+        setEditingTaskId,
+        setShowActivityComposer,
+        setShowTaskComposer,
+        setTaskForm,
+        setTaskTab,
+        showActivityComposer,
+        showTaskComposer,
+        taskForm,
+        taskTab,
+    });
+    // Sidebar sort: Alphabetical A→Z, with "Ideas" (or system default) always last
+    const sortForSidebar = React.useCallback((arr) => {
+        const items = Array.isArray(arr) ? arr.slice() : [];
+
+        const regularAreas = items.filter((item) => {
+            const isIdeas = (item.title || '').trim().toLowerCase() === 'ideas' || !!item.is_default;
+            return !isIdeas;
+        });
+
+        const ideasAreas = items.filter((item) => {
+            const isIdeas = (item.title || '').trim().toLowerCase() === 'ideas' || !!item.is_default;
+            return isIdeas;
+        });
+
+        const sortedRegular = regularAreas.sort((a, b) => (a.position || 0) - (b.position || 0));
+        return [...sortedRegular, ...ideasAreas];
+    }, []);
+    const {
+        loading,
+        keyAreas,
+        setKeyAreas,
+        goals,
+        users,
+        currentUserId,
+    } = useKeyAreasBootstrap({ sortForSidebar });
 
     // Build a stable lookup map from any possible goal id key to the goal title.
     // This avoids repeated array scans in TaskRow and makes lookups resilient
@@ -1506,10 +537,10 @@ export default function KeyAreas() {
         const m = new Map();
         try {
             (goals || []).forEach((g) => {
-                const title = g && (g.title || g.name || g.label) ;
+                const title = g && (g.title || g.name || g.label);
                 const ids = [g && g.id, g && g._id, g && g.goalId, g && g.goal_id];
                 ids.forEach((id) => {
-                    if (id !== undefined && id !== null) m.set(String(id), title || "");
+                    if (id !== undefined && id !== null) m.set(String(id), title || '');
                 });
             });
         } catch (_) {}
@@ -1521,590 +552,45 @@ export default function KeyAreas() {
     useEffect(() => {
         try {
             if (goals && goals.length && allTasks && allTasks.length) {
-                // shallow copy to trigger subscribers without changing identity of items
                 setAllTasks((prev) => (Array.isArray(prev) ? prev.slice() : prev));
             }
         } catch (_) {}
     }, [goals.length]);
-
-    // Sync view tab and active filter from URL params
-    useEffect(() => {
-        const params = new URLSearchParams(location.search || "");
-        const viewParam = params.get('view');
-        const activeParam = params.get('active');
-        const allowedViews = new Set(['active-tasks', 'delegated', 'todo', 'activity-trap', 'my-focus']);
-        if (viewParam && allowedViews.has(viewParam) && viewParam !== viewTab) {
-            setViewTab(viewParam);
-        }
-        if (activeParam && (activeParam === 'active' || activeParam === 'all' || activeParam === 'completed') && activeParam !== activeFilter) {
-            setActiveFilter(activeParam);
-        } else if (
-            !activeParam &&
-            (viewParam === 'active-tasks' || (!viewParam && viewTab === 'active-tasks')) &&
-            activeFilter !== 'all'
-        ) {
-            setActiveFilter('all');
-        }
-    }, [location.search]);
-
-    // Persist view tab and active filter to URL (keep other params intact)
-    useEffect(() => {
-        const params = new URLSearchParams(location.search || "");
-        let changed = false;
-        if (params.get('view') !== viewTab) {
-            params.set('view', viewTab);
-            changed = true;
-        }
-        if (viewTab === 'active-tasks') {
-            if (params.get('active') !== activeFilter) {
-                params.set('active', activeFilter);
-                changed = true;
-            }
-        } else if (params.has('active')) {
-            params.delete('active');
-            changed = true;
-        }
-        if (changed) {
-            navigate({ pathname: location.pathname, search: `?${params.toString()}` }, { replace: true });
-        }
-    }, [viewTab, activeFilter]);
-
-    // Check if external sync is active so we can auto-refresh tasks
-    useEffect(() => {
-        let ignore = false;
-        (async () => {
-            try {
-                const svc = await getCalendarService();
-                const status = await svc.getSyncStatus();
-                if (!ignore) setSyncActive(!!(status?.google?.connected || status?.microsoft?.connected));
-            } catch (_) {
-                if (!ignore) setSyncActive(false);
-            }
-        })();
-        return () => { ignore = true; };
-    }, []);
-
-    // Poll every 15s when external sync is active
-    useEffect(() => {
-        if (!syncActive) return;
-        const id = setInterval(() => setRefreshTick((t) => t + 1), 15000);
-        return () => clearInterval(id);
-    }, [syncActive]);
-
-    // Reload tasks when viewTab or activeFilter changes
-    useEffect(() => {
-        // Handle MY FOCUS tab - navigate to separate page
-        if (viewTab === 'my-focus') {
-            navigate('/my-focus');
-            return;
-        }
-        
-        // Handle DELEGATED tab - show TWO sections: pending at top, all delegated below
-        if (viewTab === 'delegated') {
-            refreshDelegatedData({ showLoading: true });
-            return;
-        }
-        
-        // Handle TODO tab - show all tasks across all key areas (no key area filter)
-        if (viewTab === 'todo') {
-            (async () => {
-                try {
-                    const svc = await getTaskService();
-                    // Load ALL user tasks (empty opts = all tasks owned by user)
-                    const allUserTasks = await svc.list({});
-                    const normalizedTasks = Array.isArray(allUserTasks)
-                        ? allUserTasks.map((task) => normalizeTaskForUi(task))
-                        : [];
-                    setAllTasks(normalizedTasks);
-                    
-                    // Load activities for all tasks
-                    const actSvc = await getActivityService();
-                    const entries = await Promise.all(
-                        normalizedTasks.map(async (row) => {
-                            try {
-                                const list = await actSvc.list({ taskId: row.id });
-                                return [
-                                    String(row.id),
-                                    Array.isArray(list)
-                                        ? list.map((activity) => normalizeActivityWithTask(activity, row))
-                                        : [],
-                                ];
-                            } catch {
-                                return [String(row.id), []];
-                            }
-                        }),
-                    );
-                    setActivitiesByTask(Object.fromEntries(entries));
-                } catch (e) {
-                    console.error('Failed to load all tasks', e);
-                }
-            })();
-            return;
-        }
-
-        // Handle ACTIVITY TRAP tab - show tasks without goals from ALL key areas (no key area filter)
-        if (viewTab === 'activity-trap') {
-            (async () => {
-                try {
-                    const svc = await getTaskService();
-                    // Load all tasks without goals (empty keyAreaId = all key areas)
-                    const trapTasks = await svc.list({ withoutGoal: true });
-                    const normalizedTrapTasks = Array.isArray(trapTasks)
-                        ? trapTasks.map((task) => normalizeTaskForUi(task))
-                        : [];
-                    setAllTasks(normalizedTrapTasks);
-                    
-                    // Load activities for all trap tasks
-                    const actSvc = await getActivityService();
-                    const entries = await Promise.all(
-                        normalizedTrapTasks.map(async (row) => {
-                            try {
-                                const list = await actSvc.list({ taskId: row.id });
-                                return [
-                                    String(row.id),
-                                    Array.isArray(list)
-                                        ? list.map((activity) => normalizeActivityWithTask(activity, row))
-                                        : [],
-                                ];
-                            } catch {
-                                return [String(row.id), []];
-                            }
-                        }),
-                    );
-                    setActivitiesByTask(Object.fromEntries(entries));
-                } catch (e) {
-                    console.error('Failed to load activity trap tasks', e);
-                }
-            })();
-            return;
-        }
-        
-        // For ACTIVE TASKS - require selected key area
-        if (!selectedKA) return;
-        (async () => {
-            const opts = { keyAreaId: selectedKA.id };
-            const t = await api.listTasks(selectedKA.id, opts);
-            setAllTasks(t);
-            // Reload activities for the filtered tasks
-            try {
-                const svc = await getActivityService();
-                const entries = await Promise.all(
-                    (t || []).map(async (row) => {
-                        try {
-                            const list = await svc.list({ taskId: row.id });
-                            return [String(row.id), Array.isArray(list) ? list.map(normalizeActivity) : []];
-                        } catch {
-                            return [String(row.id), []];
-                        }
-                    }),
-                );
-                setActivitiesByTask(Object.fromEntries(entries));
-            } catch (e) {
-                // ignore activity load failures
-            }
-        })();
-    }, [viewTab, activeFilter, selectedKA?.id, currentUserId, navigate, refreshTick, refreshDelegatedData]);
-    
-    // Listen for 'task-created' events from ModalManager (navbar quick actions)
-    // When a task is created via the quick actions with a key area, add it to allTasks
-    useEffect(() => {
-        const handler = (e) => {
-            const created = e && e.detail ? e.detail : null;
-            if (!created) return;
-            
-            // Only add the task if it matches the currently selected key area
-            const createdKeyAreaId = created.keyAreaId || created.key_area_id || null;
-            if (!selectedKA || String(createdKeyAreaId) !== String(selectedKA.id)) return;
-            
-            try {
-                // Normalize the created task to match the format used internally
-                const normalized = {
-                    ...created,
-                    // Normalize field names
-                    status: mapServerStatusToUi(created.status),
-                    due_date: created.dueDate || created.due_date || null,
-                    deadline: created.dueDate || created.due_date || null,
-                    start_date: created.startDate || created.start_date || null,
-                    end_date: created.endDate || created.end_date || null,
-                    completionDate: created.completionDate || created.completion_date || null,
-                    assignee: created.assignee ?? null,
-                    duration: created.duration ?? null,
-                    key_area_id: createdKeyAreaId,
-                    list_index: created.listIndex ?? created.list_index ?? 1,
-                    listIndex: created.listIndex ?? created.list_index ?? 1,
-                    goal_id: created.goalId ?? created.goal_id ?? null,
-                };
-                
-                // Add the task to allTasks
-                setAllTasks((prev) => [...(prev || []), normalized]);
-            } catch (err) {
-                console.error('Failed to add task-created event to allTasks', err);
-            }
-        };
-        
-        window.addEventListener('task-created', handler);
-        return () => window.removeEventListener('task-created', handler);
-    }, [selectedKA]);
-    
-    // Listen for 'activity-created' events from ModalManager (navbar quick actions)
-    // When an activity is created via quick actions, add it to activitiesByTask
-    useEffect(() => {
-        const handler = (e) => {
-            const created = e && e.detail ? e.detail : null;
-            if (!created) return;
-            
-            const taskId = created.taskId || created.task_id;
-            if (!taskId) return; // Activities must have a taskId
-            
-            try {
-                // Normalize the created activity to match internal format
-                const normalized = normalizeActivity(created);
-                
-                // Add the activity to activitiesByTask under the appropriate task
-                setActivitiesByTask((prev) => {
-                    const taskKey = String(taskId);
-                    const existingActivities = prev[taskKey] || [];
-                    return {
-                        ...prev,
-                        [taskKey]: [...existingActivities, normalized]
-                    };
-                });
-            } catch (err) {
-                console.error('Failed to add activity-created event to activitiesByTask', err);
-            }
-        };
-        
-        window.addEventListener('activity-created', handler);
-        return () => window.removeEventListener('activity-created', handler);
-    }, []);
-    
-    const [activityAttachTaskId, setActivityAttachTaskId] = useState(null);
-    // Toasts and saving state for activity updates
-    const { addToast } = useToast ? useToast() : { addToast: () => {} };
-    const [savingActivityIds, setSavingActivityIds] = useState(new Set());
-    const [isSavingActivity, setIsSavingActivity] = useState(false);
-
-    // Open global activity composer on request (from various UI spots)
-    useEffect(() => {
-        const handler = (e) => {
-            const tid = e?.detail?.taskId ?? null;
-            // debug: log event reception
-            // eslint-disable-next-line no-console
-            console.log('ka-open-activity-composer received', { tid });
-            // Reset editing state
-            setEditingActivityId(null);
-
-            // If a taskId was provided, try to find the parent task so we can prefill
-            // the activity's Key Area, List and Task selection in the composer modal.
-            const parent = tid ? (allTasks || []).find((t) => String(t.id) === String(tid)) : null;
-
-            setActivityForm({
-                title: "",
-                description: "",
-                // Prefill list and key area from parent task when available
-                list: parent ? (parent.list || parent.list_index || parent.listIndex || '') : '',
-                key_area_id: parent ? (parent.key_area_id || parent.keyAreaId || parent.keyArea || selectedKA?.id || null) : (selectedKA?.id || null),
-                assignee: parent ? (parent.assignee || '') : '',
-                priority: "normal",
-                goal: "",
-                start_date: "",
-                end_date: "",
-                deadline: "",
-                finish_date: "",
-                duration: "",
-                _endAuto: true,
-                // Also set the taskId so the Task dropdown is preselected
-                taskId: parent ? String(parent.id || parent.taskId || parent.task_id || '') : (tid ? String(tid) : ''),
-            });
-
-            setActivityAttachTaskId(tid ? String(tid) : null);
-            setShowActivityComposer(true);
-        };
-        window.addEventListener("ka-open-activity-composer", handler);
-        return () => window.removeEventListener("ka-open-activity-composer", handler);
-    }, [selectedKA, allTasks]);
-
-    // Open task editor (reuse Add Task modal) populated for editing
-    useEffect(() => {
-        const handler = (e) => {
-            const task = e?.detail?.task;
-            if (!task) return;
-            // Prefill form from task
-            const mapPriority = (p) => {
-                const v = String(p || "normal").toLowerCase();
-                if (v === "med" || v === "medium" || v === "normal") return "normal";
-                if (v === "low") return "low";
-                if (v === "high") return "high";
-                return "normal";
-            };
-                        setTaskForm({
-                // include id so edit modals receive a usable identifier for update flows
-                id: task.id || task.taskId || task.task_id || task._id || null,
-                title: task.title || "",
-                description: task.description || "",
-                list_index: task.list_index || 1,
-                goal_id: task.goal_id || "",
-                start_date: toDateOnly(task.start_date) || "",
-                deadline: toDateOnly(task.deadline) || "",
-                end_date: toDateOnly(task.end_date) || "",
-                                            status: task.status || "open",
-                                            priority: (function(p) {
-                                                const s = String(p || "normal").toLowerCase();
-                                                if (s === "low" || s === "1") return 1;
-                                                if (s === "high" || s === "3") return 3;
-                                                return 2;
-                                            })(task.priority),
-                tags: task.tags || "",
-                assignee: task.assignee || "",
-                key_area_id: task.key_area_id || selectedKA?.id || null,
-                list: "",
-                finish_date: "",
-                duration: task.duration || "",
-                _endAuto: false, // avoid auto-mirroring on edit
-            });
-            setEditingTaskId(task.id);
-            setShowTaskComposer(true);
-        };
-        window.addEventListener("ka-open-task-editor", handler);
-        return () => window.removeEventListener("ka-open-task-editor", handler);
-    }, [selectedKA]);
-
-    // Debug: log when the composer visibility changes so we can confirm
-    useEffect(() => {
-        // eslint-disable-next-line no-console
-        console.log('showActivityComposer changed', { showActivityComposer });
-    }, [showActivityComposer]);
-
-    // control whether the external EditActivityModal is shown directly
-    const [showEditActivityModal, setShowEditActivityModal] = useState(false);
-
-    // Open activity editor — instead of the activity modal we reuse the Task composer modal
-    // to give the activity a richer edit surface. We map activity -> taskForm and set
-    // `editingActivityViaTaskModal` so the task submit handler knows to persist to activity service.
-    useEffect(() => {
-        const handler = (e) => {
-            // Debug: log when the editor event is received and its payload
-            // eslint-disable-next-line no-console
-            console.log('KeyAreas: ka-open-activity-editor received', { detail: e && e.detail });
-            const activity = e?.detail?.activity;
-            if (!activity) return;
-            const tid = e?.detail?.taskId ?? null;
-            setActivityAttachTaskId(tid ? String(tid) : null);
-            // Normalize incoming activity fields so aliases are consistent
-            const norm = normalizeActivity(activity || {});
-            const mapPriority = (v) => {
-                const n = Number(v);
-                if (!Number.isNaN(n)) return n === 3 ? "high" : n === 1 ? "low" : "normal";
-                return String(v || "normal").toLowerCase();
-            };
-
-            // Populate taskForm with normalized activity values so the Task composer UI is reused
-            setTaskForm({
-                id: norm.id || null,
-                title: norm.text || "",
-                description: norm.description || norm.notes || "",
-                list_index: norm.list || norm.list_index || 1,
-                goal_id: norm.goal || norm.goalId || norm.goal_id || "",
-                start_date: toDateOnly(norm.start_date) || "",
-                deadline: toDateOnly(norm.deadline) || "",
-                end_date: toDateOnly(norm.end_date) || "",
-                status: norm.completed ? "done" : "open",
-                priority: (function(p) {
-                    const s = String(p || "normal").toLowerCase();
-                    if (s === "low" || s === "1") return 1;
-                    if (s === "high" || s === "3") return 3;
-                    return 2;
-                })(norm.priority),
-                tags: "",
-                assignee: norm.assignee || norm.responsible || "",
-                key_area_id: norm.key_area_id || selectedKA?.id || null,
-                list: norm.list || "",
-                finish_date: toDateOnly(norm.completionDate) || "",
-                duration: norm.duration || "",
-                _endAuto: false,
-            });
-            // Also set activityForm so the dedicated activity editor modal can be used
-            setActivityForm({
-                title: norm.text || "",
-                description: norm.description || norm.notes || "",
-                list: norm.list || "",
-                key_area_id: norm.key_area_id || selectedKA?.id || null,
-                assignee: norm.assignee || norm.responsible || "",
-                priority: (function(p) {
-                    const s = String(p || "normal").toLowerCase();
-                    if (s === "low" || s === "1") return 1;
-                    if (s === "high" || s === "3") return 3;
-                    return 2;
-                })(norm.priority),
-                goal: norm.goal || "",
-                start_date: toDateOnly(norm.start_date) || "",
-                end_date: toDateOnly(norm.end_date) || "",
-                deadline: toDateOnly(norm.deadline) || "",
-                finish_date: toDateOnly(norm.completionDate) || "",
-                duration: norm.duration || "",
-                _endAuto: false,
-            });
-            // track that we're editing an activity
-            setEditingActivityViaTaskModal({ id: activity.id, taskId: tid ? String(tid) : null });
-            setEditingTaskId(null);
-            // make sure any open activity composer (Add Activity) or task composer is closed
-            // so only the dedicated EditActivityModal is shown
-            setShowActivityComposer(false);
-            setShowTaskComposer(false);
-            // Debug: log that we will open the EditActivityModal and the ids involved
-            // eslint-disable-next-line no-console
-            console.log('KeyAreas: opening EditActivityModal', { activityId: activity.id, taskId: tid });
-            // open external EditActivityModal directly instead of the Task composer
-            setShowEditActivityModal(true);
-        };
-        window.addEventListener("ka-open-activity-editor", handler);
-        return () => window.removeEventListener("ka-open-activity-editor", handler);
-    }, [selectedKA]);
-
-    useEffect(() => {
-        (async () => {
-            try {
-                const uSvc = await getUsersService();
-                const list = await uSvc.list();
-                setUsers(Array.isArray(list) ? list : []);
-            } catch {
-                setUsers([]);
-            }
-        })();
-    }, []);
-
-    useEffect(() => {
-        (async () => {
-            try {
-                const pSvc = await getUserProfileService();
-                const profile = await pSvc.getProfile();
-                const id = profile?.id || profile?.userId || profile?.sub || null;
-                if (id) setCurrentUserId(id);
-            } catch {
-                // Keep null if profile fetch fails; auth guard will redirect on 401.
-            }
-        })();
-    }, []);
-
-    // small helper to mark a task as saving for UI feedback
-    const markSaving = (id, timeout = 1200) => {
-        try {
-            setSavingIds((s) => new Set([...s, id]));
-            if (timeout) {
-                setTimeout(() => setSavingIds((s) => {
-                    const copy = new Set(s);
-                    copy.delete(id);
-                    return copy;
-                }), timeout);
-            }
-        } catch (e) {}
-    };
-
-    // Inline single-field update with optimistic UI (used by TaskRow)
-    const updateField = async (id, key, value) => {
-        const prev = Array.isArray(allTasks) ? allTasks.slice() : [];
-        const prevTask = prev.find((t) => t.id === id);
-        if (!prevTask) return;
-        const inlineUpdate = buildInlineTaskFieldUpdate({
-            task: prevTask,
-            key,
-            value,
-            usersList: users || [],
-            currentUserId,
-            getPriorityLevel,
-        });
-
-        // optimistic transform
-        const optimistic = (t) => {
-            if (t.id !== id) return t;
-            return { ...t, ...inlineUpdate.optimistic };
-        };
-        setAllTasks((prev) => prev.map(optimistic));
-        markSaving(id, 2000);
-
-        if (!inlineUpdate.persist || !inlineUpdate.patch) {
-            return;
-        }
-
-        // build patch - always preserve list_index and key_area_id
-        const patch = {
-            list_index: prevTask.list_index || prevTask.list || 1,
-            key_area_id: prevTask.key_area_id || prevTask.keyAreaId || null,
-            ...inlineUpdate.patch,
-        };
-
-        try {
-            const updated = await api.updateTask(id, patch);
-            // api.updateTask returns normalized UI-friendly task shape
-            setAllTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...updated } : t)));
-            setSelectedTaskFull((prevFull) =>
-                prevFull && String(prevFull.id) === String(id) ? { ...prevFull, ...updated } : prevFull,
-            );
-            markSaving(id);
-        } catch (err) {
-            console.error('[KeyAreas] Failed to update task field', err);
-            setAllTasks(prev);
-            try { addToast && addToast({ type: 'error', message: err?.message || t('keyAreas.toastSaveFailed') }); } catch (e) {}
-        }
-    };
-
-    const [taskForm, setTaskForm] = useState({
-        title: "",
-        description: "",
-        list_index: 1,
-        goal_id: "",
-        start_date: "",
-        deadline: "",
-        end_date: "",
-        status: "open",
-        priority: "normal",
-        tags: "",
-        assignee: "",
-        _endAuto: true, // internal flag: keep end date synced to start date until user changes it
-    });
-
-    // Activity composer form (mirrors task fields for UI consistency; most are UI-only)
-    const [activityForm, setActivityForm] = useState({
-        title: "",
-        description: "",
-        list: "",
-        key_area_id: null,
-        assignee: "",
-        priority: "normal",
-        goal: "",
-        start_date: "",
-        end_date: "",
-        deadline: "",
-        finish_date: "",
-        duration: "",
-        _endAuto: true,
+    const {
+        handleActivityModalSave,
+        handleDeleteTask,
+        handleSaveTask,
+        isSavingActivity,
+        saveActivityName,
+        savingActivityIds,
+        savingIds,
+        setSavingActivityIds,
+        updateActivityField,
+        updateField,
+    } = useKeyAreasMutations({
+        t,
+        addToast,
+        users,
+        currentUserId,
+        selectedKA,
+        allTasks,
+        setAllTasks,
+        activitiesByTask,
+        setActivitiesByTask,
+        setSelectedTask,
+        setSelectedTaskFull,
+        refreshActivitiesForTask,
+        activityAttachTaskId,
+        setActivityAttachTaskId,
+        editingActivityViaTaskModal,
+        setEditingActivityId,
+        setShowActivityComposer,
     });
 
     // Expanded inline activities (tree mode) per task id
     const [expandedActivityRows, setExpandedActivityRows] = useState(new Set());
     const [editingActivity, setEditingActivity] = useState(null); // { taskId, id }
     const [openActivityDetails, setOpenActivityDetails] = useState(new Set()); // Set of activity ids for a given task row render
-    // Sidebar sort: Alphabetical A→Z, with "Ideas" (or system default) always last
-    const sortForSidebar = React.useCallback((arr) => {
-        const items = Array.isArray(arr) ? arr.slice() : [];
-        
-        // Separate Ideas/default areas from regular areas
-        const regularAreas = items.filter(item => {
-            const isIdeas = (item.title || "").trim().toLowerCase() === "ideas" || !!item.is_default;
-            return !isIdeas;
-        });
-        
-        const ideasAreas = items.filter(item => {
-            const isIdeas = (item.title || "").trim().toLowerCase() === "ideas" || !!item.is_default;
-            return isIdeas;
-        });
-        
-        // Sort regular areas by position
-        const sortedRegular = regularAreas.sort((a, b) => (a.position || 0) - (b.position || 0));
-        
-        // Return regular areas first, then Ideas areas at the end (unordered)
-        return [...sortedRegular, ...ideasAreas];
-    }, []);
     const toggleActivitiesRow = (id) => {
         setExpandedActivityRows((prev) => {
             const next = new Set(prev);
@@ -2115,25 +601,7 @@ export default function KeyAreas() {
     };
 
     // Activities associated to tasks: { [taskId]: Activity[] }
-    const [activitiesByTask, setActivitiesByTask] = useState({});
-    const [activityTaskId, setActivityTaskId] = useState("new");
     const [activityName, setActivityName] = useState("");
-
-    // Helper: refresh activities for a specific task id
-    const refreshActivitiesForTask = async (taskId) => {
-        try {
-            const svc = await getActivityService();
-            const list = await svc.list({ taskId });
-            // Diagnostic: log result length so we can tell if backend returned items
-            try {
-                console.info('KeyAreas.refreshActivitiesForTask', { taskId: String(taskId), returned: Array.isArray(list) ? list.length : 0 });
-            } catch (__) {}
-            setActivitiesByTask((prev) => ({ ...prev, [String(taskId)]: Array.isArray(list) ? list.map(normalizeActivity) : [] }));
-        } catch (e) {
-            console.error("Failed to refresh activities", e);
-            setActivitiesByTask((prev) => ({ ...prev, [String(taskId)]: [] }));
-        }
-    };
 
     const openTaskInKeyAreaPanels = useCallback((task, { activityId = null } = {}) => {
         if (!task?.id) return;
@@ -2154,254 +622,42 @@ export default function KeyAreas() {
         }
     }, [activitiesByTask]);
 
-    // Helper: refresh all tasks currently in state
-    const refreshAllActivities = async () => {
-        if (!Array.isArray(allTasks) || allTasks.length === 0) return;
-        try {
-            try { console.info('KeyAreas.refreshAllActivities starting', { taskCount: allTasks.length }); } catch (__) {}
-            const svc = await getActivityService();
-            const entries = await Promise.all(
-                allTasks.map(async (t) => {
-                    try {
-                        const list = await svc.list({ taskId: t.id });
-                        try { console.info('KeyAreas.refreshAllActivities.item', { taskId: String(t.id), returned: Array.isArray(list) ? list.length : 0 }); } catch (__) {}
-                        return [String(t.id), Array.isArray(list) ? list.map(normalizeActivity) : []];
-                    } catch {
-                        return [String(t.id), []];
-                    }
-                }),
-            );
-            const grouped = Object.fromEntries(entries);
-            try { console.info('KeyAreas.refreshAllActivities completed', { loadedTaskKeys: Object.keys(grouped).length }); } catch (__) {}
-            setActivitiesByTask(grouped);
-        } catch (e) {
-            console.error("Failed to load activities for tasks", e);
-        }
-    };
-    // On mount and when tasks change, refresh activities
-    useEffect(() => {
-        refreshAllActivities();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [allTasks.length]);
-    // Listen for refresh events from slide-over
-    useEffect(() => {
-        const handler = (e) => {
-            const detail = e?.detail || {};
-            if (detail.sourceTaskId || detail.targetTaskId) {
-                setActivitiesByTask((prev) => {
-                    const next = { ...prev };
-                    const sourceKey = detail.sourceTaskId ? String(detail.sourceTaskId) : null;
-                    const targetKey = detail.targetTaskId ? String(detail.targetTaskId) : null;
-
-                    if (sourceKey) {
-                        if (Array.isArray(detail.sourceList)) {
-                            next[sourceKey] = detail.sourceList.map(normalizeActivity);
-                        } else {
-                            const sourceList = Array.isArray(next[sourceKey]) ? next[sourceKey] : [];
-                            next[sourceKey] = sourceList.filter((activity) => String(activity.id) !== String(detail.movedActivity?.id));
-                        }
-                    }
-
-                    if (targetKey && detail.movedActivity) {
-                        const parentTask = (allTasks || []).find((task) => String(task.id) === String(targetKey)) || null;
-                        const targetList = Array.isArray(next[targetKey]) ? next[targetKey] : [];
-                        const moved = normalizeActivityWithTask(detail.movedActivity, parentTask);
-                        const existingIndex = targetList.findIndex((activity) => String(activity.id) === String(moved.id));
-                        if (existingIndex >= 0) {
-                            const copy = targetList.slice();
-                            copy[existingIndex] = moved;
-                            next[targetKey] = copy;
-                        } else {
-                            next[targetKey] = [...targetList, moved];
-                        }
-                    }
-
-                    return next;
-                });
-                return;
-            }
-
-            if (detail.taskId && Array.isArray(detail.list)) {
-                setActivitiesByTask((prev) => ({
-                    ...prev,
-                    [String(detail.taskId)]: detail.list.map(normalizeActivity),
-                }));
-                return;
-            }
-
-            if (detail?.refresh) refreshAllActivities();
-        };
-        window.addEventListener("ka-activities-updated", handler);
-        return () => window.removeEventListener("ka-activities-updated", handler);
-    }, [allTasks]);
-
-    // Ensure activities for the currently selected full-task view are loaded.
-    // When a user clicks a task to open the full view, we may not have primed
-    // activitiesByTask for that single task (for example when viewing 'All' or
-    // when selectedKA is null). Load activities on demand when selectedTaskFull changes.
-    useEffect(() => {
-        if (!selectedTaskFull || !selectedTaskFull.id) return;
-        const key = String(selectedTaskFull.id);
-        try {
-            const existing = activitiesByTask[key];
-            if (!Array.isArray(existing) || existing.length === 0) {
-                // fire-and-forget; helper already logs errors
-                refreshActivitiesForTask(selectedTaskFull.id).catch((err) => {
-                    console.error('Failed to load activities for selectedTaskFull', err);
-                });
-            }
-        } catch (e) {
-            // defensive: still attempt to fetch
-            refreshActivitiesForTask(selectedTaskFull.id).catch((err) => console.error(err));
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedTaskFull && selectedTaskFull.id]);
-
-    // Create task from activity / Convert activity to task
-    useEffect(() => {
-        const handler = async (e) => {
-            const detail = e?.detail || {};
-            const taskId = detail.taskId;
-            const activity = detail.activity;
-            if (!taskId || !activity) return;
-
-            // Find parent task to inherit fields
-            const parent = allTasks.find((t) => String(t.id) === String(taskId));
-            if (!parent) return;
-            const kaId = parent.key_area_id || selectedKA?.id;
-            if (!kaId) return;
-
-            // Use latest activity state to prevent duplicates
-            const key = String(taskId);
-            const currentArr = (activitiesByTask[key] || []).slice();
-            const currentItem = currentArr.find((a) => String(a.id) === String(activity.id));
-            if (currentItem && currentItem.created_task_id) {
-                // Already converted/created => no-op
-                return;
-            }
-
-            // Priority: normalize numeric/string to task schema ("low"|"med"|"high")
-            const lvl = getPriorityLevel(activity.priority ?? parent.priority ?? "med");
-            const prio = lvl === 3 ? "high" : lvl === 1 ? "low" : "med";
-
-            // Map activity fields into a new task (use activity text as title)
-            const payload = {
-                key_area_id: kaId,
-                title: (activity.text || activity.activity_name || "").trim() || "Untitled activity",
-                description: (activity.notes || activity.text || "").trim() || `Created from activity in task "${parent.title || ""}"`,
-                status: "open",
-                priority: prio,
-                category: parent.category || "Key Areas",
-                goal_id: parent.goal_id || "",
-                list_index: parent.list_index || 1,
-                start_date: toDateOnly(activity.date_start) || parent.start_date || "",
-                deadline: toDateOnly(activity.deadline) || parent.deadline || "",
-                end_date: toDateOnly(activity.date_end) || "",
-                tags: parent.tags || "",
-                recurrence: "",
-                attachments: "",
-                assignee: activity.responsible || parent.assignee || "",
-            };
-
-            try {
-                const created = await api.createTask(payload);
-                setAllTasks((prev) => [...prev, created]);
-
-                // Mark activity as already used to create a task
-                setActivitiesByTask((prev) => {
-                    const arr = (prev[key] || []).map((a) =>
-                        String(a.id) === String(activity.id)
-                            ? { ...a, created_task_id: created.id, created_task_at: Date.now() }
-                            : a,
-                    );
-                    return { ...prev, [key]: arr };
-                });
-
-                // Determine whether to remove the original activity. If the event provided
-                // an explicit `remove` flag use it, otherwise fall back to a confirmation.
-                const shouldRemove = typeof detail.remove === 'boolean' ? detail.remove : window.confirm(
-                    "Task created. Do you want to remove the original activity (convert)?",
-                );
-                if (shouldRemove) {
-                    try {
-                        const svc = await getActivityService();
-                        await svc.remove(activity.id);
-                    } catch (err) {
-                        console.error('Failed to remove activity after convert', err);
-                    }
-                    setActivitiesByTask((prev) => {
-                        const arr = (prev[key] || []).filter((a) => String(a.id) !== String(activity.id));
-                        return { ...prev, [key]: arr };
-                    });
-                    // notify other views
-                    window.dispatchEvent(new CustomEvent('ka-activities-updated', { detail: { refresh: true, taskId } }));
-                } else {
-                    // Keep the activity but mark it as having an associated created task
-                    setActivitiesByTask((prev) => {
-                        const arr = (prev[key] || []).map((a) =>
-                            String(a.id) === String(activity.id)
-                                ? { ...a, created_task_id: created.id, created_task_at: Date.now() }
-                                : a,
-                        );
-                        return { ...prev, [key]: arr };
-                    });
-                }
-            } catch (err) {
-                console.error("Failed creating task from activity", err);
-            }
-        };
-        window.addEventListener("ka-create-task-from-activity", handler);
-        return () => window.removeEventListener("ka-create-task-from-activity", handler);
-    }, [allTasks, selectedKA, activitiesByTask]);
-
-    // When the composer opens, ensure the visible tab matches the composer list_index
-    useEffect(() => {
-        if (showTaskComposer) {
-            const idx = Number(taskForm?.list_index || 1);
-            if (taskTab !== idx) setTaskTab(idx);
-        }
-    }, [showTaskComposer]);
-
-    // If the user switches tabs while the composer is open, keep the composer list_index in sync
-    useEffect(() => {
-        if (showTaskComposer) {
-            setTaskForm((s) => ({ ...s, list_index: taskTab }));
-        }
-    }, [taskTab]);
-
-    // When start_date changes while auto mode is on (or end_date empty), mirror to end_date
-    useEffect(() => {
-        if (!showTaskComposer) return;
-        setTaskForm((s) => {
-            const start = s.start_date || "";
-            if (s._endAuto || !s.end_date) {
-                return { ...s, end_date: start };
-            }
-            return s;
-        });
-    }, [taskForm.start_date, showTaskComposer]);
-
-    // Mirror start -> end for Activity composer
-    useEffect(() => {
-        if (!showActivityComposer) return;
-        setActivityForm((s) => {
-            const start = s.start_date || "";
-            if (s._endAuto || !s.end_date) {
-                return { ...s, end_date: start };
-            }
-            return s;
-        });
-    }, [activityForm.start_date, showActivityComposer]);
-
-    // Auto-hide mass edit when selection is cleared
-    useEffect(() => {
-        if (selectedIds.size === 0) {
-            if (showMassEdit) setShowMassEdit(false);
-            if (showMassEditModal) setShowMassEditModal(false);
-            if (showMassFieldPicker) setShowMassFieldPicker(false);
-            if (massEditField) setMassEditField(null);
-        }
-    }, [selectedIds, showMassEdit, showMassEditModal, showMassFieldPicker, massEditField]);
+    const {
+        openKA,
+        showAllKeyAreas,
+    } = useKeyAreasSelection({
+        loading,
+        keyAreas,
+        setKeyAreas,
+        location,
+        navigate,
+        selectedKA,
+        setSelectedKA,
+        allTasks,
+        setAllTasks,
+        viewTab,
+        setViewTab,
+        panelViewMode,
+        selectedTaskFull,
+        setSelectedTaskFull,
+        selectedTaskInPanel,
+        setSelectedTaskInPanel,
+        setSelectedActivityIdsInPanel,
+        setSelectedActivityCountInPanel,
+        setActivitiesByTask,
+        setTaskTab,
+        setSearchTerm,
+        setSiteSearch,
+        setQuadrant,
+        setShowTaskComposer,
+        setEditingActivityViaTaskModal,
+        setExpandedActivityRows,
+        setOpenActivityDetails,
+        setEditingActivity,
+        setFilter,
+        openTaskInKeyAreaPanels,
+        setTaskFullInitialTab,
+    });
 
     useEffect(() => {
         setSelectedActivityIdsInPanel(new Set());
@@ -2440,1626 +696,121 @@ export default function KeyAreas() {
         setSelectedActivityCountInPanel(selectedActivityIdsInPanel.size);
     }, [selectedActivityIdsInPanel]);
 
-    useEffect(() => {
-        (async () => {
-            try {
-                const [kas, gs] = await Promise.all([api.listKeyAreas(), api.listGoals()]);
-                // Ensure Ideas always has position 10
-                const processedKas = (kas || []).map(ka => {
-                    const isIdeas = (ka.title || "").trim().toLowerCase() === "ideas" || !!ka.is_default;
-                    if (isIdeas) {
-                        return { ...ka, position: 10 };
-                    }
-                    return ka;
-                });
-                const sorted = processedKas.slice().sort((a, b) => (a.position || 0) - (b.position || 0));
-                setKeyAreas(sorted);
-                // Do not persist key areas in localStorage; always rely on backend
-                // emit key areas so sidebar can populate its dropdown
-                try {
-                    const sidebarList = sortForSidebar(sorted);
-                    window.dispatchEvent(
-                        new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: sidebarList } }),
-                    );
-                } catch (e) {
-                    // ignore if window not available or dispatch fails
-                }
-                setGoals(gs || []);
-                setLoading(false);
-            } catch (e) {
-                const status = e?.response?.status;
-                if (status === 401) {
-                    window.location.hash = "#/login";
-                    return;
-                }
-                setLoading(false);
-            }
-        })();
-    }, []);
-
-    // Close activities popover on Escape
-    useEffect(() => {
-        if (!openActivitiesMenu) return;
-        const onKey = (e) => {
-            if (e.key === "Escape") setOpenActivitiesMenu(null);
-        };
-        document.addEventListener("keydown", onKey);
-        return () => document.removeEventListener("keydown", onKey);
-    }, [openActivitiesMenu]);
-
-    // no global listeners needed for initial tab
-
-    // Removed: do not prime sidebar from cache; rely on backend
-
-    // Re-emit to Sidebar whenever the in-memory list changes (after edits/deletes)
-    useEffect(() => {
-        if (loading) return;
-        try {
-            const sidebarList = sortForSidebar(keyAreas);
-            window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: sidebarList } }));
-        } catch (e) {}
-    }, [keyAreas, loading]);
-
-    // If navigated with openKA=1 but no specific ?ka, pick the first KA and open it.
-    useEffect(() => {
-        const isOnKeyAreas = location.pathname && location.pathname.startsWith("/key-areas");
-        if (!isOnKeyAreas) return;
-        const params = new URLSearchParams(location.search || "");
-        const hasOpenKA = params.get("openKA") === "1";
-        const hasKASelected = Boolean(params.get("ka"));
-        if (!hasOpenKA || hasKASelected) return;
-        if (!keyAreas || keyAreas.length === 0) return;
-        // Prefer first non-Ideas KA; fallback to absolute first by position
-        const sorted = [...keyAreas].sort((a, b) => (a.position || 0) - (b.position || 0));
-        const firstNonIdeas = sorted.find((k) => !((k.title || "").toLowerCase() === "ideas" || k.is_default));
-        const first = firstNonIdeas || sorted[0];
-        if (!first?.id) return;
-        const next = new URLSearchParams(location.search || "");
-        next.set("ka", String(first.id));
-        next.set("openKA", "1");
-        if (!next.get("view")) next.set("view", "active-tasks");
-        if (!next.get("active")) next.set("active", "all");
-        navigate({ pathname: "/key-areas", search: `?${next.toString()}` }, { replace: true });
-        try {
-            window.dispatchEvent(new CustomEvent("sidebar-open-ka", { detail: { id: first.id } }));
-        } catch (e) {}
-    }, [location.pathname, location.search, keyAreas, navigate]);
-
-    // close view dropdown on outside click or Escape
-    useEffect(() => {
-        if (!showViewMenu) return;
-        const handleClick = (e) => {
-            if (!viewMenuRef.current) return;
-            if (!viewMenuRef.current.contains(e.target)) setShowViewMenu(false);
-        };
-        const handleKey = (e) => {
-            if (e.key === "Escape") setShowViewMenu(false);
-        };
-        document.addEventListener("mousedown", handleClick);
-        document.addEventListener("keydown", handleKey);
-        return () => {
-            document.removeEventListener("mousedown", handleClick);
-            document.removeEventListener("keydown", handleKey);
-        };
-    }, [showViewMenu]);
-
-    // close columns (gear) menu on outside click or Escape
-    useEffect(() => {
-        if (!showColumnsMenu) return;
-        const handleClick = (e) => {
-            if (columnsMenuRef.current && columnsMenuRef.current.contains(e.target)) return;
-            if (columnsMenuPopupRef.current && columnsMenuPopupRef.current.contains(e.target)) return;
-            setShowColumnsMenu(false);
-        };
-        const handleKey = (e) => {
-            if (e.key === "Escape") setShowColumnsMenu(false);
-        };
-        document.addEventListener("mousedown", handleClick);
-        document.addEventListener("keydown", handleKey);
-        return () => {
-            document.removeEventListener("mousedown", handleClick);
-            document.removeEventListener("keydown", handleKey);
-        };
-    }, [showColumnsMenu]);
-
-    useEffect(() => {
-        if (!showStatusMenu) return;
-        const handleClick = (e) => {
-            if (statusMenuRef.current && statusMenuRef.current.contains(e.target)) return;
-            setShowStatusMenu(false);
-        };
-        const handleKey = (e) => {
-            if (e.key === "Escape") setShowStatusMenu(false);
-        };
-        document.addEventListener("mousedown", handleClick);
-        document.addEventListener("keydown", handleKey);
-        return () => {
-            document.removeEventListener("mousedown", handleClick);
-            document.removeEventListener("keydown", handleKey);
-        };
-    }, [showStatusMenu]);
-
-    // When columns menu is open, reposition it on scroll/resize so it follows the gear button
-    useEffect(() => {
-        if (!showColumnsMenu) return;
-        let raf = null;
-        const updateAnchor = () => {
-            if (!columnsButtonRef.current) return;
-            try {
-                const rect = columnsButtonRef.current.getBoundingClientRect();
-                const menuWidth = 224; // matches w-56
-                const left = Math.max(8, rect.right - menuWidth + window.scrollX);
-                const top = rect.bottom + window.scrollY + 6;
-                setColumnsAnchor({ left, top });
-            } catch (e) {}
-        };
-        const onScrollOrResize = () => {
-            if (raf) cancelAnimationFrame(raf);
-            raf = requestAnimationFrame(updateAnchor);
-        };
-        window.addEventListener('scroll', onScrollOrResize, { passive: true });
-        window.addEventListener('resize', onScrollOrResize);
-        // update immediately
-        updateAnchor();
-        return () => {
-            if (raf) cancelAnimationFrame(raf);
-            window.removeEventListener('scroll', onScrollOrResize);
-            window.removeEventListener('resize', onScrollOrResize);
-        };
-    }, [showColumnsMenu]);
-
-    // close list ellipsis menu on outside click or Escape (based on the tabs container)
-    useEffect(() => {
-        if (openListMenu == null) return;
-        const handleClick = (e) => {
-            if (!tabsRef.current) return;
-            if (!tabsRef.current.contains(e.target)) setOpenListMenu(null);
-        };
-        const handleKey = (e) => {
-            if (e.key === "Escape") setOpenListMenu(null);
-        };
-        document.addEventListener("mousedown", handleClick);
-        document.addEventListener("keydown", handleKey);
-        return () => {
-            document.removeEventListener("mousedown", handleClick);
-            document.removeEventListener("keydown", handleKey);
-        };
-    }, [openListMenu]);
-
-    // also close when switching KA or view
-    useEffect(() => {
-        setShowViewMenu(false);
-    }, [selectedKA, view]);
-
-    // Close list menu on outside click or Escape
-    useEffect(() => {
-        if (openListMenu == null) return;
-        const handleClick = (e) => {
-            if (!tabsRef.current) return;
-            if (!tabsRef.current.contains(e.target)) setOpenListMenu(null);
-        };
-        const handleKey = (e) => {
-            if (e.key === "Escape") setOpenListMenu(null);
-        };
-        document.addEventListener("mousedown", handleClick);
-        document.addEventListener("keydown", handleKey);
-        return () => {
-            document.removeEventListener("mousedown", handleClick);
-            document.removeEventListener("keydown", handleKey);
-        };
-    }, [openListMenu]);
-
-    // Close Add Task modal on Escape
-    useEffect(() => {
-        if (!showTaskComposer) return;
-        const onKey = (e) => {
-            if (e.key === "Escape") {
-                setShowTaskComposer(false);
-                setEditingTaskId(null);
-                setEditingActivityViaTaskModal(null);
-            }
-        };
-        document.addEventListener("keydown", onKey);
-        return () => document.removeEventListener("keydown", onKey);
-    }, [showTaskComposer]);
-
-    // keep list names in state from backend
-    useEffect(() => {
-        // when key areas load, prime listNames map
-        if (!Array.isArray(keyAreas) || keyAreas.length === 0) return;
-        const m = {};
-        keyAreas.forEach((ka) => {
-            if (ka && ka.id) m[ka.id] = { ...(ka.listNames || {}) };
-        });
-        setListNames(m);
-    }, [keyAreas]);
-
-    // reset activities selector when switching key areas
-    useEffect(() => {
-        setActivityTaskId("new");
-    }, [selectedKA]);
-
-    // when a task is opened, default the activities selector to that task (if it belongs to the current KA)
-    useEffect(() => {
-        if (selectedTask && selectedKA && String(selectedTask.key_area_id) === String(selectedKA.id)) {
-            setActivityTaskId(String(selectedTask.id));
-        } else if (!selectedTask) {
-            setActivityTaskId("new");
-        }
-    }, [selectedTask, selectedKA]);
-
-    // React to sidebar clicks and query params: show all key areas or select Ideas
-    useEffect(() => {
-        const showAll = () => {
-            suppressKaParamOpenRef.current = true;
-            setSelectedKA(null);
-            setAllTasks([]);
-            setFilter("");
-        };
-
-        const selectIdeas = async () => {
-            if (loading) return;
-            const found = keyAreas.find((k) => k.title?.toLowerCase() === "ideas" || k.is_default);
-            // do NOT open the Ideas area; instead show it in the main list and make it read-only
-            if (found) {
-                setSelectedKA(null);
-                setAllTasks([]);
-                setFilter(found.title || "Ideas");
-            } else {
-                // If not found yet, avoid injecting synthetic items; wait for backend load
-                return;
-            }
-        };
-
-        window.addEventListener("sidebar-keyareas-click", showAll);
-        window.addEventListener("sidebar-ideas-click", selectIdeas);
-        
-        // Listen for reorder events from sidebar drag-drop
-        const handleSidebarReorder = async (e) => {
-            const reorderedKAs = e?.detail?.keyAreas;
-            if (Array.isArray(reorderedKAs)) {
-                // Update local keyAreas state with the new order from sidebar
-                setKeyAreas(reorderedKAs);
-                // Persist the new order to backend
-                try {
-                    const svc = await getKeyAreaService();
-                    const changed = reorderedKAs.filter((ka, idx) => {
-                        const oldKa = keyAreas[idx];
-                        return !oldKa || oldKa.id !== ka.id || oldKa.position !== ka.position;
-                    });
-                    if (changed.length > 0) {
-                        await svc.reorder(changed);
-                    }
-                } catch (err) {
-                    console.warn("Failed to persist sidebar reorder:", err);
-                }
-            }
-        };
-        window.addEventListener("sidebar-keyareas-reorder", handleSidebarReorder);
-
-        // also respect query params when navigated via Link
-        const params = new URLSearchParams(location.search);
-        if (params.get("view") === "all") showAll();
-        if (params.get("select") === "ideas") selectIdeas();
-
-        return () => {
-            window.removeEventListener("sidebar-keyareas-click", showAll);
-            window.removeEventListener("sidebar-ideas-click", selectIdeas);
-            window.removeEventListener("sidebar-keyareas-reorder", handleSidebarReorder);
-        };
-    }, [keyAreas, loading, location.search]);
-
     // storage picker removed
 
-    const nonIdeasCount = useMemo(
-        () => keyAreas.filter((k) => (k.title || "").toLowerCase() !== "ideas" && !k.is_default).length,
-        [keyAreas],
-    );
-    // Allow up to 9 additional key areas besides Ideas
-    const canAdd = useMemo(() => nonIdeasCount < 9, [nonIdeasCount]);
-
-    const filteredKAs = useMemo(() => {
-        const q = filter.trim().toLowerCase();
-        const params = new URLSearchParams(location.search);
-        const explicitSelect = params.get("select");
-
-        // If the URL explicitly requests Ideas, show only Ideas
-        if (explicitSelect === "ideas") {
-            return keyAreas.filter((k) => (k.title || "").toLowerCase() === "ideas" || k.is_default);
-        }
-
-        // Modified: Include ALL key areas (including Ideas) and let the sorting handle the order
-        const base = keyAreas; // Changed from filtering out Ideas
-        if (!q) return base;
-        return base.filter((k) => k.title.toLowerCase().includes(q) || (k.description || "").toLowerCase().includes(q));
-    }, [keyAreas, filter]);
-
-    const paramsForRender = new URLSearchParams(location.search);
-    const showOnlyIdeas = paramsForRender.get("select") === "ideas";
-    const ideaForShow = keyAreas.find((k) => (k.title || "").toLowerCase() === "ideas") || null;
-
-    const onSaveKA = async (e) => {
-        e.preventDefault();
-        const form = new FormData(e.currentTarget);
-        const payload = {
-            title: form.get("title").toString().trim(),
-            description: form.get("description").toString().trim(),
-            color: form.get("color").toString().trim() || "#3B82F6",
-        };
-        if (!payload.title) return;
-
-        if (editing) {
-            // Update all fields including color
-            const updated = await api.updateKeyArea(editing.id, {
-                title: payload.title,
-                description: payload.description,
-                color: payload.color,
-            });
-                setKeyAreas((prev) => prev.map((k) => (k.id === editing.id ? { 
-                    ...k, 
-                    title: payload.title,
-                    description: payload.description,
-                    color: payload.color,
-                    ...updated 
-                } : k)));
-            // emit updated list for sidebar (alphabetical with Ideas last)
-            try {
-                    const updatedList = (keyAreas || []).map((k) => (k.id === editing.id ? { 
-                        ...k, 
-                        title: payload.title,
-                        description: payload.description,
-                        color: payload.color,
-                        ...updated 
-                    } : k));
-                const sidebarList = sortForSidebar(updatedList);
-                window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: sidebarList } }));
-            } catch (e) {}
-        } else {
-            // Only consider non-default, non-Ideas key areas for positions 1..9
-            const isRegular = (k) => (k.title || "").toLowerCase() !== "ideas" && !k.is_default;
-            const used = new Set(keyAreas.filter(isRegular).map((k) => k.position));
-            let pos = 1;
-            while (used.has(pos) && pos <= 9) pos++;
-            try {
-                const created = await api.createKeyArea({
-                    title: payload.title,
-                    description: payload.description,
-                    color: payload.color,
-                    position: pos,
-                    is_default: false,
-                });
-                setKeyAreas((prev) => {
-                    const regular = prev.filter(isRegular);
-                    const others = prev.filter((k) => !isRegular(k));
-                    const nextRegular = [
-                        ...regular.filter((k) => k.position !== pos),
-                        { ...created, position: pos },
-                    ].sort((a, b) => (a.position || 0) - (b.position || 0));
-                    return [...others, ...nextRegular].sort((a, b) => (a.position || 0) - (b.position || 0));
-                });
-                // emit updated list after create
-                try {
-                    const regular = (keyAreas || []).filter(isRegular);
-                    const others = (keyAreas || []).filter((k) => !isRegular(k));
-                    const nextRegular = [
-                        ...regular.filter((k) => k.position !== pos),
-                        { ...created, position: pos },
-                    ].sort((a, b) => (a.position || 0) - (b.position || 0));
-                    const after = [...others, ...nextRegular];
-                    const sidebarList = sortForSidebar(after);
-                    window.dispatchEvent(
-                        new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: sidebarList } }),
-                    );
-                } catch (e) {}
-            } catch (err) {
-                const msg = err?.response?.data?.message || err?.message || "Action not allowed";
-                alert(`Cannot create key area: ${msg}`);
-            }
-        }
-        setShowForm(false);
-        setEditing(null);
-    };
-
-    const onDeleteKA = async (ka) => {
-        if (ka.is_default) return;
-        // Warn if tasks exist but allow user to attempt deletion (server will enforce)
-        const isSelected = selectedKA?.id && String(selectedKA.id) === String(ka.id);
-        const loadedCount = isSelected && Array.isArray(allTasks) ? allTasks.length : 0;
-        const serverCount = typeof ka.taskCount === "number" ? ka.taskCount : 0;
-        const effectiveCount = Math.max(loadedCount, serverCount);
-
-        let proceed = true;
-        if (effectiveCount > 0) {
-            proceed = confirm(
-                `"${ka.title}" has ${effectiveCount} task(s).\n` +
-                    `You need to move or delete these tasks first.\n\n` +
-                    `Do you still want to try deleting the key area now?`,
-            );
-            if (!proceed) return;
-        } else {
-            proceed = confirm(`Delete "${ka.title}"?`);
-            if (!proceed) return;
-        }
-        try {
-            await api.deleteKeyArea(ka.id);
-            const next = (keyAreas || []).filter((k) => k.id !== ka.id);
-            setKeyAreas(next);
-            try {
-                const sidebarList = sortForSidebar(next);
-                window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: sidebarList } }));
-            } catch (e) {}
-            if (selectedKA?.id === ka.id) {
-                setSelectedKA(null);
-                setAllTasks([]);
-            }
-        } catch (err) {
-            const msg =
-                err?.response?.data?.message ||
-                err?.message ||
-                "This key area has tasks and cannot be deleted until tasks are moved or removed.";
-            alert(`Cannot delete "${ka.title}": ${msg}`);
-            // Optionally refresh key areas to show latest taskCount
-            try {
-                const fresh = await api.listKeyAreas();
-                setKeyAreas(fresh);
-            } catch {}
-        }
-    };
-
-    // Drag-and-drop reorder helpers
-    const [dragKAId, setDragKAId] = useState(null);
-    const reorderByDrop = async (fromId, toId) => {
-        if (!fromId || !toId || fromId === toId) return;
-        const ordered = (keyAreas || [])
-            .filter((k) => (k.title || "").toLowerCase() !== "ideas" && !k.is_default)
-            .sort((a, b) => (a.position || 0) - (b.position || 0));
-        const fromIdx = ordered.findIndex((k) => String(k.id) === String(fromId));
-        const toIdx = ordered.findIndex((k) => String(k.id) === String(toId));
-        if (fromIdx < 0 || toIdx < 0) return;
-        const nextOrdered = ordered.slice();
-        const [moved] = nextOrdered.splice(fromIdx, 1);
-        nextOrdered.splice(toIdx, 0, moved);
-        // Reassign positions 1..N
-        const withPos = nextOrdered.map((k, i) => ({ ...k, position: i + 1 }));
-        // Persist changes via bulk endpoint (falls back to per-item)
-        const changed = withPos.filter((k, i) => ordered[i]?.id !== k.id || ordered[i]?.position !== k.position);
-        try {
-            if (changed.length) {
-                const svc = await getKeyAreaService();
-                await svc.reorder(changed);
-            }
-            // Update local state
-            setKeyAreas((prev) => {
-                const map = new Map(prev.map((x) => [String(x.id), { ...x }]));
-                withPos.forEach((k) => map.set(String(k.id), { ...map.get(String(k.id)), position: k.position }));
-                const next = Array.from(map.values()).sort((a, b) => (a.position || 0) - (b.position || 0));
-                try {
-                    const sidebarList = sortForSidebar(next);
-                    window.dispatchEvent(
-                        new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: sidebarList } }),
-                    );
-                } catch {}
-                return next;
-            });
-        } catch (err) {
-            const msg = err?.response?.data?.message || err?.message || "Could not reorder";
-            alert(msg);
-        }
-    };
-
-    // Reorder a non-Ideas key area up or down among slots 1-9
-    const reorderKA = async (ka, direction = "up") => {
-        if (!ka || ka.is_default || (ka.title || "").toLowerCase() === "ideas") return;
-        const ordered = (keyAreas || [])
-            .filter((k) => (k.title || "").toLowerCase() !== "ideas" && !k.is_default)
-            .sort((a, b) => (a.position || 0) - (b.position || 0));
-        const idx = ordered.findIndex((k) => String(k.id) === String(ka.id));
-        if (idx < 0) return;
-        const targetIdx = direction === "up" ? idx - 1 : idx + 1;
-        if (targetIdx < 0 || targetIdx >= ordered.length) return; // boundary
-        const a = ordered[idx];
-        const b = ordered[targetIdx];
-        try {
-            // swap positions and persist via bulk reorder
-            const svc = await getKeyAreaService();
-            await svc.reorder([
-                { id: a.id, position: b.position },
-                { id: b.id, position: a.position },
-            ]);
-            // update local state and emit
-            setKeyAreas((prev) => {
-                const map = new Map(prev.map((x) => [String(x.id), { ...x }]));
-                const na = { ...map.get(String(a.id)), position: b.position };
-                const nb = { ...map.get(String(b.id)), position: a.position };
-                map.set(String(a.id), na);
-                map.set(String(b.id), nb);
-                const next = Array.from(map.values()).sort((x, y) => (x.position || 0) - (y.position || 0));
-                try {
-                    window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: next } }));
-                } catch {}
-                return next;
-            });
-        } catch (err) {
-            const msg = err?.response?.data?.message || err?.message || "Could not reorder";
-            alert(msg);
-        }
-    };
-
-    // respond to sidebar open requests (if sidebar dispatches an event)
-    useEffect(() => {
-        const handler = (e) => {
-            const id = e?.detail?.id;
-            if (!id) return;
-            const found = (keyAreas || []).find((k) => String(k.id) === String(id));
-            if (found) openKA(found);
-        };
-        window.addEventListener("sidebar-open-ka", handler);
-        return () => window.removeEventListener("sidebar-open-ka", handler);
-    }, [keyAreas]);
-
-    // respond to ?ka=<id> query param
-    useEffect(() => {
-        const params = new URLSearchParams(location.search);
-        const kaParam = params.get("ka");
-        const taskParam = params.get("task");
-        const activityParam = params.get("activity");
-        const openPanelTaskParam = params.get("openPanelTask");
-        // Back/show-all can briefly leave stale ?ka in URL while selectedKA is already cleared.
-        // Suppress auto-open until the query is cleared.
-        if (suppressKaParamOpenRef.current) {
-            if (!kaParam) suppressKaParamOpenRef.current = false;
-            return;
-        }
-        if (kaParam && keyAreas.length) {
-            const found = keyAreas.find((k) => String(k.id) === String(kaParam));
-            // Re-open when switching from global tabs even if the KA id matches.
-            if (
-                found &&
-                (
-                    !selectedKA ||
-                    String(selectedKA.id) !== String(found.id) ||
-                    viewTab !== "active-tasks"
-                )
-            ) {
-                openKA(found);
-            }
-        }
-        // If task param present and we already have selectedKA tasks loaded, open it
-        if (taskParam && selectedKA && String(selectedKA.id) === String(kaParam)) {
-            const tId = String(taskParam);
-            const hit = (allTasks || []).find((t) => String(t.id) === tId);
-            if (hit) {
-                if (openPanelTaskParam === '1') {
-                    openTaskInKeyAreaPanels(hit, { activityId: activityParam });
-                } else {
-                    setSelectedTaskFull(hit);
-                    if (activityParam) {
-                        setTaskFullInitialTab("activities");
-                    }
-                }
-            }
-        }
-    }, [location.search, keyAreas, selectedKA, allTasks, viewTab, openTaskInKeyAreaPanels]);
-
-    const openKA = async (ka) => {
-        if (!ka?.id) return;
-        const nextId = String(ka.id);
-        // Ignore duplicate open requests for the same KA while it is opening.
-        if (openingKaIdRef.current === nextId) return;
-        const isSameKa = selectedKA && String(selectedKA.id) === nextId;
-        const needsContextReset =
-            viewTab !== 'active-tasks' ||
-            !!selectedTaskFull ||
-            !!selectedTaskInPanel ||
-            panelViewMode === 'simple';
-        // Avoid reopening only when we are already on the same KA in the normal active-tasks state.
-        if (isSameKa && !needsContextReset) return;
-        openingKaIdRef.current = nextId;
-        // Close any open task full view when switching Key Areas
-        try {
-            setSelectedTaskFull(null);
-            setSelectedTaskInPanel(null);
-            setSelectedActivityIdsInPanel(new Set());
-            setSelectedActivityCountInPanel(0);
-            setSelectedKA(ka);
-            // Reset task data immediately so the view does not momentarily show
-            // stale rows from the previous tab/filter while the canonical loader runs.
-            setAllTasks([]);
-            setActivitiesByTask({});
-            setTaskTab(1);
-            // Opening a Key Area should always land in the Active Tasks context.
-            // Preserve the current sub-filter; initial page entry establishes the default.
-            setViewTab('active-tasks');
-            setSearchTerm("");
-            setSiteSearch("");
-            setQuadrant("all");
-            setView("list");
-            setShowTaskComposer(false);
-            setEditingActivityViaTaskModal(null);
-            setExpandedActivityRows(new Set());
-            setOpenActivityDetails(new Set());
-            setEditingActivity(null);
-        } finally {
-            openingKaIdRef.current = null;
-        }
-    };
-
-    const tabNumbers = useMemo(() => {
-        const s = new Set([1]);
-        const kaId = selectedKA?.id;
-        allTasks
-            .filter((t) => !kaId || String(t.key_area_id || t.keyAreaId) === String(kaId))
-            .forEach((t) => s.add(t.list_index || 1));
-        return Array.from(s).sort((a, b) => a - b);
-    }, [allTasks, selectedKA]);
-
-    // Determine how many lists to show in the left card for the selected KA.
-    const leftListCount = useMemo(() => {
-        const kaId = selectedKA?.id;
-        const maxFromTabs = tabNumbers && tabNumbers.length ? Math.max(...tabNumbers) : 4;
-        const nameKeys = kaId
-            ? Object.keys(listNames[String(kaId)] || {})
-                  .map((k) => Number(k))
-                  .filter(Boolean)
-            : [];
-        const maxFromNames = nameKeys.length ? Math.max(...nameKeys) : 0;
-        // Allow fewer than 4 when empty; always show at least 1 list
-        return Math.max(1, maxFromTabs, maxFromNames);
-    }, [selectedKA, listNames, tabNumbers]);
-
-    // Available lists for the selected KA: union of tabs (used by tasks) and named lists.
-    const availableListNumbers = useMemo(() => {
-        const s = new Set(tabNumbers);
-        const kaId = selectedKA?.id;
-        if (kaId) {
-            const nameKeys = Object.keys(listNames[String(kaId)] || {})
-                .map((k) => Number(k))
-                .filter(Boolean);
-            nameKeys.forEach((n) => s.add(n));
-        }
-        const arr = Array.from(s);
-        arr.sort((a, b) => a - b);
-        return arr;
-    }, [selectedKA, listNames, tabNumbers]);
-
-    // Helpers to manage per-key-area list names
-    const getListName = (kaId, n) => {
-        if (!kaId) return `List ${n}`;
-        const names = listNames[String(kaId)] || {};
-        return names[String(n)] || `List ${n}`;
-    };
-
-    const renameList = async (n) => {
-        if (!selectedKA) return;
-        const current = getListName(selectedKA.id, n);
-        const raw = prompt(t("keyAreas.promptRenameList"), current);
-        if (raw === null) return; // cancelled
-        const val = String(raw || "").trim();
-        if (!val) {
-            alert(t("keyAreas.alertListNameEmpty"));
-            return;
-        }
-        const existingNames = Object.values(listNames[String(selectedKA.id)] || {});
-        const hasDuplicate = existingNames.some(
-            (name) => String(name || "").toLowerCase() === val.toLowerCase() && String(name) !== String(current),
-        );
-        if (hasDuplicate) {
-            alert(t("keyAreas.alertListNameExists"));
-            return;
-        }
-
-        const prevMap = { ...(listNames[String(selectedKA.id)] || {}) };
-        const newMap = { ...prevMap, [String(n)]: val };
-        setListNames((prev) => ({ ...prev, [String(selectedKA.id)]: newMap }));
-        setKeyAreas((prev) =>
-            (prev || []).map((ka) =>
-                String(ka.id) === String(selectedKA.id) ? { ...ka, listNames: newMap } : ka,
-            ),
-        );
-        try {
-            const svc = await getKeyAreaService();
-            await svc.update(selectedKA.id, { listNames: newMap });
-        } catch (e) {
-            console.error("Failed to persist list names", e);
-            setListNames((prev) => ({ ...prev, [String(selectedKA.id)]: prevMap }));
-            setKeyAreas((prev) =>
-                (prev || []).map((ka) =>
-                    String(ka.id) === String(selectedKA.id) ? { ...ka, listNames: prevMap } : ka,
-                ),
-            );
-            alert(t("keyAreas.alertSaveListFailed"));
-        }
-    };
-
-    const deleteList = async (n) => {
-        if (!selectedKA) return;
-        const kaId = selectedKA.id;
-        // Only allow deletion if the list has no tasks
-        const hasTasks = (allTasks || []).some(
-            (t) => (t.list_index || 1) === n && String(t.key_area_id) === String(kaId),
-        );
-        if (hasTasks) {
-            alert(t("keyAreas.alertListHasTasks"));
-            return;
-        }
-        const names = listNames[String(kaId)] || {};
-        const hasCustomName = !!(names && names[String(n)]);
-        const msg = hasCustomName
-            ? `Delete custom name for list ${n}? Tasks in this list will not be affected.`
-            : `Remove list ${n}? It will disappear since it has no tasks.`;
-        if (!confirm(msg)) return;
-        const { [String(n)]: _rem, ...rest } = names;
-        const prevMap = { ...names };
-        const prevTab = taskTab;
-        const newMap = { ...rest };
-        setListNames((prev) => ({ ...prev, [String(kaId)]: newMap }));
-        setKeyAreas((prev) =>
-            (prev || []).map((ka) =>
-                String(ka.id) === String(kaId) ? { ...ka, listNames: newMap } : ka,
-            ),
-        );
-        if (taskTab === n) setTaskTab(1);
-        try {
-            const svc = await getKeyAreaService();
-            await svc.update(kaId, { listNames: newMap });
-        } catch (e) {
-            console.error("Failed to persist list names", e);
-            setListNames((prev) => ({ ...prev, [String(kaId)]: prevMap }));
-            setKeyAreas((prev) =>
-                (prev || []).map((ka) =>
-                    String(ka.id) === String(kaId) ? { ...ka, listNames: prevMap } : ka,
-                ),
-            );
-            setTaskTab(prevTab);
-            alert(t("keyAreas.alertDeleteListFailed"));
-        }
-    };
-
-    const visibleTasks = useMemo(() => {
-        const isSearch = String(siteSearch || "").trim().length >= 2;
-        let arr = isSearch 
-            ? (searchResults || []) 
-            : allTasks.filter((t) => {
-                // Filter by key area (if in a specific key area view)
-                if (selectedKA && String(t.key_area_id || t.keyAreaId) !== String(selectedKA.id)) {
-                    return false;
-                }
-                // Filter by list index
-                return (t.list_index || 1) === taskTab;
-            });
-        if (viewTab === 'active-tasks') {
-            if (activeFilter === 'completed') {
-                arr = arr.filter((t) => isTaskCompleted(t));
-            } else if (activeFilter === 'active') {
-                arr = arr.filter((t) => !isTaskCompleted(t) && hasScheduledTaskDates(t));
-            }
-        }
-        if (!isSearch && searchTerm.trim()) {
-            const q = searchTerm.trim().toLowerCase();
-            arr = arr.filter(
-                (t) => (t.title || "").toLowerCase().includes(q) || (t.description || "").toLowerCase().includes(q),
-            );
-        }
-        const hasAllStatusesSelected =
-            TASK_STATUS_FILTER_VALUES.length === filterStatuses.length &&
-            TASK_STATUS_FILTER_VALUES.every((status) => filterStatuses.includes(status));
-        if (!hasAllStatusesSelected) {
-            arr = arr.filter((t) => {
-                const normalizedStatus = isTaskCompleted(t)
-                    ? "completed"
-                    : getItemStatusFilterValue(t);
-                return filterStatuses.includes(normalizedStatus);
-            });
-        }
-        if (filterAssignee) {
-            const selectedRaw = String(filterAssignee || "").trim();
-            const selectedLower = selectedRaw.toLowerCase();
-            const selectedUser = (users || []).find((u) => String(u?.id) === selectedRaw);
-            const emailRx = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i;
-
-            const selectedAliases = new Set([selectedLower]);
-            if (selectedUser) {
-                if (selectedUser?.name) selectedAliases.add(String(selectedUser.name).toLowerCase().trim());
-                if (selectedUser?.email) selectedAliases.add(String(selectedUser.email).toLowerCase().trim());
-                selectedAliases.add(String(selectedUser.id).toLowerCase().trim());
-                if (currentUserId && String(selectedUser.id) === String(currentUserId)) {
-                    selectedAliases.add("me");
-                }
-            } else if (currentUserId && String(currentUserId) === selectedRaw) {
-                selectedAliases.add("me");
-            }
-
-            arr = arr.filter((t) => {
-                const raw = String(t.assignee || t.responsible || t.owner || t.assigned_to || "").trim();
-                if (!raw) return false;
-                const rawLower = raw.toLowerCase();
-                if (selectedAliases.has(rawLower)) return true;
-
-                // Cross-match by detected email fragments (e.g. "Name user@x.com")
-                const rawEmail = (rawLower.match(emailRx) || [null])[0];
-                if (rawEmail && selectedAliases.has(rawEmail)) return true;
-
-                // Tolerate mixed formatting by allowing contains checks across aliases.
-                for (const alias of selectedAliases) {
-                    if (!alias) continue;
-                    if (rawLower.includes(alias) || alias.includes(rawLower)) return true;
-                }
-                return false;
-            });
-        }
-        // Site-wide search already filtered by query in the async fetch; apply quadrant filter if set
-        if (quadrant !== "all") arr = arr.filter((t) => String(t.eisenhower_quadrant || "") === quadrant);
-        return arr;
-    }, [allTasks, taskTab, searchTerm, quadrant, siteSearch, searchResults, filterStatuses, filterAssignee, viewTab, activeFilter, selectedKA, users, currentUserId]);
-
-    const statusFilterOptions = useMemo(() => ([
-        { value: "open", label: "Open" },
-        { value: "in_progress", label: t("keyAreas.statusInProgress") },
-        { value: "completed", label: t("keyAreas.completed") },
-    ]), [t]);
-
-    const allStatusesSelected =
-        TASK_STATUS_FILTER_VALUES.length === filterStatuses.length &&
-        TASK_STATUS_FILTER_VALUES.every((status) => filterStatuses.includes(status));
-
-    const statusFilterLabel = allStatusesSelected
-        ? "All"
-        : filterStatuses.length === 0
-            ? "None"
-            : filterStatuses.length === 1
-                ? statusFilterOptions.find((option) => option.value === filterStatuses[0])?.label || filterStatuses[0]
-                : `${filterStatuses.length} selected`;
-
-    const toggleStatusFilter = useCallback((value) => {
-        if (value === "all") {
-            setFilterStatuses((prev) => (prev.length === TASK_STATUS_FILTER_VALUES.length ? [] : TASK_STATUS_FILTER_VALUES));
-            return;
-        }
-
-        setFilterStatuses((prev) => {
-            const exists = prev.includes(value);
-            if (exists) return prev.filter((status) => status !== value);
-            return [...prev, value];
-        });
-    }, []);
-
-    const handleTaskSort = (field) => {
-        if (taskSortField === field) {
-            if (taskSortDirection === 'asc') {
-                setTaskSortDirection('desc');
-            } else if (taskSortDirection === 'desc') {
-                setTaskSortField(null);
-                setTaskSortDirection(null);
-            }
-        } else {
-            setTaskSortField(field);
-            setTaskSortDirection('asc');
-        }
-    };
-
-    const handleActivitySort = (field) => {
-        if (activitySortField === field) {
-            if (activitySortDirection === 'asc') {
-                setActivitySortDirection('desc');
-            } else if (activitySortDirection === 'desc') {
-                setActivitySortField(null);
-                setActivitySortDirection(null);
-            }
-        } else {
-            setActivitySortField(field);
-            setActivitySortDirection('asc');
-        }
-    };
-
-    const sortedTasks = useMemo(() => {
-        const arr = Array.isArray(visibleTasks) ? visibleTasks.slice() : [];
-        
-        // Apply column header sorting first if active
-        if (taskSortField && taskSortDirection) {
-            arr.sort((a, b) => {
-                let aVal, bVal;
-                
-                switch (taskSortField) {
-                    case 'title':
-                        aVal = (a.title || a.name || '').toLowerCase();
-                        bVal = (b.title || b.name || '').toLowerCase();
-                        break;
-                    case 'responsible':
-                        aVal = (a.assignee || a.responsible || '').toLowerCase();
-                        bVal = (b.assignee || b.responsible || '').toLowerCase();
-                        break;
-                    case 'status':
-                        aVal = (a.status || '').toLowerCase();
-                        bVal = (b.status || '').toLowerCase();
-                        break;
-                    case 'priority':
-                        aVal = getPriorityLevel(a.priority);
-                        bVal = getPriorityLevel(b.priority);
-                        break;
-                    case 'quadrant':
-                        aVal = a.quadrant || 4;
-                        bVal = b.quadrant || 4;
-                        break;
-                    case 'start_date':
-                        aVal = a.start_date || a.startDate || '';
-                        bVal = b.start_date || b.startDate || '';
-                        break;
-                    case 'end_date':
-                        aVal = a.end_date || a.endDate || '';
-                        bVal = b.end_date || b.endDate || '';
-                        break;
-                    case 'deadline':
-                        aVal = a.deadline || a.due_date || a.dueDate || '';
-                        bVal = b.deadline || b.due_date || b.dueDate || '';
-                        break;
-                    case 'duration':
-                        aVal = parseDurationToMinutes(a.duration ?? a.duration_minutes) ?? 0;
-                        bVal = parseDurationToMinutes(b.duration ?? b.duration_minutes) ?? 0;
-                        break;
-                    case 'completed':
-                        aVal = a.completionDate || a.completion_date || '';
-                        bVal = b.completionDate || b.completion_date || '';
-                        break;
-                    default:
-                        return 0;
-                }
-                
-                // Handle empty values
-                if (!aVal && !bVal) return 0;
-                if (!aVal) return 1;
-                if (!bVal) return -1;
-                
-                // Compare values
-                let comparison = 0;
-                if (typeof aVal === 'string' && typeof bVal === 'string') {
-                    comparison = aVal.localeCompare(bVal);
-                } else {
-                    comparison = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
-                }
-                
-                return taskSortDirection === 'asc' ? comparison : -comparison;
-            });
-        } else {
-            // Apply dropdown sorting when no column sort is active
-            switch (sortBy) {
-                case "date":
-                    arr.sort((a, b) => {
-                        const ad = a.deadline || a.due_date || a.dueDate || a.end_date || null;
-                        const bd = b.deadline || b.due_date || b.dueDate || b.end_date || null;
-                        if (!ad && !bd) return 0;
-                        if (!ad) return 1;
-                        if (!bd) return -1;
-                        return new Date(ad).getTime() - new Date(bd).getTime();
-                    });
-                    break;
-                case "priority":
-                    arr.sort((a, b) => getPriorityLevel(b.priority) - getPriorityLevel(a.priority));
-                    break;
-                case "status":
-                    {
-                        const order = { open: 0, in_progress: 1, done: 2, completed: 2, cancelled: 3, blocked: 3 };
-                        arr.sort(
-                            (a, b) =>
-                                (order[String(a.status || "").toLowerCase()] ?? 99) -
-                                (order[String(b.status || "").toLowerCase()] ?? 99),
-                        );
-                    }
-                    break;
-                default:
-                    break;
-            }
-        }
-        return arr;
-    }, [visibleTasks, sortBy, taskSortField, taskSortDirection]);
-
-    // Debug traces removed: temporary logging used during goal/title load debugging cleared.
-
-    // Build a visible-tasks array that includes a pre-resolved goal title when possible.
-    const visibleTasksWithResolvedGoal = React.useMemo(() => {
-        try {
-            return (visibleTasks || []).map((t) => {
-                const existing = t.resolvedGoalTitle || null;
-                if (existing) return { ...t, resolvedGoalTitle: existing };
-                // determine goal id from several shapes
-                const gid = t.goal_id ?? t.goalId ?? (t.goal && (t.goal.id || t.goal.goal_id)) ?? null;
-                if (gid === null || gid === undefined) return { ...t, resolvedGoalTitle: null };
-                // lookup in the goalTitleMap (supports Map or plain object)
-                let resolved = null;
-                try {
-                    if (goalTitleMap && typeof goalTitleMap.get === 'function') resolved = goalTitleMap.get(String(gid)) || null;
-                    else if (goalTitleMap) resolved = goalTitleMap[String(gid)] || null;
-                } catch (_) {
-                    resolved = null;
-                }
-                return { ...t, resolvedGoalTitle: resolved };
-            });
-        } catch (_) {
-            return visibleTasks || [];
-        }
-    }, [visibleTasks, goalTitleMap]);
-
-    // Targeted, rate-limited diagnostic: log tasks that reference a goal but have no resolved title.
-    React.useEffect(() => {
-        try {
-            const missing = (visibleTasksWithResolvedGoal || []).filter((t) => {
-                const hasRef = !!(t.goal_id || t.goalId || (t.goal && (t.goal.id || t.goal.goal_id)));
-                return hasRef && !t.resolvedGoalTitle;
-            }).slice(0, 10).map((t) => ({ id: t.id, title: t.title, goalRef: t.goal_id || t.goalId || (t.goal && (t.goal.id || t.goal.goal_id)) }));
-            if (missing && missing.length) {
-                // use console.info for targeted diagnostics (kept small)
-                console.info('KeyAreas: tasks with goal ref but missing resolved title', { time: new Date().toISOString(), count: missing.length, sample: missing });
-            }
-        } catch (_) {}
-    }, [visibleTasksWithResolvedGoal, goals.length]);
-
-    // Selection helpers
-    const isSelected = (id) => selectedIds.has(id);
-    const toggleSelect = (id) => {
-        setSelectedIds((prev) => {
-            const next = new Set(prev);
-            if (next.has(id)) next.delete(id);
-            else next.add(id);
-            return next;
-        });
-    };
-    const clearSelection = () => {
-        setSelectedIds(new Set());
-        setShowMassFieldPicker(false);
-        setMassEditField(null);
-    };
-    const selectAllVisible = () => {
-        const all = new Set(selectedIds);
-        const allSelected = sortedTasks.every((t) => all.has(t.id));
-        if (allSelected) {
-            // unselect all visible
-            sortedTasks.forEach((t) => all.delete(t.id));
-        } else {
-            sortedTasks.forEach((t) => all.add(t.id));
-        }
-        setSelectedIds(all);
-    };
-
-    const selectedTasks = useMemo(
-        () => (Array.isArray(sortedTasks) ? sortedTasks.filter((t) => selectedIds.has(t.id)) : []),
-        [sortedTasks, selectedIds],
-    );
-
-    const applyBulkEdit = async (e) => {
-        e.preventDefault();
-        if (!selectedKA) return;
-        if (selectedIds.size === 0) return;
-        // Build patch of only provided fields
-        const patch = {};
-        if (bulkForm.assignee.trim()) patch.assignee = bulkForm.assignee.trim();
-        if (bulkForm.status) patch.status = bulkForm.status;
-        if (bulkForm.priority) {
-            const p = String(bulkForm.priority).toLowerCase();
-            patch.priority = p === "med" ? "medium" : p;
-        }
-        if (bulkForm.start_date) patch.start_date = toDateOnly(bulkForm.start_date);
-        if (bulkForm.deadline) patch.deadline = toDateOnly(bulkForm.deadline);
-        if (bulkForm.end_date) patch.end_date = toDateOnly(bulkForm.end_date);
-        const hasAny = Object.keys(patch).length > 0;
-        if (!hasAny) return;
-
-        const updates = [];
-        for (const id of Array.from(selectedIds)) {
-            const original = allTasks.find((t) => String(t.id) === String(id));
-            if (!original) continue;
-            const next = { ...original, ...patch };
-            next.eisenhower_quadrant = computeEisenhowerQuadrant({
-                deadline: next.deadline,
-                end_date: next.end_date,
-                start_date: next.start_date,
-                priority: next.priority,
-                status: next.status,
-                key_area_id: next.key_area_id,
-            });
-            // Persist
-            // eslint-disable-next-line no-await-in-loop
-            const saved = await api.updateTask(next.id, next);
-            updates.push(saved);
-        }
-        // Update state in one pass
-        setAllTasks((prev) => {
-            const map = new Map(prev.map((t) => [String(t.id), t]));
-            updates.forEach((u) => map.set(String(u.id), { ...map.get(String(u.id)), ...u }));
-            return Array.from(map.values());
-        });
-        // Reset bulk form, hide bar, and clear selection to return to normal state
-        setBulkForm({ assignee: "", status: "", priority: "", start_date: "", deadline: "", end_date: "" });
-        setShowMassEdit(false);
-        clearSelection();
-    };
-
-    const handleBulkDeleteSelected = async () => {
-        if (selectedIds.size === 0) return;
-        const confirmed = window.confirm("Delete selected tasks?");
-        if (!confirmed) return;
-
-        for (const id of Array.from(selectedIds)) {
-            const task = allTasks.find((t) => String(t.id) === String(id));
-            if (!task) continue;
-            try {
-                await handleDeleteTask(task);
-            } catch (error) {
-                console.error("Failed to delete selected task", task, error);
-            }
-        }
-        setSelectedIds(new Set());
-    };
-
-    const handleTaskMassActionChange = async (action) => {
-        if (!action || selectedIds.size === 0) return;
-        if (action === "edit") {
-            setShowMassFieldPicker(true);
-            return;
-        }
-        if (action === "delete") {
-            await handleBulkDeleteSelected();
-        }
-    };
-
-    const handleBulkFieldSave = async (
-        field,
-        value,
-        targetIds = Array.from(selectedIds),
-        activityTargetIds = [],
-    ) => {
-        const taskIds = Array.isArray(targetIds) ? targetIds.map((id) => String(id)) : [];
-        const activityIds = Array.isArray(activityTargetIds)
-            ? activityTargetIds.map((id) => String(id))
-            : [];
-
-        const updates = [];
-        for (const id of taskIds) {
-            const original = allTasks.find((t) => String(t.id) === String(id));
-            if (!original) continue;
-            const next = { ...original };
-
-            if (field === 'assignee') {
-                const selectedUser = users.find((user) => String(user.id || user.member_id) === String(value));
-                if (selectedUser) {
-                    const userId = selectedUser.id || selectedUser.member_id;
-                    next.assignee = String(userId) === String(currentUserId)
-                        ? 'Me'
-                        : `${selectedUser.name || selectedUser.firstname || ''} ${selectedUser.lastname || ''}`.trim();
-                    next.delegatedToUserId = String(userId) === String(currentUserId) ? null : userId;
-                } else {
-                    next.assignee = '';
-                    next.delegatedToUserId = null;
-                }
-            } else if (field === 'status') {
-                next.status = value || next.status;
-            } else if (field === 'priority') {
-                next.priority = value || next.priority;
-            } else if (field === 'duration') {
-                next.duration = value || null;
-            } else if (field === 'goalId') {
-                next.goal_id = value || null;
-                next.goalId = value || null;
-            } else if (field === 'key_area_bundle') {
-                next.key_area_id = value?.key_area_id || null;
-                if (value?.list_index) next.list_index = value.list_index;
-            } else if (field === 'date') {
-                next.start_date = value?.start_date || null;
-                next.end_date = value?.end_date || null;
-                next.deadline = value?.deadline || null;
-            }
-
-            next.eisenhower_quadrant = computeEisenhowerQuadrant({
-                deadline: next.deadline,
-                end_date: next.end_date,
-                start_date: next.start_date,
-                priority: next.priority,
-                status: next.status,
-                key_area_id: next.key_area_id,
-            });
-
-            // eslint-disable-next-line no-await-in-loop
-            const saved = await api.updateTask(next.id, next);
-            updates.push(saved);
-        }
-
-        setAllTasks((prev) => {
-            const map = new Map(prev.map((task) => [String(task.id), task]));
-            updates.forEach((task) => map.set(String(task.id), { ...map.get(String(task.id)), ...task }));
-            return Array.from(map.values());
-        });
-
-        if (activityIds.length > 0) {
-            const svc = await getActivityService();
-            const updatedActivities = [];
-
-            for (const activityId of activityIds) {
-                let originalActivity = null;
-                let originalTask = null;
-
-                for (const [taskId, list] of Object.entries(activitiesByTask || {})) {
-                    const found = Array.isArray(list)
-                        ? list.find((activity) => String(activity.id) === String(activityId))
-                        : null;
-                    if (found) {
-                        originalActivity = found;
-                        originalTask = allTasks.find((task) => String(task.id) === String(taskId)) || null;
-                        break;
-                    }
-                }
-
-                if (!originalActivity) continue;
-
-                const body = {};
-
-                if (field === 'assignee') {
-                    body.delegatedToUserId =
-                        value && String(value) !== String(currentUserId) ? value : null;
-                } else if (field === 'status') {
-                    body.status = value || originalActivity.status;
-                    body.completed = String(value || '').toLowerCase() === 'done';
-                } else if (field === 'priority') {
-                    body.priority = value || originalActivity.priority || null;
-                } else if (field === 'duration') {
-                    body.duration = value || null;
-                } else if (field === 'goalId') {
-                    body.goalId = value || null;
-                } else if (field === 'date') {
-                    body.startDate = value?.start_date || null;
-                    body.endDate = value?.end_date || null;
-                    body.deadline = value?.deadline || null;
-                } else {
-                    body[field] = value;
-                }
-
-                // eslint-disable-next-line no-await-in-loop
-                const savedActivity = await svc.update(activityId, body);
-                updatedActivities.push({
-                    activityId: String(activityId),
-                    normalized: normalizeActivityWithTask(savedActivity || {}, originalTask || originalActivity),
-                });
-            }
-
-            if (updatedActivities.length > 0) {
-                setActivitiesByTask((prev) => {
-                    const updated = { ...prev };
-                    for (const key of Object.keys(updated)) {
-                        updated[key] = (updated[key] || []).map((activity) => {
-                            const match = updatedActivities.find(
-                                (entry) => String(entry.activityId) === String(activity.id),
-                            );
-                            return match ? { ...activity, ...match.normalized } : activity;
-                        });
-                    }
-                    return updated;
-                });
-            }
-        }
-
-        setShowMassFieldPicker(false);
-        setMassEditField(null);
-        clearSelection();
-    };
-
-    const handleActivityPanelMassFieldSave = async (field, value) => {
-        if (!selectedTaskInPanel?.id || selectedActivityIdsInPanel.size === 0) return;
-        const taskId = selectedTaskInPanel.id;
-        const taskKey = String(taskId);
-        const list = Array.isArray(activitiesByTask[taskKey]) ? activitiesByTask[taskKey] : [];
-        const selectedActivities = list.filter((activity) => selectedActivityIdsInPanel.has(activity.id));
-
-        for (const activity of selectedActivities) {
-            if (field === 'date') {
-                // eslint-disable-next-line no-await-in-loop
-                await updateActivityField(activity, taskId, 'start_date', value?.start_date || '');
-                // eslint-disable-next-line no-await-in-loop
-                await updateActivityField(activity, taskId, 'end_date', value?.end_date || '');
-                // eslint-disable-next-line no-await-in-loop
-                await updateActivityField(activity, taskId, 'deadline', value?.deadline || '');
-            } else if (field === 'goalId') {
-                // eslint-disable-next-line no-await-in-loop
-                await updateActivityField(activity, taskId, 'goalId', value || null);
-            } else if (field === 'duration') {
-                // eslint-disable-next-line no-await-in-loop
-                await updateActivityField(activity, taskId, 'duration', value || null);
-            } else {
-                // eslint-disable-next-line no-await-in-loop
-                await updateActivityField(activity, taskId, field, value);
-            }
-        }
-
-        setShowActivityMassFieldPicker(false);
-        setSelectedActivityIdsInPanel(new Set());
-    };
-
-    // Close activity composer with Escape
-    useEffect(() => {
-        if (!showActivityComposer) return;
-        const onKey = (e) => {
-            if (e.key === "Escape") {
-                setShowActivityComposer(false);
-                setActivityAttachTaskId(null);
-            }
-        };
-        window.addEventListener("keydown", onKey);
-        return () => window.removeEventListener("keydown", onKey);
-    }, [showActivityComposer]);
-
-    const handleSaveTask = async (updated) => {
-        const q = computeEisenhowerQuadrant({
-            deadline: updated.deadline,
-            end_date: updated.end_date,
-            start_date: updated.start_date || updated.startDate,
-            priority: updated.priority,
-            status: updated.status,
-            key_area_id: updated.key_area_id || updated.keyAreaId || updated.key_area || updated.keyArea,
-        });
-        const payload = {
-            ...updated,
-            priority: (() => {
-                const raw = updated.priority;
-                if (raw === undefined || raw === null || raw === "") return undefined;
-                const n = Number(raw);
-                if (!Number.isNaN(n)) return n === 1 ? "low" : n === 3 ? "high" : "medium";
-                const p = String(raw).toLowerCase();
-                if (p === "med" || p === "normal") return "medium";
-                if (p === "low" || p === "medium" || p === "high") return p;
-                return undefined;
-            })(),
-            eisenhower_quadrant: q,
-        };
-        // payload prepared for update
-        const saved = await api.updateTask(payload.id, payload);
-    // server returned updated task in `saved`
-        // Update UI immediately with server payload (already normalized by api.updateTask)
-        setAllTasks((prev) => prev.map((t) => (t.id === saved.id ? { ...t, ...saved } : t)));
-        
-        // If key area changed, clear selectedTaskFull so user sees the task moved
-        const originalTask = allTasks.find((t) => t.id === saved.id);
-        const keyAreaChanged = originalTask && 
-            String(originalTask.key_area_id || originalTask.keyAreaId) !== String(saved.key_area_id || saved.keyAreaId);
-        const listChanged = originalTask &&
-            String(originalTask.list_index || originalTask.list || originalTask.listIndex || "") !==
-            String(saved.list_index || saved.list || saved.listIndex || "");
-
-        if (keyAreaChanged || listChanged) {
-            const nextKeyAreaId = saved.key_area_id || saved.keyAreaId || null;
-            const nextListIndex = saved.list_index || saved.list || saved.listIndex || null;
-            setActivitiesByTask((prev) => {
-                const key = String(saved.id);
-                if (!Array.isArray(prev[key]) || prev[key].length === 0) return prev;
-                return {
-                    ...prev,
-                    [key]: prev[key].map((a) => ({
-                        ...a,
-                        keyAreaId: nextKeyAreaId,
-                        key_area_id: nextKeyAreaId,
-                        ...(nextListIndex !== null ? { list: nextListIndex, list_index: nextListIndex, listIndex: nextListIndex } : {}),
-                    })),
-                };
-            });
-        }
-        
-        if (keyAreaChanged) {
-            // Task moved to different key area - clear selection and show success message
-            setSelectedTaskFull(null);
-            try { addToast && addToast({ type: 'success', message: t('keyAreas.toastMovedKeyArea') }); } catch (e) {}
-        }
-        
-        await refreshActivitiesForTask(saved.id);
-        setSelectedTask(null);
-    };
-
-    // Handler for ActivityFormModal onSave -> accept normalized payload from modal
-    const handleActivityModalSave = async (payload) => {
-        setIsSavingActivity(true);
-        try {
-            const svc = await getActivityService();
-            const mapPriorityToApi = (p) => {
-                if (p === undefined || p === null || p === '') return undefined;
-                const num = Number(p);
-                if (!Number.isNaN(num)) {
-                    if (num <= 1) return "low";
-                    if (num >= 3) return "high";
-                    return "normal";
-                }
-                const s = String(p).toLowerCase();
-                if (s === "low" || s === "normal" || s === "high") return s;
-                if (s === "medium" || s === "med") return "normal";
-                return undefined;
-            };
-            // Normalize incoming payload for API shape
-            const body = {
-                text: (payload.text || payload.activity_name || payload.title || "").trim(),
-                completed: !!payload.completed,
-            };
-            // Include optional date/metadata fields when provided by the modal so
-            // activities created/updated from the composer retain start/end/deadline.
-            if (
-                payload.startDate !== undefined ||
-                payload.start_date !== undefined ||
-                payload.date_start !== undefined
-            ) {
-                body.startDate = toDateOnly(payload.startDate ?? payload.start_date ?? payload.date_start) || null;
-            }
-            if (
-                payload.endDate !== undefined ||
-                payload.end_date !== undefined ||
-                payload.date_end !== undefined
-            ) {
-                body.endDate = toDateOnly(payload.endDate ?? payload.end_date ?? payload.date_end) || null;
-            }
-            if (
-                payload.deadline !== undefined ||
-                payload.dueDate !== undefined ||
-                payload.due_date !== undefined
-            ) {
-                body.deadline = toDateOnly(payload.deadline ?? payload.dueDate ?? payload.due_date) || null;
-            }
-            if (typeof payload.duration !== 'undefined') {
-                const durationRaw = payload.duration;
-                body.duration =
-                    durationRaw === null
-                        ? null
-                        : String(durationRaw).trim() || null;
-            }
-            if (typeof payload.priority !== 'undefined') body.priority = mapPriorityToApi(payload.priority);
-            if (payload.goalId || payload.goal || payload.goal_id) body.goalId = payload.goalId || payload.goal || payload.goal_id;
-            if (payload.completionDate) body.completionDate = payload.completionDate;
-            // Allow task attachment if provided
-            if (payload.taskId || payload.task_id) body.taskId = payload.taskId || payload.task_id;
-            // Allow delegation if provided
-            if (payload.delegatedToUserId) body.delegatedToUserId = payload.delegatedToUserId;
-
-            if (payload.id) {
-                // update
-                const updated = await svc.update(payload.id, body);
-                const sourceTaskId =
-                    editingActivityViaTaskModal?.taskId ||
-                    payload.originalTaskId ||
-                    payload.original_task_id ||
-                    activityAttachTaskId ||
-                    null;
-                const targetTaskId =
-                    updated?.taskId ||
-                    updated?.task_id ||
-                    body.taskId ||
-                    payload.taskId ||
-                    payload.task_id ||
-                    sourceTaskId ||
-                    null;
-                const normalizedUpdated = normalizeActivity(updated || {});
-
-                setActivitiesByTask((prev) => {
-                    const next = { ...prev };
-                    const sourceKey = sourceTaskId ? String(sourceTaskId) : null;
-                    const targetKey = targetTaskId ? String(targetTaskId) : null;
-
-                    if (sourceKey) {
-                        const sourceList = Array.isArray(next[sourceKey]) ? next[sourceKey] : [];
-                        next[sourceKey] = sourceList.filter((activity) => String(activity.id) !== String(payload.id));
-                    }
-
-                    if (targetKey) {
-                        const parentTask = (allTasks || []).find((task) => String(task.id) === String(targetKey)) || null;
-                        const targetList = Array.isArray(next[targetKey]) ? next[targetKey] : [];
-                        const targetActivity = normalizeActivityWithTask(normalizedUpdated, parentTask);
-                        const existingIndex = targetList.findIndex((activity) => String(activity.id) === String(payload.id));
-                        if (existingIndex >= 0) {
-                            const copy = targetList.slice();
-                            copy[existingIndex] = targetActivity;
-                            next[targetKey] = copy;
-                        } else {
-                            next[targetKey] = [...targetList, targetActivity];
-                        }
-                    }
-
-                    return next;
-                });
-
-                // Refresh the affected task buckets in the background to pick up any
-                // server-side normalization, but keep the optimistic move in place.
-                const refreshTaskIds = [...new Set(
-                    [sourceTaskId, targetTaskId]
-                        .filter((id) => id !== null && id !== undefined && `${id}`.trim() !== '')
-                        .map((id) => String(id)),
-                )];
-                refreshTaskIds.forEach((taskId) => {
-                    (async () => {
-                        try {
-                            const list = await svc.list({ taskId });
-                            setActivitiesByTask((prev) => ({
-                                ...prev,
-                                [String(taskId)]: Array.isArray(list) ? list.map(normalizeActivity) : [],
-                            }));
-                        } catch (e) {
-                            // ignore background refresh failures
-                        }
-                    })();
-                });
-            } else {
-                // create
-                if (payload.taskId) body.taskId = payload.taskId;
-                const created = await svc.create(body);
-                const tid = body.taskId || activityAttachTaskId || null;
-                // Immediately insert the created activity into local state so UI shows
-                // the dates/fields the user provided even if the backend hasn't
-                // returned them yet. Merge `body` into the server response and
-                // normalize for UI consistency (same approach used for tasks).
-                try {
-                    if (tid) {
-                        const key = String(tid);
-                        const norm = normalizeActivity({ ...(created || {}), ...(body || {}) });
-                        setActivitiesByTask((prev) => {
-                            const copyArr = Array.isArray(prev[key]) ? prev[key].slice() : [];
-                            copyArr.push(norm);
-                            return { ...prev, [key]: copyArr };
-                        });
-                        // Try to refresh in background to pick up any server-side
-                        // normalization differences, but don't block the UI.
-                        (async () => {
-                            try {
-                                const list = await svc.list({ taskId: tid });
-                                setActivitiesByTask((prev) => ({ ...prev, [String(tid)]: Array.isArray(list) ? list.map(normalizeActivity) : [] }));
-                            } catch (__) {}
-                        })();
-                    }
-                } catch (e) {
-                    // ignore local update failure and fall back to simple refetch
-                    try {
-                        if (tid) {
-                            const list = await svc.list({ taskId: tid });
-                            setActivitiesByTask((prev) => ({ ...prev, [String(tid)]: Array.isArray(list) ? list.map(normalizeActivity) : [] }));
-                        }
-                    } catch (__) {}
-                }
-            }
-
-            // notify other views and close modal
-            window.dispatchEvent(new CustomEvent("ka-activities-updated", { detail: { refresh: true } }));
-            setShowActivityComposer(false);
-            setEditingActivityId(null);
-            setActivityAttachTaskId(null);
-        } catch (err) {
-            console.error("Failed to save activity from modal", err);
-            // If the server returned validation messages, log them to help debugging
-            console.error('Save activity error response data:', err?.response?.data);
-            alert(t("keyAreas.alertSaveActivityFailed"));
-        } finally {
-            setIsSavingActivity(false);
-        }
-    };
-
-    const handleDeleteTask = async (task) => {
-        // Prevent deleting a task that still has activities
-        try {
-            let list = activitiesByTask[String(task.id)];
-                if (!Array.isArray(list)) {
-                // fetch latest to be sure
-                const svc = await getActivityService();
-                list = await svc.list({ taskId: task.id });
-            }
-            const count = Array.isArray(list) ? list.length : 0;
-            if (count > 0) {
-                alert(
-                    `Cannot delete this task because it has ${count} activit${count === 1 ? "y" : "ies"}. Remove those activities first.`,
-                );
-                return;
-            }
-        } catch (e) {
-            // If activities cannot be loaded, fail-safe and do not delete
-            console.error("Failed to verify activities before delete", e);
-            alert(t("keyAreas.alertVerifyActivitiesFailed"));
-            return;
-        }
-
-        await api.deleteTask(task.id);
-        setAllTasks((prev) => prev.filter((t) => t.id !== task.id));
-        setActivitiesByTask((prev) => {
-            const copy = { ...(prev || {}) };
-            delete copy[String(task.id)];
-            return copy;
-        });
-        setSelectedTask(null);
-    };
+    const {
+        canAdd,
+        filteredKAs,
+        showOnlyIdeas,
+        ideaForShow,
+        dragKAId,
+        setDragKAId,
+        onSaveKA,
+        onDeleteKA,
+        reorderByDrop,
+    } = useKeyAreasCrud({
+        keyAreas,
+        setKeyAreas,
+        location,
+        filter,
+        editing,
+        setEditing,
+        setShowForm,
+        selectedKA,
+        setSelectedKA,
+        allTasks,
+        setAllTasks,
+        sortForSidebar,
+    });
+    const {
+        availableListNumbers,
+        deleteList,
+        getListName,
+        leftListCount,
+        listNames,
+        renameList,
+        setListNames,
+    } = useKeyAreaLists({
+        allTasks,
+        getKeyAreaService,
+        keyAreas,
+        selectedKA,
+        setKeyAreas,
+        setTaskTab,
+        t,
+        taskTab,
+    });
+    const {
+        activitySortDirection,
+        activitySortField,
+        allStatusesSelected,
+        filterAssignee,
+        filterStatuses,
+        handleActivitySort,
+        handleTaskSort,
+        setFilterAssignee,
+        setSortBy,
+        setVisibleColumns,
+        sortBy,
+        sortedTasks,
+        statusFilterLabel,
+        statusFilterOptions,
+        taskSortDirection,
+        taskSortField,
+        toggleStatusFilter,
+        visibleColumns,
+        visibleTasksWithResolvedGoal,
+    } = useKeyAreasTaskViewModel({
+        activeFilter,
+        allTasks,
+        currentUserId,
+        getPriorityLevel,
+        goalTitleMap,
+        goalsLength: goals.length,
+        initialActiveFilter,
+        quadrant,
+        searchResults,
+        searchTerm,
+        selectedKA,
+        siteSearch,
+        t,
+        taskTab,
+        users,
+        viewTab,
+    });
+    const {
+        handleActivityPanelMassFieldSave,
+        handleBulkFieldSave,
+        handleTaskMassActionChange,
+        isSelected,
+        massEditField,
+        selectedIds,
+        selectAllVisible,
+        setMassEditField,
+        setShowMassFieldPicker,
+        showMassEdit,
+        showMassFieldPicker,
+        tasksDisplayRef,
+        toggleSelect,
+    } = useKeyAreasBulkActions({
+        activitiesByTask,
+        allTasks,
+        api,
+        computeEisenhowerQuadrant,
+        currentUserId,
+        getActivityService,
+        handleDeleteTask,
+        normalizeActivityWithTask,
+        selectedActivityIdsInPanel,
+        selectedTaskInPanel,
+        setActivitiesByTask,
+        setAllTasks,
+        setSelectedActivityIdsInPanel,
+        setShowActivityMassFieldPicker,
+        sortedTasks,
+        updateActivityField,
+        users,
+    });
 
     return (
         <div className="h-[calc(100vh-72px)] bg-[#EDEDED] overflow-hidden">
@@ -4075,1567 +826,237 @@ export default function KeyAreas() {
                         onClick={() => setMobileSidebarOpen(false)}
                     />
                 )}
-                {/* External EditActivityModal rendered directly when requested */}
-                {showEditActivityModal && editingActivityViaTaskModal && (
-                    <EditActivityModal
-                        isOpen={true}
-                        currentUserId={currentUserId}
-                        initialData={(function(){
-                            try {
-                                const id = editingActivityViaTaskModal.id;
-                                const taskId = editingActivityViaTaskModal.taskId;
-                                let raw = null;
-                                if (taskId && activitiesByTask && activitiesByTask[String(taskId)]) {
-                                    raw = activitiesByTask[String(taskId)].find(a => String(a.id) === String(id));
-                                }
-                                const source = raw || activityForm || {};
-                                const norm = normalizeActivity(source || {});
-                                // Attempt to fall back to parent task values when activity lacks key area/list/assignee
-                                const parentTaskId = taskId ? String(taskId) : (norm.taskId || norm.task_id || norm.task ? String(norm.taskId || norm.task_id || norm.task) : null);
-                                const parent = parentTaskId ? ((allTasks || []).find((t) => String(t.id) === String(parentTaskId)) || null) : null;
-                                const resolvedKeyArea = norm.key_area_id || norm.keyAreaId || norm.keyArea || (parent && (parent.key_area_id || parent.keyAreaId || parent.keyArea)) || '';
-                                const resolvedList = norm.list || norm.list_index || norm.listIndex || (parent && (parent.list || parent.list_index || parent.listIndex)) || '';
-                                const resolvedAssignee = norm.assignee || norm.responsible || (parent && (parent.assignee || parent.responsible)) || '';
-                                return {
-                                    id: norm.id || norm.activityId || null,
-                                    type: 'activity',
-                                    taskId: norm.taskId || norm.task_id || norm.task || '',
-                                    text: norm.text || norm.activity_name || '',
-                                    title: norm.text || norm.activity_name || '',
-                                    description: norm.description || norm.notes || norm.note || '',
-                                    start_date: norm.start_date || norm.startDate || norm.date_start || '',
-                                    startDate: norm.start_date || norm.startDate || norm.date_start || '',
-                                    end_date: norm.end_date || norm.endDate || norm.date_end || '',
-                                    endDate: norm.end_date || norm.endDate || norm.date_end || '',
-                                    deadline: norm.deadline || norm.dueDate || norm.due_date || '',
-                                    duration: norm.duration || norm.duration_minutes || '',
-                                    key_area_id: resolvedKeyArea,
-                                    list: resolvedList,
-                                    list_index: resolvedList,
-                                    assignee: resolvedAssignee,
-                                    priority: norm.priority ?? norm.priority_level ?? undefined,
-                                    goal: norm.goal || norm.goal_id || norm.goalId || undefined,
-                                    completed: norm.completed || false,
-                                };
-                            } catch (e) {
-                                return activityForm || {};
-                            }
-                        })()}
-                        keyAreas={keyAreas}
-                        users={users}
-                        goals={goals}
-                        tasks={allTasks}
-                        availableLists={availableListNumbers}
-                        parentListNames={selectedKA ? listNames[selectedKA.id] : null}
-                        onSave={async (payload) => {
-                            await handleActivityModalSave(payload);
-                            setEditingActivityViaTaskModal(null);
-                            setShowEditActivityModal(false);
-                        }}
-                        onCancel={() => { setShowEditActivityModal(false); setEditingActivityViaTaskModal(null); }}
-                        isSaving={isSavingActivity}
-                    />
-                )}
+                <KeyAreasModalStack
+                    addToast={addToast}
+                    activityForm={activityForm}
+                    activitiesByTask={activitiesByTask}
+                    allTasks={allTasks}
+                    availableListNumbers={availableListNumbers}
+                    currentUserId={currentUserId}
+                    editing={editing}
+                    editingActivityId={editingActivityId}
+                    editingActivityViaTaskModal={editingActivityViaTaskModal}
+                    editingTaskId={editingTaskId}
+                    goals={goals}
+                    handleActivityModalSave={handleActivityModalSave}
+                    handleActivityPanelMassFieldSave={handleActivityPanelMassFieldSave}
+                    handleBulkFieldSave={handleBulkFieldSave}
+                    handleSaveTask={handleSaveTask}
+                    isSavingActivity={isSavingActivity}
+                    keyAreas={keyAreas}
+                    listNames={listNames}
+                    onCreateTask={async (payload) => {
+                        try {
+                            const created = await api.createTask(payload);
+                            setAllTasks((prev) => [...prev, created]);
+                        } catch (err) {
+                            console.error('Failed to create task from modal', err);
+                        }
+                    }}
+                    onHideActivityComposer={() => setShowActivityComposer(false)}
+                    onHideEditActivityModal={() => setShowEditActivityModal(false)}
+                    onHideTaskComposer={() => setShowTaskComposer(false)}
+                    onSaveKA={onSaveKA}
+                    selectedKA={selectedKA}
+                    setActivityAttachTaskId={setActivityAttachTaskId}
+                    setEditing={setEditing}
+                    setEditingActivityId={setEditingActivityId}
+                    setEditingActivityViaTaskModal={setEditingActivityViaTaskModal}
+                    setEditingTaskId={setEditingTaskId}
+                    setMassEditField={setMassEditField}
+                    setShowActivityMassFieldPicker={setShowActivityMassFieldPicker}
+                    setShowForm={setShowForm}
+                    setShowMassFieldPicker={setShowMassFieldPicker}
+                    showActivityComposer={showActivityComposer}
+                    showActivityMassFieldPicker={showActivityMassFieldPicker}
+                    showEditActivityModal={showEditActivityModal}
+                    showForm={showForm}
+                    showMassFieldPicker={showMassFieldPicker}
+                    showTaskComposer={showTaskComposer}
+                    t={t}
+                    taskForm={taskForm}
+                    users={users}
+                />
                 <main className="flex-1 min-w-0 w-full h-full min-h-0 transition-all overflow-hidden">
-                    {/* Main View Tabs (legacy pattern - at top like legacy UI) */}
-                    <div className="md:hidden">
-                        <ViewTabsNavigation 
-                            viewTab={viewTab}
-                            setViewTab={setViewTab}
-                            activeFilter={activeFilter}
-                            setActiveFilter={setActiveFilter}
-                            pendingDelegationsCount={pendingDelegations.length}
-                        />
-                    </div>
-                    
                     <div className="flex-1 h-full min-h-0 max-w-full overflow-hidden px-1 md:px-2 pb-1 flex flex-col">
                         <div>
-                            {/* Header / Search / New KA */}
-                            <div
-                                className="flex items-center justify-between gap-3 mb-4"
-                                style={{ display: selectedTaskFull ? "none" : undefined }}
-                            >
-                            {!selectedKA && !isGlobalTasksView ? (
-                                <div className="flex items-center gap-3 w-full">
-                                    <h1 className="text-2xl font-bold text-slate-900">{t("keyAreas.title")}</h1>
-                                    <div className="ml-auto flex items-center gap-2">
-                                        {!showOnlyIdeas && (
-                                            <>
-                                                <button
-                                                    className={`flex items-center gap-2 rounded-lg font-semibold shadow px-2 py-1 text-sm border border-slate-200 ${
-                                                        canAdd
-                                                            ? "bg-blue-600 hover:bg-blue-700 text-white"
-                                                            : "bg-gray-300 text-gray-600 cursor-not-allowed"
-                                                    }`}
-                                                    onClick={() => canAdd && (setShowForm(true), setEditing(null))}
-                                                    disabled={!canAdd}
-                                                    title={
-                                                        canAdd
-                                                            ? undefined
-                                                            : "Limit reached: You can have up to 9 custom Key Areas (Ideas is fixed as the 10th)."
-                                                    }
-                                                >
-                                                   New Key Area
-                                                </button>
-                                                {!canAdd && (
-                                                    <span className="text-xs text-slate-500">Max 10 Key Areas reached.</span>
-                                                )}
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="flex flex-wrap items-center gap-2 w-full">
-                                    {/* mobile sidebar toggle */}
-                                    <button
-                                        className="md:hidden p-2 rounded-lg bg-white border border-slate-200 mr-2"
-                                        onClick={() => setShowMobileSidebar(true)}
-                                        aria-label="Open menu"
-                                    >
-                                        <FaBars />
-                                    </button>
-                                    {selectedKA && !(panelViewMode === "simple" && selectedTaskInPanel) && (
-                                        <button
-                                            className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
-                                            aria-label="Back"
-                                            style={{ minWidth: 36, minHeight: 36 }}
-                                            onClick={() => {
-                                                suppressKaParamOpenRef.current = true;
-                                                setSelectedKA(null);
-                                                setAllTasks([]);
-                                                // Clear any URL params (like ?select=ideas) to show full list
-                                                navigate("/key-areas", { replace: true });
-                                            }}
-                                        >
-                                            <FaChevronLeft />
-                                        </button>
-                                    )}
-
-                                    {/* Show selected KA icon then title inline - or special views */}
-                                    {(selectedKA || isGlobalTasksView) && (
-                                        <div className="inline-flex items-center gap-1">
-                                            <img
-                                                alt="Key Areas"
-                                                className="w-7 h-7 md:w-8 md:h-8 object-contain"
-                                                src={`${import.meta.env.BASE_URL}key-area.png`}
-                                                onError={(e) => {
-                                                    if (e?.currentTarget) e.currentTarget.src = "/key-area.png";
-                                                }}
-                                            />
-                                            <span 
-                                                className="relative text-base md:text-lg font-bold text-slate-900 truncate px-1"
-                                                style={{ color: (selectedKA && selectedKA.color) || '#1F2937' }}
-                                            >
-                                                {viewTab === 'delegated' ? 'Delegated Tasks' : 
-                                                 viewTab === 'todo' ? 'To-Do (All Tasks)' :
-                                                 viewTab === 'activity-trap' ? 'Activity Trap' :
-                                                 selectedKA?.title || ''}
-                                            </span>
-                                        </div>
-                                    )}
-
-                                    <div className="ml-auto flex flex-wrap items-center justify-end gap-1.5">
-                                        {selectedKA && viewTab !== 'delegated' && viewTab !== 'todo' && viewTab !== 'activity-trap' && (
-                                            <div className="flex flex-wrap items-center gap-3 text-sm">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-slate-600">Sort by:</span>
-                                                    <select
-                                                        value={sortBy}
-                                                        onChange={(e) => setSortBy(e.target.value)}
-                                                        className="border border-slate-200 rounded px-2 py-0.5 text-sm bg-white w-[100px]"
-                                                    >
-                                                        <option value="manual">{t("keyAreas.sortManual")}</option>
-                                                        <option value="date">{t("keyAreas.sortDate")}</option>
-                                                        <option value="priority">{t("keyAreas.sortPriority")}</option>
-                                                        <option value="status">{t("keyAreas.sortStatus")}</option>
-                                                    </select>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-slate-600">Status:</span>
-                                                    <div className="relative" ref={statusMenuRef}>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setShowStatusMenu((s) => !s)}
-                                                            className="border border-slate-200 rounded px-2 py-0.5 text-sm bg-white min-w-[100px] inline-flex items-center justify-between gap-2"
-                                                            aria-haspopup="menu"
-                                                            aria-expanded={showStatusMenu ? "true" : "false"}
-                                                        >
-                                                            <span className="truncate">{statusFilterLabel}</span>
-                                                            <span className="text-[10px]">▾</span>
-                                                        </button>
-                                                        {showStatusMenu && (
-                                                            <div className="absolute right-0 mt-1 w-44 rounded-md border border-slate-200 bg-white shadow-lg z-50 p-2">
-                                                                <label className="flex items-center gap-2 px-1 py-1 text-sm">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        checked={allStatusesSelected}
-                                                                        onChange={() => toggleStatusFilter("all")}
-                                                                    />
-                                                                    <span>All</span>
-                                                                </label>
-                                                                {statusFilterOptions.map((option) => (
-                                                                    <label key={option.value} className="flex items-center gap-2 px-1 py-1 text-sm">
-                                                                        <input
-                                                                            type="checkbox"
-                                                                            checked={filterStatuses.includes(option.value)}
-                                                                            onChange={() => toggleStatusFilter(option.value)}
-                                                                        />
-                                                                        <span>{option.label}</span>
-                                                                    </label>
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-slate-600">Responsible:</span>
-                                                    <select
-                                                        value={filterAssignee}
-                                                        onChange={(e) => setFilterAssignee(e.target.value)}
-                                                        className="border border-slate-200 rounded px-2 py-0.5 text-sm bg-white w-[100px]"
-                                                    >
-                                                        <option value="">All</option>
-                                                        {(users || []).map((u) => (
-                                                            <option key={u.id} value={String(u.id)}>{u.name}</option>
-                                                        ))}
-                                                    </select>
-                                                </div>
-                                            </div>
-                                        )}
-                                        {selectedKA && viewTab !== 'delegated' && viewTab !== 'todo' && viewTab !== 'activity-trap' && (
-                                            <div className="relative" ref={panelViewMenuRef}>
-                                                <button
-                                                    type="button"
-                                                    className="day-header-btn px-2 py-0 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center gap-2 focus:outline-none focus:ring-0 focus:border-slate-300"
-                                                    style={{ minWidth: 32, minHeight: 30, outline: 'none', boxShadow: 'none' }}
-                                                    onClick={() => setShowPanelViewMenu((s) => !s)}
-                                                    aria-haspopup="menu"
-                                                    aria-expanded={showPanelViewMenu ? "true" : "false"}
-                                                >
-                                                    <span>View</span>
-                                                    <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
-                                                        {panelViewMode === "triple" ? t("keyAreas.viewTriple") : t("keyAreas.viewSimple")}
-                                                    </span>
-                                                    <FaChevronDown className={`${showPanelViewMenu ? "rotate-180" : "rotate-0"} transition-transform`} />
-                                                </button>
-                                                {showPanelViewMenu && (
-                                                    <div role="menu" className="absolute right-0 z-50 mt-2 w-40 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden">
-                                                        {["triple", "simple"].map((mode) => (
-                                                            <button
-                                                                key={mode}
-                                                                role="menuitemradio"
-                                                                aria-checked={panelViewMode === mode}
-                                                                className={`w-full text-left px-3 py-2 text-sm ${
-                                                                    panelViewMode === mode ? "bg-blue-50 text-blue-700 font-semibold" : "text-slate-700 hover:bg-slate-50"
-                                                                }`}
-                                                                onClick={() => {
-                                                                    setPanelViewMode(mode);
-                                                                    setShowPanelViewMenu(false);
-                                                                }}
-                                                            >
-                                                                {mode === "triple" ? t("keyAreas.viewTripleFull") : t("keyAreas.viewSimpleFull")}
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-                                        {/* Columns (gear) placed beside View in header */}
-                                        <div className="relative ml-1" ref={columnsMenuRef}>
-                                            <button
-                                                type="button"
-                                                aria-haspopup="menu"
-                                                aria-expanded={showColumnsMenu ? "true" : "false"}
-                                                className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-1 text-sm font-semibold hover:bg-slate-50"
-                                                onClick={() => setShowColumnsMenu((s) => !s)}
-                                                title="Columns"
-                                            >
-                                                <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 512 512" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
-                                                    <path d="M487.4 315.7l-42.6-24.6c4.3-23.2 4.3-47 0-70.2l42.6-24.6c4.9-2.8 7.1-8.6 5.5-14-11.1-35.6-30-67.8-54.7-94.6-3.8-4.1-10-5.1-14.8-2.3L380.8 110c-17.9-15.4-38.5-27.3-60.8-35.1V25.8c0-5.6-3.9-10.5-9.4-11.7-36.7-8.2-74.3-7.8-109.2 0-5.5 1.2-9.4 6.1-9.4 11.7V75c-22.2 7.9-42.8 19.8-60.8 35.1L88.7 85.5c-4.9-2.8-11-1.9-14.8 2.3-24.7 26.7-43.6 58.9-54.7 94.6-1.7 5.4.6 11.2 5.5 14L67.3 221c-4.3 23.2-4.3 47 0 70.2l-42.6 24.6c-4.9 2.8-7.1 8.6-5.5 14 11.1 35.6 30 67.8 54.7 94.6 3.8 4.1 10 5.1 14.8 2.3l42.6-24.6c17.9 15.4 38.5 27.3 60.8 35.1v49.2c0 5.6 3.9 10.5 9.4 11.7 36.7 8.2 74.3 7.8 109.2 0 5.5-1.2 9.4-6.1 9.4-11.7v-49.2c22.2-7.9 42.8-19.8 60.8-35.1l42.6 24.6c4.9 2.8 11 1.9 14.8-2.3 24.7-26.7 43.6-58.9 54.7-94.6 1.5-5.5-.7-11.3-5.6-14.1zM256 336c-44.1 0-80-35.9-80-80s35.9-80 80-80 80 35.9 80 80-35.9 80-80 80z"></path>
-                                                </svg>
-                                            </button>
-                                            {showColumnsMenu && (
-                                                <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded shadow z-50 p-3 text-sm">
-                                                    <div className="font-medium mb-2">{t("keyAreas.columns")}</div>
-                                                    {Object.keys(visibleColumns).map((key) => (
-                                                        <label key={key} className="flex items-center gap-2 py-1">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={!!visibleColumns[key]}
-                                                                onChange={() => setVisibleColumns((prev) => ({ ...prev, [key]: !prev[key] }))}
-                                                            />
-                                                            <span className="capitalize">{key.replace('_', ' ')}</span>
-                                                        </label>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                            </div>
-                            {panelViewMode === "simple" && viewTab === "active-tasks" && selectedTaskInPanel && selectedKA && !isGlobalTasksView && (
-                                <div className="mt-2 mb-1 flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 py-1.5">
-                                    <button
-                                        type="button"
-                                        className="px-2 py-1 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
-                                        aria-label="Back to task list"
-                                        onClick={() => setSelectedTaskInPanel(null)}
-                                    >
-                                        <FaChevronLeft />
-                                    </button>
-                                    <span
-                                        className="inline-block w-4 h-4 rounded-[3px]"
-                                        style={{ backgroundColor: (selectedKA && selectedKA.color) || '#10b981' }}
-                                        aria-hidden="true"
-                                    />
-                                    {(() => {
-                                        const lvl = getPriorityLevel ? getPriorityLevel(selectedTaskInPanel?.priority) : 2;
-                                        if (lvl === 2) return null;
-                                        if (lvl === 3) {
-                                            return (
-                                                <img src={`${import.meta.env.BASE_URL}high-priority.svg`} alt="High priority" className="inline-block w-2 h-4" title="Priority: High" />
-                                            );
-                                        }
-                                        return (
-                                            <img src={`${import.meta.env.BASE_URL}low-priority-down.svg`} alt="Low priority" className="inline-block w-2 h-4" title="Priority: Low" />
-                                        );
-                                    })()}
-                                    <span className="text-sm font-semibold text-slate-900 truncate">
-                                        {selectedTaskInPanel?.title || selectedTaskInPanel?.name || "Untitled Task"}
-                                    </span>
-                                </div>
-                            )}
+                            <KeyAreasHeaderBar
+                                activeFilter={activeFilter}
+                                setActiveFilter={setActiveFilter}
+                                allStatusesSelected={allStatusesSelected}
+                                canAdd={canAdd}
+                                columnsMenuRef={columnsMenuRef}
+                                filterAssignee={filterAssignee}
+                                filterStatuses={filterStatuses}
+                                getPriorityLevel={getPriorityLevel}
+                                isGlobalTasksView={isGlobalTasksView}
+                                pendingDelegationsCount={pendingDelegations.length}
+                                panelViewMenuRef={panelViewMenuRef}
+                                panelViewMode={panelViewMode}
+                                selectedKA={selectedKA}
+                                selectedTaskFull={selectedTaskFull}
+                                selectedTaskInPanel={selectedTaskInPanel}
+                                setEditing={setEditing}
+                                setFilterAssignee={setFilterAssignee}
+                                setMobileSidebarOpen={setMobileSidebarOpen}
+                                setPanelViewMode={setPanelViewMode}
+                                setSelectedTaskInPanel={setSelectedTaskInPanel}
+                                setShowColumnsMenu={setShowColumnsMenu}
+                                setShowForm={setShowForm}
+                                setShowPanelViewMenu={setShowPanelViewMenu}
+                                setShowStatusMenu={setShowStatusMenu}
+                                setSortBy={setSortBy}
+                                setViewTab={setViewTab}
+                                showAllKeyAreas={showAllKeyAreas}
+                                showColumnsMenu={showColumnsMenu}
+                                showOnlyIdeas={showOnlyIdeas}
+                                showPanelViewMenu={showPanelViewMenu}
+                                showStatusMenu={showStatusMenu}
+                                sortBy={sortBy}
+                                statusFilterLabel={statusFilterLabel}
+                                statusFilterOptions={statusFilterOptions}
+                                statusMenuRef={statusMenuRef}
+                                t={t}
+                                toggleStatusFilter={toggleStatusFilter}
+                                users={users}
+                                viewTab={viewTab}
+                                visibleColumns={visibleColumns}
+                                setVisibleColumns={setVisibleColumns}
+                                navigate={navigate}
+                            />
                         </div>
-                        {/* Title block removed; title now shown inline with Back */}
-                        {selectedTaskFull && (
-                            <div className="mb-4">
-                                <TaskFullView
-                                    task={selectedTaskFull}
-                                    goals={goals}
-                                    kaTitle={(selectedKA && selectedKA.title) || (keyAreas.find(k => String(k.id) === String(selectedTaskFull.key_area_id)) || {}).title}
-                                    listNames={listNames}
-                                    kaId={(selectedKA && selectedKA.id) || selectedTaskFull.key_area_id}
-                                    listNumbers={availableListNumbers}
-                                    selectedKA={selectedKA || keyAreas.find(k => String(k.id) === String(selectedTaskFull.key_area_id))}
-                                    users={users}
-                                    currentUserId={currentUserId}
-                                    allTasks={allTasks}
-                                    savingActivityIds={savingActivityIds}
-                                    setSavingActivityIds={setSavingActivityIds}
-                                    readOnly={
-                                        Boolean((selectedKA && selectedKA.is_default) || (selectedTaskFull && ((keyAreas.find(k => String(k.id) === String(selectedTaskFull.key_area_id)) || {}).is_default))) &&
-                                        (((selectedKA && (selectedKA.title || "").toLowerCase()) || ((keyAreas.find(k => String(k.id) === String(selectedTaskFull.key_area_id)) || {}).title || "").toLowerCase()) !== "ideas")
-                                    }
-                                    onBack={() => setSelectedTaskFull(null)}
-                                    onSave={async (payload) => {
-                                        const originalTask = allTasks.find((x) => x.id === payload.id);
-                                        await handleSaveTask(payload);
-                                        const updated = allTasks.find((x) => x.id === payload.id) || payload;
-                                        
-                                        // If key area changed, selectedTaskFull is already cleared by handleSaveTask
-                                        const keyAreaChanged = originalTask && 
-                                            String(originalTask.key_area_id || originalTask.keyAreaId) !== 
-                                            String(payload.key_area_id || payload.keyAreaId);
-                                        
-                                        if (!keyAreaChanged) {
-                                            setSelectedTaskFull(updated);
-                                        }
-                                    }}
-                                    onDelete={async (tsk) => {
-                                        await handleDeleteTask(tsk);
-                                        setSelectedTaskFull(null);
-                                    }}
-                                    onRequestEdit={async (task) => {
-                                        // Map server task shape into the Task composer form and open the shared EditTaskModal
-                                        const mapPriority = (p) => {
-                                            const v = String(p || "normal").toLowerCase();
-                                            if (v === "med" || v === "medium" || v === "normal") return "normal";
-                                            if (v === "low") return "low";
-                                            if (v === "high") return "high";
-                                            return "normal";
-                                        };
-                                        setTaskForm({
-                                            id: task.id || task.taskId || task.task_id || task._id || null,
-                                            title: task.title || task.name || "",
-                                            description: task.description || "",
-                                            list_index: task.list_index || task.listIndex || 1,
-                                            goal_id: task.goal_id || "",
-                                            start_date: toDateOnly(task.start_date) || toDateOnly(task.startDate) || "",
-                                            deadline: toDateOnly(task.deadline) || toDateOnly(task.dueDate) || "",
-                                            end_date: toDateOnly(task.end_date) || toDateOnly(task.endDate) || "",
-                                            status: task.status || "open",
-                                            priority: (function(p) {
-                                                const s = String(p || "normal").toLowerCase();
-                                                if (s === "low" || s === "1") return 1;
-                                                if (s === "high" || s === "3") return 3;
-                                                return 2;
-                                            })(task.priority),
-                                            tags: task.tags || "",
-                                            assignee: task.assignee || "",
-                                            key_area_id: (selectedKA && selectedKA.id) || task.key_area_id || task.keyAreaId || null,
-                                            list: "",
-                                            finish_date: "",
-                                            duration: task.duration || "",
-                                            _endAuto: false,
-                                        });
-                                        setEditingTaskId(task.id);
-                                        setShowTaskComposer(true);
-                                    }}
-                                    activitiesByTask={activitiesByTask}
-                                    onUpdateActivities={(id, nextList) => {
-                                        setActivitiesByTask((prev) => ({ ...prev, [id]: nextList }));
-                                    }}
-                                    initialTab={taskFullInitialTab}
-                                    initialActivityId={(() => {
-                                        const params = new URLSearchParams(location.search);
-                                        const taskParam = params.get('task');
-                                        const activityParam = params.get('activity');
-                                        if (!activityParam || !selectedTaskFull?.id) return null;
-                                        return String(taskParam || '') === String(selectedTaskFull.id) ? activityParam : null;
-                                    })()}
-                                />
-                            </div>
-                        )}
+                        <KeyAreasTaskFullSection
+                            allTasks={allTasks}
+                            activitiesByTask={activitiesByTask}
+                            availableListNumbers={availableListNumbers}
+                            currentUserId={currentUserId}
+                            goals={goals}
+                            handleDeleteTask={handleDeleteTask}
+                            handleSaveTask={handleSaveTask}
+                            keyAreas={keyAreas}
+                            listNames={listNames}
+                            locationSearch={location.search}
+                            savingActivityIds={savingActivityIds}
+                            selectedKA={selectedKA}
+                            selectedTaskFull={selectedTaskFull}
+                            setActivitiesByTask={setActivitiesByTask}
+                            setEditingTaskId={setEditingTaskId}
+                            setSavingActivityIds={setSavingActivityIds}
+                            setSelectedTaskFull={setSelectedTaskFull}
+                            setShowTaskComposer={setShowTaskComposer}
+                            setTaskForm={setTaskForm}
+                            taskFullInitialTab={taskFullInitialTab}
+                            users={users}
+                        />
                         {(selectedKA || viewTab === 'delegated' || viewTab === 'todo') && (viewTab !== 'delegated' && viewTab !== 'todo' && viewTab !== 'activity-trap') && (
                             <div className="flex-1 min-h-0 overflow-hidden">
                                 <ResizablePanels
                                     mode={panelViewMode}
                                     simpleActivePanel={panelViewMode === "simple" && selectedTaskInPanel ? "activity" : "task"}
                                     taskPanel={
-                                    <div className="flex flex-col h-full bg-white">
-                                        {/* Task Panel Content */}
-                                        <div
-                                            className={`flex-1 min-h-0 overflow-hidden pt-3 pb-0 ${
-                                                panelViewMode === "simple" ? "px-3" : "pl-3 pr-px"
-                                            }`}
-                                        >
-                                            <div className="space-y-6 flex flex-col min-h-0 h-full">
-                                <div className="bg-white border border-blue-300 rounded-lg shadow-sm overflow-hidden p-3 space-y-2 flex flex-col flex-1 min-h-0">
-                                        {/* Header Row: Task Lists Label + Mass Edit Control */}
-                                        <div className="flex items-center justify-between border-b border-black pb-2">
-                                            <div className="flex items-center gap-2">
-                                                <span className="font-medium text-slate-700">
-                                                    {viewTab === 'delegated' ? 'Delegated Tasks:' :
-                                                     viewTab === 'todo' ? 'All Tasks:' :
-                                                     'Task Lists:'}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center gap-3 text-sm">
-                                                <span className="text-slate-500" aria-live="polite">
-                                                    {selectedIds.size} selected
-                                                </span>
-                                                <MassActionMenu
-                                                    label="Mass Edit"
-                                                    ariaLabel="mass action"
-                                                    disabled={selectedIds.size === 0}
-                                                    title={selectedIds.size === 0 ? 'Select tasks to enable mass edit' : undefined}
-                                                    onSelect={handleTaskMassActionChange}
-                                                />
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setTaskForm({
-                                                            title: "",
-                                                            description: "",
-                                                            list_index: taskTab || 1,
-                                                            goal_id: "",
-                                                            start_date: "",
-                                                            deadline: "",
-                                                            end_date: "",
-                                                            status: "open",
-                                                            priority: "normal",
-                                                            tags: "",
-                                                            assignee: "",
-                                                            duration: "",
-                                                            // Prefill key area with the currently selected Key Area for new task creation.
-                                                            key_area_id: selectedKA?.id || null,
-                                                            list: "",
-                                                            finish_date: "",
-                                                            _endAuto: true,
-                                                        });
-                                                        setShowTaskComposer(true);
-                                                    }}
-                                                    className="inline-flex items-center gap-2 px-4 py-1 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                    aria-label="Add task"
-                                                >
-                                                    Add Task
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        {/* List Tabs Section (left sidebar lists within the view) */}
-                                        <div className="pt-0">
-                                            <div
-                                                ref={tabsRef}
-                                                className="flex items-center gap-1 overflow-x-auto bg-slate-100 border border-slate-200 rounded-lg px-1 py-0.5"
-                                            >
-                                                        {Array.from({ length: leftListCount }).map((_, i) => {
-                                                            const n = i + 1;
-                                                            return (
-                                                                <div key={n} className="relative">
-                                                                    <button
-                                                                        onClick={() => setTaskTab(n)}
-                                                                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-sm font-semibold border transition ${
-                                                                            taskTab === n
-                                                                                ? "bg-white text-slate-900 border-slate-300 shadow"
-                                                                                : "bg-transparent text-slate-800 border-transparent hover:bg-slate-200"
-                                                                        }`}
-                                                                    >
-                                                                        <span>{getListName(selectedKA?.id, n)}</span>
-                                                                        <span
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                const rect =
-                                                                                    e.currentTarget.getBoundingClientRect();
-                                                                                setListMenuPos({
-                                                                                    top:
-                                                                                        rect.bottom +
-                                                                                        window.scrollY +
-                                                                                        6,
-                                                                                    left: rect.left + window.scrollX,
-                                                                                });
-                                                                                setOpenListMenu((cur) =>
-                                                                                    cur === n ? null : n,
-                                                                                );
-                                                                            }}
-                                                                            aria-haspopup="menu"
-                                                                            aria-expanded={
-                                                                                openListMenu === n ? "true" : "false"
-                                                                            }
-                                                                            title={`Options for ${getListName(selectedKA?.id, n)}`}
-                                                                            className={`ml-1 p-1 rounded cursor-pointer ${
-                                                                                taskTab === n
-                                                                                    ? "text-slate-600 hover:bg-slate-100"
-                                                                                    : "text-slate-700 hover:bg-slate-200"
-                                                                            }`}
-                                                                            role="button"
-                                                                        >
-                                                                            <FaEllipsisV className="w-3.5 h-3.5" />
-                                                                        </span>
-                                                                    </button>
-                                                                    {openListMenu === n && (
-                                                                        <>
-                                                                            <div
-                                                                                className="fixed inset-0 z-40"
-                                                                                onClick={() => setOpenListMenu(null)}
-                                                                            />
-                                                                            <div
-                                                                                role="menu"
-                                                                                className="fixed z-50 w-32 bg-white border border-slate-200 rounded-lg shadow"
-                                                                                style={{
-                                                                                    top: `${listMenuPos.top}px`,
-                                                                                    left: `${listMenuPos.left}px`,
-                                                                                }}
-                                                                            >
-                                                                                <button
-                                                                                    role="menuitem"
-                                                                                    onClick={() => {
-                                                                                        renameList(n);
-                                                                                        setOpenListMenu(null);
-                                                                                    }}
-                                                                                    className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
-                                                                                    aria-label="Rename list"
-                                                                                >
-                                                                                    Rename List
-                                                                                </button>
-                                                                                <button
-                                                                                    role="menuitem"
-                                                                                    onClick={() => {
-                                                                                        deleteList(n);
-                                                                                        setOpenListMenu(null);
-                                                                                    }}
-                                                                                    className="block w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                                                                                    aria-label="Delete list"
-                                                                                >
-                                                                                    Delete List
-                                                                                </button>
-                                                                            </div>
-                                                                        </>
-                                                                    )}
-                                                                </div>
-                                                            );
-                                                        })}
-                                                        {leftListCount < 10 && (
-                                                            <div className="flex items-center">
-                                                                <button
-                                                                    onClick={async () => {
-                                                                        if (!selectedKA) return;
-                                                                        if (
-                                                                            selectedKA.is_default ||
-                                                                            (selectedKA.title || "").toLowerCase() ===
-                                                                                "ideas"
-                                                                        ) {
-                                                                            alert(
-                                                                                t("keyAreas.alertCannotAddListIdeas"),
-                                                                            );
-                                                                            return;
-                                                                        }
-                                                                        const kaId = selectedKA.id;
-                                                                        const currentCount = leftListCount;
-                                                                        const next = currentCount + 1;
-                                                                        const nextName = `List ${next}`;
-                                                                        setListNames((prev) => {
-                                                                            const copy = { ...(prev || {}) };
-                                                                            copy[kaId] = { ...(copy[kaId] || {}) };
-                                                                            copy[kaId][next] = nextName;
-                                                                            return copy;
-                                                                        });
-                                                                        setTaskTab(next);
-                                                                            try {
-                                                                                const names = listNames[kaId] || {};
-                                                                                const newMap = {
-                                                                                    ...names,
-                                                                                    [next]: nextName,
-                                                                                };
-                                                                                const svc = await getKeyAreaService();
-                                                                                await svc.update(kaId, {
-                                                                                    listNames: newMap,
-                                                                                });
-                                                                            } catch (e) {
-                                                                                console.error(
-                                                                                    "Failed to persist new list",
-                                                                                    e,
-                                                                                );
-                                                                            }
-                                                                    }}
-                                                                    title="Add list"
-                                                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border bg-white text-slate-800 hover:bg-slate-50"
-                                                                >
-                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                                                    </svg>
-                                                                    Add List
-                                                                </button>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                        </div>
-
-                                        {/* Bottom Row: Tasks Display (full width) */}
-                                        <div ref={tasksDisplayRef} className="flex flex-col flex-1 min-h-0">
-                                            {view === "list" ? (
-                                                sortedTasks.length === 0 ? (
-                                                    <EmptyState
-                                                        title="List is empty."
-                                                        hint="Use the 'Add Task' button below to create your first task."
-                                                    />
-                                                ) : (
-                                                    <div className="flex-1 min-h-0 overflow-x-auto overflow-y-auto hover-scrollbar-y">
-                                                        <table className="min-w-[1400px] w-full text-sm table-fixed">
-                                                            <colgroup>
-                                                                <col style={{ width: '3rem' }} />
-                                                                <col style={{ width: '15rem' }} />
-                                                                {visibleColumns.responsible && <col style={{ width: '6rem' }} />}
-                                                                <col style={{ width: '6rem' }} />
-                                                                {visibleColumns.priority && <col style={{ width: '6rem' }} />}
-                                                                {visibleColumns.quadrant && <col style={{ width: '6rem' }} />}
-                                                                {visibleColumns.start_date && <col style={{ width: '6rem' }} />}
-                                                                {visibleColumns.end_date && <col style={{ width: '6rem' }} />}
-                                                                {visibleColumns.deadline && <col style={{ width: '6rem' }} />}
-                                                                {visibleColumns.duration && <col style={{ width: '6rem' }} />}
-                                                                {visibleColumns.completed && <col style={{ width: '6rem' }} />}
-                                                            </colgroup>
-                                                            <thead className="bg-slate-50 border border-slate-200 text-slate-700">
-                                                                <tr>
-                                                                    <th className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left w-12">
-                                                                        <input
-                                                                            type="checkbox"
-                                                                            aria-label="Select all visible"
-                                                                            checked={
-                                                                                sortedTasks.length > 0 &&
-                                                                                sortedTasks.every((t) =>
-                                                                                    selectedIds.has(t.id),
-                                                                                )
-                                                                            }
-                                                                            onChange={selectAllVisible}
-                                                                        />
-                                                                    </th>
-                                                                    <th 
-                                                                        className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[240px] cursor-pointer hover:bg-slate-100"
-                                                                        onClick={() => handleTaskSort('title')}
-                                                                    >
-                                                                        Task {taskSortField === 'title' && (taskSortDirection === 'asc' ? '↑' : '↓')}
-                                                                    </th>
-                                                                    {visibleColumns.responsible && (
-                                                                        <th 
-                                                                            className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
-                                                                            onClick={() => handleTaskSort('responsible')}
-                                                                        >
-                                                                            Responsible {taskSortField === 'responsible' && (taskSortDirection === 'asc' ? '↑' : '↓')}
-                                                                        </th>
-                                                                    )}
-                                                                    <th 
-                                                                        className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
-                                                                        onClick={() => handleTaskSort('status')}
-                                                                    >
-                                                                        Status {taskSortField === 'status' && (taskSortDirection === 'asc' ? '↑' : '↓')}
-                                                                    </th>
-                                                                    {visibleColumns.priority && (
-                                                                        <th 
-                                                                            className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
-                                                                            onClick={() => handleTaskSort('priority')}
-                                                                        >
-                                                                            Priority {taskSortField === 'priority' && (taskSortDirection === 'asc' ? '↑' : '↓')}
-                                                                        </th>
-                                                                    )}
-                                                                    {visibleColumns.quadrant && (
-                                                                        <th 
-                                                                            className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
-                                                                            onClick={() => handleTaskSort('quadrant')}
-                                                                        >
-                                                                            Quadrant {taskSortField === 'quadrant' && (taskSortDirection === 'asc' ? '↑' : '↓')}
-                                                                        </th>
-                                                                    )}
-                                                                    {/* Goal and Tags columns removed per UX request */}
-                                                                    {visibleColumns.start_date && (
-                                                                        <th 
-                                                                            className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
-                                                                            onClick={() => handleTaskSort('start_date')}
-                                                                        >
-                                                                            Start Date {taskSortField === 'start_date' && (taskSortDirection === 'asc' ? '↑' : '↓')}
-                                                                        </th>
-                                                                    )}
-                                                                    {visibleColumns.end_date && (
-                                                                        <th 
-                                                                            className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
-                                                                            onClick={() => handleTaskSort('end_date')}
-                                                                        >
-                                                                            End date {taskSortField === 'end_date' && (taskSortDirection === 'asc' ? '↑' : '↓')}
-                                                                        </th>
-                                                                    )}
-                                                                    {visibleColumns.deadline && (
-                                                                        <th 
-                                                                            className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
-                                                                            onClick={() => handleTaskSort('deadline')}
-                                                                        >
-                                                                            Deadline {taskSortField === 'deadline' && (taskSortDirection === 'asc' ? '↑' : '↓')}
-                                                                        </th>
-                                                                    )}
-                                                                    {visibleColumns.duration && (
-                                                                        <th 
-                                                                            className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
-                                                                            onClick={() => handleTaskSort('duration')}
-                                                                        >
-                                                                            Duration {taskSortField === 'duration' && (taskSortDirection === 'asc' ? '↑' : '↓')}
-                                                                        </th>
-                                                                    )}
-                                                                    {visibleColumns.completed && (
-                                                                        <th 
-                                                                            className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
-                                                                            onClick={() => handleTaskSort('completed')}
-                                                                        >
-                                                                            Completed {taskSortField === 'completed' && (taskSortDirection === 'asc' ? '↑' : '↓')}
-                                                                        </th>
-                                                                    )}
-                                                                    {/* Actions column removed — actions available via row menu */}
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody className="bg-white">
-                                                                {sortedTasks.map((t) => {
-                                                                    const q = computeEisenhowerQuadrant({
-                                                                        deadline: t.deadline,
-                                                                        end_date: t.end_date,
-                                                                        start_date: t.start_date || t.startDate,
-                                                                        priority: t.priority,
-                                                                        status: t.status,
-                                                                        key_area_id: t.key_area_id || t.keyAreaId || t.key_area || t.keyArea,
-                                                                    });
-                                                                    return (
-                                                                        <React.Fragment key={t.id}>
-                                                                            <TaskRow
-                                                                                t={t}
-                                                                                goals={goals}
-                                                                                goalMap={goalTitleMap}
-                                                                                visibleColumns={visibleColumns}
-                                                                                q={q}
-                                                                                isSelected={isSelected(t.id)}
-                                                                                onToggleSelect={() => toggleSelect(t.id)}
-                                                                                onOpenTask={(task) => { setSelectedTaskFull(task); setTaskFullInitialTab("activities"); }}
-                                                                                onStatusChange={(val) => handleTaskStatusChange(t.id, val)}
-                                                                                onToggleActivitiesRow={() => toggleActivitiesRow(t.id)}
-                                                                                activityCount={(activitiesByTask[String(t.id)] || []).length}
-                                                                                getPriorityLevel={getPriorityLevel}
-                                                                                toDateOnly={toDateOnly}
-                                                                                formatDuration={formatDuration}
-                                                                                // inline editing support (optimistic single-field updates)
-                                                                                updateField={updateField}
-                                                                                enableInlineEditing={!showMassEdit}
-                                                                                users={users}
-                                                                                currentUserId={currentUserId}
-                                                                                isSaving={savingIds.has(t.id)}
-                                                                                onMouseEnter={() => {
-                                                                                    if (
-                                                                                        expandedActivityRows &&
-                                                                                        expandedActivityRows.size > 0
-                                                                                    ) {
-                                                                                        if (
-                                                                                            !(
-                                                                                                expandedActivityRows.size ===
-                                                                                                    1 &&
-                                                                                                expandedActivityRows.has(
-                                                                                                    t.id,
-                                                                                                )
-                                                                                            )
-                                                                                        ) {
-                                                                                            setExpandedActivityRows(new Set());
-                                                                                        }
-                                                                                    }
-                                                                                }}
-                                                                                expandedActivity={expandedActivityRows.has(t.id)}
-                                                                                onEditClick={() => {
-                                                                                    const mapPriority = (p) => {
-                                                                                        const v = String(p || "normal").toLowerCase();
-                                                                                        if (v === "med" || v === "medium" || v === "normal") return "normal";
-                                                                                        if (v === "low") return "low";
-                                                                                        if (v === "high") return "high";
-                                                                                        return "normal";
-                                                                                    };
-                                                                                    setTaskForm({
-                                                                                        id: t.id || t.taskId || t._id || null,
-                                                                                        title: t.title || t.name || "",
-                                                                                        description: t.description || t.notes || "",
-                                                                                        list_index: t.list_index || t.listIndex || 1,
-                                                                                        goal_id: t.goal_id || t.goalId || t.goal || "",
-                                                                                        start_date: toDateOnly(t.start_date) || toDateOnly(t.startDate) || "",
-                                                                                        deadline: toDateOnly(t.deadline) || toDateOnly(t.dueDate) || "",
-                                                                                        end_date: toDateOnly(t.end_date) || toDateOnly(t.endDate) || "",
-                                                                                        status: t.status || "open",
-                                                                                        priority: (function(p) {
-                                                                                            const s = String(p || "normal").toLowerCase();
-                                                                                            if (s === "low" || s === "1") return 1;
-                                                                                            if (s === "high" || s === "3") return 3;
-                                                                                            return 2;
-                                                                                        })(t.priority),
-                                                                                        tags: t.tags || "",
-                                                                                        assignee: t.assignee || "",
-                                                                                        key_area_id: t.key_area_id || t.keyAreaId || selectedKA?.id || null,
-                                                                                        list: "",
-                                                                                        finish_date: t.finish_date || "",
-                                                                                        duration: t.duration || "",
-                                                                                        _endAuto: false,
-                                                                                    });
-                                                                                    setEditingTaskId(t.id);
-                                                                                    setShowTaskComposer(true);
-                                                                                }}
-                                                                                onDeleteClick={() => handleDeleteTask(t)}
-                                                                                onRowClick={(task) => {
-                                                                                    if (panelViewMode === "simple") {
-                                                                                        setSelectedTaskInPanel(task);
-                                                                                        return;
-                                                                                    }
-                                                                                    setSelectedTaskInPanel(task);
-                                                                                }}
-                                                                                rowClassName=""
-                                                                            />
-                                                                            {expandedActivityRows.has(t.id) && (
-                                                                                <tr className="bg-slate-50">
-                                                                                    <td className="px-3 py-2" />
-                                                                                    <td colSpan={14} className="px-0 py-2">
-                                                                                        <div className="ml-6 pl-6 border-l-2 border-slate-200">
-                                                                                            <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-2">{t("keyAreas.activities")}</div>
-                                                                                            <ActivityList
-                                                                                                task={t}
-                                                                                                activitiesByTask={activitiesByTask}
-                                                                                                setActivitiesByTask={setActivitiesByTask}
-                                                                                                savingActivityIds={savingActivityIds}
-                                                                                                setSavingActivityIds={setSavingActivityIds}
-                                                                                                getPriorityLevel={getPriorityLevel}
-                                                                                                addToast={addToast}
-                                                                                                             enableInlineEditing={!showMassEdit}
-                                                                                                             users={users}
-                                                                                                             currentUserId={currentUserId}
-                                                                                                             goals={goals}
-                                                                                                filterStatuses={filterStatuses}
-                                                                                                allStatusesSelected={allStatusesSelected}
-                                                                                            />
-                                                                                        </div>
-                                                                                    </td>
-                                                                                </tr>
-                                                                            )}
-                                                                        </React.Fragment>
-                                                                    );
-                                                                })}
-                                                            </tbody>
-                                                        </table>
-                                                    </div>
-                                                )
-                                            ) : view === "kanban" ? (
-                                                <KanbanView
-                                                    tasks={visibleTasks}
-                                                    selectedIds={selectedIds}
-                                                    toggleSelect={toggleSelect}
-                                                    onSelect={(t) => {
-                                                        setSelectedTaskFull(t);
-                                                        setTaskFullInitialTab("activities");
-                                                    }}
-                                                    onStatusChange={handleTaskStatusChange}
-                                                />
-                                            ) : (
-                                                <CalendarView
-                                                    tasks={visibleTasks}
-                                                    selectedIds={selectedIds}
-                                                    toggleSelect={toggleSelect}
-                                                    onSelect={(t) => {
-                                                        setSelectedTaskFull(t);
-                                                        setTaskFullInitialTab("activities");
-                                                    }}
-                                                    onStatusChange={handleTaskStatusChange}
-                                                />
-                                            )}
-                                        </div>
-                                    </div>
-                                        
-                                        </div>
-                                        </div>
-                                    </div>
-                                }
+                                        <KeyAreasTaskPanel
+                                            activitiesByTask={activitiesByTask}
+                                            addToast={addToast}
+                                            allStatusesSelected={allStatusesSelected}
+                                            currentUserId={currentUserId}
+                                            deleteList={deleteList}
+                                            expandedActivityRows={expandedActivityRows}
+                                            filterStatuses={filterStatuses}
+                                            getKeyAreaService={getKeyAreaService}
+                                            getListName={getListName}
+                                            getPriorityLevel={getPriorityLevel}
+                                            goalTitleMap={goalTitleMap}
+                                            goals={goals}
+                                            handleDeleteTask={handleDeleteTask}
+                                            handleTaskMassActionChange={handleTaskMassActionChange}
+                                            handleTaskSort={handleTaskSort}
+                                            handleTaskStatusChange={handleTaskStatusChange}
+                                            isSelected={isSelected}
+                                            leftListCount={leftListCount}
+                                            listMenuPos={listMenuPos}
+                                            listNames={listNames}
+                                            openListMenu={openListMenu}
+                                            panelViewMode={panelViewMode}
+                                            renameList={renameList}
+                                            savingActivityIds={savingActivityIds}
+                                            savingIds={savingIds}
+                                            selectAllVisible={selectAllVisible}
+                                            selectedIds={selectedIds}
+                                            selectedKA={selectedKA}
+                                            setActivitiesByTask={setActivitiesByTask}
+                                            setEditingTaskId={setEditingTaskId}
+                                            setExpandedActivityRows={setExpandedActivityRows}
+                                            setListMenuPos={setListMenuPos}
+                                            setListNames={setListNames}
+                                            setOpenListMenu={setOpenListMenu}
+                                            setSelectedTaskFull={setSelectedTaskFull}
+                                            setSelectedTaskInPanel={setSelectedTaskInPanel}
+                                            setSavingActivityIds={setSavingActivityIds}
+                                            setShowTaskComposer={setShowTaskComposer}
+                                            setTaskForm={setTaskForm}
+                                            setTaskFullInitialTab={setTaskFullInitialTab}
+                                            setTaskTab={setTaskTab}
+                                            showMassEdit={showMassEdit}
+                                            sortedTasks={sortedTasks}
+                                            t={t}
+                                            tabsRef={tabsRef}
+                                            taskSortDirection={taskSortDirection}
+                                            taskSortField={taskSortField}
+                                            taskTab={taskTab}
+                                            tasksDisplayRef={tasksDisplayRef}
+                                            toggleActivitiesRow={toggleActivitiesRow}
+                                            toggleSelect={toggleSelect}
+                                            updateField={updateField}
+                                            users={users}
+                                            viewTab={viewTab}
+                                            visibleColumns={visibleColumns}
+                                        />
+                                    }
                                 activityPanel={
-                                    selectedTaskInPanel ? (
-                                        <div className="flex flex-col h-full bg-white">
-                                            <div
-                                                className={`flex-1 min-h-0 overflow-hidden pt-3 pb-0 ${
-                                                    panelViewMode === "simple" ? "px-3" : "pl-px pr-3"
-                                                }`}
-                                            >
-                                                <div className="space-y-6 flex flex-col min-h-0 h-full">
-                                                    <div className="bg-white border border-blue-300 rounded-lg shadow-sm overflow-hidden flex flex-col flex-1 min-h-0">
-                                            {/* Activity Panel Header (hidden in simple view; top secondary row already contains back + task info) */}
-                                            {panelViewMode !== "simple" && (
-                                                <div className="px-4 pt-3 pb-2 border-b border-black bg-white flex items-center justify-between">
-                                                    <div className="flex items-center gap-2 min-w-0">
-                                                        {(() => {
-                                                            const lvl = getPriorityLevel ? getPriorityLevel(selectedTaskInPanel?.priority) : 2;
-                                                            if (lvl === 2) return null;
-                                                            if (lvl === 3) {
-                                                                return (
-                                                                    <img src={`${import.meta.env.BASE_URL}high-priority.svg`} alt="High priority" className="inline-block w-2 h-4" title="Priority: High" />
-                                                                );
-                                                            }
-                                                            return (
-                                                                <img src={`${import.meta.env.BASE_URL}low-priority-down.svg`} alt="Low priority" className="inline-block w-2 h-4" title="Priority: Low" />
-                                                            );
-                                                        })()}
-                                                        <h3 className="text-sm font-semibold text-slate-900 truncate">{selectedTaskInPanel.title || 'Untitled Task'}</h3>
-                                                    </div>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setSelectedTaskInPanel(null)}
-                                                        className="ml-2 p-1.5 rounded-md text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-                                                        aria-label="Close activity panel"
-                                                    >
-                                                        <FaTimes className="w-4 h-4" />
-                                                    </button>
-                                                </div>
-                                            )}
-
-                                            {/* Activity Panel Content */}
-                                            <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-                                                {/* Activities Tab Header */}
-                                                <div className="px-2 pt-2 bg-white flex items-center gap-2">
-                                                    <div className="inline-flex items-center gap-1 bg-slate-100 rounded-lg p-1">
-                                                        <div className="px-3 py-1 rounded-md text-sm font-semibold bg-white text-slate-900 shadow" aria-label="Activities">
-                                                            <span className="inline-flex items-center gap-1">
-                                                                <svg className="w-4 h-4" viewBox="0 0 448 512" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" fill="currentColor" style={{ color: selectedKA?.color || 'rgb(16, 185, 129)' }}>
-                                                                    <path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z"></path>
-                                                                </svg>
-                                                                Activities
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                    <div className="ml-auto flex items-center gap-3 text-sm">
-                                                        <span className="text-slate-500" aria-live="polite">
-                                                            {selectedActivityCountInPanel} selected
-                                                        </span>
-                                                        <MassActionMenu
-                                                            label="Mass Edit"
-                                                            ariaLabel="activity mass action"
-                                                            disabled={selectedActivityCountInPanel === 0}
-                                                            title={
-                                                                selectedActivityCountInPanel === 0
-                                                                    ? 'Select activities to enable mass edit'
-                                                                    : undefined
-                                                            }
-                                                            onSelect={(action) => {
-                                                                if (!action) return;
-                                                                if (action === 'edit') {
-                                                                    setShowActivityMassFieldPicker(true);
-                                                                    return;
-                                                                }
-                                                                if (action === 'delete') {
-                                                                    const confirmed = window.confirm(
-                                                                        t('unifiedTable.confirmDeleteSelected') || 'Delete selected items?',
-                                                                    );
-                                                                    if (!confirmed) return;
-                                                                    const taskKey = String(selectedTaskInPanel?.id || '');
-                                                                    const list = Array.isArray(activitiesByTask[taskKey])
-                                                                        ? activitiesByTask[taskKey]
-                                                                        : [];
-                                                                    const toDelete = list.filter((activity) =>
-                                                                        selectedActivityIdsInPanel.has(activity.id),
-                                                                    );
-                                                                    Promise.all(
-                                                                        toDelete.map(async (activity) => {
-                                                                            try {
-                                                                                const activityService = await getActivityService();
-                                                                                await activityService.remove(activity.id);
-                                                                                return activity.id;
-                                                                            } catch (error) {
-                                                                                console.error('Failed to delete activity:', error);
-                                                                                return null;
-                                                                            }
-                                                                        }),
-                                                                    ).then((removedIds) => {
-                                                                        const deleted = new Set(
-                                                                            removedIds.filter(Boolean).map((id) => String(id)),
-                                                                        );
-                                                                        setActivitiesByTask((prev) => ({
-                                                                            ...prev,
-                                                                            [taskKey]: (prev[taskKey] || []).filter(
-                                                                                (item) => !deleted.has(String(item.id)),
-                                                                            ),
-                                                                        }));
-                                                                    });
-                                                                    setSelectedActivityIdsInPanel(new Set());
-                                                                }
-                                                            }}
-                                                        />
-                                                    </div>
-                                                    <button
-                                                        type="button"
-                                                        className="px-3 py-1 rounded-md text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700"
-                                                        onClick={() => window.dispatchEvent(new CustomEvent("ka-open-activity-composer", { detail: { taskId: selectedTaskInPanel?.id } }))}
-                                                    >
-                                                        Add Activity
-                                                    </button>
-                                                </div>
-
-                                                {/* Activities Table */}
-                                                <div className="flex-1 min-h-0 px-2 pt-2 pb-4 flex flex-col">
-                                                    <div className="mb-3 flex-1 min-h-0 flex flex-col">
-                                                        {(() => {
-                                                            const taskKey = String(selectedTaskInPanel.id);
-                                                            let list = (activitiesByTask[taskKey] || []).slice();
-
-                                                            if (!allStatusesSelected) {
-                                                                list = list.filter((activity) =>
-                                                                    filterStatuses.includes(getItemStatusFilterValue(activity)),
-                                                                );
-                                                            }
-                                                            
-                                                            // Apply activity sorting
-                                                            if (activitySortField && activitySortDirection) {
-                                                                list.sort((a, b) => {
-                                                                    let aVal, bVal;
-                                                                    
-                                                                    switch (activitySortField) {
-                                                                        case 'name':
-                                                                            aVal = (a.name || a.activity || '').toLowerCase();
-                                                                            bVal = (b.name || b.activity || '').toLowerCase();
-                                                                            break;
-                                                                        case 'responsible':
-                                                                            aVal = (a.responsible || '').toLowerCase();
-                                                                            bVal = (b.responsible || '').toLowerCase();
-                                                                            break;
-                                                                        case 'status':
-                                                                            aVal = (a.status || '').toLowerCase();
-                                                                            bVal = (b.status || '').toLowerCase();
-                                                                            break;
-                                                                        case 'priority':
-                                                                            aVal = getPriorityLevel(a.priority);
-                                                                            bVal = getPriorityLevel(b.priority);
-                                                                            break;
-                                                                        case 'start_date':
-                                                                            aVal = a.start_date || a.startDate || '';
-                                                                            bVal = b.start_date || b.startDate || '';
-                                                                            break;
-                                                                        case 'end_date':
-                                                                            aVal = a.end_date || a.endDate || '';
-                                                                            bVal = b.end_date || b.endDate || '';
-                                                                            break;
-                                                                        case 'deadline':
-                                                                            aVal = a.deadline || '';
-                                                                            bVal = b.deadline || '';
-                                                                            break;
-                                                                        case 'duration':
-                                                                            aVal = parseDurationToMinutes(a.duration ?? a.duration_minutes) ?? 0;
-                                                                            bVal = parseDurationToMinutes(b.duration ?? b.duration_minutes) ?? 0;
-                                                                            break;
-                                                                        case 'completed':
-                                                                            aVal = a.completionDate || a.completion_date || '';
-                                                                            bVal = b.completionDate || b.completion_date || '';
-                                                                            break;
-                                                                        default:
-                                                                            return 0;
-                                                                    }
-                                                                    
-                                                                    // Handle empty values
-                                                                    if (!aVal && !bVal) return 0;
-                                                                    if (!aVal) return 1;
-                                                                    if (!bVal) return -1;
-                                                                    
-                                                                    // Compare values
-                                                                    let comparison = 0;
-                                                                    if (typeof aVal === 'string' && typeof bVal === 'string') {
-                                                                        comparison = aVal.localeCompare(bVal);
-                                                                    } else {
-                                                                        comparison = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
-                                                                    }
-                                                                    
-                                                                    return activitySortDirection === 'asc' ? comparison : -comparison;
-                                                                });
-                                                            }
-                                                            
-                                                            return Array.isArray(list) && list.length > 0 ? (
-                                                                <div className="flex-1 min-h-0 overflow-x-auto overflow-y-auto hover-scrollbar-y">
-                                                                    <table className="min-w-[1400px] w-full text-sm table-fixed border-collapse">
-                                                                        <colgroup>
-                                                                            <col style={{ width: '3rem' }} />
-                                                                            <col style={{ width: '15rem' }} />
-                                                                            {visibleColumns.responsible && <col style={{ width: '6rem' }} />}
-                                                                            {visibleColumns.status !== false && <col style={{ width: '6rem' }} />}
-                                                                            {visibleColumns.priority && <col style={{ width: '6rem' }} />}
-                                                                            {visibleColumns.start_date && <col style={{ width: '6rem' }} />}
-                                                                            {visibleColumns.end_date && <col style={{ width: '6rem' }} />}
-                                                                            {visibleColumns.deadline && <col style={{ width: '6rem' }} />}
-                                                                            {visibleColumns.duration && <col style={{ width: '6rem' }} />}
-                                                                            {visibleColumns.completed && <col style={{ width: '6rem' }} />}
-                                                                        </colgroup>
-                                                                        <thead className="bg-slate-50 border border-slate-200 text-slate-700">
-                                                                            <tr>
-                                                                                <th className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left w-12">
-                                                                                    <input
-                                                                                        type="checkbox"
-                                                                                        aria-label="Select all visible activities"
-                                                                                        checked={
-                                                                                            list.length > 0 &&
-                                                                                            list.every((activity) =>
-                                                                                                selectedActivityIdsInPanel.has(activity.id),
-                                                                                            )
-                                                                                        }
-                                                                                        onChange={() => {
-                                                                                            if (
-                                                                                                list.length > 0 &&
-                                                                                                list.every((activity) =>
-                                                                                                    selectedActivityIdsInPanel.has(activity.id),
-                                                                                                )
-                                                                                            ) {
-                                                                                                setSelectedActivityIdsInPanel(new Set());
-                                                                                                return;
-                                                                                            }
-                                                                                            setSelectedActivityIdsInPanel(
-                                                                                                new Set(list.map((activity) => activity.id)),
-                                                                                            );
-                                                                                        }}
-                                                                                    />
-                                                                                </th>
-                                                                                <th 
-                                                                                    className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[240px] cursor-pointer hover:bg-slate-100"
-                                                                                    onClick={() => handleActivitySort('name')}
-                                                                                >
-                                                                                    Activity {activitySortField === 'name' && (activitySortDirection === 'asc' ? '↑' : '↓')}
-                                                                                </th>
-                                                                                {visibleColumns.responsible && (
-                                                                                    <th 
-                                                                                        className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
-                                                                                        onClick={() => handleActivitySort('responsible')}
-                                                                                    >
-                                                                                        Responsible {activitySortField === 'responsible' && (activitySortDirection === 'asc' ? '↑' : '↓')}
-                                                                                    </th>
-                                                                                )}
-                                                                                {visibleColumns.status !== false && (
-                                                                                    <th 
-                                                                                        className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
-                                                                                        onClick={() => handleActivitySort('status')}
-                                                                                    >
-                                                                                        Status {activitySortField === 'status' && (activitySortDirection === 'asc' ? '↑' : '↓')}
-                                                                                    </th>
-                                                                                )}
-                                                                                {visibleColumns.priority && (
-                                                                                    <th 
-                                                                                        className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
-                                                                                        onClick={() => handleActivitySort('priority')}
-                                                                                    >
-                                                                                        Priority {activitySortField === 'priority' && (activitySortDirection === 'asc' ? '↑' : '↓')}
-                                                                                    </th>
-                                                                                )}
-                                                                                {visibleColumns.start_date && (
-                                                                                    <th 
-                                                                                        className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
-                                                                                        onClick={() => handleActivitySort('start_date')}
-                                                                                    >
-                                                                                        Start date {activitySortField === 'start_date' && (activitySortDirection === 'asc' ? '↑' : '↓')}
-                                                                                    </th>
-                                                                                )}
-                                                                                {visibleColumns.end_date && (
-                                                                                    <th 
-                                                                                        className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
-                                                                                        onClick={() => handleActivitySort('end_date')}
-                                                                                    >
-                                                                                        End date {activitySortField === 'end_date' && (activitySortDirection === 'asc' ? '↑' : '↓')}
-                                                                                    </th>
-                                                                                )}
-                                                                                {visibleColumns.deadline && (
-                                                                                    <th 
-                                                                                        className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
-                                                                                        onClick={() => handleActivitySort('deadline')}
-                                                                                    >
-                                                                                        Deadline {activitySortField === 'deadline' && (activitySortDirection === 'asc' ? '↑' : '↓')}
-                                                                                    </th>
-                                                                                )}
-                                                                                {visibleColumns.duration && (
-                                                                                    <th 
-                                                                                        className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
-                                                                                        onClick={() => handleActivitySort('duration')}
-                                                                                    >
-                                                                                        Duration {activitySortField === 'duration' && (activitySortDirection === 'asc' ? '↑' : '↓')}
-                                                                                    </th>
-                                                                                )}
-                                                                                {visibleColumns.completed && (
-                                                                                    <th 
-                                                                                        className="sticky top-0 z-20 bg-slate-50 px-3 py-2 text-left font-semibold w-[96px] cursor-pointer hover:bg-slate-100"
-                                                                                        onClick={() => handleActivitySort('completed')}
-                                                                                    >
-                                                                                        Completed {activitySortField === 'completed' && (activitySortDirection === 'asc' ? '↑' : '↓')}
-                                                                                    </th>
-                                                                                )}
-                                                                            </tr>
-                                                                        </thead>
-                                                                        <tbody>
-                                                                            {list.map((a) => (
-                                                                                <tr
-                                                                                    key={a.id}
-                                                                                    data-activity-row-id={String(a.id)}
-                                                                                    className={`border-b border-slate-100 ${String(panelTargetActivityId || '') === String(a.id) ? 'bg-blue-50 ring-1 ring-inset ring-blue-200' : 'bg-white'}`}
-                                                                                >
-                                                                                    <td className="px-3 py-2 align-top w-12">
-                                                                                        <div className="relative inline-flex items-center gap-2">
-                                                                                            <input
-                                                                                                type="checkbox"
-                                                                                                aria-label={`Select ${a.text || a.activity_name || 'activity'}`}
-                                                                                                checked={selectedActivityIdsInPanel.has(a.id)}
-                                                                                                onChange={() => {
-                                                                                                    setSelectedActivityIdsInPanel((prev) => {
-                                                                                                        const next = new Set(prev);
-                                                                                                        if (next.has(a.id)) next.delete(a.id);
-                                                                                                        else next.add(a.id);
-                                                                                                        return next;
-                                                                                                    });
-                                                                                                }}
-                                                                                            />
-                                                                                            <ActivityRowMenu activity={a} taskId={selectedTaskInPanel?.id} />
-                                                                                        </div>
-                                                                                    </td>
-                                                                                    <td className="px-3 py-2 align-top w-[240px] overflow-hidden">
-                                                                                        <div className="flex items-center gap-2">
-                                                                                            <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" className="w-4 h-4 shrink-0" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg" style={{ color: selectedKA?.color || 'rgb(16, 185, 129)' }}>
-                                                                                                <path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z"></path>
-                                                                                            </svg>
-                                                                                            <div className="flex flex-col">
-                                                                                                {activityNameEditId === a.id ? (
-                                                                                                    <input
-                                                                                                        autoFocus
-                                                                                                        className="text-sm text-slate-800 border rounded px-1 py-0.5 max-w-[540px]"
-                                                                                                        value={activityNameEditValue}
-                                                                                                        onChange={(e) => setActivityNameEditValue(e.target.value)}
-                                                                                                        onBlur={() => saveActivityName(a, selectedTaskInPanel?.id, activityNameEditValue)}
-                                                                                                        onKeyDown={(e) => {
-                                                                                                            if (e.key === 'Enter') {
-                                                                                                                e.preventDefault();
-                                                                                                                saveActivityName(a, selectedTaskInPanel?.id, activityNameEditValue);
-                                                                                                            } else if (e.key === 'Escape') {
-                                                                                                                setActivityNameEditId(null);
-                                                                                                                setActivityNameEditValue((a.text || a.activity_name || '').trim());
-                                                                                                            }
-                                                                                                        }}
-                                                                                                    />
-                                                                                                ) : (
-                                                                                                    <div
-                                                                                                        className="text-sm text-slate-800 truncate max-w-[540px] cursor-pointer"
-                                                                                                        onDoubleClick={() => {
-                                                                                                            setActivityNameEditId(a.id);
-                                                                                                            setActivityNameEditValue((a.text || a.activity_name || '').trim());
-                                                                                                        }}
-                                                                                                        title="Double click to edit"
-                                                                                                    >
-                                                                                                        {a.text || a.activity_name || 'Untitled activity'}
-                                                                                                    </div>
-                                                                                                )}
-                                                                                                <div className="text-xs text-slate-500">{a.note || ''}</div>
-                                                                                            </div>
-                                                                                        </div>
-                                                                                    </td>
-                                                                                    {visibleColumns.responsible && (
-                                                                                        <td className="px-3 py-2 align-top text-slate-800 w-[96px]">
-                                                                                            {Array.isArray(users) && users.length ? (
-                                                                                                <select
-                                                                                                    className="w-full min-w-0 rounded-md border border-slate-300 bg-white px-2 py-0.5 text-sm"
-                                                                                                    value={resolveAssignee({ activity: a, taskAssignee: selectedTaskInPanel?.assignee, users, currentUserId }).selectValue}
-                                                                                                    onChange={(e) => updateActivityField(a, selectedTaskInPanel?.id, 'assignee', e.target.value)}
-                                                                                                    disabled={savingActivityIds.has(a.id)}
-                                                                                                >
-                                                                                                    <option value="">—</option>
-                                                                                                    {users.map((u) => (<option key={u.id} value={u.id}>{u.name}</option>))}
-                                                                                                </select>
-                                                                                            ) : (
-                                                                                                (a.assignee || selectedTaskInPanel?.assignee || '—')
-                                                                                            )}
-                                                                                        </td>
-                                                                                    )}
-                                                                                    {visibleColumns.status !== false && (
-                                                                                        <td className="px-3 py-2 align-top w-[96px]">
-                                                                                            <div className="flex w-full items-center gap-2">
-                                                                                                <span className={`inline-block w-2.5 h-2.5 rounded-full ${String(a.status || '').toLowerCase() === 'done' ? 'bg-emerald-500' : String(a.status || '').toLowerCase() === 'in_progress' ? 'bg-blue-500' : 'bg-slate-400'}`} aria-hidden="true" />
-                                                                                                <div className="min-w-0 flex-1">
-                                                                                                    <select
-                                                                                                        value={a.status || 'open'}
-                                                                                                        onChange={(e) => updateActivityField(a, selectedTaskInPanel?.id, 'status', e.target.value)}
-                                                                                                        disabled={savingActivityIds.has(a.id)}
-                                                                                                        className="w-full min-w-0 rounded-md border border-slate-300 bg-white px-2 py-0.5 text-sm"
-                                                                                                        aria-label={`Change status for ${a.text || 'activity'}`}
-                                                                                                    >
-                                                                                                        <option value="open">Open</option>
-                                                                                                        <option value="in_progress">In progress</option>
-                                                                                                        <option value="done">Done</option>
-                                                                                                    </select>
-                                                                                                </div>
-                                                                                            </div>
-                                                                                        </td>
-                                                                                    )}
-                                                                                    {visibleColumns.priority && (
-                                                                                        <td className="px-3 py-2 align-top w-[96px]">
-                                                                                            {(() => {
-                                                                                                const priorityValue = (function() {
-                                                                                                    const raw = a.priority ?? selectedTaskInPanel.priority;
-                                                                                                    if (raw === 1 || String(raw) === '1' || String(raw).toLowerCase() === 'low') return 'low';
-                                                                                                    if (raw === 3 || String(raw) === '3' || String(raw).toLowerCase() === 'high') return 'high';
-                                                                                                    return 'normal';
-                                                                                                })();
-                                                                                                return (
-                                                                                                    <select
-                                                                                                        className="w-full min-w-0 rounded-md border border-slate-300 bg-white py-0.5 text-sm px-2"
-                                                                                                        value={priorityValue}
-                                                                                                        onChange={(e) => updateActivityField(a, selectedTaskInPanel?.id, 'priority', e.target.value)}
-                                                                                                        disabled={savingActivityIds.has(a.id)}
-                                                                                                    >
-                                                                                                        <option value="high">High</option>
-                                                                                                        <option value="normal">Normal</option>
-                                                                                                        <option value="low" style={{ color: "#6b7280" }}>Low</option>
-                                                                                                    </select>
-                                                                                                );
-                                                                                            })()}
-                                                                                        </td>
-                                                                                    )}
-                                                                                    {visibleColumns.start_date && (
-                                                                                        <td className="px-3 py-2 align-top text-slate-800 w-[96px]">
-                                                                                            <div className="relative block w-full">
-                                                                                                <button
-                                                                                                    type="button"
-                                                                                                    className="flex w-full items-center justify-start gap-1 rounded px-1 text-left hover:bg-slate-100"
-                                                                                                    onClick={() => {
-                                                                                                        const key = `start_${a.id}`;
-                                                                                                        setActivityDateEditId(key);
-                                                                                                        setTimeout(() => {
-                                                                                                            try {
-                                                                                                                activityDateRefs.current[key]?.showPicker?.();
-                                                                                                                activityDateRefs.current[key]?.focus();
-                                                                                                            } catch (_) {}
-                                                                                                        }, 0);
-                                                                                                    }}
-                                                                                                    disabled={savingActivityIds.has(a.id)}
-                                                                                                    title="Edit start date"
-                                                                                                >
-                                                                                                    <span>{(a.start_date || a.startDate) ? formatDate(a.start_date || a.startDate) : '—'}</span>
-                                                                                                </button>
-                                                                                                <input
-                                                                                                    ref={(el) => { activityDateRefs.current[`start_${a.id}`] = el; }}
-                                                                                                    type="date"
-                                                                                                    className="absolute opacity-0"
-                                                                                                    value={toDateOnly(a.start_date || a.startDate) || ''}
-                                                                                                    onChange={(e) => updateActivityField(a, selectedTaskInPanel?.id, 'start_date', e.target.value)}
-                                                                                                    onBlur={() => setActivityDateEditId(null)}
-                                                                                                    disabled={savingActivityIds.has(a.id)}
-                                                                                                    style={{ width: 0, height: 0 }}
-                                                                                                />
-                                                                                            </div>
-                                                                                        </td>
-                                                                                    )}
-                                                                                    {visibleColumns.end_date && (
-                                                                                        <td className="px-3 py-2 align-top text-slate-800 w-[96px]">
-                                                                                            <div className="relative block w-full">
-                                                                                                <button
-                                                                                                    type="button"
-                                                                                                    className="flex w-full items-center justify-start gap-1 rounded px-1 text-left hover:bg-slate-100"
-                                                                                                    onClick={() => {
-                                                                                                        const key = `end_${a.id}`;
-                                                                                                        setActivityDateEditId(key);
-                                                                                                        setTimeout(() => {
-                                                                                                            try {
-                                                                                                                activityDateRefs.current[key]?.showPicker?.();
-                                                                                                                activityDateRefs.current[key]?.focus();
-                                                                                                            } catch (_) {}
-                                                                                                        }, 0);
-                                                                                                    }}
-                                                                                                    disabled={savingActivityIds.has(a.id)}
-                                                                                                    title="Edit end date"
-                                                                                                >
-                                                                                                    <span>{(a.end_date || a.endDate) ? formatDate(a.end_date || a.endDate) : '—'}</span>
-                                                                                                </button>
-                                                                                                <input
-                                                                                                    ref={(el) => { activityDateRefs.current[`end_${a.id}`] = el; }}
-                                                                                                    type="date"
-                                                                                                    className="absolute opacity-0"
-                                                                                                    value={toDateOnly(a.end_date || a.endDate) || ''}
-                                                                                                    onChange={(e) => updateActivityField(a, selectedTaskInPanel?.id, 'end_date', e.target.value)}
-                                                                                                    onBlur={() => setActivityDateEditId(null)}
-                                                                                                    disabled={savingActivityIds.has(a.id)}
-                                                                                                    style={{ width: 0, height: 0 }}
-                                                                                                />
-                                                                                            </div>
-                                                                                        </td>
-                                                                                    )}
-                                                                                    {visibleColumns.deadline && (
-                                                                                        <td className="px-3 py-2 align-top text-slate-800 w-[96px]">
-                                                                                            <div className="relative block w-full">
-                                                                                                <button
-                                                                                                    type="button"
-                                                                                                    className="flex w-full items-center justify-start gap-1 rounded px-1 text-left hover:bg-slate-100"
-                                                                                                    onClick={() => {
-                                                                                                        const key = `deadline_${a.id}`;
-                                                                                                        setActivityDateEditId(key);
-                                                                                                        setTimeout(() => {
-                                                                                                            try {
-                                                                                                                activityDateRefs.current[key]?.showPicker?.();
-                                                                                                                activityDateRefs.current[key]?.focus();
-                                                                                                            } catch (_) {}
-                                                                                                        }, 0);
-                                                                                                    }}
-                                                                                                    disabled={savingActivityIds.has(a.id)}
-                                                                                                    title="Edit deadline"
-                                                                                                >
-                                                                                                    <span>{a.deadline ? formatDate(a.deadline) : '—'}</span>
-                                                                                                </button>
-                                                                                                <input
-                                                                                                    ref={(el) => { activityDateRefs.current[`deadline_${a.id}`] = el; }}
-                                                                                                    type="date"
-                                                                                                    className="absolute opacity-0"
-                                                                                                    value={toDateOnly(a.deadline) || ''}
-                                                                                                    onChange={(e) => updateActivityField(a, selectedTaskInPanel?.id, 'deadline', e.target.value)}
-                                                                                                    onBlur={() => setActivityDateEditId(null)}
-                                                                                                    disabled={savingActivityIds.has(a.id)}
-                                                                                                    style={{ width: 0, height: 0 }}
-                                                                                                />
-                                                                                            </div>
-                                                                                        </td>
-                                                                                    )}
-                                                                                    {visibleColumns.duration && (
-                                                                                        <td className="px-3 py-2 align-top text-slate-800 w-[96px]">
-                                                                                            <div className="w-full text-left">
-                                                                                                {activityDurationEdit.id === a.id ? (
-                                                                                                    <DurationPicker
-                                                                                                        value={activityDurationEdit.value}
-                                                                                                        onChange={(nextValue) => setActivityDurationEdit({ id: a.id, value: nextValue })}
-                                                                                                        onClose={(reason, nextValue) => {
-                                                                                                            if (reason !== 'done') {
-                                                                                                                setActivityDurationEdit({ id: null, value: '' });
-                                                                                                                return;
-                                                                                                            }
-                                                                                                            const currentValue = durationToTimeInputValue(a.duration);
-                                                                                                            setActivityDurationEdit({ id: null, value: '' });
-                                                                                                            if ((nextValue || '') !== currentValue) {
-                                                                                                                updateActivityField(a, selectedTaskInPanel?.id, 'duration', nextValue || null);
-                                                                                                            }
-                                                                                                        }}
-                                                                                                        compact
-                                                                                                        autoFocus
-                                                                                                        className="w-full"
-                                                                                                        allowClear
-                                                                                                        disabled={savingActivityIds.has(a.id)}
-                                                                                                        hoursAriaLabel="Activity duration hours"
-                                                                                                        minutesAriaLabel="Activity duration minutes"
-                                                                                                    />
-                                                                                                ) : (
-                                                                                                    <button
-                                                                                                        type="button"
-                                                                                                        className="w-full rounded px-1 text-left hover:bg-slate-100"
-                                                                                                        onClick={() => {
-                                                                                                            setActivityDurationEdit({
-                                                                                                                id: a.id,
-                                                                                                                value: durationToTimeInputValue(a.duration),
-                                                                                                            });
-                                                                                                        }}
-                                                                                                        disabled={savingActivityIds.has(a.id)}
-                                                                                                        title="Edit duration"
-                                                                                                    >
-                                                                                                        {durationToTimeInputValue(a.duration) || String(a.duration ?? '').trim() || '—'}
-                                                                                                    </button>
-                                                                                                )}
-                                                                                            </div>
-                                                                                        </td>
-                                                                                    )}
-                                                                                    {visibleColumns.completed && (
-                                                                                        <td className="px-3 py-2 align-top text-slate-800 w-[96px]">
-                                                                                            <div className="w-full text-left">
-                                                                                                {(() => {
-                                                                                                    const date = a.completionDate || a.completion_date;
-                                                                                                    if (!date) return '';
-                                                                                                    try {
-                                                                                                        const d = new Date(date);
-                                                                                                        return d.toISOString().split('T')[0];
-                                                                                                    } catch { return ''; }
-                                                                                                })()}
-                                                                                            </div>
-                                                                                        </td>
-                                                                                    )}
-                                                                                </tr>
-                                                                            ))}
-                                                                        </tbody>
-                                                                    </table>
-                                                                </div>
-                                                            ) : (
-                                                                <div className="text-sm text-slate-500 mt-2">No activities yet.</div>
-                                                            );
-                                                        })()}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="flex flex-col h-full bg-white">
-                                            <div className="flex-1 min-h-0 overflow-hidden pl-px pr-3 pt-3 pb-0">
-                                                <div className="space-y-6 flex flex-col min-h-0 h-full">
-                                                    <div className="bg-white border border-blue-300 rounded-lg shadow-sm overflow-hidden p-3 space-y-2 flex flex-col flex-1 min-h-0">
-                                                        {/* Activities Tab Header */}
-                                                        <div className="pt-0">
-                                                            <div className="inline-flex items-center gap-1 bg-slate-100 rounded-lg p-1">
-                                                                <div className="px-3 py-1 rounded-md text-sm font-semibold bg-white text-slate-900 shadow" aria-label="Activities">
-                                                                    <span className="inline-flex items-center gap-1">
-                                                                        <svg className="w-4 h-4" viewBox="0 0 448 512" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" fill="currentColor" style={{ color: 'rgb(16, 185, 129)' }}>
-                                                                            <path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z"></path>
-                                                                        </svg>
-                                                                        Activities
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Empty Activities State */}
-                                                        <div className="flex-1 min-h-0 overflow-auto p-4">
-                                                            <div className="flex items-center justify-center h-full text-slate-500 text-center">
-                                                                <div>
-                                                                    <p className="text-lg font-medium mb-2">{t("keyAreas.selectTask")}</p>
-                                                                    <p className="text-sm">Choose a task from the left panel to view its activities</p>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )
+                                    <KeyAreasActivityPanel
+                                        ActivityRowMenu={(props) => (
+                                            <ActivityRowMenu
+                                                {...props}
+                                                getActivityService={getActivityService}
+                                                setActivitiesByTask={setActivitiesByTask}
+                                                t={t}
+                                            />
+                                        )}
+                                        activityDateRefs={activityDateRefs}
+                                        activityDurationEdit={activityDurationEdit}
+                                        activityNameEditId={activityNameEditId}
+                                        activityNameEditValue={activityNameEditValue}
+                                        activitySortDirection={activitySortDirection}
+                                        activitySortField={activitySortField}
+                                        activitiesByTask={activitiesByTask}
+                                        allStatusesSelected={allStatusesSelected}
+                                        currentUserId={currentUserId}
+                                        filterStatuses={filterStatuses}
+                                        formatDate={formatDate}
+                                        getActivityService={getActivityService}
+                                        getPriorityLevel={getPriorityLevel}
+                                        handleActivitySort={handleActivitySort}
+                                        panelTargetActivityId={panelTargetActivityId}
+                                        panelViewMode={panelViewMode}
+                                        saveActivityName={saveActivityName}
+                                        savingActivityIds={savingActivityIds}
+                                        selectedActivityCountInPanel={selectedActivityCountInPanel}
+                                        selectedActivityIdsInPanel={selectedActivityIdsInPanel}
+                                        selectedKA={selectedKA}
+                                        selectedTaskInPanel={selectedTaskInPanel}
+                                        setActivitiesByTask={setActivitiesByTask}
+                                        setActivityDateEditId={setActivityDateEditId}
+                                        setActivityDurationEdit={setActivityDurationEdit}
+                                        setActivityNameEditId={setActivityNameEditId}
+                                        setActivityNameEditValue={setActivityNameEditValue}
+                                        setSelectedActivityIdsInPanel={setSelectedActivityIdsInPanel}
+                                        setSelectedTaskInPanel={setSelectedTaskInPanel}
+                                        setShowActivityMassFieldPicker={setShowActivityMassFieldPicker}
+                                        t={t}
+                                        updateActivityField={updateActivityField}
+                                        users={users}
+                                        visibleColumns={visibleColumns}
+                                    />
                                 }
                                 initialTaskWidth={50}
                                 minTaskWidth={30}
@@ -5644,655 +1065,68 @@ export default function KeyAreas() {
                             </div>
                         )}
 
-                        {/* DELEGATED TAB: Two-section layout - pending at top, all delegated below */}
-                        {viewTab === 'delegated' && (
-                            <div className="flex-1 h-[calc(100vh-200px)] min-h-0 overflow-hidden flex flex-col gap-4" style={{ display: selectedTaskFull ? "none" : undefined }}>
-                                <div
-                                    className={`min-h-[180px] overflow-hidden flex flex-col ${pendingDelegations.length > 0 ? 'flex-1' : 'flex-none'}`}
-                                    style={pendingDelegations.length > 0 ? undefined : { flexBasis: '180px' }}
-                                >
-                                    <UnifiedTaskActivityTable
-                                        viewTab={viewTab}
-                                        title="Pending Delegations"
-                                        delegatedSection="pending"
-                                        tasks={delegatedTasks.filter((item) => {
-                                            const status = getDelegationStatus(item);
-                                            return !status || status === 'pending';
-                                        })}
-                                        activities={delegatedActivities.filter((item) => {
-                                            const status = getDelegationStatus(item);
-                                            return !status || status === 'pending';
-                                        })}
-                                        keyAreas={keyAreas}
-                                        users={users}
-                                        goals={goals}
-                                        currentUserId={currentUserId}
-                                        hideSearch={true}
-                                        delegationActionsEnabled={true}
-                                        onDelegationRefresh={refreshDelegatedData}
-                                        onTaskClick={(task) => {
-                                            setSelectedTaskFull(task);
-                                            setTaskFullInitialTab("details");
-                                        }}
-                                        onActivityClick={(activity) => {
-                                            const task = delegatedTasks.find(t => String(t.id) === String(activity.taskId || activity.task_id));
-                                            if (task) {
-                                                setSelectedTaskFull(task);
-                                                setTaskFullInitialTab("details");
-                                            }
-                                        }}
-                                        onTaskUpdate={async (id, updatedTask) => {
-                                            const previousTask = delegatedTasks.find((task) => String(task.id) === String(id));
-                                            if (previousTask) {
-                                                setDelegatedTasks((prev) =>
-                                                    prev.map((task) =>
-                                                        String(task.id) === String(id)
-                                                            ? mergeTaskUpdateForUi(task, updatedTask)
-                                                            : task,
-                                                    ),
-                                                );
-                                            }
-                                            try {
-                                                await api.updateTask(id, updatedTask);
-                                                await refreshDelegatedData();
-                                            } catch (error) {
-                                                console.error('Failed to update task:', error);
-                                                await refreshDelegatedData();
-                                            }
-                                        }}
-                                        onTaskDelete={async (id) => {
-                                            try {
-                                                await api.deleteTask(id);
-                                                await refreshDelegatedData();
-                                            } catch (error) {
-                                                console.error('Failed to delete task:', error);
-                                            }
-                                        }}
-                                        onActivityUpdate={async (id, updatedActivity) => {
-                                            try {
-                                                const activityService = await getActivityService();
-                                                await activityService.update(id, updatedActivity);
-                                                await refreshDelegatedData();
-                                            } catch (error) {
-                                                console.error('Failed to update activity:', error);
-                                            }
-                                        }}
-                                        onActivityDelete={async (id) => {
-                                            try {
-                                                const activityService = await getActivityService();
-                                                await activityService.remove(id);
-                                                await refreshDelegatedData();
-                                            } catch (error) {
-                                                console.error('Failed to delete activity:', error);
-                                            }
-                                        }}
-                                    />
-                                </div>
+                        <KeyAreasGlobalTables
+                            acceptedDelegatedActivities={acceptedDelegatedActivities}
+                            acceptedDelegatedTasks={acceptedDelegatedTasks}
+                            activitiesByTask={activitiesByTask}
+                            allTasks={allTasks}
+                            currentUserId={currentUserId}
+                            delegatedActivities={delegatedActivities}
+                            delegatedTasks={delegatedTasks}
+                            editUnifiedActivity={editUnifiedActivity}
+                            editUnifiedTask={editUnifiedTask}
+                            getDelegationStatus={getDelegationStatus}
+                            goals={goals}
+                            handleBulkFieldSave={handleBulkFieldSave}
+                            keyAreas={keyAreas}
+                            openUnifiedActivityDetails={openUnifiedActivityDetails}
+                            openUnifiedTaskDetails={openUnifiedTaskDetails}
+                            pendingDelegations={pendingDelegations}
+                            refreshDelegatedData={refreshDelegatedData}
+                            selectedKA={selectedKA}
+                            selectedTaskFull={selectedTaskFull}
+                            setActivitiesByTask={setActivitiesByTask}
+                            setAllTasks={setAllTasks}
+                            setDelegatedTasks={setDelegatedTasks}
+                            setSelectedTaskFull={setSelectedTaskFull}
+                            setTaskFullInitialTab={setTaskFullInitialTab}
+                            users={users}
+                            viewTab={viewTab}
+                        />
 
-                                <div className="flex-1 min-h-0 flex flex-col">
-                                    <div className="flex-1 min-h-0 overflow-hidden">
-                                        <UnifiedTaskActivityTable
-                                            viewTab={viewTab}
-                                            title="Accepted Delegations"
-                                            delegatedSection="accepted"
-                                            tasks={acceptedDelegatedTasks}
-                                            activities={acceptedDelegatedActivities}
-                                            keyAreas={keyAreas}
-                                            users={users}
-                                            goals={goals}
-                                            currentUserId={currentUserId}
-                                            hideSearch={true}
-                                            onDelegationRefresh={refreshDelegatedData}
-                                            onTaskClick={(task) => {
-                                                setSelectedTaskFull(task);
-                                                setTaskFullInitialTab("details");
-                                            }}
-                                            onActivityClick={(activity) => {
-                                                const task = delegatedTasks.find(t => String(t.id) === String(activity.taskId || activity.task_id));
-                                                if (task) {
-                                                    setSelectedTaskFull(task);
-                                                    setTaskFullInitialTab("details");
-                                                }
-                                            }}
-                                            onTaskUpdate={async (id, updatedTask) => {
-                                                const previousTask = delegatedTasks.find((task) => String(task.id) === String(id));
-                                                if (previousTask) {
-                                                    setDelegatedTasks((prev) =>
-                                                        prev.map((task) =>
-                                                            String(task.id) === String(id)
-                                                                ? mergeTaskUpdateForUi(task, updatedTask)
-                                                                : task,
-                                                        ),
-                                                    );
-                                                }
-                                                try {
-                                                    await api.updateTask(id, updatedTask);
-                                                    await refreshDelegatedData();
-                                                } catch (error) {
-                                                    console.error('Failed to update task:', error);
-                                                    await refreshDelegatedData();
-                                                }
-                                            }}
-                                            onTaskDelete={async (id) => {
-                                                try {
-                                                    await api.deleteTask(id);
-                                                    await refreshDelegatedData();
-                                                } catch (error) {
-                                                    console.error('Failed to delete task:', error);
-                                                }
-                                            }}
-                                            onActivityUpdate={async (id, updatedActivity) => {
-                                                try {
-                                                    const activityService = await getActivityService();
-                                                    await activityService.update(id, updatedActivity);
-                                                    await refreshDelegatedData();
-                                                } catch (error) {
-                                                    console.error('Failed to update activity:', error);
-                                                }
-                                            }}
-                                            onActivityDelete={async (id) => {
-                                                try {
-                                                    const activityService = await getActivityService();
-                                                    await activityService.remove(id);
-                                                    await refreshDelegatedData();
-                                                } catch (error) {
-                                                    console.error('Failed to delete activity:', error);
-                                                }
-                                            }}
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Unified Table View for TODO, ACTIVITY TRAP tabs */}
-                        {(viewTab === 'todo' || viewTab === 'activity-trap') && (
-                            <div className="flex-1 h-[calc(100vh-200px)] min-h-0 overflow-hidden flex flex-col" style={{ display: selectedTaskFull ? "none" : undefined }}>
-                                <div className="flex-1 min-h-0">
-                                    <UnifiedTaskActivityTable
-                                        viewTab={viewTab}
-                                        tasks={allTasks}
-                                        activities={Object.values(activitiesByTask).flat()}
-                                        keyAreas={keyAreas}
-                                        users={users}
-                                        goals={goals}
-                                        currentUserId={currentUserId}
-                                        onTaskClick={openUnifiedTaskDetails}
-                                        onActivityClick={openUnifiedActivityDetails}
-                                        onTaskEdit={editUnifiedTask}
-                                        onActivityEdit={editUnifiedActivity}
-                                        onTaskUpdate={async (id, updatedTask) => {
-                                            const previousTask = allTasks.find((task) => String(task.id) === String(id));
-                                            if (previousTask) {
-                                                setAllTasks((prev) =>
-                                                    prev.map((task) =>
-                                                        String(task.id) === String(id)
-                                                            ? mergeTaskUpdateForUi(task, updatedTask)
-                                                            : task,
-                                                    ),
-                                                );
-                                                setSelectedTaskFull((prevTask) =>
-                                                    prevTask && String(prevTask.id) === String(id)
-                                                        ? mergeTaskUpdateForUi(prevTask, updatedTask)
-                                                        : prevTask,
-                                                );
-                                            }
-                                            try {
-                                                // If delegation happened, refresh the task list for the current view
-                                                if (updatedTask.delegatedToUserId) {
-                                                    await api.updateTask(id, updatedTask);
-                                                    // Task was delegated, reload the appropriate view
-                                                    if (viewTab === 'todo') {
-                                                        const svc = await getTaskService();
-                                                        const allUserTasks = await svc.list({});
-                                                        setAllTasks(
-                                                            Array.isArray(allUserTasks)
-                                                                ? allUserTasks.map((task) => normalizeTaskForUi(task))
-                                                                : [],
-                                                        );
-                                                    } else if (viewTab === 'activity-trap') {
-                                                        const svc = await getTaskService();
-                                                        const trapTasks = await svc.list({ withoutGoal: true });
-                                                        setAllTasks(
-                                                            Array.isArray(trapTasks)
-                                                                ? trapTasks.map((task) => normalizeTaskForUi(task))
-                                                                : [],
-                                                        );
-                                                    } else if (selectedKA) {
-                                                        // Active tasks view - reload selected key area tasks
-                                                        const rows = await api.listTasks(selectedKA.id);
-                                                        setAllTasks(rows || []);
-                                                    }
-                                                } else {
-                                                    // Normal update
-                                                    const result = await api.updateTask(id, updatedTask);
-                                                    const normalizedResult = normalizeTaskForUi(
-                                                        result,
-                                                        updatedTask?.key_area_id || updatedTask?.keyAreaId || null,
-                                                    );
-                                                    setAllTasks((prev) =>
-                                                        prev.map((task) =>
-                                                            String(task.id) === String(id) ? normalizedResult : task,
-                                                        ),
-                                                    );
-                                                }
-                                            } catch (error) {
-                                                console.error('Failed to update task:', error);
-                                                if (previousTask) {
-                                                    setAllTasks((prev) =>
-                                                        prev.map((task) =>
-                                                            String(task.id) === String(id) ? previousTask : task,
-                                                        ),
-                                                    );
-                                                    setSelectedTaskFull((prevTask) =>
-                                                        prevTask && String(prevTask.id) === String(id)
-                                                            ? previousTask
-                                                            : prevTask,
-                                                    );
-                                                }
-                                            }
-                                        }}
-                                        onTaskDelete={async (id) => {
-                                            try {
-                                                await api.deleteTask(id);
-                                                setAllTasks((prev) =>
-                                                    prev.filter((task) => String(task.id) !== String(id)),
-                                                );
-                                                setActivitiesByTask((prev) => {
-                                                    const updated = { ...prev };
-                                                    delete updated[String(id)];
-                                                    return updated;
-                                                });
-                                            } catch (error) {
-                                                console.error('Failed to delete task:', error);
-                                            }
-                                        }}
-                                        onActivityUpdate={async (id, updatedActivity) => {
-                                            try {
-                                                const activityService = await getActivityService();
-                                                const result = await activityService.update(id, updatedActivity);
-                                                const normalizedResult = normalizeActivity(result || {});
-                                                // Update the activities in state
-                                                setActivitiesByTask((prev) => {
-                                                    const updated = { ...prev };
-                                                    for (const key of Object.keys(updated)) {
-                                                        updated[key] = updated[key].map((activity) =>
-                                                            String(activity.id) === String(id)
-                                                                ? normalizeActivityWithTask(
-                                                                    normalizedResult,
-                                                                    allTasks.find(
-                                                                        (task) =>
-                                                                            String(task.id) ===
-                                                                            String(
-                                                                                normalizedResult.taskId ||
-                                                                                    normalizedResult.task_id ||
-                                                                                    activity.taskId ||
-                                                                                    activity.task_id,
-                                                                            ),
-                                                                    ) || activity,
-                                                                )
-                                                                : activity,
-                                                        );
-                                                    }
-                                                    return updated;
-                                                });
-                                            } catch (error) {
-                                                console.error('Failed to update activity:', error);
-                                            }
-                                        }}
-                                        onActivityDelete={async (id) => {
-                                            try {
-                                                const activityService = await getActivityService();
-                                                await activityService.remove(id);
-                                                // Remove the activity from state
-                                                setActivitiesByTask((prev) => {
-                                                    const updated = { ...prev };
-                                                    for (const key of Object.keys(updated)) {
-                                                        updated[key] = updated[key].filter(
-                                                            (activity) => String(activity.id) !== String(id),
-                                                        );
-                                                    }
-                                                    return updated;
-                                                });
-                                            } catch (error) {
-                                                console.error('Failed to delete activity:', error);
-                                            }
-                                        }}
-                                        onMassEdit={async (selected) => {
-                                            const taskIds = Array.isArray(selected?.taskIds)
-                                                ? selected.taskIds.map((id) => String(id))
-                                                : [];
-                                            const activityIds = Array.isArray(selected?.activityIds)
-                                                ? selected.activityIds.map((id) => String(id))
-                                                : [];
-                                            if ((taskIds.length === 0 && activityIds.length === 0) || !selected?.field) return;
-                                            await handleBulkFieldSave(
-                                                selected.field,
-                                                selected.value,
-                                                taskIds,
-                                                activityIds,
-                                            );
-                                        }}
-                                    />
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Global Activities popover (attached to hamburger) */}
-                        {openActivitiesMenu && (
-                            <>
-                                <div className="fixed inset-0 z-40" onClick={() => setOpenActivitiesMenu(null)} />
-                                <div
-                                    className="fixed z-50 w-72 bg-white border border-slate-200 rounded-lg shadow"
-                                    style={{ top: `${activitiesMenuPos.top}px`, left: `${activitiesMenuPos.left}px` }}
-                                    role="dialog"
-                                    aria-label="Task activities"
-                                >
-                                    <div className="px-3 py-2 border-b text-sm font-semibold text-slate-900">
-                                        Activities
-                                    </div>
-                                    <div className="max-h-60 overflow-auto">
-                                        {(() => {
-                                            const list = activitiesByTask[String(openActivitiesMenu)] || [];
-                                            if (!list.length)
-                                                return (
-                                                    <div className="px-3 py-3">
-                                                        <EmptyState title="No activities for this task yet." />
-                                                    </div>
-                                                );
-                                            return (
-                                                <ul className="py-1">
-                                                    {list.map((a) => (
-                                                        <li
-                                                            key={a.id}
-                                                            className="px-3 py-2 text-sm text-slate-800 border-b last:border-b-0"
-                                                        >
-                                                            <div className="truncate">{a.text}</div>
-                                                            {/* createdAt removed */}
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            );
-                                        })()}
-                                    </div>
-                                    <div className="px-3 py-2 border-t flex items-center gap-2">
-                                        <button
-                                            type="button"
-                                            className="px-2 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm"
-                                            onClick={() => {
-                                                const tsk = allTasks.find(
-                                                    (x) => String(x.id) === String(openActivitiesMenu),
-                                                );
-                                                if (tsk) {
-                                                    setTaskFullInitialTab("activities");
-                                                    setSelectedTaskFull(tsk);
-                                                }
-                                                setOpenActivitiesMenu(null);
-                                            }}
-                                        >
-                                            Open
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className="px-2 py-1 rounded bg-white border border-slate-200 text-slate-700 text-sm hover:bg-slate-50"
-                                            onClick={() => setOpenActivitiesMenu(null)}
-                                        >
-                                            Close
-                                        </button>
-                                    </div>
-                                </div>
-                            </>
-                        )}
-                        {!selectedKA && !isGlobalTasksView && (
-                            <>
-                                {String(siteSearch || "").trim().length >= 2 && (
-                                    <div className="mb-4 bg-white border border-slate-200 rounded-lg shadow-sm p-3">
-                                        <div className="text-sm font-semibold text-slate-700 mb-2">
-                                            Search results for “{siteSearch.trim()}”
-                                        </div>
-                                        {isSearching ? (
-                                            <div className="text-sm text-slate-500">Searching…</div>
-                                        ) : (searchResults && searchResults.length ? (
-                                            <ul className="space-y-2">
-                                                {searchResults.map((t) => {
-                                                    const ka = (keyAreas || []).find((k) => String(k.id) === String(t.key_area_id || t.keyAreaId || t.key_area));
-                                                    return (
-                                                        <li key={t.id} className="text-sm">
-                                                            <span className="font-semibold text-slate-900">{t.title || t.name}</span>
-                                                            {ka ? (
-                                                                <span className="text-slate-500"> — {ka.title || ka.name}</span>
-                                                            ) : null}
-                                                        </li>
-                                                    );
-                                                })}
-                                            </ul>
-                                        ) : (
-                                            <div className="text-sm text-slate-500">No matching tasks found.</div>
-                                        ))}
-                                    </div>
-                                )}
-                                <div className="flex-1 min-h-0">
-                                    <KeyAreasList
-                                        loading={loading}
-                                        showOnlyIdeas={showOnlyIdeas}
-                                        ideaForShow={ideaForShow}
-                                        filteredKAs={filteredKAs}
-                                        dragKAId={dragKAId}
-                                        openKA={openKA}
-                                        reorderByDrop={reorderByDrop}
-                                        setDragKAId={setDragKAId}
-                                        setEditing={setEditing}
-                                        setShowForm={setShowForm}
-                                        onDeleteKA={onDeleteKA}
-                                    />
-                                </div>
-                            </>
-                        )}
+                        <KeyAreasActivitiesPopover
+                            activitiesByTask={activitiesByTask}
+                            activitiesMenuPos={activitiesMenuPos}
+                            allTasks={allTasks}
+                            openActivitiesMenu={openActivitiesMenu}
+                            setOpenActivitiesMenu={setOpenActivitiesMenu}
+                            setSelectedTaskFull={setSelectedTaskFull}
+                            setTaskFullInitialTab={setTaskFullInitialTab}
+                        />
+                        <KeyAreasLandingShell
+                            dragKAId={dragKAId}
+                            filteredKAs={filteredKAs}
+                            ideaForShow={ideaForShow}
+                            isGlobalTasksView={isGlobalTasksView}
+                            isSearching={isSearching}
+                            keyAreas={keyAreas}
+                            loading={loading}
+                            onDeleteKA={onDeleteKA}
+                            openKA={openKA}
+                            reorderByDrop={reorderByDrop}
+                            searchResults={searchResults}
+                            selectedKA={selectedKA}
+                            setDragKAId={setDragKAId}
+                            setEditing={setEditing}
+                            setShowForm={setShowForm}
+                            showOnlyIdeas={showOnlyIdeas}
+                            siteSearch={siteSearch}
+                        />
                         {/* DETAIL: Tabs */}
                         {selectedKA && (
                             <div className="space-y-4">
-                                {/* Composer — rendered from left card; show form only when requested */}
-                                {showTaskComposer && (
-                                    <>
-                                        {editingTaskId ? (
-                                            // Use external EditTaskModal when editing a task
-                                            <EditTaskModal
-                                                isOpen={true}
-                                                // ensure we always pass a definitive id into the modal's initialData
-                                                initialData={{ ...(taskForm || {}), id: editingTaskId || taskForm?.id || null }}
-                                                onSave={async (payload) => {
-                                                    const originalTask = allTasks.find((t) => t.id === (editingTaskId || payload.id));
-                                                    await handleSaveTask(payload);
-                                                    
-                                                    // Check if key area or list changed
-                                                    const keyAreaChanged = originalTask && 
-                                                        String(originalTask.key_area_id || originalTask.keyAreaId) !== 
-                                                        String(payload.key_area_id || payload.keyAreaId);
-                                                    const listChanged = originalTask &&
-                                                        String(originalTask.list_index || originalTask.list) !== 
-                                                        String(payload.list_index || payload.list);
-                                                    
-                                                    setEditingTaskId(null);
-                                                    setShowTaskComposer(false);
-                                                    
-                                                    // Show appropriate feedback
-                                                    if (keyAreaChanged) {
-                                                        try { addToast && addToast({ type: 'success', message: t('keyAreas.toastMovedKeyArea') }); } catch (e) {}
-                                                    } else if (listChanged) {
-                                                        try { addToast && addToast({ type: 'success', message: t('keyAreas.toastMovedList') }); } catch (e) {}
-                                                    }
-                                                }}
-                                                onCancel={() => { setShowTaskComposer(false); setEditingTaskId(null); }}
-                                                isSaving={false}
-                                                users={users}
-                                                currentUserId={currentUserId}
-                                                keyAreas={keyAreas}
-                                                goals={goals}
-                                                availableLists={[1]}
-                                            />
-                                        ) : editingActivityViaTaskModal ? (
-                                            // Use external EditActivityModal when editing an activity via task modal
-                                            <EditActivityModal
-                                                isOpen={true}
-                                                    initialData={(function(){
-                                                        try {
-                                                            const id = editingActivityViaTaskModal.id;
-                                                            const taskId = editingActivityViaTaskModal.taskId;
-                                                            let raw = null;
-                                                            if (taskId && activitiesByTask && activitiesByTask[String(taskId)]) {
-                                                                raw = activitiesByTask[String(taskId)].find(a => String(a.id) === String(id));
-                                                            }
-                                                            const source = raw || activityForm || {};
-                                                            const norm = normalizeActivity(source || {});
-                                                            const parentTaskId = taskId ? String(taskId) : (norm.taskId || norm.task_id || norm.task ? String(norm.taskId || norm.task_id || norm.task) : null);
-                                                            const parent = parentTaskId ? ((allTasks || []).find((t) => String(t.id) === String(parentTaskId)) || null) : null;
-                                                            const resolvedKeyArea = norm.key_area_id || norm.keyAreaId || norm.keyArea || (parent && (parent.key_area_id || parent.keyAreaId || parent.keyArea)) || '';
-                                                            const resolvedList = norm.list || norm.list_index || norm.listIndex || (parent && (parent.list || parent.list_index || parent.listIndex)) || '';
-                                                            const resolvedAssignee = norm.assignee || norm.responsible || (parent && (parent.assignee || parent.responsible)) || '';
-                                    return {
-                                        id: norm.id || norm.activityId || null,
-                                        type: 'activity',
-                                        taskId: norm.taskId || norm.task_id || norm.task || '',
-                                        text: norm.text || norm.activity_name || '',
-                                        title: norm.text || norm.activity_name || '',
-                                        description: norm.description || norm.notes || norm.note || '',
-                                        start_date: norm.start_date || norm.startDate || norm.date_start || '',
-                                        startDate: norm.start_date || norm.startDate || norm.date_start || '',
-                                        end_date: norm.end_date || norm.endDate || norm.date_end || '',
-                                        endDate: norm.end_date || norm.endDate || norm.date_end || '',
-                                        deadline: norm.deadline || norm.dueDate || norm.due_date || '',
-                                        duration: norm.duration || norm.duration_minutes || '',
-                                        key_area_id: resolvedKeyArea,
-                                        list: resolvedList,
-                                        list_index: resolvedList,
-                                        assignee: resolvedAssignee,
-                                        priority: norm.priority ?? norm.priority_level ?? undefined,
-                                        goal: norm.goal || norm.goal_id || norm.goalId || undefined,
-                                        completed: norm.completed || false,
-                                    };
-                                                        } catch (e) {
-                                                            return activityForm || {};
-                                                        }
-                                                    })()}
-                                                keyAreas={keyAreas}
-                                                users={users}
-                                                goals={goals}
-                                                tasks={allTasks}
-                                                availableLists={availableListNumbers}
-                                                parentListNames={selectedKA ? listNames[selectedKA.id] : null}
-                                                onSave={async (payload) => {
-                                                    await handleActivityModalSave(payload);
-                                                    setEditingActivityViaTaskModal(null);
-                                                    setShowEditActivityModal(false);
-                                                }}
-                                                onCancel={() => { setShowEditActivityModal(false); setEditingActivityViaTaskModal(null); }}
-                                                isSaving={isSavingActivity}
-                                            />
-                                        ) : (
-                                            // Use a dedicated CreateTaskModal component for creating tasks
-                                            <CreateTaskModal
-                                                isOpen={true}
-                                                initialData={taskForm}
-                                                keyAreas={keyAreas}
-                                                users={users}
-                                                goals={goals}
-                                                availableLists={availableListNumbers}
-                                                parentListNames={selectedKA ? listNames[selectedKA.id] : null}
-                                                currentUserId={currentUserId}
-                                                onSave={async (payload) => {
-                                                    try {
-                                                        const created = await api.createTask(payload);
-                                                        setAllTasks((prev) => [...prev, created]);
-                                                    } catch (err) {
-                                                        console.error('Failed to create task from modal', err);
-                                                    }
-                                                    setEditingTaskId(null);
-                                                    setShowTaskComposer(false);
-                                                    setEditingActivityViaTaskModal(null);
-                                                }}
-                                                onCancel={() => { setShowTaskComposer(false); setEditingTaskId(null); setEditingActivityViaTaskModal(null); }}
-                                                isSaving={false}
-                                            />
-                                        )}
-                                    </>
-                                )}
-
-                                {showActivityComposer && (
-                                    <CreateActivityFormModal
-                                        isOpen={showActivityComposer}
-                                        currentUserId={currentUserId}
-                                        initialData={activityForm}
-                                        onSave={handleActivityModalSave}
-                                        onCancel={() => { setShowActivityComposer(false); setEditingActivityId(null); setActivityAttachTaskId(null); }}
-                                        isSaving={isSavingActivity}
-                                        keyAreas={keyAreas}
-                                        users={users}
-                                        goals={goals}
-                                        tasks={allTasks}
-                                        availableLists={availableListNumbers}
-                                    />
-                                )}
-
-                                {/* Tasks list rendering moved inside the Task Lists card above */}
-
-                                {/* Kanban/Calendar already rendered above based on view */}
                             </div>
                         )}
-
-                        <BulkFieldPickerModal
-                            isOpen={showMassFieldPicker}
-                            title="Select field"
-                            fields={[
-                                { value: 'assignee', label: 'Responsible' },
-                                { value: 'status', label: 'Status' },
-                                { value: 'priority', label: 'Priority' },
-                                { value: 'goalId', label: 'Goal' },
-                                { value: 'duration', label: 'Duration' },
-                                { value: 'key_area_bundle', label: 'Key Area' },
-                                { value: 'date', label: 'Date' },
-                            ]}
-                            users={users}
-                            keyAreas={keyAreas}
-                            goals={goals}
-                            availableLists={availableListNumbers}
-                            listNamesByKeyArea={listNames}
-                            onCancel={() => {
-                                setShowMassFieldPicker(false);
-                                setMassEditField(null);
-                            }}
-                            onSave={handleBulkFieldSave}
-                        />
-
-                        <BulkFieldPickerModal
-                            isOpen={showActivityMassFieldPicker}
-                            title="Select field"
-                            fields={[
-                                { value: 'assignee', label: 'Responsible' },
-                                { value: 'status', label: 'Status' },
-                                { value: 'priority', label: 'Priority' },
-                                { value: 'goalId', label: 'Goal' },
-                                { value: 'duration', label: 'Duration' },
-                                { value: 'date', label: 'Date' },
-                            ]}
-                            users={users}
-                            goals={goals}
-                            onCancel={() => setShowActivityMassFieldPicker(false)}
-                            onSave={handleActivityPanelMassFieldSave}
-                        />
-                        
-                        {/* Modals Container */}
-                        <>
-                            {/* Create/Edit KA Modal */}
-                            <KeyAreaModal
-                                isOpen={showForm}
-                                editing={editing}
-                                onSave={onSaveKA}
-                                onCancel={() => {
-                                    setShowForm(false);
-                                    setEditing(null);
-                                }}
-                            />
-                        </>
                     </div>
                 </main>
             </div>
