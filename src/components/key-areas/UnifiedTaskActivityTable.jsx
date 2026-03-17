@@ -1275,7 +1275,7 @@ export default function UnifiedTaskActivityTable({
                                                         className="bg-white border border-slate-200 rounded shadow"
                                                         onMouseDown={(e) => e.stopPropagation()}
                                                     >
-                                                        {getDelegatedShortcutTarget(item) && (
+                                                        {!delegationActionsEnabled && getDelegatedShortcutTarget(item) && (
                                                             <button
                                                                 type="button"
                                                                 className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex items-center gap-2"
@@ -1289,31 +1289,35 @@ export default function UnifiedTaskActivityTable({
                                                                 Open in Key Areas
                                                             </button>
                                                         )}
-                                                        <button
-                                                            type="button"
-                                                            className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex items-center gap-2"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setOpenRowMenuId(null);
-                                                                if (item.type === 'task' && onTaskEdit) onTaskEdit(item);
-                                                                if (item.type === 'activity' && onActivityEdit) onActivityEdit(item);
-                                                            }}
-                                                        >
-                                                            <FaEdit size={12} />
-                                                            {t("unifiedTable.edit")}
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            className="block w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleDelete(item, e);
-                                                                setOpenRowMenuId(null);
-                                                            }}
-                                                        >
-                                                            <FaTrash size={12} />
-                                                            {t("unifiedTable.delete")}
-                                                        </button>
+                                                        {!delegationActionsEnabled && (
+                                                            <button
+                                                                type="button"
+                                                                className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex items-center gap-2"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setOpenRowMenuId(null);
+                                                                    if (item.type === 'task' && onTaskEdit) onTaskEdit(item);
+                                                                    if (item.type === 'activity' && onActivityEdit) onActivityEdit(item);
+                                                                }}
+                                                            >
+                                                                <FaEdit size={12} />
+                                                                {t("unifiedTable.edit")}
+                                                            </button>
+                                                        )}
+                                                        {!delegationActionsEnabled && (
+                                                            <button
+                                                                type="button"
+                                                                className="block w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleDelete(item, e);
+                                                                    setOpenRowMenuId(null);
+                                                                }}
+                                                            >
+                                                                <FaTrash size={12} />
+                                                                {t("unifiedTable.delete")}
+                                                            </button>
+                                                        )}
                                                         {viewTab !== 'delegated' && (
                                                             <>
                                                                 <button
@@ -1478,6 +1482,23 @@ export default function UnifiedTaskActivityTable({
                                                     if (raw === 3 || String(raw) === '3' || String(raw).toLowerCase() === 'high') return 'high';
                                                     return 'normal';
                                                 })();
+                                                // For pending delegations, show read-only priority display
+                                                if (delegationActionsEnabled) {
+                                                    return (
+                                                        <div className="flex items-center justify-center">
+                                                            {priorityValue === 'high' && (
+                                                                <span title="High Priority" className="text-red-600">⚠️</span>
+                                                            )}
+                                                            {priorityValue === 'low' && (
+                                                                <span title="Low Priority" className="text-blue-600">⬇️</span>
+                                                            )}
+                                                            {priorityValue === 'normal' && (
+                                                                <span className="text-gray-400">—</span>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                }
+                                                // For regular tasks, show editable priority select
                                                 return (
                                                     <select
                                                         className="w-full rounded-md border border-slate-300 bg-white py-0.5 text-sm px-2"
