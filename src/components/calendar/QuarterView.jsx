@@ -132,17 +132,24 @@ export default function QuarterView({
     // (replaced below with calendar-aligned weeks)
 
     // Helpers for day span checks
-    const overlapsDayByCalendarDate = (rangeStart, rangeEnd, dayDate) => {
+    // All-day events store end as exclusive next-day midnight UTC (e.g. Mar17 event → end=Mar18T00:00:00Z).
+    // Convert to the correct inclusive local date by detecting UTC midnight and going back 1 day.
+    const toInclusiveLocalDate = (raw, isAllDayEvent = false) => {
+        if (!raw) return null;
+        const d = new Date(raw);
+        if (isNaN(d.getTime())) return null;
+        if (isAllDayEvent && d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0) {
+            return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - 1));
+        }
+        return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+    };
+    const overlapsDayByCalendarDate = (rangeStart, rangeEnd, dayDate, isAllDayEvent = false) => {
         try {
             const s = rangeStart ? new Date(rangeStart) : null;
-            const e = rangeEnd ? new Date(rangeEnd) : null;
-            if (!s && !e) return false;
-            const rs = s || e;
-            const re = e || s;
-            const startDateOnly = new Date(rs.getFullYear(), rs.getMonth(), rs.getDate(), 0, 0, 0, 0);
-            const endDateOnly = new Date(re.getFullYear(), re.getMonth(), re.getDate(), 0, 0, 0, 0);
+            if (!s && !rangeEnd) return false;
+            const startDateOnly = new Date((s || new Date(rangeEnd)).getFullYear(), (s || new Date(rangeEnd)).getMonth(), (s || new Date(rangeEnd)).getDate(), 0, 0, 0, 0);
+            const endDateOnly = toInclusiveLocalDate(rangeEnd || rangeStart, isAllDayEvent) || startDateOnly;
             const dayDateOnly = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), 0, 0, 0, 0);
-
             const from = startDateOnly <= endDateOnly ? startDateOnly : endDateOnly;
             const to = startDateOnly <= endDateOnly ? endDateOnly : startDateOnly;
             return dayDateOnly >= from && dayDateOnly <= to;
@@ -154,11 +161,11 @@ export default function QuarterView({
         try {
             const sRaw = ev?.start || ev?.startDate || ev?.start_at || null;
             const eRaw = ev?.end || ev?.endDate || ev?.end_at || sRaw || null;
+            const isAllDayEvent = !!(ev?.allDay || ev?.all_day);
             const s = sRaw ? new Date(sRaw) : null;
-            const e = eRaw ? new Date(eRaw) : null;
-            if (!s && !e) return null;
-            const sd = new Date((s || e).getFullYear(), (s || e).getMonth(), (s || e).getDate(), 0, 0, 0, 0);
-            const ed = new Date((e || s).getFullYear(), (e || s).getMonth(), (e || s).getDate(), 0, 0, 0, 0);
+            if (!s && !eRaw) return null;
+            const sd = new Date((s || new Date(eRaw)).getFullYear(), (s || new Date(eRaw)).getMonth(), (s || new Date(eRaw)).getDate(), 0, 0, 0, 0);
+            const ed = toInclusiveLocalDate(eRaw || sRaw, isAllDayEvent) || sd;
             return sd <= ed ? { start: sd, end: ed } : { start: ed, end: sd };
         } catch (_) {
             return null;
@@ -981,9 +988,10 @@ export default function QuarterView({
                                                                         if (ev?.taskId || ev?.task_id) return acc;
                                                                         const eventKey = getEventKey(ev, evIdx);
                                                                         const previewSpan = allDaySpanPreview[eventKey];
+                                                                        const isAllDayEv = !!(ev?.allDay || ev?.all_day);
                                                                         const inDay = previewSpan
-                                                                            ? overlapsDayByCalendarDate(previewSpan.start, previewSpan.end, date)
-                                                                            : overlapsDayByCalendarDate(ev.start, ev.end, date);
+                                                                            ? overlapsDayByCalendarDate(previewSpan.start, previewSpan.end, date, isAllDayEv)
+                                                                            : overlapsDayByCalendarDate(ev.start, ev.end, date, isAllDayEv);
                                                                         if (!inDay) return acc;
                                                                         acc.push({ ev, eventKey });
                                                                         return acc;
