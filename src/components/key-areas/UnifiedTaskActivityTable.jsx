@@ -1237,117 +1237,121 @@ export default function UnifiedTaskActivityTable({
                                                 onClick={(e) => e.stopPropagation()}
                                             />
                                             <div className="relative">
-                                                <button
-                                                    type="button"
-                                                    data-row-actions-btn="true"
-                                                    aria-haspopup="menu"
-                                                    aria-expanded={openRowMenuId === item.itemId ? 'true' : 'false'}
-                                                    className="p-1 rounded hover:bg-slate-100 text-slate-600"
-                                                    title="More actions"
-                                                    onMouseDown={(e) => e.stopPropagation()}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        const btnEl = e.currentTarget;
-                                                        setOpenRowMenuId((prev) => {
-                                                            if (prev === item.itemId) {
-                                                                setRowMenuButtonEl(null);
-                                                                return null;
-                                                            }
-                                                            if (!btnEl || typeof btnEl.getBoundingClientRect !== 'function') {
-                                                                setRowMenuButtonEl(null);
-                                                                return item.itemId;
-                                                            }
-                                                            window.dispatchEvent(new CustomEvent('unified-task-row-menu-open', {
-                                                                detail: { sourceId: rowMenuInstanceIdRef.current },
-                                                            }));
-                                                            setRowMenuPos(getRowMenuPosition(btnEl));
-                                                            setRowMenuButtonEl(btnEl);
-                                                            return item.itemId;
-                                                        });
-                                                    }}
-                                                >
-                                                    <FaEllipsisV />
-                                                </button>
-                                                {openRowMenuId === item.itemId && createPortal(
-                                                    <div
-                                                        data-row-actions-menu="true"
-                                                        style={{ position: 'fixed', top: rowMenuPos.top, left: rowMenuPos.left, zIndex: 1000, minWidth: 160 }}
-                                                        className="bg-white border border-slate-200 rounded shadow"
-                                                        onMouseDown={(e) => e.stopPropagation()}
-                                                    >
-                                                        {!delegationActionsEnabled && getDelegatedShortcutTarget(item) && (
-                                                            <button
-                                                                type="button"
-                                                                className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex items-center gap-2"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setOpenRowMenuId(null);
-                                                                    openDelegatedShortcut(item, e);
-                                                                }}
+                                                {!delegationActionsEnabled && (
+                                                    <>
+                                                        <button
+                                                            type="button"
+                                                            data-row-actions-btn="true"
+                                                            aria-haspopup="menu"
+                                                            aria-expanded={openRowMenuId === item.itemId ? 'true' : 'false'}
+                                                            className="p-1 rounded hover:bg-slate-100 text-slate-600"
+                                                            title="More actions"
+                                                            onMouseDown={(e) => e.stopPropagation()}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                const btnEl = e.currentTarget;
+                                                                setOpenRowMenuId((prev) => {
+                                                                    if (prev === item.itemId) {
+                                                                        setRowMenuButtonEl(null);
+                                                                        return null;
+                                                                    }
+                                                                    if (!btnEl || typeof btnEl.getBoundingClientRect !== 'function') {
+                                                                        setRowMenuButtonEl(null);
+                                                                        return item.itemId;
+                                                                    }
+                                                                    window.dispatchEvent(new CustomEvent('unified-task-row-menu-open', {
+                                                                        detail: { sourceId: rowMenuInstanceIdRef.current },
+                                                                    }));
+                                                                    setRowMenuPos(getRowMenuPosition(btnEl));
+                                                                    setRowMenuButtonEl(btnEl);
+                                                                    return item.itemId;
+                                                                });
+                                                            }}
+                                                        >
+                                                            <FaEllipsisV />
+                                                        </button>
+                                                        {openRowMenuId === item.itemId && createPortal(
+                                                            <div
+                                                                data-row-actions-menu="true"
+                                                                style={{ position: 'fixed', top: rowMenuPos.top, left: rowMenuPos.left, zIndex: 1000, minWidth: 160 }}
+                                                                className="bg-white border border-slate-200 rounded shadow"
+                                                                onMouseDown={(e) => e.stopPropagation()}
                                                             >
-                                                                <FaExternalLinkAlt size={12} />
-                                                                Open in Key Areas
-                                                            </button>
-                                                        )}
-                                                        {!delegationActionsEnabled && (
-                                                            <button
-                                                                type="button"
-                                                                className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex items-center gap-2"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setOpenRowMenuId(null);
-                                                                    if (item.type === 'task' && onTaskEdit) onTaskEdit(item);
-                                                                    if (item.type === 'activity' && onActivityEdit) onActivityEdit(item);
-                                                                }}
-                                                            >
-                                                                <FaEdit size={12} />
-                                                                {t("unifiedTable.edit")}
-                                                            </button>
-                                                        )}
-                                                        {!delegationActionsEnabled && (
-                                                            <button
-                                                                type="button"
-                                                                className="block w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleDelete(item, e);
-                                                                    setOpenRowMenuId(null);
-                                                                }}
-                                                            >
-                                                                <FaTrash size={12} />
-                                                                {t("unifiedTable.delete")}
-                                                            </button>
-                                                        )}
-                                                        {viewTab !== 'delegated' && (
-                                                            <>
-                                                                <button
-                                                                    type="button"
-                                                                    className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex items-center gap-2"
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        handleCompleteToggle(item, e);
-                                                                        setOpenRowMenuId(null);
-                                                                    }}
-                                                                >
-                                                                    {isCompleted ? <FaTimes size={12} /> : <FaCheck size={12} />}
-                                                                    {isCompleted ? t("unifiedTable.markNotCompleted") : t("unifiedTable.markCompleted")}
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex items-center gap-2"
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        handleTogglePrivate(item, e);
-                                                                        setOpenRowMenuId(null);
-                                                                    }}
-                                                                >
-                                                                    {isPrivate ? <FaLockOpen size={12} /> : <FaLock size={12} />}
-                                                                    {isPrivate ? t("unifiedTable.markPublic") : t("unifiedTable.markPrivate")}
-                                                                </button>
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                , document.body)}
+                                                                {!delegationActionsEnabled && getDelegatedShortcutTarget(item) && (
+                                                                    <button
+                                                                        type="button"
+                                                                        className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex items-center gap-2"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setOpenRowMenuId(null);
+                                                                            openDelegatedShortcut(item, e);
+                                                                        }}
+                                                                    >
+                                                                        <FaExternalLinkAlt size={12} />
+                                                                        Open in Key Areas
+                                                                    </button>
+                                                                )}
+                                                                {!delegationActionsEnabled && (
+                                                                    <button
+                                                                        type="button"
+                                                                        className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex items-center gap-2"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setOpenRowMenuId(null);
+                                                                            if (item.type === 'task' && onTaskEdit) onTaskEdit(item);
+                                                                            if (item.type === 'activity' && onActivityEdit) onActivityEdit(item);
+                                                                        }}
+                                                                    >
+                                                                        <FaEdit size={12} />
+                                                                        {t("unifiedTable.edit")}
+                                                                    </button>
+                                                                )}
+                                                                {!delegationActionsEnabled && (
+                                                                    <button
+                                                                        type="button"
+                                                                        className="block w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            handleDelete(item, e);
+                                                                            setOpenRowMenuId(null);
+                                                                        }}
+                                                                    >
+                                                                        <FaTrash size={12} />
+                                                                        {t("unifiedTable.delete")}
+                                                                    </button>
+                                                                )}
+                                                                {viewTab !== 'delegated' && (
+                                                                    <>
+                                                                        <button
+                                                                            type="button"
+                                                                            className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex items-center gap-2"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                handleCompleteToggle(item, e);
+                                                                                setOpenRowMenuId(null);
+                                                                            }}
+                                                                        >
+                                                                            {isCompleted ? <FaTimes size={12} /> : <FaCheck size={12} />}
+                                                                            {isCompleted ? t("unifiedTable.markNotCompleted") : t("unifiedTable.markCompleted")}
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex items-center gap-2"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                handleTogglePrivate(item, e);
+                                                                                setOpenRowMenuId(null);
+                                                                            }}
+                                                                        >
+                                                                            {isPrivate ? <FaLockOpen size={12} /> : <FaLock size={12} />}
+                                                                            {isPrivate ? t("unifiedTable.markPublic") : t("unifiedTable.markPrivate")}
+                                                                        </button>
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        , document.body)}
+                                                    </>
+                                                )}
                                             </div>
                                         </div>
                                     </td>
@@ -1486,13 +1490,13 @@ export default function UnifiedTaskActivityTable({
                                                 if (delegationActionsEnabled) {
                                                     return (
                                                         <div className="flex items-center justify-center">
-                                                            {priorityValue === 'high' && (
+                                                            {item.priority === 'high' && (
                                                                 <span title="High Priority" className="text-red-600">⚠️</span>
                                                             )}
-                                                            {priorityValue === 'low' && (
+                                                            {item.priority === 'low' && (
                                                                 <span title="Low Priority" className="text-blue-600">⬇️</span>
                                                             )}
-                                                            {priorityValue === 'normal' && (
+                                                            {(!item.priority || item.priority === 'normal') && (
                                                                 <span className="text-gray-400">—</span>
                                                             )}
                                                         </div>

@@ -139,7 +139,7 @@ export default function PendingDelegationsSection({
       setListError('Task List selection is required');
       return;
     }
-    if (acceptingItem?.type === 'activity' && acceptMode === 'add-to-task' && !selectedTaskForActivity) {
+    if (acceptingItem?.type === 'activity' && acceptMode === 'add-to-task' && selectedKeyArea && !String(selectedKeyArea).startsWith('__missing_') && !selectedTaskForActivity) {
       setTaskError('Please select a task to add this activity to');
       return;
     }
@@ -475,7 +475,6 @@ export default function PendingDelegationsSection({
                         name="accept-mode"
                         value="add-to-task"
                         checked={acceptMode === 'add-to-task'}
-                        disabled={!selectedKeyArea || String(selectedKeyArea).startsWith('__missing_')}
                         onChange={(e) => {
                           setAcceptMode(e.target.value);
                           // Load tasks for the selected key area when switching to add-to-task mode
@@ -483,9 +482,9 @@ export default function PendingDelegationsSection({
                             loadTasksForKeyArea(selectedKeyArea);
                           }
                         }}
-                        className="mr-2 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                        className="mr-2 cursor-pointer"
                       />
-                      <span className={`text-sm ${!selectedKeyArea || String(selectedKeyArea).startsWith('__missing_') ? 'text-gray-400' : 'text-gray-700'}`}>
+                      <span className="text-sm text-gray-700">
                         {t("pendingDelegationsSection.modeActivity")}
                       </span>
                     </label>
@@ -499,9 +498,15 @@ export default function PendingDelegationsSection({
                           setSelectedTaskForActivity(e.target.value);
                           setTaskError('');
                         }}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                        disabled={!selectedKeyArea || String(selectedKeyArea).startsWith('__missing_')}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                       >
-                        <option value="">-- Select a Task --</option>
+                        <option value="">
+                          {!selectedKeyArea || String(selectedKeyArea).startsWith('__missing_')
+                            ? "-- Select a Key Area first --"
+                            : "-- Select a Task --"
+                          }
+                        </option>
                         {availableTasks.map((task) => (
                           <option key={task.id} value={task.id}>
                             {task.title}
