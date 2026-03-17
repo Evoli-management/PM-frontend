@@ -190,8 +190,6 @@ const CalendarContainer = () => {
             return false;
         }
     });
-    // Real-time refresh support (polling when external sync is enabled)
-    const [syncActive, setSyncActive] = useState(false);
     const [refreshTick, setRefreshTick] = useState(0);
     const lastEventMoveRef = React.useRef({ key: "", at: 0 });
 
@@ -227,6 +225,13 @@ const CalendarContainer = () => {
         };
         window.addEventListener('open-create-appointment', handler);
         return () => window.removeEventListener('open-create-appointment', handler);
+    }, []);
+
+    // Refresh calendar data when an external sync completes (e.g. manual sync from Integrations page)
+    useEffect(() => {
+        const handler = () => setRefreshTick((t) => t + 1);
+        window.addEventListener('calendar-sync-completed', handler);
+        return () => window.removeEventListener('calendar-sync-completed', handler);
     }, []);
 
     // Load persisted view on mount, but always anchor to today's date/time.
@@ -328,28 +333,118 @@ const CalendarContainer = () => {
             localStorage.setItem("calendar:slotSizeMinutes", String(slotSizeMinutes));
         } catch {}
     }, [slotSizeMinutes]);
-    // Check if external sync is enabled to start auto-refresh
+    // SSE stream: refresh calendar immediately when the backend pushes a sync event.
+    // The backend sends a keepalive 'ping' every 20s so Heroku's 30s idle timeout
+    // never closes the connection. If it does drop anyway, we reconnect automatically.
+    // Falls back to 15s polling only if SSE cannot be established at all.
     useEffect(() => {
-        let ignore = false;
-        (async () => {
+        let abortController = null;
+        let fallbackId = null;
+        let reconnectId = null;
+        let active = true;
+        let sseWorking = false;
+
+        const apiBase = import.meta.env.VITE_API_BASE_URL ||
+            (import.meta.env.DEV ? '/api' : 'https://practicalmanager-4241d0bfc5ed.herokuapp.com/api');
+
+        const scheduleReconnect = () => {
+            if (!active) return;
+            clearTimeout(reconnectId);
+            reconnectId = setTimeout(connectSSE, 3000);
+        };
+
+        const connectSSE = async () => {
+            const token = localStorage.getItem('access_token');
+            if (!token || !active) return;
+            abortController?.abort();
+            abortController = new AbortController();
             try {
-                const status = await calendarService.getSyncStatus();
-                if (!ignore) setSyncActive(!!(status?.google?.connected || status?.microsoft?.connected));
+                const response = await fetch(`${apiBase}/calendar/sync/events`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                    signal: abortController.signal,
+                });
+                if (!response.ok || !response.body) { scheduleReconnect(); return; }
+                sseWorking = true;
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                while (active) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    const text = decoder.decode(value, { stream: true });
+                    // 'ping' is the keepalive — ignore it; anything else is a real sync event
+                    // Real sync events carry JSON (e.g. data: {"provider":"graph"}).
+                    // Keepalive pings send data: ping — no JSON, no { character.
+                    if (text.includes('data: {')) {
+                        if (active) setRefreshTick((t) => t + 1);
+                    }
+                }
+                // Stream ended — reconnect
+                if (active) scheduleReconnect();
             } catch (_) {
-                if (!ignore) setSyncActive(false);
+                if (active) scheduleReconnect();
+            }
+        };
+
+        const startFallbackPolling = () => {
+            if (fallbackId) return;
+            const lastSyncAt = { google: null, microsoft: null };
+            const check = async () => {
+                if (sseWorking) return;
+                try {
+                    const status = await calendarService.getSyncStatus();
+                    let changed = false;
+                    for (const provider of ['google', 'microsoft']) {
+                        const ts = status?.[provider]?.lastSyncAt || null;
+                        if (ts && ts !== lastSyncAt[provider]) {
+                            lastSyncAt[provider] = ts;
+                            changed = true;
+                        }
+                    }
+                    if (changed) setRefreshTick((t) => t + 1);
+                } catch (_) {}
+            };
+            check();
+            fallbackId = setInterval(check, 15 * 1000);
+        };
+
+        // First attempt — if it fails immediately, start fallback polling
+        (async () => {
+            const token = localStorage.getItem('access_token');
+            if (!token) { startFallbackPolling(); return; }
+            try {
+                abortController = new AbortController();
+                const response = await fetch(`${apiBase}/calendar/sync/events`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                    signal: abortController.signal,
+                });
+                if (!response.ok || !response.body) { startFallbackPolling(); scheduleReconnect(); return; }
+                sseWorking = true;
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                while (active) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    const text = decoder.decode(value, { stream: true });
+                    // Real sync events carry JSON (e.g. data: {"provider":"graph"}).
+                    // Keepalive pings send data: ping — no JSON, no { character.
+                    if (text.includes('data: {')) {
+                        if (active) setRefreshTick((t) => t + 1);
+                    }
+                }
+                if (active) scheduleReconnect();
+            } catch (_) {
+                startFallbackPolling();
+                if (active) scheduleReconnect();
             }
         })();
-        return () => { ignore = true; };
-    }, []);
 
-    // Auto-refresh interval when sync is active
-    useEffect(() => {
-        if (!syncActive) return;
-        const id = setInterval(() => {
-            setRefreshTick((t) => t + 1);
-        }, 5000); // refresh every 5s
-        return () => clearInterval(id);
-    }, [syncActive]);
+        return () => {
+            active = false;
+            abortController?.abort();
+            clearTimeout(reconnectId);
+            if (fallbackId) clearInterval(fallbackId);
+        };
+    }, []);
 
     // persist workWeek preference when changed
     useEffect(() => {

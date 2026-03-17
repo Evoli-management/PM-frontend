@@ -50,12 +50,15 @@ export const Integrations = ({ showToast }) => {
                     syncStatus: status.microsoft?.syncStatus || null,
                 },
             });
+            return status;
         } catch (err) {
             console.error('Failed to load integration status:', err);
+            showToast && showToast(t("integrations.statusLoadFailed"), 'error');
+            return null;
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [showToast, t]);
 
     useEffect(() => { loadStatus(); }, [loadStatus]);
 
@@ -69,7 +72,11 @@ export const Integrations = ({ showToast }) => {
             if (result?.success) {
                 showToast && showToast(provider === 'google' ? t("integrations.googleConnected") : t("integrations.microsoftConnected"));
                 await loadStatus();
-                calendarService.triggerSync().catch(e => console.warn('Initial sync failed:', e));
+                // Trigger initial sync; surface failure as a warning toast (connection itself succeeded)
+                calendarService.triggerSync().catch(e => {
+                    console.warn('Initial sync after connect failed:', e);
+                    showToast && showToast(t("integrations.syncFailed"), 'error');
+                });
             }
         } catch (error) {
             const errMsg = error?.response?.data?.error || error?.message || '';
@@ -103,10 +110,22 @@ export const Integrations = ({ showToast }) => {
         try {
             showToast && showToast(t("integrations.syncStarted"));
             await calendarService.triggerSync();
-            showToast && showToast(t("integrations.syncCompleted"), 'success');
-            await loadStatus();
-        } catch {
-            showToast && showToast(t("integrations.syncFailed"), 'error');
+            // Load fresh status BEFORE showing result toast so we can detect
+            // cases where the trigger returned 200 but the sync itself errored.
+            const freshStatus = await loadStatus();
+            const provStatus = freshStatus?.[provider];
+            if (provStatus?.syncStatus === 'error' && provStatus?.lastError) {
+                showToast && showToast(t("integrations.syncFailed") + ': ' + provStatus.lastError, 'error');
+            } else {
+                showToast && showToast(t("integrations.syncCompleted"), 'success');
+            }
+            window.dispatchEvent(new CustomEvent('calendar-sync-completed'));
+        } catch (err) {
+            const detail = err?.response?.data?.message || err?.message || '';
+            showToast && showToast(
+                detail ? t("integrations.syncFailed") + ': ' + detail : t("integrations.syncFailed"),
+                'error'
+            );
         } finally {
             setSyncing('');
         }

@@ -825,6 +825,7 @@
       "goal": "Obiettivi",
       "keyArea": "Aree chiave",
       "appointment": "Appuntamenti",
+      "event": "Eventi",
       "user": "Utenti",
       "other": "Altro"
     }
@@ -1035,7 +1036,7 @@
     "author2": "Responsabile risorse umane, InnovateX"
   },
   "navbar": {
-    "searchPlaceholder": "Cerca tra pagine, compiti, attività, obiettivi, aree chiave e appuntamenti...",
+    "searchPlaceholder": "Cerca tra pagine, compiti, attività, obiettivi, aree chiave, appuntamenti ed eventi...",
     "searching": "Ricerca...",
     "searchResults": "Risultati della ricerca",
     "noResults": "Nessun risultato",
@@ -1074,6 +1075,7 @@
     "categoryGoals": "Obiettivi",
     "categoryKeyAreas": "Aree chiave",
     "categoryAppointments": "Appuntamenti",
+    "categoryEvents": "Eventi",
     "categoryUsers": "Utenti",
     "categoryOther": "Altro",
     "widgetMyDay": "La mia giornata",
@@ -2489,6 +2491,7 @@
     "syncStarted": "Sincronizzazione avviata...",
     "syncCompleted": "Sincronizzazione completata!",
     "syncFailed": "Sincronizzazione non riuscita",
+    "statusLoadFailed": "Impossibile caricare lo stato dell'integrazione",
     "googleConnected": "Google connesso! Sincronizzazione ora...",
     "microsoftConnected": "Microsoft connesso! Sincronizzazione ora...",
     "googleDisconnected": "Google si è disconnesso",

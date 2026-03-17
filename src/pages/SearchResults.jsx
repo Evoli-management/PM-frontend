@@ -4,7 +4,7 @@ import { FaBars } from "react-icons/fa";
 import { useTranslation } from "react-i18next";
 import Sidebar from "../components/shared/Sidebar.jsx";
 
-const resultCategoryOrder = ["task", "activity", "goal", "key-area", "appointment", "user", "page", "other"];
+const resultCategoryOrder = ["task", "activity", "goal", "key-area", "appointment", "event", "user", "page", "other"];
 
 const getSearchColumnCount = (count) => {
   if (count > 10) return 3;
@@ -42,6 +42,7 @@ export default function SearchResults() {
     goal: t("searchResults.categories.goal"),
     "key-area": t("searchResults.categories.keyArea"),
     appointment: t("searchResults.categories.appointment"),
+    event: t("searchResults.categories.event"),
     user: t("searchResults.categories.user"),
     other: t("searchResults.categories.other"),
   };
