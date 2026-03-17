@@ -8,6 +8,7 @@ import { useResizable } from '../../hooks/useResizable'
 import usersService from '../../services/usersService'
 import { formatKeyAreaLabel } from '../../utils/keyAreaDisplay'
 import { durationToTimeInputValue, isDurationInputValid } from '../../utils/duration'
+import { validateTaskDeadline } from '../../components/key-areas/taskFormLogic.js'
 import DurationPicker from '../shared/DurationPicker.jsx'
 
 // A clean reusable Create Activity form modal. Use this file if the original got corrupted.
@@ -185,7 +186,8 @@ export default function CreateActivityFormModal({
     if (!isOpen) return
     if (!deadlineAuto) return
     if (!endDate) return
-    if (deadline !== endDate) setDeadline(endDate)
+    // Removed auto-sync of deadline to endDate
+    // if (deadline !== endDate) setDeadline(endDate)
   }, [isOpen, endDate, deadline, deadlineAuto])
 
   useEffect(() => {
@@ -306,6 +308,13 @@ export default function CreateActivityFormModal({
     // Validate required field
     if (!title || !(title || '').trim()) {
       alert(t('createActivityModal.titleRequired'));
+      return;
+    }
+
+    // Validate deadline is within start and end dates
+    const deadlineValidation = validateTaskDeadline(startDate, endDate, deadline);
+    if (!deadlineValidation.valid) {
+      alert(deadlineValidation.error);
       return;
     }
 
