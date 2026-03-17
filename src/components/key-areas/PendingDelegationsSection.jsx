@@ -456,25 +456,26 @@ export default function PendingDelegationsSection({
                     {t("pendingDelegationsSection.modeLabel")}
                   </label>
                   <div className="space-y-2">
-                    <label className="flex items-center">
+                  <label className="flex items-center cursor-pointer">
                       <input
                         type="radio"
                         name="accept-mode"
                         value="create-new"
                         checked={acceptMode === 'create-new'}
                         onChange={(e) => setAcceptMode(e.target.value)}
-                        className="mr-2"
+                        className="mr-2 cursor-pointer"
                       />
                       <span className="text-sm text-gray-700">
                         {t("pendingDelegationsSection.modeTask")}
                       </span>
                     </label>
-                    <label className="flex items-center">
+                    <label className="flex items-center cursor-pointer opacity-100">
                       <input
                         type="radio"
                         name="accept-mode"
                         value="add-to-task"
                         checked={acceptMode === 'add-to-task'}
+                        disabled={!selectedKeyArea || String(selectedKeyArea).startsWith('__missing_')}
                         onChange={(e) => {
                           setAcceptMode(e.target.value);
                           // Load tasks for the selected key area when switching to add-to-task mode
@@ -482,9 +483,9 @@ export default function PendingDelegationsSection({
                             loadTasksForKeyArea(selectedKeyArea);
                           }
                         }}
-                        className="mr-2"
+                        className="mr-2 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                       />
-                      <span className="text-sm text-gray-700">
+                      <span className={`text-sm ${!selectedKeyArea || String(selectedKeyArea).startsWith('__missing_') ? 'text-gray-400' : 'text-gray-700'}`}>
                         {t("pendingDelegationsSection.modeActivity")}
                       </span>
                     </label>
