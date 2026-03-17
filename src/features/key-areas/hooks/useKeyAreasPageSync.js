@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const ALLOWED_VIEWS = new Set(['active-tasks', 'delegated', 'todo', 'activity-trap', 'my-focus']);
 
@@ -13,14 +13,28 @@ export default function useKeyAreasPageSync({
 }) {
     const [syncActive, setSyncActive] = useState(false);
     const [refreshTick, setRefreshTick] = useState(0);
+    const lastSearchRef = useRef(location.search);
+    const lastSyncedViewRef = useRef(viewTab);
 
     useEffect(() => {
+        // Only sync state from the URL when the URL search string actually changes.
+        // This prevents a user-triggered viewTab update from being immediately overwritten
+        // by the previous URL state (causing a "bounce" between tabs).
+        if (location.search === lastSearchRef.current) return;
+        lastSearchRef.current = location.search;
+
         const params = new URLSearchParams(location.search || '');
         const viewParam = params.get('view');
         const activeParam = params.get('active');
 
-        if (viewParam && ALLOWED_VIEWS.has(viewParam) && viewParam !== viewTab) {
+        if (
+            viewParam &&
+            ALLOWED_VIEWS.has(viewParam) &&
+            viewParam !== viewTab &&
+            viewParam !== lastSyncedViewRef.current
+        ) {
             setViewTab(viewParam);
+            lastSyncedViewRef.current = viewParam;
         }
 
         if (
@@ -39,6 +53,10 @@ export default function useKeyAreasPageSync({
     }, [activeFilter, location.search, setActiveFilter, setViewTab, viewTab]);
 
     useEffect(() => {
+        // When switching to My Focus the app navigates away from /key-areas entirely,
+        // so there's no need to keep the query params in sync while on that view.
+        if (viewTab === 'my-focus') return;
+
         const params = new URLSearchParams(location.search || '');
         let changed = false;
 
@@ -59,6 +77,7 @@ export default function useKeyAreasPageSync({
 
         if (changed) {
             navigate({ pathname: location.pathname, search: `?${params.toString()}` }, { replace: true });
+            lastSyncedViewRef.current = viewTab;
         }
     }, [activeFilter, location.pathname, location.search, navigate, viewTab]);
 
