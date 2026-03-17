@@ -1686,7 +1686,6 @@ const WeekView = ({
 
                             const weekTasks = (Array.isArray(events) ? events : []).filter((t) => {
                               try {
-                                if (String(t?.kind || "").toLowerCase() === "appointment") return false;
                                 const s = resolveStartRaw(t);
                                 const e = resolveEndRaw(t);
                                 const isAllDayLike = Boolean(t?.allDay || t?.all_day);

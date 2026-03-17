@@ -1417,8 +1417,6 @@ export default function DayView({
                               if (seen.has(dedupeId)) return false;
                               seen.add(dedupeId);
 
-                              if (String(t?.kind || '').toLowerCase() === 'appointment') return false;
-
                               const s = t.start || t.startAt || t.start_at || t.startDate || t.start_date || null;
                               const e = t.end || t.endAt || t.end_at || t.endDate || t.end_date || null;
                               if (!s || !e) return false;
