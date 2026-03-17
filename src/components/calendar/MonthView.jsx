@@ -630,11 +630,11 @@ export default function MonthView({
     const d = new Date(iso);
     if (isNaN(d.getTime())) return null;
     const hasTimeComponent = String(iso).includes("T");
-    const isMidnight = d.getHours() === 0 && d.getMinutes() === 0 && d.getSeconds() === 0;
-    if (hasTimeComponent && isMidnight) {
-      const prev = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-      prev.setDate(prev.getDate() - 1);
-      return prev;
+    // Check UTC midnight — all-day events use UTC midnight as exclusive end
+    const isUtcMidnight = d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0;
+    if (hasTimeComponent && isUtcMidnight) {
+      // Subtract 1 day to get the last inclusive day (e.g. end=Mar18 → last day=Mar17)
+      return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - 1));
     }
     return new Date(d.getFullYear(), d.getMonth(), d.getDate());
   };
