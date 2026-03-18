@@ -188,7 +188,6 @@ export default function EditActivityModal({
   const [startDate, setStartDate] = useState(safeDate(initialData.date_start || initialData.startDate) || '');
   const [endDate, setEndDate] = useState(safeDate(initialData.date_end || initialData.endDate) || '');
   const [endAuto, setEndAuto] = useState(true);
-  const [deadlineAuto, setDeadlineAuto] = useState(true);
   const [keyAreaError, setKeyAreaError] = useState('');
   const [listError, setListError] = useState('');
   const [deadline, setDeadline] = useState(safeDate(initialData.deadline || initialData.dueDate));
@@ -254,7 +253,6 @@ export default function EditActivityModal({
     // Keep auto-sync enabled on open so changing Start date auto-fills End date,
     // matching behavior in other composer/edit modals until user edits End date manually.
     setEndAuto(true);
-    setDeadlineAuto(true);
     setDeadline(safeDate(initialData.deadline ?? initialData.dueDate ?? initialData.due_date ?? initialData.deadline));
     setDuration(durationToTimeInputValue(initialData.duration || ''));
     setKeyAreaId(initialData.key_area_id || initialData.keyAreaId || initialData.keyArea || initialData.key_area || '');
@@ -377,14 +375,6 @@ export default function EditActivityModal({
       }
     })();
   }, [isOpen, users]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    if (!deadlineAuto) return;
-    if (!endDate) return;
-    // Removed auto-sync of deadline to endDate
-    // if (deadline !== endDate) setDeadline(endDate);
-  }, [isOpen, endDate, deadline, deadlineAuto]);
 
   if (!isOpen) return null;
 
@@ -586,7 +576,6 @@ export default function EditActivityModal({
                   onChange={(e) => {
                     const v = e.target.value;
                     setEndDate(v);
-                    if (deadlineAuto) setDeadline(v);
                     if (v && startDate && v < startDate) setStartDate(v);
                     try { setEndAuto(false); } catch (__) {}
                   }}
@@ -608,7 +597,6 @@ export default function EditActivityModal({
                     value={deadline}
                     onChange={(e) => {
                       setDeadline(e.target.value);
-                      setDeadlineAuto(false);
                     }}
                     ref={deadlineRef}
                   />

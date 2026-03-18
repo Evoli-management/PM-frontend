@@ -152,22 +152,13 @@ export const applyStartEndDateRule = ({ startDate, endDate, deadline, changedKey
         if (nextValue && (!nextEnd || nextValue > nextEnd)) {
             nextEnd = nextValue;
         }
-        if (nextValue && nextDeadline && nextDeadline < nextValue) {
-            nextDeadline = nextValue;
-        }
     } else if (key === "end_date" || key === "endDate") {
         nextEnd = nextValue;
         if (nextValue && nextStart && nextValue < nextStart) {
             nextStart = nextValue;
         }
-        if (nextStart && nextDeadline && nextDeadline < nextStart) {
-            nextDeadline = nextStart;
-        }
     } else if (key === "deadline" || key === "dueDate") {
         nextDeadline = nextValue;
-        if (nextDeadline && nextStart && nextDeadline < nextStart) {
-            nextDeadline = nextStart;
-        }
     }
 
     return {
