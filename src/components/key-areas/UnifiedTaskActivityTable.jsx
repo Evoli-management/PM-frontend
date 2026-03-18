@@ -1498,24 +1498,17 @@ export default function UnifiedTaskActivityTable({
                                                     return 'normal';
                                                 })();
                                                 if (isDelegatedPendingSection) {
-                                                    const priorityLabel =
-                                                        priorityValue === 'high'
-                                                            ? 'High'
-                                                            : priorityValue === 'low'
-                                                                ? 'Low'
-                                                                : 'Normal';
-                                                    const priorityTone =
-                                                        priorityValue === 'high'
-                                                            ? 'text-red-700'
-                                                            : priorityValue === 'low'
-                                                                ? 'text-blue-700'
-                                                                : 'text-slate-500';
-
                                                     return (
-                                                        <div className={`flex items-center justify-center gap-1 text-sm ${priorityTone}`}>
-                                                            <span aria-hidden="true">{getPriorityIcon(priorityValue) || '—'}</span>
-                                                            <span>{priorityLabel}</span>
-                                                        </div>
+                                                        <select
+                                                            className="w-full rounded-md border border-slate-300 bg-slate-50 py-0.5 text-sm px-2 text-slate-700 cursor-not-allowed"
+                                                            value={priorityValue}
+                                                            disabled
+                                                            aria-label="Delegated priority"
+                                                        >
+                                                            <option value="high">High</option>
+                                                            <option value="normal">Normal</option>
+                                                            <option value="low">Low</option>
+                                                        </select>
                                                     );
                                                 }
 
