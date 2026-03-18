@@ -67,6 +67,7 @@ export default function UnifiedTaskActivityTable({
     const [userTasks, setUserTasks] = useState([]); // For accept-into-task feature
     const [selectedKeyArea, setSelectedKeyArea] = useState('');
     const [selectedTaskForActivity, setSelectedTaskForActivity] = useState(''); // For accept-into-task
+    const [acceptMode, setAcceptMode] = useState('new-task'); // 'new-task' or 'attach-task'
     const [respondingTaskId, setRespondingTaskId] = useState(null);
     const [openRowMenuId, setOpenRowMenuId] = useState(null);
     const [rowMenuPos, setRowMenuPos] = useState({ top: 0, left: 0 });
@@ -75,6 +76,13 @@ export default function UnifiedTaskActivityTable({
     const [bodyScrollbarWidth, setBodyScrollbarWidth] = useState(0);
     const [showMassFieldPicker, setShowMassFieldPicker] = useState(false);
     const rowMenuInstanceIdRef = useRef(`utm-row-menu-${Math.random().toString(36).slice(2)}`);
+
+    useEffect(() => {
+        if (acceptMode !== 'attach-task') return;
+        if (!selectedTaskForActivity && userTasks.length > 0) {
+            setSelectedTaskForActivity(userTasks[0].id);
+        }
+    }, [acceptMode, selectedTaskForActivity, userTasks]);
 
     useEffect(() => {
         if (!openRowMenuId) return;
@@ -993,6 +1001,8 @@ export default function UnifiedTaskActivityTable({
         // Load user's key areas and tasks for selection
         setAcceptingActivity(activity);
         setShowAcceptModal(true);
+        setAcceptMode('new-task');
+        setSelectedTaskForActivity('');
         
         try {
             const areas = await keyAreaService.list();
@@ -1009,7 +1019,7 @@ export default function UnifiedTaskActivityTable({
 
     const handleKeyAreaChangeForActivity = async (keyAreaId) => {
         setSelectedKeyArea(keyAreaId);
-        setSelectedTaskForActivity(''); // Reset task selection
+        setSelectedTaskForActivity('');
         
         if (keyAreaId) {
             try {
@@ -1018,8 +1028,8 @@ export default function UnifiedTaskActivityTable({
                     setUserTasks([]);
                     return;
                 }
-                const { get } = await import('../../services/taskService');
-                const tasks = await get({ keyAreaId });
+                const { default: taskService } = await import('../../services/taskService');
+                const tasks = await taskService.list({ keyAreaId });
                 setUserTasks(Array.isArray(tasks) ? tasks : []);
             } catch (error) {
                 console.error('Failed to load tasks:', error);
@@ -1032,6 +1042,7 @@ export default function UnifiedTaskActivityTable({
 
     const confirmAcceptActivityDelegation = async () => {
         if (!selectedKeyArea || !acceptingActivity) return;
+        if (acceptMode === 'attach-task' && !selectedTaskForActivity) return;
         
         setRespondingTaskId(acceptingActivity.id);
         try {
@@ -1040,7 +1051,7 @@ export default function UnifiedTaskActivityTable({
             };
             
             // If user selected an existing task, add it to payload
-            if (selectedTaskForActivity) {
+            if (acceptMode === 'attach-task' && selectedTaskForActivity) {
                 payload.taskId = selectedTaskForActivity;
             }
             
@@ -1770,8 +1781,11 @@ export default function UnifiedTaskActivityTable({
                                                 type="radio"
                                                 name="accept-activity-mode"
                                                 value="new-task"
-                                                checked={!selectedTaskForActivity}
-                                                onChange={() => setSelectedTaskForActivity('')}
+                                                checked={acceptMode === 'new-task'}
+                                                onChange={() => {
+                                                    setAcceptMode('new-task');
+                                                    setSelectedTaskForActivity('');
+                                                }}
                                             />
                                             <span className="text-sm text-slate-700">Add as a <b>new Task</b> in Key Areas</span>
                                         </label>
@@ -1780,8 +1794,9 @@ export default function UnifiedTaskActivityTable({
                                                 type="radio"
                                                 name="accept-activity-mode"
                                                 value="attach-task"
-                                                checked={!!selectedTaskForActivity}
+                                                checked={acceptMode === 'attach-task'}
                                                 onChange={() => {
+                                                    setAcceptMode('attach-task');
                                                     if (userTasks.length > 0) setSelectedTaskForActivity(userTasks[0].id);
                                                 }}
                                             />
@@ -1789,7 +1804,7 @@ export default function UnifiedTaskActivityTable({
                                         </label>
                                     </div>
                                     {/* Only show task select if "Attach as Activity" is chosen */}
-                                    {!!selectedTaskForActivity && (
+                                    {acceptMode === 'attach-task' && (
                                         <div className="mt-3 p-2 border-l-4 border-slate-300 bg-white rounded">
                                             <label className="block text-xs font-medium text-slate-700 mb-1">
                                                 Select Task to attach Activity
@@ -1797,9 +1812,13 @@ export default function UnifiedTaskActivityTable({
                                             <select
                                                 value={selectedTaskForActivity}
                                                 onChange={(e) => setSelectedTaskForActivity(e.target.value)}
+                                                disabled={userTasks.length === 0}
                                                 className="w-full h-10 rounded-lg border border-slate-300 px-3 text-sm bg-white shadow-sm placeholder-slate-400 text-slate-900 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 
                                                          focus:border-transparent"
                                             >
+                                                <option value="">
+                                                    {userTasks.length === 0 ? '-- No tasks in this Key Area --' : '-- Select a Task --'}
+                                                </option>
                                                 {userTasks.map((task) => (
                                                     <option key={task.id} value={task.id}>
                                                         {task.title}
@@ -1833,7 +1852,7 @@ export default function UnifiedTaskActivityTable({
                             </button>
                             <button
                                 onClick={acceptingTask ? confirmAcceptDelegation : confirmAcceptActivityDelegation}
-                                disabled={!selectedKeyArea || respondingTaskId}
+                                disabled={!selectedKeyArea || respondingTaskId || (acceptingActivity && acceptMode === 'attach-task' && !selectedTaskForActivity)}
                                 className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 
                                          rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
                             >
