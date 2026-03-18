@@ -14,6 +14,7 @@ import {
   useTaskMemberMenus,
   validateTaskDateRange,
   validateTaskDuration,
+  validateTaskDeadline,
 } from './taskFormShared.js';
 
 export default function EditTaskModal({
@@ -213,7 +214,8 @@ export default function EditTaskModal({
     if (!isOpen) return;
     if (!deadlineAuto) return;
     if (!endDate) return;
-    if (deadline !== endDate) setDeadline(endDate);
+    // Removed auto-sync of deadline to endDate
+    // if (deadline !== endDate) setDeadline(endDate);
   }, [isOpen, endDate, deadline, deadlineAuto]);
 
   const effectiveListIndex = isDontForgetMode && !keyAreaId ? undefined : listIndex;
@@ -222,6 +224,9 @@ export default function EditTaskModal({
   const handleSave = async () => {
     const dateValidation = validateTaskDateRange(startDate, endDate);
     if (!dateValidation.valid) return;
+
+    const deadlineValidation = validateTaskDeadline(startDate, endDate, deadline);
+    if (!deadlineValidation.valid) return;
 
     const durationValidation = validateTaskDuration(duration);
     if (!durationValidation.valid) return;

@@ -107,9 +107,6 @@ export default function ViewTabsNavigation({
                     type="button"
                     onClick={() => {
                         setViewTab('delegated');
-                        const params = new URLSearchParams(location.search);
-                        params.set('view', 'delegated');
-                        navigate({ pathname: location.pathname, search: `?${params.toString()}` }, { replace: true });
                     }}
                     className={`px-2 py-2 rounded text-xs font-semibold whitespace-nowrap transition flex items-center gap-2 ${
                         viewTab === 'delegated'
@@ -131,9 +128,6 @@ export default function ViewTabsNavigation({
                     type="button"
                     onClick={() => {
                         setViewTab('todo');
-                        const params = new URLSearchParams(location.search);
-                        params.set('view', 'todo');
-                        navigate({ pathname: location.pathname, search: `?${params.toString()}` }, { replace: true });
                     }}
                     className={`px-2 py-2 rounded text-xs font-semibold whitespace-nowrap transition ${
                         viewTab === 'todo'
@@ -150,9 +144,6 @@ export default function ViewTabsNavigation({
                     type="button"
                     onClick={() => {
                         setViewTab('activity-trap');
-                        const params = new URLSearchParams(location.search);
-                        params.set('view', 'activity-trap');
-                        navigate({ pathname: location.pathname, search: `?${params.toString()}` }, { replace: true });
                     }}
                     className={`px-2 py-2 rounded text-xs font-semibold whitespace-nowrap transition ${
                         viewTab === 'activity-trap'
@@ -168,10 +159,9 @@ export default function ViewTabsNavigation({
                 <button
                     type="button"
                     onClick={() => {
+                        // my-focus is a separate route; we keep the viewTab state update for local UI,
+                        // but the useKeyAreasPageSync hook will navigate to /my-focus automatically.
                         setViewTab('my-focus');
-                        const params = new URLSearchParams(location.search);
-                        params.set('view', 'my-focus');
-                        navigate({ pathname: location.pathname, search: `?${params.toString()}` }, { replace: true });
                     }}
                     className={`px-2 py-2 rounded text-xs font-semibold whitespace-nowrap transition ${
                         viewTab === 'my-focus'

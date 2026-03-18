@@ -12,6 +12,7 @@ import {
   useTaskMemberMenus,
   validateTaskDateRange,
   validateTaskDuration,
+  validateTaskDeadline,
 } from './taskFormShared.js';
 
 export default function CreateTaskModal({
@@ -173,7 +174,8 @@ export default function CreateTaskModal({
 
   useEffect(() => {
     if (!isOpen || !deadlineAuto || !endDate) return;
-    if (deadline !== endDate) setDeadline(endDate);
+    // Removed auto-sync of deadline to endDate
+    // if (deadline !== endDate) setDeadline(endDate);
   }, [isOpen, endDate, deadline, deadlineAuto]);
 
   const selectedKeyArea = (localKeyAreas.length ? localKeyAreas : keyAreas).find((area) => String(area.id) === String(keyAreaId));
@@ -184,6 +186,9 @@ export default function CreateTaskModal({
   const handleSave = () => {
     const dateValidation = validateTaskDateRange(startDate, endDate);
     if (!dateValidation.valid) return;
+
+    const deadlineValidation = validateTaskDeadline(startDate, endDate, deadline);
+    if (!deadlineValidation.valid) return;
 
     const durationValidation = validateTaskDuration(duration);
     if (!durationValidation.valid) return;

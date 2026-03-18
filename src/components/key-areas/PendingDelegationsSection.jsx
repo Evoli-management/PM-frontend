@@ -93,6 +93,17 @@ export default function PendingDelegationsSection({
     }
   };
 
+  // Reload tasks when key area changes and we're in add-to-task mode
+  React.useEffect(() => {
+    if (acceptMode === 'add-to-task' && selectedKeyArea && !String(selectedKeyArea).startsWith('__missing_')) {
+      loadTasksForKeyArea(selectedKeyArea);
+    } else {
+      setAvailableTasks([]);
+    }
+    // Always clear selected task when key area changes
+    setSelectedTaskForActivity('');
+  }, [selectedKeyArea, acceptMode]);
+
   const handleAcceptClick = async (item) => {
     setAcceptingItem(item);
     setSelectedKeyArea('');
@@ -124,18 +135,22 @@ export default function PendingDelegationsSection({
       setKeyAreaError('This key area is not available for selection yet');
       return;
     }
-    if (!selectedListIndex) {
+    const requiresListSelection =
+      acceptingItem?.type !== 'activity' || acceptMode !== 'add-to-task';
+    if (requiresListSelection && !selectedListIndex) {
       setListError('Task List selection is required');
       return;
     }
-    if (acceptingItem?.type === 'activity' && acceptMode === 'add-to-task' && !selectedTaskForActivity) {
+    if (acceptingItem?.type === 'activity' && acceptMode === 'add-to-task' && selectedKeyArea && !String(selectedKeyArea).startsWith('__missing_') && !selectedTaskForActivity) {
       setTaskError('Please select a task to add this activity to');
       return;
     }
     setRespondingItemId(acceptingItem.id);
     try {
-      // Ensure listIndex is sent as integer, not string
-      const payload = { keyAreaId: selectedKeyArea, listIndex: Number(selectedListIndex) };
+      const payload = { keyAreaId: selectedKeyArea };
+      if (requiresListSelection && selectedListIndex) {
+        payload.listIndex = Number(selectedListIndex);
+      }
       if (acceptingItem.type === 'task') {
         // Accept task delegation
         await taskDelegationService.acceptDelegation(acceptingItem.id, payload);
@@ -231,6 +246,8 @@ export default function PendingDelegationsSection({
   const selectedKeyAreaOption = keyAreaOptions.find(
     (option) => String(option.value) === String(selectedKeyArea)
   );
+  const requiresListSelection =
+    acceptingItem?.type !== 'activity' || acceptMode !== 'add-to-task';
 
   return (
     <>
@@ -274,15 +291,15 @@ export default function PendingDelegationsSection({
                       </td>
                       <td className="px-2 sm:px-3 py-3 text-center">
                         {item.priority === 'high' && (
-                          <FaExclamation 
-                            title="High Priority" 
-                            className="text-red-600 mx-auto inline-block" 
+                          <FaExclamation
+                            title="High Priority"
+                            className="text-red-600 mx-auto inline-block"
                           />
                         )}
                         {item.priority === 'low' && (
-                          <FaArrowDown 
-                            title="Low Priority" 
-                            className="text-blue-600 mx-auto inline-block" 
+                          <FaArrowDown
+                            title="Low Priority"
+                            className="text-blue-600 mx-auto inline-block"
                           />
                         )}
                         {(!item.priority || item.priority === 'normal') && (
@@ -412,31 +429,33 @@ export default function PendingDelegationsSection({
                 )}
               </div>
 
-              {/* Task List (Required for all) */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {t("pendingDelegationsSection.listLabel")} <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={selectedListIndex}
-                  onChange={(e) => {
-                    setSelectedListIndex(e.target.value);
-                    setListError('');
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-                  disabled={!selectedKeyArea || availableLists.length === 0}
-                >
-                  <option value="">{t("pendingDelegationsSection.selectKeyArea")}</option>
-                  {availableLists.map((n) => (
-                    <option key={n} value={n}>
-                      {listNames[n] || `List ${n}`}
-                    </option>
-                  ))}
-                </select>
-                {listError && (
-                  <p className="text-red-500 text-xs mt-1">{listError}</p>
-                )}
-              </div>
+              {/* Task List is only required when creating a new task */}
+              {requiresListSelection && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    {t("pendingDelegationsSection.listLabel")} <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={selectedListIndex}
+                    onChange={(e) => {
+                      setSelectedListIndex(e.target.value);
+                      setListError('');
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                    disabled={!selectedKeyArea || availableLists.length === 0}
+                  >
+                    <option value="">{t("pendingDelegationsSection.selectKeyArea")}</option>
+                    {availableLists.map((n) => (
+                      <option key={n} value={n}>
+                        {listNames[n] || `List ${n}`}
+                      </option>
+                    ))}
+                  </select>
+                  {listError && (
+                    <p className="text-red-500 text-xs mt-1">{listError}</p>
+                  )}
+                </div>
+              )}
 
               {/* Accept Mode Selector (Only for Activities) */}
               {acceptingItem?.type === 'activity' && (
@@ -445,27 +464,33 @@ export default function PendingDelegationsSection({
                     {t("pendingDelegationsSection.modeLabel")}
                   </label>
                   <div className="space-y-2">
-                    <label className="flex items-center">
+                    <label className="flex items-center cursor-pointer">
                       <input
                         type="radio"
                         name="accept-mode"
                         value="create-new"
                         checked={acceptMode === 'create-new'}
                         onChange={(e) => setAcceptMode(e.target.value)}
-                        className="mr-2"
+                        className="mr-2 cursor-pointer"
                       />
                       <span className="text-sm text-gray-700">
                         {t("pendingDelegationsSection.modeTask")}
                       </span>
                     </label>
-                    <label className="flex items-center">
+                    <label className="flex items-center cursor-pointer">
                       <input
                         type="radio"
                         name="accept-mode"
                         value="add-to-task"
                         checked={acceptMode === 'add-to-task'}
-                        onChange={(e) => setAcceptMode(e.target.value)}
-                        className="mr-2"
+                        onChange={(e) => {
+                          setAcceptMode(e.target.value);
+                          // Load tasks for the selected key area when switching to add-to-task mode
+                          if (e.target.value === 'add-to-task' && selectedKeyArea && !String(selectedKeyArea).startsWith('__missing_')) {
+                            loadTasksForKeyArea(selectedKeyArea);
+                          }
+                        }}
+                        className="mr-2 cursor-pointer"
                       />
                       <span className="text-sm text-gray-700">
                         {t("pendingDelegationsSection.modeActivity")}
@@ -481,9 +506,15 @@ export default function PendingDelegationsSection({
                           setSelectedTaskForActivity(e.target.value);
                           setTaskError('');
                         }}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                        disabled={!selectedKeyArea || String(selectedKeyArea).startsWith('__missing_')}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                       >
-                        <option value="">-- Select a Task --</option>
+                        <option value="">
+                          {!selectedKeyArea || String(selectedKeyArea).startsWith('__missing_')
+                            ? "-- Select a Key Area first --"
+                            : "-- Select a Task --"
+                          }
+                        </option>
                         {availableTasks.map((task) => (
                           <option key={task.id} value={task.id}>
                             {task.title}

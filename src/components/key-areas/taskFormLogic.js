@@ -41,6 +41,28 @@ export const validateTaskDateRange = (startDate, endDate) => {
   return { valid: true };
 };
 
+export const validateTaskDeadline = (startDate, endDate, deadline) => {
+  if (!deadline) return { valid: true };
+  const dl = new Date(deadline);
+  if (Number.isNaN(dl.getTime())) return { valid: true };
+
+  if (startDate) {
+    const start = new Date(startDate);
+    if (!Number.isNaN(start.getTime()) && dl < start) {
+      return { valid: false, error: 'Deadline must be on or after start date' };
+    }
+  }
+
+  if (endDate) {
+    const end = new Date(endDate);
+    if (!Number.isNaN(end.getTime()) && dl > end) {
+      return { valid: false, error: 'Deadline must be on or before end date' };
+    }
+  }
+
+  return { valid: true };
+};
+
 export const validateTaskDuration = (value) => {
   if (!value) return { valid: true };
   if (typeof value !== 'string') return { valid: true };
@@ -62,7 +84,8 @@ export const getTaskStartDatePatch = ({
 
   if (!startDate && !endDate && !deadline) {
     patch.endDate = value;
-    patch.deadline = value;
+    // Removed auto-setting deadline
+    // patch.deadline = value;
     return patch;
   }
 
@@ -70,15 +93,18 @@ export const getTaskStartDatePatch = ({
     patch.endDate = value;
   }
 
-  if (!deadline && deadlineAuto && (!endDate || endAuto)) {
-    patch.deadline = value;
-  }
+  // Removed auto-setting deadline
+  // if (!deadline && deadlineAuto && (!endDate || endAuto)) {
+  //   patch.deadline = value;
+  // }
 
   if (endDate && value > endDate) {
     patch.endDate = value;
-    patch.deadline = value;
+    // Removed auto-setting deadline
+    // patch.deadline = value;
   } else if (deadline && deadline < value) {
-    patch.deadline = endDate && endDate >= value ? endDate : value;
+    // Removed auto-setting deadline
+    // patch.deadline = endDate && endDate >= value ? endDate : value;
   }
 
   return patch;
@@ -91,7 +117,8 @@ export const getTaskEndDatePatch = ({ startDate }, value) => {
   };
   if (!value) return patch;
 
-  patch.deadline = value;
+  // Removed auto-setting deadline to endDate
+  // patch.deadline = value;
   if (startDate && value < startDate) {
     patch.startDate = value;
   }
