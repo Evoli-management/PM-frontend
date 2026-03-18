@@ -1497,23 +1497,28 @@ export default function UnifiedTaskActivityTable({
                                                     if (raw === 3 || String(raw) === '3' || String(raw).toLowerCase() === 'high') return 'high';
                                                     return 'normal';
                                                 })();
-                                                // For pending delegations, show read-only priority display
-                                                if (delegationActionsEnabled) {
+                                                if (isDelegatedPendingSection) {
+                                                    const priorityLabel =
+                                                        priorityValue === 'high'
+                                                            ? 'High'
+                                                            : priorityValue === 'low'
+                                                                ? 'Low'
+                                                                : 'Normal';
+                                                    const priorityTone =
+                                                        priorityValue === 'high'
+                                                            ? 'text-red-700'
+                                                            : priorityValue === 'low'
+                                                                ? 'text-blue-700'
+                                                                : 'text-slate-500';
+
                                                     return (
-                                                        <div className="flex items-center justify-center">
-                                                            {item.priority === 'high' && (
-                                                                <span title="High Priority" className="text-red-600">⚠️</span>
-                                                            )}
-                                                            {item.priority === 'low' && (
-                                                                <span title="Low Priority" className="text-blue-600">⬇️</span>
-                                                            )}
-                                                            {(!item.priority || item.priority === 'normal') && (
-                                                                <span className="text-gray-400">—</span>
-                                                            )}
+                                                        <div className={`flex items-center justify-center gap-1 text-sm ${priorityTone}`}>
+                                                            <span aria-hidden="true">{getPriorityIcon(priorityValue) || '—'}</span>
+                                                            <span>{priorityLabel}</span>
                                                         </div>
                                                     );
                                                 }
-                                                // For regular tasks, show editable priority select
+
                                                 return (
                                                     <select
                                                         className="w-full rounded-md border border-slate-300 bg-white py-0.5 text-sm px-2"
