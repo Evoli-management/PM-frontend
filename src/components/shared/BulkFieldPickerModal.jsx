@@ -187,7 +187,7 @@ export default function BulkFieldPickerModal({
   const notchedInputCls = 'w-full bg-transparent px-0 py-0 text-slate-900 outline-none placeholder-slate-400';
   const [selectedField, setSelectedField] = useState('');
   const [fieldValue, setFieldValue] = useState('');
-  const [dateAutoFill, setDateAutoFill] = useState({ end_date: true, deadline: true });
+  const [dateAutoFill, setDateAutoFill] = useState({ end_date: true });
   const startDateInputRef = useRef(null);
   const endDateInputRef = useRef(null);
   const deadlineInputRef = useRef(null);
@@ -300,7 +300,7 @@ export default function BulkFieldPickerModal({
     if (!isOpen) {
       setSelectedField('');
       setFieldValue('');
-      setDateAutoFill({ end_date: true, deadline: true });
+      setDateAutoFill({ end_date: true });
       setShowFieldMenu(false);
     }
   }, [isOpen]);
@@ -308,7 +308,7 @@ export default function BulkFieldPickerModal({
   useEffect(() => {
     if (selectedField === 'date') {
       setFieldValue({ start_date: '', end_date: '', deadline: '' });
-      setDateAutoFill({ end_date: true, deadline: true });
+      setDateAutoFill({ end_date: true });
       return;
     }
     if (selectedField === 'key_area_bundle') {
@@ -408,20 +408,6 @@ export default function BulkFieldPickerModal({
     }));
   }, [selectedField, fieldValue, dateAutoFill.end_date]);
 
-  useEffect(() => {
-    if (selectedField !== 'date') return;
-    const current = fieldValue && typeof fieldValue === 'object'
-      ? fieldValue
-      : { start_date: '', end_date: '', deadline: '' };
-    if (!dateAutoFill.deadline) return;
-    if (!current.end_date) return;
-    if (current.deadline === current.end_date) return;
-    setFieldValue((prev) => ({
-      ...(prev && typeof prev === 'object' ? prev : {}),
-      deadline: current.end_date,
-    }));
-  }, [selectedField, fieldValue, dateAutoFill.deadline]);
-
   if (!isOpen) return null;
 
   const renderValueEditor = () => {
@@ -492,14 +478,11 @@ export default function BulkFieldPickerModal({
                 const nextEndDate = (dateAutoFill.end_date || (current.end_date && current.end_date < nextValue))
                   ? nextValue
                   : current.end_date;
-                const nextDeadline = (dateAutoFill.deadline || (current.deadline && current.deadline < nextEndDate))
-                  ? nextEndDate
-                  : current.deadline;
                 return {
                   ...current,
                   start_date: nextValue,
                   end_date: nextEndDate,
-                  deadline: nextDeadline,
+                  deadline: current.deadline,
                 };
               });
             },
@@ -520,7 +503,7 @@ export default function BulkFieldPickerModal({
                     ...current,
                     start_date: nextValue,
                     end_date: nextValue,
-                    deadline: dateAutoFill.deadline ? nextValue : current.deadline,
+                    deadline: current.deadline,
                   };
                 }
                 return {
@@ -540,7 +523,6 @@ export default function BulkFieldPickerModal({
             'Deadline',
             dateValue.deadline || '',
             (e) => {
-              setDateAutoFill((prev) => ({ ...prev, deadline: false }));
               setFieldValue((prev) => ({ ...(prev || {}), deadline: e.target.value }));
             },
             deadlineInputRef,

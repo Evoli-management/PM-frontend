@@ -67,7 +67,6 @@ export default function CreateActivityFormModal({
   const [startDate, setStartDate] = useState(safeDate(initialData.startDate || initialData.date_start) || '')
   const [endDate, setEndDate] = useState(safeDate(initialData.endDate || initialData.date_end) || '')
   const [endAuto, setEndAuto] = useState(!(initialData.endDate || initialData.date_end))
-  const [deadlineAuto, setDeadlineAuto] = useState(true)
   const [deadline, setDeadline] = useState(safeDate(initialData.deadline || initialData.dueDate))
   const [priority, setPriority] = useState(initialData.priority ?? initialData.priority_level ?? 'normal')
   const [goalId, setGoalId] = useState(initialData.goalId || initialData.goal || '')
@@ -124,7 +123,6 @@ export default function CreateActivityFormModal({
     setEndDate(nextEnd)
     // If initial data provides an explicit end date, disable auto-sync; otherwise keep auto-sync enabled
     setEndAuto(!Boolean(initialData?.endDate || initialData?.date_end))
-    setDeadlineAuto(true)
     setDeadline(safeDate(initialData?.deadline || initialData?.dueDate))
     setPriority(initialData?.priority ?? initialData?.priority_level ?? 'normal')
     setGoalId(initialData?.goalId || initialData?.goal || '')
@@ -181,14 +179,6 @@ export default function CreateActivityFormModal({
       }
     })()
   }, [isOpen])
-
-  useEffect(() => {
-    if (!isOpen) return
-    if (!deadlineAuto) return
-    if (!endDate) return
-    // Removed auto-sync of deadline to endDate
-    // if (deadline !== endDate) setDeadline(endDate)
-  }, [isOpen, endDate, deadline, deadlineAuto])
 
   useEffect(() => {
     if (!isOpen) return
@@ -475,7 +465,6 @@ export default function CreateActivityFormModal({
                   onChange={(e) => {
                     const v = e.target.value
                     setEndDate(v)
-                    if (deadlineAuto) setDeadline(v)
                     if (v && startDate && v < startDate) setStartDate(v)
                     try { setEndAuto(false) } catch (__) {}
                   }}
@@ -497,7 +486,6 @@ export default function CreateActivityFormModal({
                   value={deadline}
                   onChange={(e) => {
                     setDeadline(e.target.value)
-                    setDeadlineAuto(false)
                   }}
                   ref={deadlineRef}
                 />
