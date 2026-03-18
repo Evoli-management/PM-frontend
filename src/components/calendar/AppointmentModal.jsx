@@ -382,6 +382,8 @@ const buildRecurringPattern = ({
     const [deleting, setDeleting] = useState(false);
     const isAppointmentLikeEvent = useMemo(() => {
         if (!isEdit || !event) return false;
+        // Reliable: any event that came from an external calendar has outlookId or googleId
+        if (event?.outlookId || event?.outlook_id || event?.googleId || event?.google_id) return true;
         const kind = String(event?.kind || "").toLowerCase();
         if (kind === "appointment" || kind === "appointment_exception") return true;
         if (kind.includes("appointment")) return true;
@@ -392,6 +394,13 @@ const buildRecurringPattern = ({
 
         if (event?.appointmentId || event?.appointment_id) return true;
         return false;
+    }, [isEdit, event]);
+
+    const syncBadge = useMemo(() => {
+        if (!isEdit || !event) return null;
+        if (event?.outlookId || event?.outlook_id) return "Synced from Outlook";
+        if (event?.googleId || event?.google_id) return "Synced from Google";
+        return null;
     }, [isEdit, event]);
     const modalEntityLabel = useMemo(() => {
         if (isEdit) {
@@ -1062,15 +1071,24 @@ const buildRecurringPattern = ({
                 `}</style>
 
                 {/* Header */}
-                <div 
+                <div
                     className="relative border-b border-slate-200 px-5 py-2 cursor-grab active:cursor-grabbing select-none flex-shrink-0"
+                    style={{ minHeight: syncBadge ? '56px' : undefined }}
                     onMouseDown={handleMouseDown}
                 >
-                    <h3 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xl font-semibold text-slate-900">
-                        {isEdit
-                            ? t("appointmentModal.editTitle")
-                            : t("appointmentModal.createTitle")}
-                    </h3>
+                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-0.5">
+                        <h3 className="text-xl font-semibold text-slate-900">
+                            {isEdit
+                                ? t("appointmentModal.editTitle")
+                                : t("appointmentModal.createTitle")}
+                        </h3>
+                        {syncBadge && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-200">
+                                <svg viewBox="0 0 16 16" fill="currentColor" className="h-3 w-3" aria-hidden="true"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm-.75 3.5a.75.75 0 0 1 1.5 0v3.25l2 1.15a.75.75 0 1 1-.75 1.3l-2.25-1.3A.75.75 0 0 1 7.25 8V4.5Z"/></svg>
+                                {syncBadge}
+                            </span>
+                        )}
+                    </div>
                     <div className="flex items-center justify-end gap-2">
                         <button
                             type="submit"
