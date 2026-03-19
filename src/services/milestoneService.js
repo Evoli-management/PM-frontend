@@ -58,6 +58,10 @@ export const createMilestone = async (goalId, milestoneData) => {
             const p = parseFloat(milestoneData.performance);
             if (!isNaN(p)) cleanData.performance = p;
         }
+        if (milestoneData.score != null) {
+            const s = parseFloat(milestoneData.score);
+            if (!isNaN(s)) cleanData.score = s;
+        }
 
         // NOTE: don't include 'done' in create operation - it's not allowed
 
