@@ -125,16 +125,27 @@ export default function Sidebar({
     const navigate = useNavigate();
     const calendarEnabled = isFeatureEnabled("calendar");
 
-    const buildKeyAreasSearch = ({ kaId = null, openKA = false, includeIdeasSelection = false } = {}) => {
+    const buildKeyAreasSearch = ({
+        kaId = null,
+        openKA = false,
+        includeIdeasSelection = false,
+        forceActiveTasks = false,
+    } = {}) => {
         const currentParams = new URLSearchParams(location.search || "");
         const nextParams = new URLSearchParams();
 
         const allowedViews = new Set(['active-tasks', 'delegated', 'todo', 'activity-trap', 'my-focus']);
         const currentView = currentParams.get('view');
-        const viewToUse = currentView && allowedViews.has(currentView) ? currentView : 'active-tasks';
+        const viewToUse = forceActiveTasks
+            ? 'active-tasks'
+            : currentView && allowedViews.has(currentView)
+                ? currentView
+                : 'active-tasks';
 
         nextParams.set('view', viewToUse);
-        nextParams.set('active', currentParams.get('active') || 'all');
+        if (viewToUse === 'active-tasks') {
+            nextParams.set('active', forceActiveTasks ? 'all' : (currentParams.get('active') || 'all'));
+        }
 
         if (kaId) {
             nextParams.set("ka", String(kaId));
@@ -236,10 +247,16 @@ export default function Sidebar({
                 if (keyAreasList && keyAreasList.length > 0) {
                     const first = [...keyAreasList].sort((a, b) => (a.position || 0) - (b.position || 0))[0];
                     openedFirstId = first?.id;
-                    navigate({ pathname: item.to, search: buildKeyAreasSearch({ kaId: first.id, openKA: true }) });
+                    navigate({
+                        pathname: item.to,
+                        search: buildKeyAreasSearch({ kaId: first.id, openKA: true, forceActiveTasks: true }),
+                    });
                 } else {
                     openFirstKARef.current = true;
-                    navigate({ pathname: item.to, search: buildKeyAreasSearch({ openKA: true }) });
+                    navigate({
+                        pathname: item.to,
+                        search: buildKeyAreasSearch({ openKA: true, forceActiveTasks: true }),
+                    });
                 }
             } else {
                 navigate({ pathname: item.to, search: "" });
@@ -249,10 +266,10 @@ export default function Sidebar({
                 if (keyAreasList && keyAreasList.length > 0) {
                     const first = [...keyAreasList].sort((a, b) => (a.position || 0) - (b.position || 0))[0];
                     openedFirstId = first?.id;
-                    window.location.href = `${item.to}${buildKeyAreasSearch({ kaId: first.id, openKA: true })}`;
+                    window.location.href = `${item.to}${buildKeyAreasSearch({ kaId: first.id, openKA: true, forceActiveTasks: true })}`;
                 } else {
                     openFirstKARef.current = true;
-                    window.location.href = `${item.to}${buildKeyAreasSearch({ openKA: true })}`;
+                    window.location.href = `${item.to}${buildKeyAreasSearch({ openKA: true, forceActiveTasks: true })}`;
                 }
             } else {
                 window.location.href = `${item.to}`;
@@ -284,9 +301,12 @@ export default function Sidebar({
                     return String(a.title || "").localeCompare(String(b.title || ""));
                 })[0];
                 try {
-                    navigate({ pathname: "/key-areas", search: buildKeyAreasSearch({ kaId: first.id, openKA: true }) });
+                    navigate({
+                        pathname: "/key-areas",
+                        search: buildKeyAreasSearch({ kaId: first.id, openKA: true, forceActiveTasks: true }),
+                    });
                 } catch {
-                    window.location.href = `/key-areas${buildKeyAreasSearch({ kaId: first.id, openKA: true })}`;
+                    window.location.href = `/key-areas${buildKeyAreasSearch({ kaId: first.id, openKA: true, forceActiveTasks: true })}`;
                 }
                 try {
                     window.dispatchEvent(new CustomEvent("sidebar-open-ka", { detail: { id: first.id } }));
@@ -515,7 +535,11 @@ export default function Sidebar({
                                                                         <Link
                                                                             to={{
                                                                                 pathname: "/key-areas",
-                                                                                search: buildKeyAreasSearch({ kaId: ka.id }),
+                                                                                search: buildKeyAreasSearch({
+                                                                                    kaId: ka.id,
+                                                                                    openKA: true,
+                                                                                    forceActiveTasks: true,
+                                                                                }),
                                                                             }}
                                                                             onClick={(e) => {
                                                                                 // Prevent navigation if we're dragging

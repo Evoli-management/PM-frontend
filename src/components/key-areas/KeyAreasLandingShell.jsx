@@ -11,6 +11,7 @@ export default function KeyAreasLandingShell({
     loading,
     onDeleteKA,
     openKA,
+    pendingDirectOpen = false,
     reorderByDrop,
     searchResults,
     setDragKAId,
@@ -20,7 +21,7 @@ export default function KeyAreasLandingShell({
     showOnlyIdeas,
     siteSearch,
 }) {
-    if (selectedKA || isGlobalTasksView) return null;
+    if (selectedKA || isGlobalTasksView || pendingDirectOpen) return null;
 
     return (
         <>
