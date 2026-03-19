@@ -152,10 +152,10 @@ const ListView = ({ goals, onGoalClick, onUpdate, onDelete, selectedGoals = new 
     }
 
     return (
-        <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm overflow-visible">
+        <div className="h-full min-h-0 flex flex-col bg-white border border-blue-300 rounded-lg shadow-sm overflow-hidden p-3">
             {/* Header */}
-            <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
-                <div className="grid grid-cols-12 gap-4 text-sm font-semibold text-slate-600">
+            <div className="px-3 pb-2 border-b border-black shrink-0">
+                <div className="grid grid-cols-12 gap-4 text-sm font-medium text-slate-700">
                     {onToggleSelection && <div className="col-span-1">Select</div>}
                     <div className={onToggleSelection ? "col-span-3" : "col-span-4"}>Goal</div>
                     <div className="col-span-2">Status</div>
@@ -166,7 +166,7 @@ const ListView = ({ goals, onGoalClick, onUpdate, onDelete, selectedGoals = new 
             </div>
 
             {/* Goals List */}
-            <div className="divide-y divide-slate-200">
+            <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-slate-200 pt-2 hover-scrollbar-y pr-1">
                 {(localGoals || goals).map((goal, index) => {
                     const completedMilestones =
                         (goal.milestones || []).filter((m) => {
@@ -207,7 +207,7 @@ const ListView = ({ goals, onGoalClick, onUpdate, onDelete, selectedGoals = new 
                     return (
                         <div
                             key={goal.id}
-                            className="px-6 py-4 hover:bg-slate-50 transition-colors cursor-pointer"
+                            className="px-3 py-4 hover:bg-slate-50 transition-colors cursor-pointer"
                                 onClick={() => onGoalClick(goal)}
                         >
                             <div className="grid grid-cols-12 gap-4 items-center">
