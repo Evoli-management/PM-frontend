@@ -176,8 +176,68 @@ export default function useKeyAreasSelection({
     }, [keyAreas, openKA]);
 
     useEffect(() => {
+        const params = new URLSearchParams(location.search || '');
+        const selectedKaId = selectedKA?.id ? String(selectedKA.id) : null;
+        const currentKaParam = params.get('ka');
+        const hasTaskContext =
+            params.has('task') ||
+            params.has('activity') ||
+            params.get('openPanelTask') === '1';
+        const shouldKeepUrlKaForHydration =
+            !!currentKaParam &&
+            (
+                viewTab === 'active-tasks' ||
+                params.get('openKA') === '1' ||
+                hasTaskContext
+            );
+        const hasKaContextParams =
+            params.has('ka') ||
+            params.has('openKA') ||
+            params.has('task') ||
+            params.has('activity') ||
+            params.has('openPanelTask');
+        let changed = false;
+
+        if (!selectedKaId) {
+            if (!shouldKeepUrlKaForHydration && hasKaContextParams) {
+                params.delete('ka');
+                params.delete('openKA');
+                params.delete('task');
+                params.delete('activity');
+                params.delete('openPanelTask');
+                changed = true;
+            }
+        } else if (currentKaParam !== selectedKaId) {
+            params.set('ka', selectedKaId);
+            if (hasTaskContext) {
+                params.delete('task');
+                params.delete('activity');
+                params.delete('openPanelTask');
+            }
+            params.delete('openKA');
+            changed = true;
+        } else if (params.has('openKA')) {
+            params.delete('openKA');
+            changed = true;
+        }
+
+        if (!changed) return;
+
+        navigate(
+            { pathname: location.pathname, search: params.toString() ? `?${params.toString()}` : '' },
+            { replace: true },
+        );
+    }, [location.pathname, location.search, navigate, selectedKA?.id, viewTab]);
+
+    useEffect(() => {
         const params = new URLSearchParams(location.search);
         const kaParam = params.get('ka');
+        const shouldHydrateKaFromUrl =
+            viewTab === 'active-tasks' ||
+            params.get('openKA') === '1' ||
+            !!params.get('task') ||
+            !!params.get('activity') ||
+            params.get('openPanelTask') === '1';
         const taskParam = params.get('task');
         const activityParam = params.get('activity');
         const openPanelTaskParam = params.get('openPanelTask');
@@ -191,10 +251,10 @@ export default function useKeyAreasSelection({
             const found = keyAreas.find((item) => String(item.id) === String(kaParam));
             if (
                 found &&
+                shouldHydrateKaFromUrl &&
                 (
                     !selectedKA ||
-                    String(selectedKA.id) !== String(found.id) ||
-                    viewTab !== 'active-tasks'
+                    String(selectedKA.id) !== String(found.id)
                 )
             ) {
                 openKA(found);
