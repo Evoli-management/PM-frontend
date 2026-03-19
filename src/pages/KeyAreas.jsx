@@ -104,6 +104,7 @@ export default function KeyAreas() {
         if (activeParam === 'active' || activeParam === 'all' || activeParam === 'completed') return activeParam;
         return 'all';
     })();
+    const pendingDirectOpen = params.get('openKA') === '1' || Boolean(params.get('ka'));
     const [viewTab, setViewTab] = useState(initialViewTab);
     // Sub-filter for ACTIVE TASKS view:
     // 'active' => not completed and has scheduled dates,
@@ -1113,6 +1114,7 @@ export default function KeyAreas() {
                             loading={loading}
                             onDeleteKA={onDeleteKA}
                             openKA={openKA}
+                            pendingDirectOpen={pendingDirectOpen}
                             reorderByDrop={reorderByDrop}
                             searchResults={searchResults}
                             selectedKA={selectedKA}
