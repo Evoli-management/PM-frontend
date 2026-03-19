@@ -424,7 +424,6 @@ export default function KeyAreas() {
         statusMenuRef,
         tabsRef,
     } = useKeyAreasMenus();
-    const prevViewTabRef = useRef(initialViewTab);
     useEffect(() => {
         if (panelViewMode === "simple") {
             setSelectedTaskInPanel(null);
@@ -444,17 +443,6 @@ export default function KeyAreas() {
         if (viewTab !== "active-tasks") {
             setSelectedTaskInPanel(null);
         }
-    }, [viewTab]);
-
-    useEffect(() => {
-        // When returning from global tabs to Active Tasks, force KA selection first.
-        const prev = prevViewTabRef.current;
-        const wasGlobal = prev === "delegated" || prev === "todo" || prev === "activity-trap";
-        if (viewTab === "active-tasks" && wasGlobal) {
-            setSelectedKA(null);
-            setAllTasks([]);
-        }
-        prevViewTabRef.current = viewTab;
     }, [viewTab]);
 
     const [activityNameEditId, setActivityNameEditId] = useState(null);
