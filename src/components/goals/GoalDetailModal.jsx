@@ -1,5 +1,6 @@
 import React, { useState, Suspense, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
+import { ChevronDown } from "lucide-react";
 import {
     FaLock,
     FaEye,
@@ -7,11 +8,55 @@ import {
     FaSave,
     FaEllipsisV,
     FaTrash,
+    FaUser,
+    FaUsers,
+    FaInfoCircle,
 } from "react-icons/fa";
 import { useFormattedDate } from "../../hooks/useFormattedDate";
 
 const GoalForm = React.lazy(() => import("./GoalForm"));
 import GoalGauge from "./GoalGauge";
+
+const TAG_COLOR_STORAGE_KEY = "goal-detail-tag-colors";
+const GOAL_TAG_MAX_LENGTH = 20;
+const TAG_COLOR_OPTIONS = [
+    { name: "Rose", fill: "#e11d48" },
+    { name: "Amber", fill: "#d97706" },
+    { name: "Emerald", fill: "#059669" },
+    { name: "Sky", fill: "#06b6d4" },
+    { name: "Violet", fill: "#7c3aed" },
+    { name: "Slate", fill: "#475569" },
+];
+const PRIORITY_OPTIONS = [
+    { value: "high", label: "High" },
+    { value: "medium", label: "Medium" },
+    { value: "low", label: "Low" },
+];
+
+const readStoredTagColors = (goalId) => {
+    if (!goalId || typeof window === "undefined") return {};
+    try {
+        const raw = window.localStorage.getItem(TAG_COLOR_STORAGE_KEY);
+        const parsed = raw ? JSON.parse(raw) : {};
+        return parsed?.[goalId] && typeof parsed[goalId] === "object"
+            ? parsed[goalId]
+            : {};
+    } catch {
+        return {};
+    }
+};
+
+const writeStoredTagColors = (goalId, colors) => {
+    if (!goalId || typeof window === "undefined") return;
+    try {
+        const raw = window.localStorage.getItem(TAG_COLOR_STORAGE_KEY);
+        const parsed = raw ? JSON.parse(raw) : {};
+        parsed[goalId] = colors;
+        window.localStorage.setItem(TAG_COLOR_STORAGE_KEY, JSON.stringify(parsed));
+    } catch {
+        // Ignore storage failures and keep UI functional.
+    }
+};
 
 const GoalDetailModal = ({
     goal,
@@ -33,7 +78,21 @@ const GoalDetailModal = ({
     const [showParentGoalDropdown, setShowParentGoalDropdown] = useState(false);
     const [availableGoals, setAvailableGoals] = useState([]);
     const [savingParentGoal, setSavingParentGoal] = useState(false);
+    const [tagInput, setTagInput] = useState("");
+    const [tagColors, setTagColors] = useState({});
+    const [openTagColorPicker, setOpenTagColorPicker] = useState(null);
+    const [goalRaci, setGoalRaci] = useState({
+        responsible: [],
+        consulted: [],
+        informed: [],
+    });
+    const [orgMembers, setOrgMembers] = useState([]);
+    const [teamMap, setTeamMap] = useState({});
+    const [savingInfoField, setSavingInfoField] = useState("");
+    const [openMembersRole, setOpenMembersRole] = useState(null);
     const parentGoalPickerRef = useRef(null);
+    const tagColorPickerRef = useRef(null);
+    const membersMenuRefs = useRef({});
 
     const formatDateLabel = (value) => {
         if (!value) return `Format: ${dateFormat}`;
@@ -185,6 +244,102 @@ const GoalDetailModal = ({
         }
     }, [goal, isEditing]);
 
+    useEffect(() => {
+        setTagInput("");
+    }, [goal?.id]);
+
+    useEffect(() => {
+        setTagColors(readStoredTagColors(goal?.id));
+        setOpenTagColorPicker(null);
+    }, [goal?.id]);
+
+    useEffect(() => {
+        let mounted = true;
+        (async () => {
+            try {
+                const mod = await import("../../services/usersService");
+                const svc = mod.default || mod;
+                const list = await svc.list();
+                if (mounted) setOrgMembers(Array.isArray(list) ? list : []);
+            } catch {
+                if (mounted) setOrgMembers([]);
+            }
+        })();
+        return () => {
+            mounted = false;
+        };
+    }, []);
+
+    useEffect(() => {
+        let mounted = true;
+        (async () => {
+            try {
+                const mod = await import("../../services/teamsService");
+                const svc = mod.default || mod;
+                const result = await svc.getTeams();
+                const teams = Array.isArray(result)
+                    ? result
+                    : result?.teams || result?.data || [];
+                if (!mounted) return;
+                const nextMap = {};
+                teams.forEach((team) => {
+                    if (team?.id) nextMap[team.id] = team.name || "Team";
+                });
+                setTeamMap(nextMap);
+            } catch {
+                if (mounted) setTeamMap({});
+            }
+        })();
+        return () => {
+            mounted = false;
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!goal?.id) {
+            setGoalRaci({ responsible: [], consulted: [], informed: [] });
+            return;
+        }
+        let mounted = true;
+        (async () => {
+            try {
+                const mod = await import("../../services/goalService");
+                const svc = mod.default || mod;
+                const entries = await svc.getGoalRaci(goal.id);
+                if (!mounted || !Array.isArray(entries)) return;
+                const byRole = { responsible: [], consulted: [], informed: [] };
+                entries.forEach((entry) => {
+                    if (byRole[entry.role]) {
+                        byRole[entry.role].push(String(entry.userId));
+                    }
+                });
+                setGoalRaci(byRole);
+            } catch {
+                if (mounted) {
+                    setGoalRaci({ responsible: [], consulted: [], informed: [] });
+                }
+            }
+        })();
+        return () => {
+            mounted = false;
+        };
+    }, [goal?.id]);
+
+    useEffect(() => {
+        if (!openTagColorPicker) return undefined;
+
+        const handleOutsideClick = (event) => {
+            if (!tagColorPickerRef.current?.contains(event.target)) {
+                setOpenTagColorPicker(null);
+            }
+        };
+
+        document.addEventListener("mousedown", handleOutsideClick);
+        return () => {
+            document.removeEventListener("mousedown", handleOutsideClick);
+        };
+    }, [openTagColorPicker]);
+
     if (!goal) return null;
 
     const milestonesList = localGoal?.milestones || [];
@@ -212,6 +367,29 @@ const GoalDetailModal = ({
     };
 
     const progressPercent = computeProgressPercent(milestonesList);
+    const resolvedKeyArea = Array.isArray(keyAreas)
+        ? keyAreas.find((area) => String(area.id) === String(localGoal?.keyAreaId))
+        : null;
+    const resolvedTeamName = localGoal?.teamId
+        ? localGoal?.teamName || teamMap[localGoal.teamId] || "Team goal"
+        : "Personal goal";
+    const formatMemberList = (ids = []) => {
+        if (!Array.isArray(ids) || ids.length === 0) return "—";
+        const names = ids.map((id) => (
+            orgMembers.find((member) => String(member.id) === String(id))?.name || "Unknown member"
+        ));
+        return names.join(", ");
+    };
+    const formatMemberSummary = (ids = []) => {
+        const names = Array.isArray(ids)
+            ? ids
+                .map((id) => orgMembers.find((member) => String(member.id) === String(id))?.name)
+                .filter(Boolean)
+            : [];
+        if (names.length === 0) return "Select members";
+        if (names.length <= 2) return names.join(", ");
+        return `${names[0]}, ${names[1]} +${names.length - 2}`;
+    };
 
     // Tabs: summary / milestones / activities
     const [activeTab, setActiveTab] = useState("milestones");
@@ -290,8 +468,21 @@ const GoalDetailModal = ({
         return () => document.removeEventListener('mousedown', onDown);
     }, [showParentGoalDropdown]);
 
+    useEffect(() => {
+        if (!openMembersRole) return;
+        const onDown = (e) => {
+            const menu = membersMenuRefs.current?.[openMembersRole];
+            if (menu && !menu.contains(e.target)) {
+                setOpenMembersRole(null);
+            }
+        };
+        document.addEventListener("mousedown", onDown);
+        return () => document.removeEventListener("mousedown", onDown);
+    }, [openMembersRole]);
+
     const handleSetParentGoal = async (parentGoalId) => {
         setSavingParentGoal(true);
+        setSavingInfoField("parentGoalId");
         try {
             await onUpdate(goal.id, { parentGoalId: parentGoalId || null });
             setLocalGoal(prev => ({ ...prev, parentGoalId: parentGoalId || null }));
@@ -300,9 +491,51 @@ const GoalDetailModal = ({
             alert(e?.response?.data?.message || 'Failed to link goal. Check for circular links.');
         } finally {
             setSavingParentGoal(false);
+            setSavingInfoField("");
             setShowParentGoalDropdown(false);
             setParentGoalSearch('');
         }
+    };
+
+    const handleInfoFieldUpdate = async (field, value, extraUpdates = {}) => {
+        setSavingInfoField(field);
+        try {
+            await onUpdate(goal.id, { [field]: value });
+            setLocalGoal((prev) => ({
+                ...prev,
+                [field]: value,
+                ...extraUpdates,
+            }));
+        } catch (e) {
+            console.error(`Failed to update ${field}`, e);
+        } finally {
+            setSavingInfoField("");
+        }
+    };
+
+    const handleRaciRoleChange = async (role, memberIds) => {
+        const previous = goalRaci[role] || [];
+        const nextIds = Array.isArray(memberIds) ? memberIds.map(String) : [];
+        setGoalRaci((prev) => ({ ...prev, [role]: nextIds }));
+        setSavingInfoField(role);
+        try {
+            const mod = await import("../../services/goalService");
+            const svc = mod.default || mod;
+            await svc.setGoalRaciRole(goal.id, role, nextIds);
+        } catch (e) {
+            console.error(`Failed to update ${role}`, e);
+            setGoalRaci((prev) => ({ ...prev, [role]: previous }));
+        } finally {
+            setSavingInfoField("");
+        }
+    };
+
+    const toggleRaciMember = async (role, userId) => {
+        const current = goalRaci[role] || [];
+        const next = current.includes(userId)
+            ? current.filter((id) => id !== userId)
+            : [...current, userId];
+        await handleRaciRoleChange(role, next);
     };
 
     // Close milestone menu on outside click
@@ -391,12 +624,81 @@ const GoalDetailModal = ({
         try {
             await onUpdate(goal.id, {
                 title: localGoal?.title,
+                priority: localGoal?.priority || "medium",
                 startDate: localGoal?.startDate || null,
                 dueDate: localGoal?.dueDate || null,
             });
         } catch (e) {
             console.error(e);
         }
+    };
+
+    const handlePriorityChange = async (nextPriority) => {
+        const previousPriority = localGoal?.priority || "medium";
+        setLocalGoal((prev) => ({ ...prev, priority: nextPriority }));
+        try {
+            await onUpdate(goal.id, { priority: nextPriority });
+        } catch (e) {
+            console.error("Failed to update priority", e);
+            setLocalGoal((prev) => ({ ...prev, priority: previousPriority }));
+        }
+    };
+
+    const handleAddTag = async () => {
+        const nextTag = String(tagInput || "").trim().slice(0, GOAL_TAG_MAX_LENGTH);
+        if (!nextTag) return;
+
+        const currentTags = Array.isArray(localGoal?.tags) ? localGoal.tags : [];
+        if (currentTags.some((tag) => String(tag).toLowerCase() === nextTag.toLowerCase())) {
+            setTagInput("");
+            return;
+        }
+
+        const nextTags = [...currentTags, nextTag];
+        setLocalGoal((prev) => ({ ...prev, tags: nextTags }));
+        setTagInput("");
+
+        try {
+            await onUpdate(goal.id, { tags: nextTags });
+        } catch (e) {
+            console.error("Failed to add tag", e);
+            setLocalGoal((prev) => ({ ...prev, tags: currentTags }));
+        }
+    };
+
+    const handleTagInputBlur = async () => {
+        if (!String(tagInput || "").trim()) return;
+        await handleAddTag();
+    };
+
+    const handleRemoveTag = async (tagToRemove) => {
+        const currentTags = Array.isArray(localGoal?.tags) ? localGoal.tags : [];
+        const nextTags = currentTags.filter((tag) => String(tag) !== String(tagToRemove));
+        setLocalGoal((prev) => ({ ...prev, tags: nextTags }));
+        setTagColors((prev) => {
+            if (!Object.prototype.hasOwnProperty.call(prev, tagToRemove)) return prev;
+            const next = { ...prev };
+            delete next[tagToRemove];
+            writeStoredTagColors(goal.id, next);
+            return next;
+        });
+        setOpenTagColorPicker((prev) => (prev === tagToRemove ? null : prev));
+
+        try {
+            await onUpdate(goal.id, { tags: nextTags });
+        } catch (e) {
+            console.error("Failed to remove tag", e);
+            setLocalGoal((prev) => ({ ...prev, tags: currentTags }));
+        }
+    };
+
+    const handleTagColorChange = (tag, fill) => {
+        setTagColors((prev) => {
+            const next = { ...prev, [tag]: fill };
+            writeStoredTagColors(goal.id, next);
+            return next;
+        });
+        setOpenTagColorPicker(null);
     };
 
     const handleMilestoneScoreChange = async (milestoneId, newPct) => {
@@ -533,6 +835,15 @@ const GoalDetailModal = ({
         }
     };
 
+    const memberFieldCls =
+        "w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-50 appearance-none pr-12";
+    const InformedMembersIcon = () => (
+        <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2">
+            <FaUsers className="h-5 w-5 text-slate-500" />
+            <FaInfoCircle className="absolute -bottom-1 -right-1 h-3.5 w-3.5 rounded-full bg-white text-slate-500" />
+        </span>
+    );
+
     const updateMilestoneDate = async (milestone, field, value) => {
         const prevValue = milestone[field] || null;
         const nextValue = value || null;
@@ -656,83 +967,181 @@ const GoalDetailModal = ({
 
     // Header bar (moved outside the main wrapper so it can render above the content)
     const headerBar = (
-        <div className="flex items-center gap-2 w-full">
-            <button
-                className="md:hidden p-2 rounded-lg bg-white border border-slate-200 mr-2"
-                aria-label="Open menu"
-            >
-                <svg
-                    stroke="currentColor"
-                    fill="currentColor"
-                    strokeWidth="0"
-                    viewBox="0 0 448 512"
-                    height="1em"
-                    width="1em"
-                    xmlns="http://www.w3.org/2000/svg"
-                >
-                    <path d="M16 132h416c8.837 0 16-7.163 16-16V76c0-8.837-7.163-16-16-16H16C7.163 60 0 67.163 0 76v40c0 8.837 7.163 16 16 16zm0 160h416c8.837 0 16-7.163 16-16v-40c0-8.837-7.163-16-16-16H16c-8.837 0-16 7.163-16 16v40c0 8.837 7.163 16 16 16zm0 160h416c8.837 0 16-7.163 16-16v-40c0-8.837-7.163-16-16-16H16c-8.837 0-16 7.163-16 16v40c0 8.837 7.163 16 16 16z"></path>
-                </svg>
-            </button>
-
-            <button
-                onClick={onClose}
-                className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
-                aria-label="Back"
-                style={{ minWidth: 36, minHeight: 36 }}
-            >
-                <svg
-                    stroke="currentColor"
-                    fill="currentColor"
-                    strokeWidth="0"
-                    viewBox="0 0 320 512"
-                    height="1em"
-                    width="1em"
-                    xmlns="http://www.w3.org/2000/svg"
-                >
-                    <path d="M34.52 239.03L228.87 44.69c9.37-9.37 24.57-9.37 33.94 0l22.67 22.67c9.36 9.36 9.37 24.52.04 33.9L131.49 256l154.02 154.75c9.34 9.38 9.32 24.54-.04 33.9l-22.67 22.67c-9.37 9.37-24.57 9.37-33.94 0L34.52 272.97c-9.37-9.37-9.37-24.57 0-33.94z"></path>
-                </svg>
-            </button>
-
-            <div className="inline-flex items-center gap-1">
-                <img
-                    alt="Goals"
-                    className="w-6 h-6 object-contain block w-6 h-6 min-w-[24px] min-h-[24px]"
-                    src={`${import.meta.env.BASE_URL || '/'}goals.png`}
-                />
-                <span
-                    className="relative text-base md:text-lg font-bold text-black truncate px-1"
-                >
-                    {localGoal?.title || t("goalDetailModal.untitledGoal")}
-                </span>
-            </div>
-            {/* Action buttons: align right */}
-            <div className="ml-auto flex items-center gap-2">
+        <div className="w-full">
+            <div className="flex items-center gap-2 w-full">
                 <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
-                    className="px-3 py-1 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold"
-                    aria-label="Edit goal"
+                    className="md:hidden p-2 rounded-lg bg-white border border-slate-200 mr-2 self-start"
+                    aria-label="Open menu"
                 >
-                    {t("goalDetailModal.edit")}
+                    <svg
+                        stroke="currentColor"
+                        fill="currentColor"
+                        strokeWidth="0"
+                        viewBox="0 0 448 512"
+                        height="1em"
+                        width="1em"
+                        xmlns="http://www.w3.org/2000/svg"
+                    >
+                        <path d="M16 132h416c8.837 0 16-7.163 16-16V76c0-8.837-7.163-16-16-16H16C7.163 60 0 67.163 0 76v40c0 8.837 7.163 16 16 16zm0 160h416c8.837 0 16-7.163 16-16v-40c0-8.837-7.163-16-16-16H16c-8.837 0-16 7.163-16 16v40c0 8.837 7.163 16 16 16zm0 160h416c8.837 0 16-7.163 16-16v-40c0-8.837-7.163-16-16-16H16c-8.837 0-16 7.163-16 16v40c0 8.837 7.163 16 16 16z"></path>
+                    </svg>
                 </button>
-                {typeof onDelete === 'function' && (
+
+                <button
+                    onClick={onClose}
+                    className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center self-start"
+                    aria-label="Back"
+                    style={{ minWidth: 36, minHeight: 36 }}
+                >
+                    <svg
+                        stroke="currentColor"
+                        fill="currentColor"
+                        strokeWidth="0"
+                        viewBox="0 0 320 512"
+                        height="1em"
+                        width="1em"
+                        xmlns="http://www.w3.org/2000/svg"
+                    >
+                        <path d="M34.52 239.03L228.87 44.69c9.37-9.37 24.57-9.37 33.94 0l22.67 22.67c9.36 9.36 9.37 24.52.04 33.9L131.49 256l154.02 154.75c9.34 9.38 9.32 24.54-.04 33.9l-22.67 22.67c-9.37 9.37-24.57 9.37-33.94 0L34.52 272.97c-9.37-9.37-9.37-24.57 0-33.94z"></path>
+                    </svg>
+                </button>
+
+                <div className="flex min-w-0 items-center gap-1 self-start">
+                    <img
+                        alt="Goals"
+                        className="w-6 h-6 object-contain block min-w-[24px] min-h-[24px]"
+                        src={`${import.meta.env.BASE_URL || '/'}goals.png`}
+                    />
+                    <div className="min-w-0 flex items-center gap-2 px-1">
+                        <span
+                            className="relative text-base md:text-lg font-bold text-black truncate"
+                        >
+                            {localGoal?.title || t("goalDetailModal.untitledGoal")}
+                        </span>
+                    </div>
+                </div>
+
+                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                    {Array.isArray(localGoal?.tags) && localGoal.tags.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1">
+                            {localGoal.tags.map((tag, index) => (
+                                <span
+                                    key={`${tag}-${index}`}
+                                    ref={openTagColorPicker === tag ? tagColorPickerRef : null}
+                                    className="relative inline-flex"
+                                >
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setOpenTagColorPicker((prev) =>
+                                                    prev === tag ? null : tag
+                                                )
+                                            }
+                                            className="relative inline-flex min-h-6 appearance-none items-center justify-start gap-1 border-0 bg-transparent px-3 pr-8 py-0.5 text-[11px] font-semibold text-white"
+                                            aria-label={`Change color for tag ${tag}`}
+                                        >
+                                        <svg
+                                            className="pointer-events-none absolute inset-0 h-full w-full"
+                                            viewBox="0 0 96 32"
+                                            preserveAspectRatio="none"
+                                            aria-hidden="true"
+                                        >
+                                            <path
+                                                d="M8 2 H68 Q74 2 78 6 Q83 11 90 16 Q83 21 78 26 Q74 30 68 30 H8 Q2 30 2 24 V8 Q2 2 8 2 Z"
+                                                fill={tagColors[tag] || TAG_COLOR_OPTIONS[0].fill}
+                                            />
+                                        </svg>
+                                        <span className="relative z-10 block max-w-[140px] truncate text-left leading-none">
+                                            {tag}
+                                        </span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleRemoveTag(tag);
+                                        }}
+                                        className="absolute right-3.5 top-1/2 z-10 -translate-y-1/2 text-[11px] text-white/80 hover:text-white"
+                                        aria-label={`Remove tag ${tag}`}
+                                    >
+                                        ×
+                                    </button>
+                                    {openTagColorPicker === tag && (
+                                        <div
+                                            ref={tagColorPickerRef}
+                                            className="absolute left-0 top-full z-20 mt-2 flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2 py-2 shadow-lg"
+                                        >
+                                            {TAG_COLOR_OPTIONS.map((option) => (
+                                                <button
+                                                    key={option.fill}
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleTagColorChange(tag, option.fill);
+                                                    }}
+                                                    className="h-5 w-5 rounded-full border border-white/70 shadow-sm ring-1 ring-slate-200 transition hover:scale-110"
+                                                    style={{ backgroundColor: option.fill }}
+                                                    aria-label={`Set ${tag} to ${option.name}`}
+                                                    title={option.name}
+                                                />
+                                            ))}
+                                        </div>
+                                    )}
+                                </span>
+                            ))}
+                        </div>
+                    )}
+                    <div className="min-w-[96px] flex-1 max-w-[150px]">
+                        <input
+                            type="text"
+                            value={tagInput}
+                            onChange={(e) => setTagInput(e.target.value.slice(0, GOAL_TAG_MAX_LENGTH))}
+                            onBlur={handleTagInputBlur}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    handleAddTag();
+                                }
+                            }}
+                            maxLength={GOAL_TAG_MAX_LENGTH}
+                            placeholder="Add tag"
+                            className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-900 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-50"
+                        />
+                    </div>
+                </div>
+                <div className="ml-auto flex items-center gap-2 self-start">
                     <button
                         type="button"
-                        onClick={(e) => { e.stopPropagation(); if (window.confirm(t("goalDetailModal.deleteConfirm"))) onDelete(goal.id); }}
-                        className="px-3 py-1 rounded-md border border-red-600 text-red-600 text-sm bg-white hover:bg-red-50"
-                        aria-label="Delete goal"
+                        onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
+                        className="px-3 py-1 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold"
+                        aria-label="Edit goal"
                     >
-                        {t("goalDetailModal.delete")}
+                        {t("goalDetailModal.edit")}
                     </button>
-                )}
-
+                    {typeof onDelete === 'function' && (
+                        <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); if (window.confirm(t("goalDetailModal.deleteConfirm"))) onDelete(goal.id); }}
+                            className="px-3 py-1 rounded-md border border-red-600 text-red-600 text-sm bg-white hover:bg-red-50"
+                            aria-label="Delete goal"
+                        >
+                            {t("goalDetailModal.delete")}
+                        </button>
+                    )}
+                </div>
             </div>
+            {localGoal?.description && (
+                <div className="mt-1 pl-[52px]">
+                    <p className="max-w-full text-sm text-slate-600 break-words">
+                        {localGoal.description}
+                    </p>
+                </div>
+            )}
         </div>
     );
 
     // Inner dialog/page content (reused for modal overlay or page view)
     const wrapperClass = isPage
-        ? "bg-white w-full h-full shadow-none flex flex-col animate-slideUp overflow-auto"
+        ? "bg-white w-full h-full min-h-0 rounded-lg border border-blue-300 shadow-sm flex flex-col animate-slideUp overflow-hidden"
         : "relative bg-white rounded-xl w-full max-w-3xl shadow-2xl flex flex-col animate-slideUp max-h-[90vh] overflow-hidden border border-gray-200";
     const innerContent = (
         <div className={wrapperClass} onClick={(e) => e.stopPropagation()}>
@@ -741,10 +1150,14 @@ const GoalDetailModal = ({
                 @keyframes slideUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
                 .animate-fadeIn { animation:fadeIn .2s ease-out; }
                 .animate-slideUp { animation:slideUp .3s ease-out; }
-                .milestone-scroll::-webkit-scrollbar { width:6px; }
+                .milestone-scroll { scrollbar-width:none; scrollbar-color:transparent transparent; scrollbar-gutter:stable; }
+                .milestone-scroll::-webkit-scrollbar { width:0; height:0; }
                 .milestone-scroll::-webkit-scrollbar-track { background:#f1f5f9; border-radius:3px; }
-                .milestone-scroll::-webkit-scrollbar-thumb { background:#cbd5e1; border-radius:3px; }
-                .milestone-scroll::-webkit-scrollbar-thumb:hover { background:#94a3b8; }
+                .milestone-scroll::-webkit-scrollbar-thumb { background:transparent; border-radius:3px; }
+                .milestone-scroll:hover { scrollbar-width:thin; scrollbar-color:#cbd5e1 transparent; }
+                .milestone-scroll:hover::-webkit-scrollbar { width:6px; height:6px; }
+                .milestone-scroll:hover::-webkit-scrollbar-thumb { background:#cbd5e1; }
+                .milestone-scroll:hover::-webkit-scrollbar-thumb:hover { background:#94a3b8; }
                 /* Hide native date picker indicator for inputs using .no-calendar */
                 input.no-calendar::-webkit-calendar-picker-indicator {
                     opacity: 0;
@@ -760,24 +1173,25 @@ const GoalDetailModal = ({
                 input.no-calendar { -webkit-appearance: none; appearance: none; }
             `}</style>
             {/* SUMMARY CARD – gauge + progress / dates / controls (reduced height) */}
-            <div className="px-6 pt-3 pb-3 border-b border-gray-200 bg-white">
-                <div className="rounded-2xl border border-gray-200 px-4 py-3 flex items-center gap-6">
+            <div className="px-6 pt-2 pb-2 border-b border-gray-200 bg-white">
+                <div className="rounded-2xl border border-gray-200 px-4 py-2 flex items-center gap-4">
                     {/* Gauge – custom SVG gauge component */}
                     <div className="flex flex-col items-center justify-center">
-                        <GoalGauge percent={progressPercent} size={80} />
-                        <span className="mt-1 text-xs font-semibold text-gray-700">
+                        <GoalGauge percent={progressPercent} size={68} />
+                        <span className="mt-0.5 text-xs font-semibold text-gray-700">
                             {progressPercent}%
                         </span>
                     </div>
 
                     {/* Right side: Progress / dates / lock / complete / save */}
-                    <div className="flex-1 flex flex-col gap-2">
+                    <div className="flex-1 flex flex-col gap-1.5">
                         {/* labels + controls in the same grid so labels line up exactly above their inputs */}
-                        <div className="grid grid-cols-1 gap-3 md:[grid-template-columns:96px_140px_140px_64px_64px] md:ml-auto">
+                        <div className="grid grid-cols-1 gap-2 md:[grid-template-columns:88px_112px_136px_136px_60px_60px] md:ml-auto">
                             <div className="md:contents hidden md:block text-xs font-semibold text-gray-500 mb-1">
                                 <div className="px-1">{t("goalDetailModal.colProgress")}</div>
+                                <div className="px-1">Priority</div>
                                 <div className="px-1">{t("goalDetailModal.colStartDate")}</div>
-                                <div className="px-1">{t("goalDetailModal.colDeadline")}</div>
+                                <div className="px-1">End date</div>
                                 <div className="px-1">{t("goalDetailModal.colVisibility")}</div>
                                 <div className="px-1">{t("goalDetailModal.colStatus")}</div>
                             </div>
@@ -788,10 +1202,30 @@ const GoalDetailModal = ({
                                 </span>
                                 <div
                                     id={`top-goal-status-${goal.id}`}
-                                    className="inline-flex items-center justify-center px-3 py-2 border border-slate-300 rounded-md bg-white text-sm font-semibold text-gray-700 w-full"
+                                    className="inline-flex items-center justify-center px-3 py-1.5 border border-slate-300 rounded-md bg-white text-sm font-semibold text-gray-700 w-full"
                                 >
                                     {progressPercent} %
                                 </div>
+                            </div>
+
+                            {/* Priority */}
+                            <div className="flex items-center md:block">
+                                <span className="md:hidden text-xs mr-2 text-gray-500">
+                                    Priority
+                                </span>
+                                <select
+                                    value={localGoal?.priority || "medium"}
+                                    onChange={(e) =>
+                                        handlePriorityChange(e.target.value)
+                                    }
+                                    className="w-full md:max-w-[112px] px-3 py-1.5 border border-slate-300 rounded-md text-sm bg-white text-gray-700"
+                                >
+                                    {PRIORITY_OPTIONS.map((option) => (
+                                        <option key={option.value} value={option.value}>
+                                            {option.label}
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
 
                             {/* Start date */}
@@ -827,7 +1261,7 @@ const GoalDetailModal = ({
                                                 )
                                             }
                                             placeholder={`Format: ${dateFormat}`}
-                                            className="w-full md:max-w-[140px] px-3 py-2 pr-11 border border-slate-300 rounded-md text-sm bg-white text-gray-700 no-calendar"
+                                            className="w-full md:max-w-[136px] px-3 py-1.5 pr-11 border border-slate-300 rounded-md text-sm bg-white text-gray-700 no-calendar"
                                         />
                                         <input
                                             id={`goal-${goal.id}-date_start-input-${goal.id}`}
@@ -866,10 +1300,10 @@ const GoalDetailModal = ({
                                 </div>
                             </div>
 
-                            {/* Deadline */}
+                            {/* End date */}
                             <div className="flex items-center md:block">
                                 <span className="md:hidden text-xs mr-2 text-gray-500">
-                                    {t("goalDetailModal.colDeadline")}
+                                    End date
                                 </span>
                                 <div className="md:inline-block">
                                     <div className="relative">
@@ -899,7 +1333,7 @@ const GoalDetailModal = ({
                                                 )
                                             }
                                             placeholder={`Format: ${dateFormat}`}
-                                            className="w-full md:max-w-[140px] px-3 py-2 pr-11 border border-slate-300 rounded-md text-sm bg-white text-gray-700 no-calendar"
+                                            className="w-full md:max-w-[136px] px-3 py-1.5 pr-11 border border-slate-300 rounded-md text-sm bg-white text-gray-700 no-calendar"
                                         />
                                         <input
                                             id={`goal-${goal.id}-deadline-input-${goal.id}`}
@@ -943,7 +1377,7 @@ const GoalDetailModal = ({
                                 <button
                                     id={`goal-public-cb-${goal.id}`}
                                     onClick={handleToggleVisibility}
-                                    className="w-full flex items-center justify-center px-3 py-2 border border-slate-300 rounded-md bg-white hover:bg-gray-100"
+                                    className="w-full flex items-center justify-center px-3 py-1.5 border border-slate-300 rounded-md bg-white hover:bg-gray-100"
                                     title="Visibility"
                                 >
                                     {localGoal?.visibility === "private" ? (
@@ -959,7 +1393,7 @@ const GoalDetailModal = ({
                                 <button
                                     id={`goal-${goal.id}-completed-icon`}
                                     onClick={handleToggleComplete}
-                                    className={`md:flex-none px-3 py-2 rounded-md flex items-center justify-center gap-2 text-sm ${localGoal?.status === "completed"
+                                    className={`md:flex-none px-3 py-1.5 rounded-md flex items-center justify-center gap-2 text-sm ${localGoal?.status === "completed"
                                             ? "bg-emerald-600 text-white"
                                             : "border border-gray-300 text-gray-800 hover:bg-gray-100"
                                         }`}
@@ -973,74 +1407,247 @@ const GoalDetailModal = ({
                 </div>
             </div>
 
-            {/* PARENT GOAL LINK SECTION */}
+            {/* GOAL INFORMATION */}
             <div className="px-6 pb-3 border-b border-gray-200 bg-white">
-                <div ref={parentGoalPickerRef} className="relative">
-                    <div className="flex items-center gap-2 mb-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-gray-500" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M12.293 3.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 9H7a3 3 0 000 6h1a1 1 0 110 2H7A5 5 0 017 7h7.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
-                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{t("goalDetailModal.parentGoalSection")}</span>
+                <div className="grid gap-x-6 gap-y-4 md:grid-cols-3">
+                    <div>
+                        <div className="mb-1.5 text-xs font-semibold tracking-wide text-gray-500">
+                            Key Area
+                        </div>
+                        <div className="relative">
+                            <select
+                                value={localGoal?.keyAreaId || ""}
+                                disabled={savingInfoField === "keyAreaId"}
+                                onChange={(e) => {
+                                    const selectedId = e.target.value || null;
+                                    handleInfoFieldUpdate("keyAreaId", selectedId);
+                                }}
+                                className={memberFieldCls}
+                            >
+                                <option value="">No key area</option>
+                                {(Array.isArray(keyAreas) ? keyAreas : []).map((area) => (
+                                    <option key={area.id} value={area.id}>
+                                        {area.title || area.name}
+                                    </option>
+                                ))}
+                            </select>
+                            <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-blue-500" />
+                        </div>
                     </div>
 
-                    {localGoal?.parentGoalId ? (
-                        /* Linked state: show parent name + remove button */
-                        <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-purple-200 bg-purple-50">
-                            <span className="flex-1 text-sm text-purple-800 truncate">
-                                {availableGoals.find(g => g.id === localGoal.parentGoalId)?.title
-                                    || localGoal.parentGoalTitle
-                                    || t("goalDetailModal.linkedToParent")}
-                            </span>
+                    <div>
+                        <div className="mb-1.5 text-xs font-semibold tracking-wide text-gray-500">
+                            Team Goal
+                        </div>
+                        <div className="relative">
+                            <select
+                                value={localGoal?.teamId || ""}
+                                disabled={savingInfoField === "teamId"}
+                                onChange={(e) => {
+                                    const nextTeamId = e.target.value || null;
+                                    handleInfoFieldUpdate("teamId", nextTeamId, {
+                                        teamName: nextTeamId ? teamMap[nextTeamId] || localGoal?.teamName || "" : null,
+                                    });
+                                }}
+                                className={memberFieldCls}
+                            >
+                                <option value="">Personal goal</option>
+                                {Object.entries(teamMap).map(([id, name]) => (
+                                    <option key={id} value={id}>
+                                        {name}
+                                    </option>
+                                ))}
+                            </select>
+                            <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-blue-500" />
+                        </div>
+                    </div>
+
+                    <div ref={parentGoalPickerRef} className="relative">
+                        <div className="mb-1.5 flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-gray-500" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M12.293 3.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 9H7a3 3 0 000 6h1a1 1 0 110 2H7A5 5 0 017 7h7.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+                            <span className="text-xs font-semibold text-gray-500 tracking-wide">{t("goalDetailModal.parentGoalSection")}</span>
+                        </div>
+
+                        {localGoal?.parentGoalId ? (
+                            <div className="flex min-h-[44px] items-center gap-2 rounded-xl border border-purple-200 bg-purple-50 px-4 py-2.5">
+                                <span className="flex-1 text-sm text-purple-800 truncate">
+                                    {availableGoals.find(g => g.id === localGoal.parentGoalId)?.title
+                                        || localGoal.parentGoalTitle
+                                        || t("goalDetailModal.linkedToParent")}
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => handleSetParentGoal(null)}
+                                    disabled={savingParentGoal}
+                                    className="text-sm text-purple-500 hover:text-red-600 font-medium disabled:opacity-50 flex-shrink-0"
+                                    aria-label="Remove parent goal link"
+                                >
+                                    {savingParentGoal ? t("goalDetailModal.saving") : "×"}
+                                </button>
+                            </div>
+                        ) : (
+                            <div>
+                                <input
+                                    type="text"
+                                    placeholder={t("goalDetailModal.searchParentPlaceholder")}
+                                    value={parentGoalSearch}
+                                    onChange={(e) => { setParentGoalSearch(e.target.value); setShowParentGoalDropdown(true); }}
+                                    onFocus={() => setShowParentGoalDropdown(true)}
+                                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50"
+                                />
+                                {showParentGoalDropdown && (
+                                    <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-44 overflow-y-auto">
+                                        {availableGoals
+                                            .filter(g => g.id !== goal.id && g.title?.toLowerCase().includes(parentGoalSearch.toLowerCase()))
+                                            .slice(0, 8)
+                                            .map(g => (
+                                                <button
+                                                    key={g.id}
+                                                    type="button"
+                                                    disabled={savingParentGoal}
+                                                    className="w-full text-left px-3 py-2 text-sm text-slate-800 hover:bg-purple-50 hover:text-purple-800 truncate disabled:opacity-50"
+                                                    onClick={() => handleSetParentGoal(g.id)}
+                                                >
+                                                    {g.title}
+                                                </button>
+                                            ))}
+                                        {availableGoals.filter(g => g.id !== goal.id && g.title?.toLowerCase().includes(parentGoalSearch.toLowerCase())).length === 0 && (
+                                            <div className="px-3 py-2 text-sm text-slate-400">{t("goalDetailModal.noMatchingGoals")}</div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    <div>
+                        <div className="mb-1.5 text-xs font-semibold tracking-wide text-gray-500">
+                            Responsible
+                        </div>
+                        <div className="relative">
+                            <FaUser className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+                            <select
+                                value={goalRaci.responsible[0] || ""}
+                                disabled={savingInfoField === "responsible"}
+                                onChange={(e) => handleRaciRoleChange("responsible", e.target.value ? [String(e.target.value)] : [])}
+                                className={`${memberFieldCls} pl-11`}
+                            >
+                                <option value="">Unassigned</option>
+                                {orgMembers.map((member) => (
+                                    <option key={member.id} value={member.id}>
+                                        {member.name}
+                                    </option>
+                                ))}
+                            </select>
+                            <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-blue-500" />
+                        </div>
+                    </div>
+
+                    <div
+                        ref={(node) => {
+                            if (node) membersMenuRefs.current.consulted = node;
+                            else delete membersMenuRefs.current.consulted;
+                        }}
+                    >
+                        <div className="mb-1.5 text-xs font-semibold tracking-wide text-gray-500">
+                            Consulted
+                        </div>
+                        <div className="relative">
+                            <FaUsers className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
                             <button
                                 type="button"
-                                onClick={() => handleSetParentGoal(null)}
-                                disabled={savingParentGoal}
-                                className="text-xs text-purple-500 hover:text-red-600 font-medium disabled:opacity-50 flex-shrink-0"
-                                aria-label="Remove parent goal link"
+                                disabled={savingInfoField === "consulted"}
+                                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-50 appearance-none pr-12 pl-11 text-left transition-colors hover:border-slate-400"
+                                style={{ borderStyle: "solid", borderWidth: 1, borderColor: "#cbd5e1" }}
+                                onClick={() => setOpenMembersRole((current) => (current === "consulted" ? null : "consulted"))}
                             >
-                                {savingParentGoal ? t("goalDetailModal.saving") : t("goalDetailModal.removeParent")}
+                                <span className={goalRaci.consulted.length ? "text-slate-900" : "text-slate-400"}>
+                                    {formatMemberSummary(goalRaci.consulted)}
+                                </span>
                             </button>
-                        </div>
-                    ) : (
-                        /* Unlinked state: show search picker */
-                        <div>
-                            <input
-                                type="text"
-                                placeholder={t("goalDetailModal.searchParentPlaceholder")}
-                                value={parentGoalSearch}
-                                onChange={(e) => { setParentGoalSearch(e.target.value); setShowParentGoalDropdown(true); }}
-                                onFocus={() => setShowParentGoalDropdown(true)}
-                                className="w-full text-sm px-3 py-1.5 border border-slate-300 rounded-md bg-white placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50"
-                            />
-                            {showParentGoalDropdown && (
-                                <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-44 overflow-y-auto">
-                                    {availableGoals
-                                        .filter(g => g.id !== goal.id && g.title?.toLowerCase().includes(parentGoalSearch.toLowerCase()))
-                                        .slice(0, 8)
-                                        .map(g => (
-                                            <button
-                                                key={g.id}
-                                                type="button"
-                                                disabled={savingParentGoal}
-                                                className="w-full text-left px-3 py-2 text-sm text-slate-800 hover:bg-purple-50 hover:text-purple-800 truncate disabled:opacity-50"
-                                                onClick={() => handleSetParentGoal(g.id)}
-                                            >
-                                                {g.title}
-                                            </button>
-                                        ))}
-                                    {availableGoals.filter(g => g.id !== goal.id && g.title?.toLowerCase().includes(parentGoalSearch.toLowerCase())).length === 0 && (
-                                        <div className="px-3 py-2 text-sm text-slate-400">{t("goalDetailModal.noMatchingGoals")}</div>
-                                    )}
+                            <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-blue-500" />
+                            {openMembersRole === "consulted" && (
+                                <div className="absolute left-0 right-0 top-[calc(100%+0.35rem)] z-20 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+                                    <div className="max-h-48 space-y-1 overflow-y-auto">
+                                        {orgMembers.map((member) => {
+                                            const checked = goalRaci.consulted.includes(String(member.id));
+                                            return (
+                                                <label key={`consulted-${member.id}`} className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                                                    <input
+                                                        type="checkbox"
+                                                        className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                                        checked={checked}
+                                                        onChange={() => toggleRaciMember("consulted", String(member.id))}
+                                                    />
+                                                    <span>{member.name}</span>
+                                                </label>
+                                            );
+                                        })}
+                                        {orgMembers.length === 0 && (
+                                            <div className="px-3 py-2 text-sm text-slate-400">No members found</div>
+                                        )}
+                                    </div>
                                 </div>
                             )}
                         </div>
-                    )}
+                    </div>
+
+                    <div
+                        ref={(node) => {
+                            if (node) membersMenuRefs.current.informed = node;
+                            else delete membersMenuRefs.current.informed;
+                        }}
+                    >
+                        <div className="mb-1.5 text-xs font-semibold tracking-wide text-gray-500">
+                            Informed
+                        </div>
+                        <div className="relative">
+                            <InformedMembersIcon />
+                            <button
+                                type="button"
+                                disabled={savingInfoField === "informed"}
+                                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-50 appearance-none pr-12 pl-11 text-left transition-colors hover:border-slate-400"
+                                style={{ borderStyle: "solid", borderWidth: 1, borderColor: "#cbd5e1" }}
+                                onClick={() => setOpenMembersRole((current) => (current === "informed" ? null : "informed"))}
+                            >
+                                <span className={goalRaci.informed.length ? "text-slate-900" : "text-slate-400"}>
+                                    {formatMemberSummary(goalRaci.informed)}
+                                </span>
+                            </button>
+                            <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-blue-500" />
+                            {openMembersRole === "informed" && (
+                                <div className="absolute left-0 right-0 top-[calc(100%+0.35rem)] z-20 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+                                    <div className="max-h-48 space-y-1 overflow-y-auto">
+                                        {orgMembers.map((member) => {
+                                            const checked = goalRaci.informed.includes(String(member.id));
+                                            return (
+                                                <label key={`informed-${member.id}`} className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                                                    <input
+                                                        type="checkbox"
+                                                        className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                                        checked={checked}
+                                                        onChange={() => toggleRaciMember("informed", String(member.id))}
+                                                    />
+                                                    <span>{member.name}</span>
+                                                </label>
+                                            );
+                                        })}
+                                        {orgMembers.length === 0 && (
+                                            <div className="px-3 py-2 text-sm text-slate-400">No members found</div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
             </div>
 
             {/* CONTENT – Tabs: Summary / Milestones / Activities */}
             {/* Use a light-gray background for the surrounding margins so date fields and small bordered controls
                 appear to sit on a subtle gray surface (matches date input/border tones). */}
-            <div className="flex-1 overflow-hidden bg-gray-50">
-                <div className="h-full flex flex-col px-6 py-6">
+            <div className="flex-1 min-h-0 overflow-hidden bg-gray-50">
+                <div className="flex h-full min-h-0 flex-col px-6 pt-1 pb-6">
                     {/* Tabs removed per user request */}
 
                     {/* SUMMARY tab - brief summary (gauge already visible above) */}
@@ -1074,9 +1681,9 @@ const GoalDetailModal = ({
                     {activeTab === "milestones" && (
                         <>
                             {/* Milestones title */}
-                            <div className="mb-4">
+                            <div className="mb-2">
                                 {/* Use a subtle gray border and neutral text to match date inputs */}
-                                <span className="inline-block border border-slate-300 rounded-lg px-4 py-1.5 text-sm font-semibold text-gray-800 bg-white">
+                                <span className="inline-block border border-slate-300 rounded-lg px-4 py-1 text-sm font-semibold text-gray-800 bg-white">
                                     {t("goalDetailModal.milestonesTitle")}
                                 </span>
                             </div>
@@ -1088,11 +1695,11 @@ const GoalDetailModal = ({
                                 </div>
                                 <div className="col-span-5">{t("goalDetailModal.colMilestone")}</div>
                                 <div className="col-span-2">{t("goalDetailModal.colStartDate")}</div>
-                                <div className="col-span-2">{t("goalDetailModal.colDeadline")}</div>
+                                <div className="col-span-2">End date</div>
                             </div>
 
                             {/* Milestones list — all milestones inside one shared container */}
-                            <div className="flex-1 overflow-y-auto milestone-scroll">
+                            <div className="flex-1 min-h-0 overflow-y-auto milestone-scroll">
                                 {/* make the milestone card border explicitly gray to match the date inputs */}
                                 <div className="p-3 border border-slate-300 rounded-xl bg-white space-y-3">
                                     {milestonesList.map((m, i) => {
@@ -1416,7 +2023,7 @@ const GoalDetailModal = ({
                                                 </div>
                                                 <div className="md:col-span-2">
                                                     <span className="md:hidden text-xs text-gray-500">
-                                                        {t("goalDetailModal.colDeadline")}
+                                                        End date
                                                     </span>
                                                     <div className="relative">
                                                         <input
@@ -1599,7 +2206,7 @@ const GoalDetailModal = ({
                                             </div>
                                             <div className="md:col-span-2">
                                                 <span className="md:hidden text-xs text-gray-500">
-                                                    Deadline
+                                                    End date
                                                 </span>
                                                 <div className="relative">
                                                     <input
@@ -1677,7 +2284,7 @@ const GoalDetailModal = ({
 
                     {/* ACTIVITIES tab - simple activity list */}
                     {activeTab === "activities" && (
-                        <div className="flex-1 overflow-y-auto milestone-scroll space-y-3">
+                        <div className="flex-1 min-h-0 overflow-y-auto milestone-scroll space-y-3">
                             <div className="mb-3">
                                 <div className="flex items-center gap-2">
                                     <input
@@ -1771,16 +2378,17 @@ const GoalDetailModal = ({
     // If opened as a full page (via route), render the content inline. Otherwise render inside an overlay.
     if (typeof isPage !== "undefined" && isPage) {
         return (
-            // Pull the whole goal page block up a bit so it lines up with the sidebar menu
-            <div className="h-full flex flex-col -mt-4">
-                <div className="px-0 mb-4">
-                    <div className="flex items-center justify-between gap-3 -mt-2">
+            <div className="flex h-full min-h-0 flex-col">
+                <div className="shrink-0 px-0 mb-4">
+                    <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2 w-full">
                             {headerBar}
                         </div>
                     </div>
                 </div>
-                {innerContent}
+                <div className="flex-1 min-h-0">
+                    {innerContent}
+                </div>
             </div>
         );
     }

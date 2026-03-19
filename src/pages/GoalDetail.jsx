@@ -130,12 +130,12 @@ const GoalDetail = () => {
     };
 
     return (
-        <div className="min-h-screen bg-[#EDEDED]">
-            <div className="flex w-full min-h-screen">
+        <div className="h-[calc(100dvh-72px)] min-h-[calc(100vh-72px)] overflow-hidden bg-[#EDEDED]">
+            <div className="flex h-full w-full">
                 <Sidebar />
-                <main className="flex-1 min-w-0 w-full min-h-screen transition-all overflow-y-auto">
-                    <div className="container mx-auto max-w-7xl overflow-x-hidden pb-1 min-h-full px-4">
-                        <div className="py-6">
+                <main className="flex-1 min-w-0 w-full h-full min-h-0 transition-all overflow-hidden">
+                    <div className="max-w-full overflow-x-hidden pb-1 h-full min-h-0 flex flex-col">
+                        <div className="px-1 md:px-2 flex-1 min-h-0 flex flex-col">
                             {loading && (
                                 <div className="flex items-center justify-center py-12">
                                     <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>

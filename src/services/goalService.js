@@ -188,6 +188,7 @@ export const createGoal = async (goalData) => {
                     weight: parseFloat(m.weight) || 1.0,
                     startDate: m.startDate ? new Date(m.startDate).toISOString() : null,
                     dueDate: m.dueDate ? new Date(m.dueDate).toISOString() : null,
+                    score: m.score != null ? parseFloat(m.score) || 0 : undefined,
                     target: m.target != null ? parseFloat(m.target) : undefined,
                     performance: m.performance != null ? parseFloat(m.performance) : undefined,
                     // NOTE: 'done' property not allowed in create milestone DTO
@@ -511,7 +512,11 @@ export const updateGoal = async (goalId, updateData) => {
                             // done property may or may not be allowed in update
                             ...(milestone.done !== undefined && { done: milestone.done }),
                             weight: milestone.weight,
+                            startDate: milestone.startDate,
                             dueDate: milestone.dueDate ? new Date(milestone.dueDate).toISOString() : null,
+                            score: milestone.score,
+                            target: milestone.target,
+                            performance: milestone.performance,
                         });
                     } catch (mErr) {
                         console.error("Failed to update milestone during goal update:", mErr);
@@ -524,7 +529,11 @@ export const updateGoal = async (goalId, updateData) => {
                         const created = await createMilestone(goalId, {
                             title: milestone.title,
                             weight: milestone.weight,
+                            startDate: milestone.startDate,
                             dueDate: milestone.dueDate ? new Date(milestone.dueDate).toISOString() : null,
+                            score: milestone.score,
+                            target: milestone.target,
+                            performance: milestone.performance,
                         });
                         console.log("Created new milestone for goal", goalId, created);
                     } catch (createErr) {
