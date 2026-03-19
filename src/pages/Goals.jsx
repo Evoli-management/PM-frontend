@@ -531,33 +531,33 @@ const Goals = () => {
                                         {!isLoading && (
                                             <>
                                                 <div className="flex flex-wrap gap-3">
-                                                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-gray-50 rounded-lg border border-gray-200">
+                                                    <div className="flex h-[30px] items-center gap-1.5 px-2.5 bg-gray-50 rounded-lg border border-gray-200">
                                                         <img
                                                             alt="Goals"
                                                             src={`${import.meta.env.BASE_URL}goals.png`}
-                                                            className="w-6 h-6 object-contain block w-6 h-6 min-w-[24px] min-h-[24px]"
+                                                            className="block h-4 w-4 min-w-4 object-contain"
                                                         />
                                                         <div className="flex items-baseline gap-1">
                                                             <span className="text-sm font-bold text-gray-900">{stats.total}</span>
                                                             <span className="text-xs text-gray-500">{t('goals.total')}</span>
                                                         </div>
                                                     </div>
-                                                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 rounded-lg border border-blue-200">
-                                                        <FaClock className="w-3.5 h-3.5 text-blue-600" />
+                                                    <div className="flex h-[30px] items-center gap-1.5 px-2.5 bg-blue-50 rounded-lg border border-blue-200">
+                                                        <FaClock className="h-4 w-4 text-blue-600" />
                                                         <div className="flex items-baseline gap-1">
                                                             <span className="text-sm font-bold text-blue-600">{stats.active}</span>
                                                             <span className="text-xs text-gray-500">{t('goals.active')}</span>
                                                         </div>
                                                     </div>
-                                                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-green-50 rounded-lg border border-green-200">
-                                                        <FaCheckCircle className="w-3.5 h-3.5 text-green-600" />
+                                                    <div className="flex h-[30px] items-center gap-1.5 px-2.5 bg-green-50 rounded-lg border border-green-200">
+                                                        <FaCheckCircle className="h-4 w-4 text-green-600" />
                                                         <div className="flex items-baseline gap-1">
                                                             <span className="text-sm font-bold text-green-600">{stats.completed}</span>
                                                             <span className="text-xs text-gray-500">{t('goals.done')}</span>
                                                         </div>
                                                     </div>
-                                                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-red-50 rounded-lg border border-red-200">
-                                                        <FaClock className="w-3.5 h-3.5 text-red-600" />
+                                                    <div className="flex h-[30px] items-center gap-1.5 px-2.5 bg-red-50 rounded-lg border border-red-200">
+                                                        <FaClock className="h-4 w-4 text-red-600" />
                                                         <div className="flex items-baseline gap-1">
                                                             <span className="text-sm font-bold text-red-600">{stats.overdue}</span>
                                                             <span className="text-xs text-gray-500">{t('goals.overdue')}</span>
@@ -571,7 +571,7 @@ const Goals = () => {
                                                         <select
                                                             value={statusFilter}
                                                             onChange={(e) => setStatusFilter(e.target.value)}
-                                                            className="pl-9 pr-8 py-1 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white transition-colors min-w-[120px]"
+                                                            className="w-[120px] pl-9 pr-8 py-1 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white transition-colors"
                                                         >
                                                             <option value="all">{t('goals.allStatus')}</option>
                                                             <option value="active">{t('goals.active')}</option>
@@ -585,7 +585,7 @@ const Goals = () => {
                                                         placeholder={t('goals.filterByTag')}
                                                         value={tagFilter}
                                                         onChange={(e) => setTagFilter(e.target.value)}
-                                                        className="px-3 py-1 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-colors min-w-[120px]"
+                                                        className="w-[120px] shrink-0 px-3 py-1 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-colors"
                                                     />
 
                                                     <div className="relative">
@@ -593,7 +593,7 @@ const Goals = () => {
                                                         <select
                                                             value={sortBy}
                                                             onChange={(e) => setSortBy(e.target.value)}
-                                                            className="pl-9 pr-8 py-1 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white transition-colors min-w-[140px]"
+                                                            className="w-[120px] pl-9 pr-8 py-1 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white transition-colors"
                                                         >
                                                             <option value="dueDate">{t('goals.dueDate')}</option>
                                                             <option value="priority">{t('goals.priority')}</option>
@@ -609,8 +609,8 @@ const Goals = () => {
                                         <div className="relative" ref={viewMenuRef}>
                                             <button
                                                 type="button"
-                                                className="day-header-btn px-2 py-0 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center gap-2 focus:outline-none focus:ring-0 focus:border-slate-300"
-                                                style={{ minWidth: 32, minHeight: 30, outline: "none", boxShadow: "none" }}
+                                                className="day-header-btn inline-flex h-[30px] items-center gap-2 rounded-md border border-slate-300 bg-white px-2 text-sm font-semibold text-blue-900 shadow-sm hover:bg-slate-50 focus:outline-none focus:ring-0 focus:border-slate-300"
+                                                style={{ minWidth: 32, outline: "none", boxShadow: "none" }}
                                                 onClick={() => setShowViewMenu((open) => !open)}
                                                 aria-haspopup="menu"
                                                 aria-expanded={showViewMenu ? "true" : "false"}
@@ -651,7 +651,7 @@ const Goals = () => {
 
                                         <button
                                             onClick={() => setIsModalOpen(true)}
-                                            className="flex items-center gap-2 px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-sm hover:shadow-md min-h-[30px]"
+                                            className="flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-1 text-white shadow-sm transition-all hover:bg-blue-700 hover:shadow-md"
                                         >
                                             <span className="text-sm font-semibold">{t('goals.newGoal')}</span>
                                         </button>
