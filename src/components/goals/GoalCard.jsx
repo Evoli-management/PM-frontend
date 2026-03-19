@@ -30,6 +30,7 @@ const GoalCard = ({
     onToggleSelection,
     cardClassName = "",
     contentClassName = "",
+    enableLazyLoadMilestones = false,
 }) => {
     const { t } = useTranslation();
     const [showActions, setShowActions] = useState(false);
@@ -65,7 +66,11 @@ const GoalCard = ({
     // Lazy-load milestones if the list endpoint didn't include them
     useEffect(() => {
         let mounted = true;
-        if ((goal.milestones === undefined || goal.milestones.length === 0) && !localMilestones) {
+        if (
+            enableLazyLoadMilestones &&
+            (goal.milestones === undefined || goal.milestones.length === 0) &&
+            !localMilestones
+        ) {
             // fetch details for this goal (includes milestones)
             (async () => {
                 try {
@@ -80,12 +85,16 @@ const GoalCard = ({
         return () => {
             mounted = false;
         };
-    }, [goal, localMilestones]);
+    }, [enableLazyLoadMilestones, goal, localMilestones]);
 
     // Prefetch goal details on hover to reduce perceived delay when opening
     const handlePointerEnter = () => {
         // only prefetch if we don't already have milestones
-        if ((goal.milestones === undefined || goal.milestones.length === 0) && !localMilestones) {
+        if (
+            enableLazyLoadMilestones &&
+            (goal.milestones === undefined || goal.milestones.length === 0) &&
+            !localMilestones
+        ) {
             // small debounce so quick mouse passes don't trigger many requests
             hoverTimer.current = setTimeout(() => {
                 try {
