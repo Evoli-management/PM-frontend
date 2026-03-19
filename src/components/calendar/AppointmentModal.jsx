@@ -367,6 +367,10 @@ const buildRecurringPattern = ({
         : "";
     const [keyAreaId, setKeyAreaId] = useState(initialKeyArea);
 
+    const [isAllDay, setIsAllDay] = useState(() => {
+        if (isEdit && event) return !!(event.allDay || event.all_day);
+        return allDayDefault;
+    });
     const [startDateStr, setStartDateStr] = useState(toYMD(initialStart));
     const [startTimeStr, setStartTimeStr] = useState(() => toHM(initialStart));
     const [endDateStr, setEndDateStr] = useState(toYMD(initialEnd));
@@ -378,6 +382,8 @@ const buildRecurringPattern = ({
     const [deleting, setDeleting] = useState(false);
     const isAppointmentLikeEvent = useMemo(() => {
         if (!isEdit || !event) return false;
+        // Reliable: any event that came from an external calendar has outlookId or googleId
+        if (event?.outlookId || event?.outlook_id || event?.googleId || event?.google_id) return true;
         const kind = String(event?.kind || "").toLowerCase();
         if (kind === "appointment" || kind === "appointment_exception") return true;
         if (kind.includes("appointment")) return true;
@@ -388,6 +394,13 @@ const buildRecurringPattern = ({
 
         if (event?.appointmentId || event?.appointment_id) return true;
         return false;
+    }, [isEdit, event]);
+
+    const syncBadge = useMemo(() => {
+        if (!isEdit || !event) return null;
+        if (event?.outlookId || event?.outlook_id) return "Synced from Outlook";
+        if (event?.googleId || event?.google_id) return "Synced from Google";
+        return null;
     }, [isEdit, event]);
     const modalEntityLabel = useMemo(() => {
         if (isEdit) {
@@ -662,12 +675,11 @@ const buildRecurringPattern = ({
                 return;
             }
 
-            // In all-day flow, keep time fields visible in the form but ignore
-            // their submitted values and normalize to full-day boundaries.
-            const s = allDayDefault
+            // For all-day events, use start-of-day and end-of-day boundaries.
+            const s = isAllDay
                 ? new Date(sRaw.getFullYear(), sRaw.getMonth(), sRaw.getDate(), 0, 0, 0, 0)
                 : sRaw;
-            const e = allDayDefault
+            const e = isAllDay
                 ? new Date(eRaw.getFullYear(), eRaw.getMonth(), eRaw.getDate(), 23, 59, 0, 0)
                 : eRaw;
 
@@ -677,7 +689,7 @@ const buildRecurringPattern = ({
             }
 
             const calendarDayDiff = getCalendarDayDiff(s, e);
-            const submitAsEvent = forceCreateAsEvent || allDayDefault || calendarDayDiff >= 1;
+            const submitAsEvent = forceCreateAsEvent || isAllDay || calendarDayDiff >= 1;
             submitKindLabel = submitAsEvent ? "event" : "appointment";
 
             if (recurrenceType && recurrenceType !== "none") {
@@ -770,6 +782,7 @@ const buildRecurringPattern = ({
                               start: toOffsetISO(s),
                               end: toOffsetISO(e),
                               timezone,
+                              allDay: isAllDay,
                               goalId: goalId || null,
                               keyAreaId: keyAreaId || null,
                           }
@@ -778,7 +791,7 @@ const buildRecurringPattern = ({
                               description: description.trim() || null,
                               start: toOffsetISO(s),
                               end: toOffsetISO(e),
-                              allDay: submitAsEvent,
+                              allDay: isAllDay || submitAsEvent,
                               keyAreaId: keyAreaId || null,
                           };
 
@@ -1058,15 +1071,24 @@ const buildRecurringPattern = ({
                 `}</style>
 
                 {/* Header */}
-                <div 
+                <div
                     className="relative border-b border-slate-200 px-5 py-2 cursor-grab active:cursor-grabbing select-none flex-shrink-0"
+                    style={{ minHeight: syncBadge ? '56px' : undefined }}
                     onMouseDown={handleMouseDown}
                 >
-                    <h3 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xl font-semibold text-slate-900">
-                        {isEdit
-                            ? t("appointmentModal.editTitle")
-                            : t("appointmentModal.createTitle")}
-                    </h3>
+                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-0.5">
+                        <h3 className="text-xl font-semibold text-slate-900">
+                            {isEdit
+                                ? t("appointmentModal.editTitle")
+                                : t("appointmentModal.createTitle")}
+                        </h3>
+                        {syncBadge && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-200">
+                                <svg viewBox="0 0 16 16" fill="currentColor" className="h-3 w-3" aria-hidden="true"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm-.75 3.5a.75.75 0 0 1 1.5 0v3.25l2 1.15a.75.75 0 1 1-.75 1.3l-2.25-1.3A.75.75 0 0 1 7.25 8V4.5Z"/></svg>
+                                {syncBadge}
+                            </span>
+                        )}
+                    </div>
                     <div className="flex items-center justify-end gap-2">
                         <button
                             type="submit"
@@ -1129,10 +1151,27 @@ const buildRecurringPattern = ({
                         />
                     </div>
 
+                    {/* All Day toggle */}
+                    <div className="flex items-center gap-3 mb-2">
+                        <label className="text-sm font-medium text-slate-700 select-none cursor-pointer" htmlFor="all-day-toggle">
+                            All Day
+                        </label>
+                        <button
+                            id="all-day-toggle"
+                            type="button"
+                            role="switch"
+                            aria-checked={isAllDay}
+                            onClick={() => setIsAllDay(v => !v)}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1 ${isAllDay ? 'bg-green-500' : 'bg-slate-300'}`}
+                        >
+                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${isAllDay ? 'translate-x-6' : 'translate-x-1'}`} />
+                        </button>
+                    </div>
+
                     {/* 2-column layout turned into 3-column with centered separator */}
                     <div className="grid grid-cols-1 gap-y-4 md:grid-cols-[1fr_auto_1fr] md:gap-x-6">
                         {/* Left column: start date, end date, start time, end time */}
-                        <div className="grid grid-rows-4 gap-0 md:col-span-1">
+                        <div className="grid gap-0 md:col-span-1" style={{ gridTemplateRows: isAllDay ? 'repeat(2, minmax(0,1fr))' : 'repeat(4, minmax(0,1fr))' }}>
                             <div className="min-h-16">
                                 <label className="text-sm font-medium text-slate-700">
                                     {t("appointmentModal.startDateField")}
@@ -1197,32 +1236,33 @@ const buildRecurringPattern = ({
                                 </div>
                             </div>
 
-                            <>
-                                <div className="min-h-16">
-                                    <label className="text-sm font-medium text-slate-700">{t("appointmentModal.startTimeField")}</label>
-                                    <TimePicker
-                                        value={startTimeStr}
-                                        onChange={(v) => setStartTimeStr(v)}
-                                        use24Hour={use24Hour}
-                                        outerClassName="appointment-time-control mt-0 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50"
-                                        innerClassName="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
-                                        label={t("appointmentModal.startTimeField")}
-                                    />
-                                </div>
+                            {!isAllDay && (
+                                <>
+                                    <div className="min-h-16">
+                                        <label className="text-sm font-medium text-slate-700">{t("appointmentModal.startTimeField")}</label>
+                                        <TimePicker
+                                            value={startTimeStr}
+                                            onChange={(v) => setStartTimeStr(v)}
+                                            use24Hour={use24Hour}
+                                            outerClassName="appointment-time-control mt-0 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50"
+                                            innerClassName="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                                            label={t("appointmentModal.startTimeField")}
+                                        />
+                                    </div>
 
-                                <div className="min-h-16">
-                                    <label className="text-sm font-medium text-slate-700">{t("appointmentModal.endTimeField")}</label>
-                                    <TimePicker
-                                        value={endTimeStr}
-                                        onChange={(v) => setEndTimeStr(v)}
-                                        use24Hour={use24Hour}
-                                        outerClassName="appointment-time-control mt-0 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50"
-                                        innerClassName="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
-                                        label={t("appointmentModal.endTimeField")}
-                                    />
-                                </div>
-
-                            </>
+                                    <div className="min-h-16">
+                                        <label className="text-sm font-medium text-slate-700">{t("appointmentModal.endTimeField")}</label>
+                                        <TimePicker
+                                            value={endTimeStr}
+                                            onChange={(v) => setEndTimeStr(v)}
+                                            use24Hour={use24Hour}
+                                            outerClassName="appointment-time-control mt-0 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50"
+                                            innerClassName="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                                            label={t("appointmentModal.endTimeField")}
+                                        />
+                                    </div>
+                                </>
+                            )}
                         </div>
 
                         {/* separator column centered between left and right on md+ */}

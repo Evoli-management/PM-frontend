@@ -45,8 +45,58 @@ const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEv
     const [kind, setKind] = useState(event.kind || "custom");
     const [keyAreaId, setKeyAreaId] = useState(event.keyAreaId || "");
     const [goalId, setGoalId] = useState(""); // placeholder (not persisted yet)
-    const [recurring, setRecurring] = useState(false); // placeholder
     const [saving, setSaving] = useState(false);
+
+    // ── Recurrence helpers ────────────────────────────────────────────────────
+    const parseRecurringPattern = (pattern) => {
+        const startDt = startDT || new Date();
+        const out = { type: "none", days: [], day: startDt.getDate(), month: startDt.getMonth() + 1, endType: "none", until: null, count: 1 };
+        if (!pattern || typeof pattern !== "string") return out;
+        try {
+            const parts = pattern.split("|").map(p => p.trim()).filter(Boolean);
+            const main = parts[0] || "";
+            if (main.startsWith("daily")) { out.type = "daily"; }
+            else if (main.startsWith("weekly")) { out.type = "weekly"; const m = main.split(":"); if (m[1]) out.days = m[1].split(",").map(d => d.trim()).filter(Boolean); }
+            else if (main.startsWith("monthly")) { out.type = "monthly"; const m = main.split(":"); if (m[1]) out.day = Number(m[1]) || out.day; }
+            else if (main.startsWith("yearly")) { out.type = "yearly"; const m = main.split(":"); if (m[1]) out.month = Number(m[1]) || out.month; if (m[2]) out.day = Number(m[2]) || out.day; }
+            for (let i = 1; i < parts.length; i++) {
+                const p = parts[i];
+                if (p.startsWith("until:")) { out.endType = "until"; out.until = p.slice(6); }
+                else if (p.startsWith("count:")) { out.endType = "count"; out.count = Number(p.slice(6)) || out.count; }
+            }
+        } catch (_) {}
+        return out;
+    };
+    const buildRecurringPattern = ({ type, weeklyDays, monthlyDay, yearlyMonth, yearlyDay, endType, untilDate, count }) => {
+        if (!type || type === "none") return null;
+        const parts = [];
+        if (type === "daily") parts.push("daily");
+        else if (type === "weekly") parts.push(`weekly:${(Array.isArray(weeklyDays) ? weeklyDays.join(",") : "").trim()}`);
+        else if (type === "monthly") parts.push(`monthly:${monthlyDay || 1}`);
+        else if (type === "yearly") parts.push(`yearly:${yearlyMonth || 1}:${yearlyDay || 1}`);
+        if (endType === "until" && untilDate) parts.push(`until:${untilDate}`);
+        else if (endType === "count" && Number(count) > 0) parts.push(`count:${Number(count)}`);
+        return parts.join("|");
+    };
+
+    const existingPattern = event?.recurrence || event?.recurringPattern || "";
+    const parsedPattern = useMemo(() => parseRecurringPattern(existingPattern), [existingPattern]);
+    const [recurrenceType, setRecurrenceType] = useState(parsedPattern.type);
+    const [recurrenceWeeklyDays, setRecurrenceWeeklyDays] = useState(parsedPattern.days);
+    const [recurrenceMonthlyDay, setRecurrenceMonthlyDay] = useState(parsedPattern.day);
+    const [recurrenceYearlyMonth, setRecurrenceYearlyMonth] = useState(parsedPattern.month);
+    const [recurrenceYearlyDay, setRecurrenceYearlyDay] = useState(parsedPattern.day);
+    const [recurrenceEndType, setRecurrenceEndType] = useState(parsedPattern.endType);
+    const [recurrenceEndDate, setRecurrenceEndDate] = useState(parsedPattern.until || "");
+    const [recurrenceCount, setRecurrenceCount] = useState(parsedPattern.count || 1);
+    const [recurrenceTouched, setRecurrenceTouched] = useState(false);
+
+    const markRecurrenceTouched = (fn) => (...args) => { setRecurrenceTouched(true); fn(...args); };
+    const toggleWeeklyDay = (day) => {
+        setRecurrenceTouched(true);
+        setRecurrenceWeeklyDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
+    };
+    const weekDays = ["mon","tue","wed","thu","fri","sat","sun"];
 
     // Load options
     const [keyAreas, setKeyAreas] = useState([]);
@@ -129,7 +179,18 @@ const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEv
                 kind,
             };
             if (keyAreaId) payload.keyAreaId = keyAreaId;
-            // goalId & recurring not yet supported on backend for events
+            if (recurrenceTouched) {
+                payload.recurringPattern = buildRecurringPattern({
+                    type: recurrenceType,
+                    weeklyDays: recurrenceWeeklyDays,
+                    monthlyDay: recurrenceMonthlyDay,
+                    yearlyMonth: recurrenceYearlyMonth,
+                    yearlyDay: recurrenceYearlyDay,
+                    endType: recurrenceEndType,
+                    untilDate: recurrenceEndDate,
+                    count: recurrenceCount,
+                });
+            }
             const updated = await calendarService.updateEvent(event.id, payload);
             onEventUpdated && onEventUpdated(updated);
             setIsEditing(false);
@@ -364,17 +425,79 @@ const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEv
                             />
                         </div>
 
-                        {/* Recurring placeholder */}
-                        <div className="mb-4">
-                            <label className="inline-flex items-center gap-2 text-sm text-slate-700">
-                                <input
-                                    type="checkbox"
-                                    checked={recurring}
-                                    onChange={(e) => setRecurring(e.target.checked)}
-                                    disabled
-                                />
-                                {t("eventModal.makeRecurring")}
-                            </label>
+                        {/* Recurrence */}
+                        <div className="mb-3">
+                            <label className="block text-xs font-semibold text-slate-600 mb-1">{t("eventModal.makeRecurring")}</label>
+                            <select
+                                className="w-full border rounded px-2 py-1 mb-2"
+                                value={recurrenceType}
+                                onChange={(e) => { setRecurrenceTouched(true); setRecurrenceType(e.target.value); }}
+                            >
+                                <option value="none">{t("appointmentModal.recurrenceNone", "Does not repeat")}</option>
+                                <option value="daily">{t("appointmentModal.recurrenceDaily", "Daily")}</option>
+                                <option value="weekly">{t("appointmentModal.recurrenceWeekly", "Weekly")}</option>
+                                <option value="monthly">{t("appointmentModal.recurrenceMonthly", "Monthly")}</option>
+                                <option value="yearly">{t("appointmentModal.recurrenceYearly", "Yearly")}</option>
+                            </select>
+                            {recurrenceType === "weekly" && (
+                                <div className="flex flex-wrap gap-1 mb-2">
+                                    {weekDays.map(d => (
+                                        <button key={d} type="button"
+                                            className={`px-2 py-0.5 rounded text-xs border ${recurrenceWeeklyDays.includes(d) ? "bg-blue-600 text-white border-blue-600" : "bg-white text-slate-600 border-slate-300"}`}
+                                            onClick={() => toggleWeeklyDay(d)}
+                                        >{d.charAt(0).toUpperCase() + d.slice(1)}</button>
+                                    ))}
+                                </div>
+                            )}
+                            {recurrenceType === "monthly" && (
+                                <div className="flex items-center gap-2 mb-2">
+                                    <span className="text-xs text-slate-600">{t("appointmentModal.recurrenceDayLabel", "Day")}</span>
+                                    <input type="number" min={1} max={31} className="border rounded px-2 py-0.5 w-16 text-xs"
+                                        value={recurrenceMonthlyDay}
+                                        onChange={markRecurrenceTouched(e => setRecurrenceMonthlyDay(Number(e.target.value)))} />
+                                </div>
+                            )}
+                            {recurrenceType === "yearly" && (
+                                <div className="flex items-center gap-2 mb-2">
+                                    <span className="text-xs text-slate-600">{t("appointmentModal.recurrenceMonthLabel", "Month")}</span>
+                                    <select className="border rounded px-2 py-0.5 text-xs"
+                                        value={recurrenceYearlyMonth}
+                                        onChange={markRecurrenceTouched(e => setRecurrenceYearlyMonth(Number(e.target.value)))}>
+                                        {[...Array(12)].map((_, i) => <option key={i+1} value={i+1}>{i+1}</option>)}
+                                    </select>
+                                    <span className="text-xs text-slate-600">{t("appointmentModal.recurrenceDayLabel", "Day")}</span>
+                                    <input type="number" min={1} max={31} className="border rounded px-2 py-0.5 w-16 text-xs"
+                                        value={recurrenceYearlyDay}
+                                        onChange={markRecurrenceTouched(e => setRecurrenceYearlyDay(Number(e.target.value)))} />
+                                </div>
+                            )}
+                            {recurrenceType !== "none" && (
+                                <div className="mt-1">
+                                    <div className="flex gap-3 mb-1">
+                                        {["none","until","count"].map(opt => (
+                                            <label key={opt} className="flex items-center gap-1 text-xs text-slate-600 cursor-pointer">
+                                                <input type="radio" name="recEndType" value={opt}
+                                                    checked={recurrenceEndType === opt}
+                                                    onChange={() => { setRecurrenceTouched(true); setRecurrenceEndType(opt); }} />
+                                                {opt === "none" ? t("appointmentModal.recurrenceEndNone","No end") : opt === "until" ? t("appointmentModal.recurrenceEndBy","End by") : t("appointmentModal.recurrenceEndAfter","End after")}
+                                            </label>
+                                        ))}
+                                    </div>
+                                    {recurrenceEndType === "until" && (
+                                        <input type="date" className="border rounded px-2 py-0.5 text-xs"
+                                            value={recurrenceEndDate}
+                                            onChange={markRecurrenceTouched(e => setRecurrenceEndDate(e.target.value))} />
+                                    )}
+                                    {recurrenceEndType === "count" && (
+                                        <div className="flex items-center gap-1">
+                                            <input type="number" min={1} className="border rounded px-2 py-0.5 w-16 text-xs"
+                                                value={recurrenceCount}
+                                                onChange={markRecurrenceTouched(e => setRecurrenceCount(Number(e.target.value)))} />
+                                            <span className="text-xs text-slate-500">{t("appointmentModal.recurrenceOccurrences","occurrences")}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         <div className="flex justify-end gap-2">

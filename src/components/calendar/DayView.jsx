@@ -53,6 +53,18 @@ function adjustEndInclusive(ed) {
     return ed;
   }
 }
+// For all-day events, end is stored as exclusive next-day midnight (e.g. "2026-03-18T00:00:00Z"
+// means the event is on March 17 only). Subtract 1 day so the display end is on the correct day.
+function allDayDisplayEnd(raw) {
+  if (!raw) return raw;
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return raw;
+  if (d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0) {
+    d.setUTCDate(d.getUTCDate() - 1);
+    return d.toISOString();
+  }
+  return raw;
+}
 
 function toPositiveInt(value) {
   const n = Number(value);
@@ -1417,19 +1429,17 @@ export default function DayView({
                               if (seen.has(dedupeId)) return false;
                               seen.add(dedupeId);
 
-                              if (String(t?.kind || '').toLowerCase() === 'appointment') return false;
-
                               const s = t.start || t.startAt || t.start_at || t.startDate || t.start_date || null;
                               const e = t.end || t.endAt || t.end_at || t.endDate || t.end_date || null;
                               if (!s || !e) return false;
+                              const isAllDayLike = Boolean(t?.allDay || t?.all_day);
                               const sd = new Date(s);
-                              const ed = new Date(e);
+                              const ed = new Date(isAllDayLike ? allDayDisplayEnd(e) : e);
                               if (isNaN(sd.getTime()) || isNaN(ed.getTime())) return false;
 
                               const sdDay = new Date(sd.getFullYear(), sd.getMonth(), sd.getDate(), 0, 0, 0, 0);
                               const edDay = new Date(ed.getFullYear(), ed.getMonth(), ed.getDate(), 0, 0, 0, 0);
                               const dayDiff = Math.floor((edDay.getTime() - sdDay.getTime()) / (24 * 60 * 60 * 1000));
-                              const isAllDayLike = Boolean(t?.allDay || t?.all_day);
                               if (!isAllDayLike && dayDiff < 1) return false;
 
                               const edAdjusted = adjustEndInclusive(ed);
@@ -1449,7 +1459,7 @@ export default function DayView({
                               const s = t.start || t.startAt || t.start_at || t.startDate || t.start_date || null;
                               const e = t.end || t.endAt || t.end_at || t.endDate || t.end_date || null;
                               const sd = new Date(s);
-                              const ed = new Date(e);
+                              const ed = new Date((t?.allDay || t?.all_day) ? allDayDisplayEnd(e) : e);
                               const edAdjusted = adjustEndInclusive(ed);
                               const startedBefore = sd < dayStart;
                               const endsAfter = edAdjusted > dayEnd;
