@@ -16,6 +16,13 @@ const toYMD = (d) =>
         d.getDate()
     ).padStart(2, "0")}`;
 
+// UTC-based YMD — used for all-day events whose timestamps are stored as
+// UTC midnight to avoid timezone shift showing the wrong calendar day.
+const toUTCYMD = (d) =>
+    `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(
+        d.getUTCDate()
+    ).padStart(2, "0")}`;
+
 const toHM = (d) =>
     `${String(d.getHours()).padStart(2, "0")}:${String(
         d.getMinutes()
@@ -589,10 +596,27 @@ const buildRecurringPattern = ({
     const start = isEdit && (event?.start || event?.startAt || event?.start_at) ? new Date(event.start || event.startAt || event.start_at) : initialStart;
     const end = isEdit && (event?.end || event?.endAt || event?.end_at) ? new Date(event.end || event.endAt || event.end_at) : initialEnd;
 
-        setStartDateStr(toYMD(start));
-        setStartTimeStr(toHM(start));
-        setEndDateStr(toYMD(end));
-        setEndTimeStr(toHM(end));
+        const isEventAllDay = !!(event?.allDay || event?.all_day);
+        if (isEventAllDay) {
+            // All-day events are stored as UTC midnight. Use UTC dates to avoid
+            // timezone shifts showing the wrong calendar day.
+            // The backend stores end as exclusive next-day UTC midnight, so subtract
+            // 1 day to get the inclusive last day shown to the user.
+            const endIsUTCMidnight =
+                end.getUTCHours() === 0 && end.getUTCMinutes() === 0 && end.getUTCSeconds() === 0;
+            const inclusiveEnd = endIsUTCMidnight
+                ? new Date(end.getTime() - 24 * 60 * 60 * 1000)
+                : end;
+            setStartDateStr(toUTCYMD(start));
+            setStartTimeStr("00:00");
+            setEndDateStr(toUTCYMD(inclusiveEnd));
+            setEndTimeStr("00:00");
+        } else {
+            setStartDateStr(toYMD(start));
+            setStartTimeStr(toHM(start));
+            setEndDateStr(toYMD(end));
+            setEndTimeStr(toHM(end));
+        }
 
         const p = parseRecurringPattern(
             event?.recurringPattern || event?.recurrence || "",
