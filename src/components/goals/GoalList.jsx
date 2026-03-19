@@ -70,7 +70,7 @@ const GoalList = ({ goals, onGoalOpen, onGoalEdit, onUpdate, onDelete, selectedG
     };
 
     return (
-        <div className="grid gap-8 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+        <div className="grid gap-2 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {goals.map((goal) => (
                 <GoalCard
                     key={goal.id}

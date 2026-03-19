@@ -1,12 +1,11 @@
 // src/pages/Goals.jsx
-import React, { useState, useEffect, useCallback, Suspense } from "react";
+import React, { useState, useEffect, useCallback, Suspense, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import * as goalService from "../services/goalService";
 import { useNavigate, useLocation } from "react-router-dom";
 import Sidebar from "../components/shared/Sidebar";
 import Toast from "../components/shared/Toast";
 // goalService is dynamically imported where needed to allow code-splitting
-import GoalsHeader from "../components/goals/GoalsHeader";
 import GoalList from "../components/goals/GoalList";
 import QuickGoalsPanel from "../components/goals/QuickGoalsPanel";
 import GoalReport from "../components/goals/GoalReport";
@@ -23,6 +22,7 @@ import {
     FaCheckCircle,
     FaClock,
     FaBars,
+    FaChevronDown,
 } from "react-icons/fa";
 // keyAreaService helpers are imported on-demand to allow code-splitting
 
@@ -52,6 +52,8 @@ const Goals = () => {
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const [selectedGoals, setSelectedGoals] = useState(new Set());
     const [quickPanelOpen, setQuickPanelOpen] = useState(false);
+    const [showViewMenu, setShowViewMenu] = useState(false);
+    const viewMenuRef = useRef(null);
     const navigate = useNavigate();
     const location = useLocation();
     // Detect active goals tab from URL
@@ -183,6 +185,30 @@ const Goals = () => {
 
         setFilteredGoals(filtered);
     }, [goals, searchTerm, statusFilter, sortBy, tagFilter]);
+
+    useEffect(() => {
+        if (!showViewMenu) return undefined;
+
+        const handleMouseDown = (event) => {
+            if (viewMenuRef.current && !viewMenuRef.current.contains(event.target)) {
+                setShowViewMenu(false);
+            }
+        };
+
+        const handleKeyDown = (event) => {
+            if (event.key === "Escape") {
+                setShowViewMenu(false);
+            }
+        };
+
+        document.addEventListener("mousedown", handleMouseDown);
+        document.addEventListener("keydown", handleKeyDown);
+
+        return () => {
+            document.removeEventListener("mousedown", handleMouseDown);
+            document.removeEventListener("keydown", handleKeyDown);
+        };
+    }, [showViewMenu]);
 
     const handleCreateGoal = async (goalData) => {
         try {
@@ -455,10 +481,17 @@ const Goals = () => {
     };
 
     const stats = getGoalStats();
+    const goalViewOptions = [
+        { id: "grid", label: t("goals.grid") },
+        { id: "list", label: t("goals.list") },
+        { id: "kanban", label: t("goals.kanban") },
+    ];
+    const activeGoalViewLabel =
+        goalViewOptions.find((view) => view.id === currentView)?.label || t("goals.grid");
 
     return (
-        <div className="min-h-screen bg-[#EDEDED]">
-            <div className="flex w-full min-h-screen">
+        <div className="h-[calc(100vh-72px)] bg-[#EDEDED] overflow-hidden">
+            <div className="flex w-full h-full min-h-0">
                 <Sidebar
                     mobileOpen={mobileSidebarOpen}
                     onMobileClose={() => setMobileSidebarOpen(false)}
@@ -471,8 +504,8 @@ const Goals = () => {
                     />
                 )}
 
-                <main className="flex-1 min-w-0 w-full min-h-screen transition-all overflow-y-auto">
-                    <div className="max-w-full overflow-x-hidden pb-1 min-h-full">
+                <main className="flex-1 min-w-0 w-full h-full min-h-0 transition-all overflow-hidden">
+                    <div className="max-w-full overflow-x-hidden pb-1 h-full min-h-0 flex flex-col">
                         <div className="flex items-center justify-between gap-4 mb-0 p-0 pb-0">
                             <div className="flex items-center gap-4">
                                 <button
@@ -487,139 +520,149 @@ const Goals = () => {
                             </div>
                         </div>
 
-                        <div className="px-1 md:px-2">
-                            <div className="mb-4">
-                                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                        <div className="px-1 md:px-2 flex-1 min-h-0 flex flex-col">
+                            <div className="mb-4 shrink-0">
+                                <div className="flex flex-wrap items-center gap-2 w-full">
                                     <div>
                                         <h1 className="text-2xl font-bold text-slate-900">{t('goals.title')}</h1>
-                                        <p className="text-sm text-slate-600">{t('goals.subtitle')}</p>
                                     </div>
 
-                                    <div className="flex items-center gap-2">
-                                        <div className="flex items-center bg-white border border-slate-200 rounded-lg p-0.5 shadow-sm">
+                                    <div className="ml-auto flex flex-wrap items-center justify-end gap-1.5">
+                                        {!isLoading && (
+                                            <>
+                                                <div className="flex flex-wrap gap-3">
+                                                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-gray-50 rounded-lg border border-gray-200">
+                                                        <img
+                                                            alt="Goals"
+                                                            src={`${import.meta.env.BASE_URL}goals.png`}
+                                                            className="w-6 h-6 object-contain block w-6 h-6 min-w-[24px] min-h-[24px]"
+                                                        />
+                                                        <div className="flex items-baseline gap-1">
+                                                            <span className="text-sm font-bold text-gray-900">{stats.total}</span>
+                                                            <span className="text-xs text-gray-500">{t('goals.total')}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 rounded-lg border border-blue-200">
+                                                        <FaClock className="w-3.5 h-3.5 text-blue-600" />
+                                                        <div className="flex items-baseline gap-1">
+                                                            <span className="text-sm font-bold text-blue-600">{stats.active}</span>
+                                                            <span className="text-xs text-gray-500">{t('goals.active')}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-green-50 rounded-lg border border-green-200">
+                                                        <FaCheckCircle className="w-3.5 h-3.5 text-green-600" />
+                                                        <div className="flex items-baseline gap-1">
+                                                            <span className="text-sm font-bold text-green-600">{stats.completed}</span>
+                                                            <span className="text-xs text-gray-500">{t('goals.done')}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-red-50 rounded-lg border border-red-200">
+                                                        <FaClock className="w-3.5 h-3.5 text-red-600" />
+                                                        <div className="flex items-baseline gap-1">
+                                                            <span className="text-sm font-bold text-red-600">{stats.overdue}</span>
+                                                            <span className="text-xs text-gray-500">{t('goals.overdue')}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <div className="relative">
+                                                        <FaFilter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm" />
+                                                        <select
+                                                            value={statusFilter}
+                                                            onChange={(e) => setStatusFilter(e.target.value)}
+                                                            className="pl-9 pr-8 py-1 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white transition-colors min-w-[120px]"
+                                                        >
+                                                            <option value="all">{t('goals.allStatus')}</option>
+                                                            <option value="active">{t('goals.active')}</option>
+                                                            <option value="completed">{t('goals.completed')}</option>
+                                                            <option value="archived">{t('goals.archived')}</option>
+                                                        </select>
+                                                    </div>
+
+                                                    <input
+                                                        type="text"
+                                                        placeholder={t('goals.filterByTag')}
+                                                        value={tagFilter}
+                                                        onChange={(e) => setTagFilter(e.target.value)}
+                                                        className="px-3 py-1 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-colors min-w-[120px]"
+                                                    />
+
+                                                    <div className="relative">
+                                                        <FaSortAmountDown className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm" />
+                                                        <select
+                                                            value={sortBy}
+                                                            onChange={(e) => setSortBy(e.target.value)}
+                                                            className="pl-9 pr-8 py-1 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white transition-colors min-w-[140px]"
+                                                        >
+                                                            <option value="dueDate">{t('goals.dueDate')}</option>
+                                                            <option value="priority">{t('goals.priority')}</option>
+                                                            <option value="progress">{t('goals.progress')}</option>
+                                                            <option value="title">{t('goals.titleSort')}</option>
+                                                            <option value="created">{t('goals.recentlyCreated')}</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            </>
+                                        )}
+
+                                        <div className="relative" ref={viewMenuRef}>
                                             <button
-                                                onClick={() => setCurrentView("grid")}
-                                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all ${currentView === "grid" ? "bg-blue-500 text-white shadow-sm" : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"}`}
-                                                title={t('goals.grid')}
+                                                type="button"
+                                                className="day-header-btn px-2 py-0 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center gap-2 focus:outline-none focus:ring-0 focus:border-slate-300"
+                                                style={{ minWidth: 32, minHeight: 30, outline: "none", boxShadow: "none" }}
+                                                onClick={() => setShowViewMenu((open) => !open)}
+                                                aria-haspopup="menu"
+                                                aria-expanded={showViewMenu ? "true" : "false"}
                                             >
-                                                <span className="hidden sm:inline text-xs font-medium">{t('goals.grid')}</span>
+                                                <span>{t("goals.view")}</span>
+                                                <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
+                                                    {activeGoalViewLabel}
+                                                </span>
+                                                <FaChevronDown className={`${showViewMenu ? "rotate-180" : "rotate-0"} transition-transform`} />
                                             </button>
-                                            <button
-                                                onClick={() => setCurrentView("list")}
-                                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all ${currentView === "list" ? "bg-blue-500 text-white shadow-sm" : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"}`}
-                                                title={t('goals.list')}
-                                            >
-                                                <span className="hidden sm:inline text-xs font-medium">{t('goals.list')}</span>
-                                            </button>
-                                            <button
-                                                onClick={() => setCurrentView("kanban")}
-                                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all ${currentView === "kanban" ? "bg-blue-500 text-white shadow-sm" : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"}`}
-                                                title={t('goals.kanban')}
-                                            >
-                                                <span className="hidden sm:inline text-xs font-medium">{t('goals.kanban')}</span>
-                                            </button>
+                                            {showViewMenu && (
+                                                <div
+                                                    role="menu"
+                                                    className="absolute right-0 z-50 mt-2 w-40 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden"
+                                                >
+                                                    {goalViewOptions.map((view) => (
+                                                        <button
+                                                            key={view.id}
+                                                            type="button"
+                                                            role="menuitemradio"
+                                                            aria-checked={currentView === view.id}
+                                                            className={`w-full text-left px-3 py-2 text-sm ${
+                                                                currentView === view.id
+                                                                    ? "bg-blue-50 text-blue-700 font-semibold"
+                                                                    : "text-slate-700 hover:bg-slate-50"
+                                                            }`}
+                                                            onClick={() => {
+                                                                setCurrentView(view.id);
+                                                                setShowViewMenu(false);
+                                                            }}
+                                                        >
+                                                            {view.label}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
 
                                         <button
                                             onClick={() => setIsModalOpen(true)}
-                                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-sm hover:shadow-md"
+                                            className="flex items-center gap-2 px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-sm hover:shadow-md min-h-[30px]"
                                         >
                                             <span className="text-sm font-semibold">{t('goals.newGoal')}</span>
                                         </button>
                                     </div>
                                 </div>
-
-                                {/* Combined Stats and Filters in Single Row */}
-                                {/* Show stats & filters even when there are no goals for the selected filter
-                                        so the user can change filters or create a new goal. */}
-                                {!isLoading && (
-                                    <div className="mt-4 bg-white rounded-xl border border-slate-200 shadow-sm p-3">
-                                        <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center">
-                                            {/* Compact Stats */}
-                                            <div className="flex gap-3">
-                                                <div className="flex items-center gap-1.5 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
-                                                    {/* Use provided goals image for Total stat */}
-                                                    <img
-                                                        alt="Goals"
-                                                        src={`${import.meta.env.BASE_URL}goals.png`}
-                                                        className="w-6 h-6 object-contain block w-6 h-6 min-w-[24px] min-h-[24px]"
-                                                    />
-                                                    <div className="flex items-baseline gap-1">
-                                                        <span className="text-sm font-bold text-gray-900">{stats.total}</span>
-                                                        <span className="text-xs text-gray-500">{t('goals.total')}</span>
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 rounded-lg border border-blue-200">
-                                                    <FaClock className="w-3.5 h-3.5 text-blue-600" />
-                                                    <div className="flex items-baseline gap-1">
-                                                        <span className="text-sm font-bold text-blue-600">{stats.active}</span>
-                                                        <span className="text-xs text-gray-500">{t('goals.active')}</span>
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-1.5 px-3 py-2 bg-green-50 rounded-lg border border-green-200">
-                                                    <FaCheckCircle className="w-3.5 h-3.5 text-green-600" />
-                                                    <div className="flex items-baseline gap-1">
-                                                        <span className="text-sm font-bold text-green-600">{stats.completed}</span>
-                                                        <span className="text-xs text-gray-500">{t('goals.done')}</span>
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-1.5 px-3 py-2 bg-red-50 rounded-lg border border-red-200">
-                                                    <FaClock className="w-3.5 h-3.5 text-red-600" />
-                                                    <div className="flex items-baseline gap-1">
-                                                        <span className="text-sm font-bold text-red-600">{stats.overdue}</span>
-                                                        <span className="text-xs text-gray-500">{t('goals.overdue')}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* Filters */}
-                                            <div className="flex flex-1 gap-2">
-                                                <div className="relative">
-                                                    <FaFilter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm" />
-                                                    <select
-                                                        value={statusFilter}
-                                                        onChange={(e) => setStatusFilter(e.target.value)}
-                                                        className="pl-9 pr-8 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-slate-50 focus:bg-white transition-colors min-w-[120px]"
-                                                    >
-                                                        <option value="all">{t('goals.allStatus')}</option>
-                                                        <option value="active">{t('goals.active')}</option>
-                                                        <option value="completed">{t('goals.completed')}</option>
-                                                        <option value="archived">{t('goals.archived')}</option>
-                                                    </select>
-                                                </div>
-
-                                                <input
-                                                    type="text"
-                                                    placeholder={t('goals.filterByTag')}
-                                                    value={tagFilter}
-                                                    onChange={(e) => setTagFilter(e.target.value)}
-                                                    className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-slate-50 focus:bg-white transition-colors min-w-[120px]"
-                                                />
-
-                                                <div className="relative">
-                                                    <FaSortAmountDown className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm" />
-                                                    <select
-                                                        value={sortBy}
-                                                        onChange={(e) => setSortBy(e.target.value)}
-                                                        className="pl-9 pr-8 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-slate-50 focus:bg-white transition-colors min-w-[140px]"
-                                                    >
-                                                        <option value="dueDate">{t('goals.dueDate')}</option>
-                                                        <option value="priority">{t('goals.priority')}</option>
-                                                        <option value="progress">{t('goals.progress')}</option>
-                                                        <option value="title">{t('goals.titleSort')}</option>
-                                                        <option value="created">{t('goals.recentlyCreated')}</option>
-                                                    </select>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
                             </div>
 
                             {/* Main Content */}
                             {/* Bulk Action Bar */}
                             {selectedGoals.size > 0 && (
-                                <div className="mb-4 bg-blue-50 border border-blue-200 rounded-xl p-4 shadow-sm">
+                                <div className="mb-4 shrink-0 bg-blue-50 border border-blue-200 rounded-xl p-4 shadow-sm">
                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                         <div className="flex items-center gap-2">
                                             <div className="flex items-center justify-center w-8 h-8 bg-blue-100 rounded-full">
@@ -666,11 +709,17 @@ const Goals = () => {
                             )}
 
                             {/* Main content area: switch between Goals list and Report tab */}
-                            {goalsTab === 'report' ? (
-                                <GoalReport />
-                            ) : (
-                                <div className="goals-content">{renderContent()}</div>
-                            )}
+                            <div className="flex-1 min-h-0 overflow-hidden">
+                                {goalsTab === 'report' ? (
+                                    <div className="h-full overflow-y-auto hover-scrollbar-y pr-1">
+                                        <GoalReport />
+                                    </div>
+                                ) : (
+                                    <div className="goals-content h-full overflow-y-auto hover-scrollbar-y pr-1">
+                                        {renderContent()}
+                                    </div>
+                                )}
+                            </div>
 
                             {/* Modal */}
                             {isModalOpen && (

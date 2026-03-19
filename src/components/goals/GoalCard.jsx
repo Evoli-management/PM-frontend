@@ -17,7 +17,20 @@ import { useFormattedDate } from "../../hooks/useFormattedDate";
 import { getStatusStyle, getProgressColorCard } from "../../utils/goalCardStyles";
 import { getGoalById, prefetchGoal } from "../../services/goalService";
 
-const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onUnarchive, onToggleVisibility, isSelected, onToggleSelection }) => {
+const GoalCard = ({
+    goal,
+    onOpen,
+    onEdit,
+    onComplete,
+    onDelete,
+    onArchive,
+    onUnarchive,
+    onToggleVisibility,
+    isSelected,
+    onToggleSelection,
+    cardClassName = "",
+    contentClassName = "",
+}) => {
     const { t } = useTranslation();
     const [showActions, setShowActions] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -171,13 +184,13 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onUna
 
     return (
         <div
-            className="group relative bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md hover:border-gray-300 transition-all duration-200 overflow-hidden cursor-pointer"
+            className={`group relative bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md hover:border-gray-300 transition-all duration-200 overflow-hidden cursor-pointer ${cardClassName}`.trim()}
             onClick={handleCardClick}
             onPointerEnter={handlePointerEnter}
             onPointerLeave={handlePointerLeave}
         >
             {/* Header Section */}
-            <div className="p-5">
+            <div className={`p-5 ${contentClassName}`.trim()}>
                 <div className="flex items-center justify-between mb-4">
                     {/* Left side: Checkbox */}
                     <div className="flex items-center gap-2">
