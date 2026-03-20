@@ -505,7 +505,7 @@ const Goals = () => {
                 )}
 
                 <main className="flex-1 min-w-0 w-full h-full min-h-0 transition-all overflow-hidden">
-                    <div className="max-w-full overflow-x-hidden pb-1 h-full min-h-0 flex flex-col">
+                    <div className="flex-1 h-full min-h-0 max-w-full overflow-hidden px-1 md:px-2 pb-1 flex flex-col">
                         <div className="flex items-center justify-between gap-4 mb-0 p-0 pb-0">
                             <div className="flex items-center gap-4">
                                 <button
@@ -520,7 +520,7 @@ const Goals = () => {
                             </div>
                         </div>
 
-                        <div className="px-1 md:px-2 flex-1 min-h-0 flex flex-col">
+                        <div className="flex-1 min-h-0 flex flex-col">
                             <div className="mb-4 shrink-0">
                                 <div className="flex flex-wrap items-center gap-2 w-full">
                                     <div>
@@ -659,66 +659,66 @@ const Goals = () => {
                                 </div>
                             </div>
 
-                            {/* Main Content */}
-                            {/* Bulk Action Bar */}
-                            {selectedGoals.size > 0 && (
-                                <div className="mb-4 shrink-0 bg-blue-50 border border-blue-200 rounded-xl p-4 shadow-sm">
-                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                                        <div className="flex items-center gap-2">
-                                            <div className="flex items-center justify-center w-8 h-8 bg-blue-100 rounded-full">
-                                                <span className="text-sm font-bold text-blue-600">{selectedGoals.size}</span>
-                                            </div>
-                                            <span className="text-sm font-medium text-slate-700">
-                                                {t('goals.goalsSelected', { count: selectedGoals.size })}
-                                            </span>
-                                            <button
-                                                onClick={handleSelectAll}
-                                                className="ml-2 text-sm text-blue-600 hover:text-blue-700 font-medium underline"
-                                            >
-                                                {selectedGoals.size === filteredGoals.length ? t('goals.deselectAll') : t('goals.selectAll')}
-                                            </button>
-                                        </div>
-                                        <div className="flex flex-wrap gap-2">
-                                            <button
-                                                onClick={() => handleBulkAction("complete")}
-                                                className="px-3 py-1.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors"
-                                            >
-                                                {t('goals.markComplete')}
-                                            </button>
-                                            <button
-                                                onClick={() => handleBulkAction("activate")}
-                                                className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-                                            >
-                                                {t('goals.activate')}
-                                            </button>
-                                            <button
-                                                onClick={() => handleBulkAction("archive")}
-                                                className="px-3 py-1.5 text-sm font-medium text-slate-700 bg-slate-200 hover:bg-slate-300 rounded-lg transition-colors"
-                                            >
-                                                {t('goals.archive')}
-                                            </button>
-                                            <button
-                                                onClick={() => handleBulkAction("delete")}
-                                                className="px-3 py-1.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
-                                            >
-                                                {t('goals.delete')}
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
+                            <div className="flex-1 min-h-0 rounded-lg border border-blue-200 bg-white shadow-sm overflow-hidden flex flex-col">
 
-                            {/* Main content area: switch between Goals list and Report tab */}
-                            <div className="flex-1 min-h-0 overflow-hidden">
-                                {goalsTab === 'report' ? (
-                                    <div className="h-full overflow-y-auto hover-scrollbar-y pr-1">
-                                        <GoalReport />
-                                    </div>
-                                ) : (
-                                    <div className="goals-content h-full overflow-y-auto hover-scrollbar-y pr-1">
-                                        {renderContent()}
+                                {selectedGoals.size > 0 && (
+                                    <div className="shrink-0 border-b border-blue-200 bg-blue-50 px-4 py-3">
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                            <div className="flex items-center gap-2">
+                                                <div className="flex items-center justify-center w-8 h-8 bg-blue-100 rounded-full">
+                                                    <span className="text-sm font-bold text-blue-600">{selectedGoals.size}</span>
+                                                </div>
+                                                <span className="text-sm font-medium text-slate-700">
+                                                    {t('goals.goalsSelected', { count: selectedGoals.size })}
+                                                </span>
+                                                <button
+                                                    onClick={handleSelectAll}
+                                                    className="ml-2 text-sm text-blue-600 hover:text-blue-700 font-medium underline"
+                                                >
+                                                    {selectedGoals.size === filteredGoals.length ? t('goals.deselectAll') : t('goals.selectAll')}
+                                                </button>
+                                            </div>
+                                            <div className="flex flex-wrap gap-2">
+                                                <button
+                                                    onClick={() => handleBulkAction("complete")}
+                                                    className="px-3 py-1.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors"
+                                                >
+                                                    {t('goals.markComplete')}
+                                                </button>
+                                                <button
+                                                    onClick={() => handleBulkAction("activate")}
+                                                    className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                                                >
+                                                    {t('goals.activate')}
+                                                </button>
+                                                <button
+                                                    onClick={() => handleBulkAction("archive")}
+                                                    className="px-3 py-1.5 text-sm font-medium text-slate-700 bg-slate-200 hover:bg-slate-300 rounded-lg transition-colors"
+                                                >
+                                                    {t('goals.archive')}
+                                                </button>
+                                                <button
+                                                    onClick={() => handleBulkAction("delete")}
+                                                    className="px-3 py-1.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+                                                >
+                                                    {t('goals.delete')}
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
                                 )}
+
+                                <div className="flex-1 min-h-0 overflow-hidden p-3">
+                                    {goalsTab === 'report' ? (
+                                        <div className="h-full overflow-y-auto hover-scrollbar-y pr-1">
+                                            <GoalReport />
+                                        </div>
+                                    ) : (
+                                        <div className="goals-content h-full overflow-y-auto hover-scrollbar-y pr-1">
+                                            {renderContent()}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
                             {/* Modal */}
