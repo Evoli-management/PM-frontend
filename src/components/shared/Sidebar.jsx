@@ -58,19 +58,19 @@ const navItems = [
                 to: { pathname: "/key-areas", search: "?select=ideas" },
             },
         ],
-    },
-    {
-        labelKey: "nav.giveStrokes", label: "Give Strokes",
-        icon: (
-            <img
-                src={`${import.meta.env.BASE_URL}strokes.png`}
-                alt="Give Strokes"
-                className="w-6 h-6 object-contain"
-            />
-        ),
-        to: "/give-strokes",
-        section: "Main",
-    },
+    },                                                                                                                                                                                                                                                                                                                                          
+    // {
+    //     labelKey: "nav.giveStrokes", label: "Give Strokes",
+    //     icon: (
+    //         <img
+    //             src={`${import.meta.env.BASE_URL}strokes.png`}
+    //             alt="Give Strokes"
+    //             className="w-6 h-6 object-contain"
+    //         />
+    //     ),
+    //     to: "/give-strokes",
+    //     section: "Main",
+    // },
     {
         labelKey: "nav.team", label: "Team",
         icon: <img src={`${import.meta.env.BASE_URL}team.png`} alt="Team" className="w-6 h-6 object-contain" />,
