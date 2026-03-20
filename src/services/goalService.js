@@ -143,7 +143,8 @@ export const createGoal = async (goalData) => {
         const cleanData = {
             title: goalData.title,
             description: goalData.description || null,
-            // NOTE: status is NOT allowed in create DTO based on backend validation error
+            priority: goalData.priority || "medium",
+            tags: Array.isArray(goalData.tags) ? goalData.tags.filter(Boolean) : [],
             visibility: goalData.visibility || "public",
         };
 
@@ -188,10 +189,9 @@ export const createGoal = async (goalData) => {
                     weight: parseFloat(m.weight) || 1.0,
                     startDate: m.startDate ? new Date(m.startDate).toISOString() : null,
                     dueDate: m.dueDate ? new Date(m.dueDate).toISOString() : null,
-                    score: m.score != null ? parseFloat(m.score) || 0 : undefined,
                     target: m.target != null ? parseFloat(m.target) : undefined,
                     performance: m.performance != null ? parseFloat(m.performance) : undefined,
-                    // NOTE: 'done' property not allowed in create milestone DTO
+                    // NOTE: score/done are not allowed in create milestone DTO
                 }));
         } else {
             // Backend requires at least one milestone, create a default one
