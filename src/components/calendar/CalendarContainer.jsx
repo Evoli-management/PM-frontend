@@ -590,33 +590,8 @@ const CalendarContainer = () => {
                         if (!abortController.signal.aborted) setActivitiesByTask({});
                     }
                     if (!abortController.signal.aborted) setWeekActivities([]);
-                } else if (view === "week") {
-                    try {
-                        const uniqueIds = Array.from(new Set((Array.isArray(tds) ? tds : []).map((t) => String(t.id))));
-                        const lists = await Promise.all(
-                            uniqueIds.map(async (id) => {
-                                try {
-                                    const svc = await getActivityService();
-                                    const list = await svc.list({ taskId: id });
-                                    return Array.isArray(list) ? list : [];
-                                } catch {
-                                    return [];
-                                }
-                            }),
-                        );
-                        const flat = ([]).concat(...lists).filter(Boolean);
-                        const activeActivities = flat.filter((a) => !a.completed && a.status !== 'done');
-                        if (!abortController.signal.aborted) {
-                            setWeekActivities(activeActivities);
-                            setActivitiesByTask({});
-                        }
-                    } catch {
-                        if (!abortController.signal.aborted) {
-                            setWeekActivities([]);
-                            setActivitiesByTask({});
-                        }
-                    }
                 } else {
+                    // weekActivities is not rendered by WeekView — skip the N-per-task API calls
                     if (!abortController.signal.aborted) {
                         setActivitiesByTask({});
                         setWeekActivities([]);
