@@ -263,11 +263,17 @@ const calendarService = {
         let appointmentIdToUse = id;
         const params = { ...(opts || {}) };
         if (typeof id === 'string' && id.includes('_')) {
-            appointmentIdToUse = id.split('_')[0];
-            // if caller didn't already pass occurrence context, add occurrence delete scope
-            if (!params.editScope && !params.occurrenceStart) {
-                params.editScope = 'occurrence';
-                params.occurrenceStart = id.split('_').slice(1).join('_');
+            if (id.startsWith('ex_')) {
+                // Exception row id — pass as-is so the backend can locate and delete the exception
+                appointmentIdToUse = id;
+                if (!params.editScope) params.editScope = 'occurrence';
+            } else {
+                appointmentIdToUse = id.split('_')[0];
+                // if caller didn't already pass occurrence context, add occurrence delete scope
+                if (!params.editScope && !params.occurrenceStart) {
+                    params.editScope = 'occurrence';
+                    params.occurrenceStart = id.split('_').slice(1).join('_');
+                }
             }
         }
         await apiClient.delete(`${base}/appointments/${appointmentIdToUse}`, { params });
