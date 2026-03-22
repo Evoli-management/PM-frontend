@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense, useCallback } from "react";
+import React, { useState, useEffect, Suspense, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { FaChevronDown } from "react-icons/fa";
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
@@ -191,6 +191,8 @@ const CalendarContainer = () => {
         }
     });
     const [refreshTick, setRefreshTick] = useState(0);
+    const loadAbortRef = useRef(null); // cancels in-flight fetch when a new one starts
+    const sseDebounceRef = useRef(null); // debounces rapid SSE sync events into one reload
     const lastEventMoveRef = React.useRef({ key: "", at: 0 });
 
     const listNormalizedTodosForRange = useCallback(async ({ from, to }) => {
@@ -375,7 +377,10 @@ const CalendarContainer = () => {
                     // Real sync events carry JSON (e.g. data: {"provider":"graph"}).
                     // Keepalive pings send data: ping — no JSON, no { character.
                     if (text.includes('data: {')) {
-                        if (active) setRefreshTick((t) => t + 1);
+                        if (active) {
+                            clearTimeout(sseDebounceRef.current);
+                            sseDebounceRef.current = setTimeout(() => setRefreshTick((t) => t + 1), 2000);
+                        }
                     }
                 }
                 // Stream ended — reconnect
@@ -428,7 +433,10 @@ const CalendarContainer = () => {
                     // Real sync events carry JSON (e.g. data: {"provider":"graph"}).
                     // Keepalive pings send data: ping — no JSON, no { character.
                     if (text.includes('data: {')) {
-                        if (active) setRefreshTick((t) => t + 1);
+                        if (active) {
+                            clearTimeout(sseDebounceRef.current);
+                            sseDebounceRef.current = setTimeout(() => setRefreshTick((t) => t + 1), 2000);
+                        }
                     }
                 }
                 if (active) scheduleReconnect();
@@ -480,6 +488,12 @@ const CalendarContainer = () => {
 
     // Fetch events/todos from backend for day/week/month/quarter views
     useEffect(() => {
+        // Cancel any in-flight fetch from a previous render so stale responses
+        // never overwrite the results of this (newer) fetch.
+        if (loadAbortRef.current) loadAbortRef.current.abort();
+        const abortController = new AbortController();
+        loadAbortRef.current = abortController;
+
         const load = async () => {
             // Compute range based on view
             const start = new Date(currentDate);
@@ -491,39 +505,35 @@ const CalendarContainer = () => {
                 const daysCount = workWeek ? 5 : 7;
                 end.setDate(start.getDate() + (daysCount - 1));
             } else if (view === "day") {
-                // Fetch exactly the selected day; tasks spanning the day will be included by backend overlap logic
                 start.setTime(currentDate.getTime());
                 end.setTime(currentDate.getTime());
             } else if (view === "month") {
                 start.setDate(1);
-                end.setMonth(start.getMonth() + 1, 0); // last day of month
+                end.setMonth(start.getMonth() + 1, 0);
             } else if (view === "quarter") {
                 const q = Math.floor(start.getMonth() / 3);
                 start.setMonth(q * 3, 1);
-                end.setMonth(q * 3 + 3, 0); // last day of quarter
+                end.setMonth(q * 3 + 3, 0);
             }
             const fromISO = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 0, 0, 0).toISOString();
             const toISO = new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59).toISOString();
 
+            // Only show the loading spinner on the very first load — on refreshes keep
+            // showing existing events so the calendar never goes blank.
+            const isFirstLoad = events.length === 0;
+            if (isFirstLoad) setLoading(true);
+
             try {
-                setLoading(true);
-                const [evs, tds, appointments] = await Promise.all([
+                // listEvents already returns all events including appointments — no need for
+                // a separate listAppointments call.
+                const [evs, tds] = await Promise.all([
                     calendarService.listEvents({ from: fromISO, to: toISO, view }),
                     listNormalizedTodosForRange({ from: fromISO, to: toISO }),
-                    calendarService.listAppointments({ from: fromISO, to: toISO }),
                 ]);
-                
-                // Merge events and appointments (listEvents already includes appointments in backend).
-                // Keep merge for compatibility, but dedupe to avoid duplicate bars at the same time.
-                const allEventsRaw = [...(Array.isArray(evs) ? evs : []), ...(Array.isArray(appointments) ? appointments : [])];
-                const seenEvents = new Set();
-                const allEvents = allEventsRaw.filter((ev) => {
-                    const key = `${ev?.kind || ''}|${ev?.id || ''}|${ev?.start || ''}|${ev?.end || ''}`;
-                    if (seenEvents.has(key)) return false;
-                    seenEvents.add(key);
-                    return true;
-                });
-                const normalizedEvents = allEvents.map((ev) => ({
+
+                if (abortController.signal.aborted) return;
+
+                const normalizedEvents = (Array.isArray(evs) ? evs : []).map((ev) => ({
                     ...ev,
                     taskId: ev?.taskId ?? ev?.task_id ?? null,
                     activityId: ev?.activityId ?? ev?.activity_id ?? null,
@@ -532,34 +542,32 @@ const CalendarContainer = () => {
                 }));
                 // Attach human-friendly labels converted from UTC -> user's timezone
                 try {
-                    // Use the synchronous wrapper; preloadTzLib is called at app startup so this will work.
                     const { formatUtcForUserSync } = await import('../../utils/time');
-                    const enriched = (normalizedEvents || []).map((ev) => ({
+                    const enriched = normalizedEvents.map((ev) => ({
                         ...ev,
                         formattedStart: ev.start ? formatUtcForUserSync(ev.start, timezone) : null,
                         formattedEnd: ev.end ? formatUtcForUserSync(ev.end, timezone) : null,
                     }));
-                    setEvents(enriched);
+                    if (!abortController.signal.aborted) setEvents(enriched);
                 } catch (e) {
-                    // Fallback: store raw events if utils fail
-                    setEvents(normalizedEvents);
+                    if (!abortController.signal.aborted) setEvents(normalizedEvents);
                 }
-                // Filter out completed tasks (status 'done' or 'completed')
+
                 const activeTodos = (Array.isArray(tds) ? tds : []).filter((t) => {
                     const status = String(t.status || '').toLowerCase();
                     return status !== 'done' && status !== 'completed';
                 });
-                setTodos(activeTodos);
+                if (!abortController.signal.aborted) setTodos(activeTodos);
 
                 // Load elephant tasks
                 try {
                     const elephantTasksData = await elephantTaskService.getElephantTasks();
-                    setElephantTasks(elephantTasksData || []);
+                    if (!abortController.signal.aborted) setElephantTasks(elephantTasksData || []);
                 } catch (error) {
                     console.warn("Failed to load elephant tasks:", error);
                 }
 
-                // If Day view, also fetch activities for tasks that are dated today
+                // Load activities (day/week views only)
                 if (view === "day") {
                     try {
                         const todayTodos = (Array.isArray(tds) ? tds : []).filter((t) =>
@@ -577,14 +585,12 @@ const CalendarContainer = () => {
                                 }
                             }),
                         );
-                        const map = Object.fromEntries(pairs);
-                        setActivitiesByTask(map);
+                        if (!abortController.signal.aborted) setActivitiesByTask(Object.fromEntries(pairs));
                     } catch {
-                        setActivitiesByTask({});
+                        if (!abortController.signal.aborted) setActivitiesByTask({});
                     }
-                    setWeekActivities([]);
+                    if (!abortController.signal.aborted) setWeekActivities([]);
                 } else if (view === "week") {
-                    // For Week view, gather activities for all tasks in the selected week and flatten
                     try {
                         const uniqueIds = Array.from(new Set((Array.isArray(tds) ? tds : []).map((t) => String(t.id))));
                         const lists = await Promise.all(
@@ -599,26 +605,29 @@ const CalendarContainer = () => {
                             }),
                         );
                         const flat = ([]).concat(...lists).filter(Boolean);
-                        // Filter out completed activities (check both completed flag and status)
                         const activeActivities = flat.filter((a) => !a.completed && a.status !== 'done');
-                        setWeekActivities(activeActivities);
-                        setActivitiesByTask({});
+                        if (!abortController.signal.aborted) {
+                            setWeekActivities(activeActivities);
+                            setActivitiesByTask({});
+                        }
                     } catch {
-                        setWeekActivities([]);
-                        setActivitiesByTask({});
+                        if (!abortController.signal.aborted) {
+                            setWeekActivities([]);
+                            setActivitiesByTask({});
+                        }
                     }
                 } else {
-                    setActivitiesByTask({});
-                    setWeekActivities([]);
+                    if (!abortController.signal.aborted) {
+                        setActivitiesByTask({});
+                        setWeekActivities([]);
+                    }
                 }
             } catch (err) {
+                if (abortController.signal.aborted) return;
                 console.warn("Failed to load calendar data", err);
-                setEvents([]);
-                setTodos([]);
-                setActivitiesByTask({});
-                setWeekActivities([]);
+                // Keep existing events on error — don't wipe the calendar for a transient failure
             } finally {
-                setLoading(false);
+                if (!abortController.signal.aborted) setLoading(false);
             }
         };
         load();
