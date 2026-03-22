@@ -663,27 +663,6 @@ const CalendarContainer = () => {
                 } catch {
                     setActivitiesByTask({});
                 }
-            } else if (view === "week") {
-                try {
-                    const uniqueIds = Array.from(new Set((Array.isArray(tds) ? tds : []).map((t) => String(t.id))));
-                    const lists = await Promise.all(
-                        uniqueIds.map(async (id) => {
-                            try {
-                                const svc = await getActivityService();
-                                const list = await svc.list({ taskId: id });
-                                return Array.isArray(list) ? list : [];
-                            } catch {
-                                return [];
-                            }
-                        }),
-                    );
-                    const flat = ([]).concat(...lists).filter(Boolean);
-                    // Filter out completed activities (check both completed flag and status)
-                    const activeActivities = flat.filter((a) => !a.completed && a.status !== 'done');
-                    setWeekActivities(activeActivities);
-                } catch {
-                    setWeekActivities([]);
-                }
             }
         } catch {}
     };
